@@ -3,6 +3,7 @@ from typing import Any, Dict, cast
 
 import pytest
 
+from rhinestone.errors import ExecutionAdapterUnavailableError
 from rhinestone.models import (
     Config,
     FileAccessPlan,
@@ -103,3 +104,27 @@ def test_search_result_returns_provider_config_without_losing_knowledge() -> Non
     )
     assert result.metadata is metadata
     assert result.provenance is provenance
+
+
+def test_unbound_resource_cannot_open_without_execution_context() -> None:
+    """解決だけを行ったResourceが暗黙runtimeやグローバル状態へfallbackしないために必要である。"""
+    candidate = ResourceCandidate("/data/a.csv", "csv", "text/csv")
+    source = Source(
+        metadata=Metadata(title="A", raw={}),
+        candidates=(candidate,),
+        capabilities=frozenset(),
+        provenance=Provenance(provider="direct", raw={}),
+        raw_metadata={},
+    )
+    resource = Resource(
+        uri=candidate.uri,
+        format=candidate.format,
+        media_type=candidate.media_type,
+        metadata=source.metadata,
+        provenance=source.provenance,
+        access_plan=FileAccessPlan(uri=candidate.uri),
+        source=source,
+    )
+
+    with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
+        resource.open()

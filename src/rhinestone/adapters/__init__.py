@@ -2,12 +2,14 @@
 
 from .base import JsonGetter, JsonObject, ProviderAdapter
 from .ckan import CkanAdapter
+from .direct import DirectAdapter
 from .estat import EStatAdapter
 from .ogc import OgcFeaturesAdapter
 from .stac import StacAdapter
 
 __all__ = [
     "CkanAdapter",
+    "DirectAdapter",
     "EStatAdapter",
     "JsonGetter",
     "JsonObject",

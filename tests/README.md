@@ -29,3 +29,16 @@ Adapters. Its `load(config)` method and injected `get_json(url, params)`
 transport are public contracts. Provider-specific constructor arguments may
 still evolve without weakening request, preservation, explicit-selection, and
 failure behaviour.
+
+The first execution vertical slice temporarily places execution adapters in
+`rhinestone.execution_adapters` and connects them through `AccessPipeline.open`.
+Those package and constructor shapes may evolve; the stable contracts are that
+the selected Resource is translated without being re-selected, runtime
+dependencies stay lazy and user-owned, and runtime failures retain their cause.
+
+The following public-composition slice treats `rhinestone.configure()` as a
+factory for an isolated application context rather than mutable process-global
+configuration. A Resource resolved by that context is bound to its executor so
+`resource.open(adapter=...)` can follow the documented interface. The binding
+mechanism is not itself a permanent API; context isolation, lazy dependencies,
+normal resolution, and explicit adapter selection are the guarantees.

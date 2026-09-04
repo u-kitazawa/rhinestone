@@ -1,5 +1,6 @@
 """Rhinestone public package."""
 
+from .api import Rhinestone, configure
 from .models import (
     AccessPlan,
     Config,
@@ -22,10 +23,12 @@ __all__ = [
     "Metadata",
     "Provenance",
     "RemoteDatasetPlan",
+    "Rhinestone",
     "Resource",
     "ResourceCandidate",
     "SearchQuery",
     "SearchResult",
     "ServiceQueryPlan",
     "Source",
+    "configure",
 ]

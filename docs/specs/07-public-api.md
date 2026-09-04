@@ -25,15 +25,19 @@ resource.open(adapter="gdal")
 利用者は、使用を許可する外部 runtime を callback/factory として Dependency Registry へ供給します。
 
 ```python
-rhinestone.configure(
+app = rhinestone.configure(
     dependencies={
         "gdal": lambda: osgeo.gdal,
         "rasterio": lambda: rasterio,
-    }
+    },
+    source_adapters=(...),
+    execution_adapters=(...),
 )
 ```
 
 callback は lazy import、optional dependency、custom initialization、mock injection、環境固有の loading を可能にします。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
+
+`configure()` は process-global state を変更せず、独立した application context を返します。同じ process 内に異なる dependency 構成を共存させることができます。Config から Resource を解決する場合は `app.resolve(config)`、直接Dataを開く場合は `app.open(config, adapter=...)` を使用します。contextから解決されたResourceは同じcontextへ束縛されるため、`resource.open(adapter=...)` も利用できます。dependency callback はResourceの解決時ではなく、Dataを開く時点で初めて評価されます。
 
 ## Source Adapter 基底クラス
 

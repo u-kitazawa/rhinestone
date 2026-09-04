@@ -3,7 +3,9 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from types import MappingProxyType
-from typing import Any, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+
+from .errors import ExecutionAdapterUnavailableError
 
 
 def _freeze(value: Any) -> Any:
@@ -121,6 +123,17 @@ class Resource:
     access_plan: AccessPlan
     source: Source
     local_path: Optional[str] = None
+    _opener: Optional[Callable[[Optional[str]], Any]] = field(
+        default=None, repr=False, compare=False
+    )
+
+    def open(self, adapter: Optional[str] = None) -> Any:
+        """Open this selected Resource through its configured application context."""
+        if self._opener is None:
+            raise ExecutionAdapterUnavailableError(
+                "Resource is not bound to an execution context"
+            )
+        return self._opener(adapter)
 
 
 @dataclass(frozen=True)
