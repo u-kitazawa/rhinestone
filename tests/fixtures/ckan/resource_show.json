@@ -1,0 +1,15 @@
+{
+  "help": "https://catalog.example/api/3/action/help_show?name=resource_show",
+  "success": true,
+  "result": {
+    "id": "resource-1",
+    "package_id": "dataset-1",
+    "name": "River observations",
+    "description": "Observed river levels",
+    "format": "CSV",
+    "mimetype": "text/csv",
+    "url": "https://files.example/river.csv",
+    "last_modified": "2024-01-02T03:04:05.000000",
+    "encoding": "utf-8"
+  }
+}

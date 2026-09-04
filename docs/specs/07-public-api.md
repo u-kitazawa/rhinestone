@@ -35,6 +35,14 @@ rhinestone.configure(
 
 callback は lazy import、optional dependency、custom initialization、mock injection、環境固有の loading を可能にします。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
 
+## Source Adapter 基底クラス
+
+`rhinestone.adapters.ProviderAdapter` を Source Adapter の公開基底クラスとします。
+具象クラスは `source_type` を宣言し、`load(config) -> Source` を実装します。
+検索はすべての Adapter に必須ではないため、基底クラスの抽象契約には含めません。
+
+JSON ベースの組み込み Adapter は `get_json(url, params)` callback を受け取り、通信実装を利用者側から注入できるようにします。provider 固有の Config と response 解釈は具象クラスが所有します。
+
 ## 戻り値
 
 Rhinestone はすべての結果を共通 DataFrame や独自形式へ変換しません。Execution Adapter は外部 OSS のデータ型と処理契約を尊重し、利用者は Resource を実行せず URI、Metadata、Provenance だけを利用することもできます。

@@ -1,0 +1,16 @@
+{
+  "GET_STATS_LIST": {
+    "RESULT": {"STATUS": 0, "ERROR_MSG": "正常に終了しました。", "DATE": "2024-01-02T03:04:05.000+09:00"},
+    "DATALIST_INF": {
+      "NUMBER": 1,
+      "RESULT_INF": {"FROM_NUMBER": 1, "TO_NUMBER": 1},
+      "TABLE_INF": [{
+        "@id": "0000000001",
+        "STAT_NAME": {"@code": "00100409", "$": "人口推計"},
+        "GOV_ORG": {"@code": "00200", "$": "総務省"},
+        "TITLE": {"@no": "1", "$": "年齢別人口"},
+        "DESCRIPTION": "人口推計の年齢別統計表"
+      }]
+    }
+  }
+}

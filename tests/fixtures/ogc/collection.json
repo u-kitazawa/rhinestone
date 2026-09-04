@@ -1,0 +1,9 @@
+{
+  "id": "rivers",
+  "title": "Rivers",
+  "description": "Observed river geometry",
+  "itemType": "feature",
+  "crs": ["http://www.opengis.net/def/crs/OGC/1.3/CRS84"],
+  "links": [{"rel": "items", "type": "application/geo+json", "href": "https://features.example/collections/rivers/items"}],
+  "extent": {"spatial": {"bbox": [[139.0, 35.0, 140.0, 36.0]]}}
+}

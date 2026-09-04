@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "result": {
+    "count": 1,
+    "results": [{
+      "id": "dataset-1",
+      "name": "river-dataset",
+      "title": "River Dataset",
+      "notes": "Official observations",
+      "resources": [{
+        "id": "resource-1",
+        "format": "CSV",
+        "url": "https://files.example/river.csv"
+      }]
+    }]
+  }
+}

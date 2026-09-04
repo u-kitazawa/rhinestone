@@ -1,0 +1,7 @@
+{
+  "type": "FeatureCollection",
+  "numberMatched": 1,
+  "numberReturned": 1,
+  "features": [{"type": "Feature", "id": "river-1", "geometry": {"type": "LineString", "coordinates": [[139.0, 35.0], [140.0, 36.0]]}, "properties": {"name": "Example River"}}],
+  "links": [{"rel": "self", "type": "application/geo+json", "href": "https://features.example/collections/rivers/items"}]
+}

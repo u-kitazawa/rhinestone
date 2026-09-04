@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "result": {
+    "id": "dataset-1",
+    "name": "river-dataset",
+    "title": "River Dataset",
+    "notes": "Official observations",
+    "organization": {"id": "org-1", "title": "River Agency"},
+    "license_title": "CC BY 4.0",
+    "metadata_modified": "2024-01-03T00:00:00.000000",
+    "resources": [{"id": "resource-1"}],
+    "extras": [{"key": "frequency", "value": "daily"}]
+  }
+}

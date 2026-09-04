@@ -1,0 +1,14 @@
+{
+  "stac_version": "1.0.0",
+  "type": "Feature",
+  "id": "scene-1",
+  "collection": "sentinel-2",
+  "bbox": [139.0, 35.0, 140.0, 36.0],
+  "geometry": {"type": "Point", "coordinates": [139.5, 35.5]},
+  "properties": {"datetime": "2024-01-02T03:04:05Z", "title": "Tokyo scene"},
+  "links": [{"rel": "self", "href": "https://stac.example/collections/sentinel-2/items/scene-1"}],
+  "assets": {
+    "visual": {"href": "https://assets.example/scene-1.tif", "type": "image/tiff; application=geotiff; profile=cloud-optimized", "title": "Visual COG", "roles": ["data"]},
+    "thumbnail": {"href": "https://assets.example/scene-1.jpg", "type": "image/jpeg", "roles": ["thumbnail"]}
+  }
+}
