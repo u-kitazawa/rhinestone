@@ -1,29 +1,34 @@
-# Rhinestone Agent Guide
+# Rhinestone エージェントガイド
 
-## Project shape
+## プロジェクト構成
 
-- Use the `src/` layout. Package code belongs under `src/rhinestone/`; keep tests in a separate `tests/` directory when they are added.
-- The design specification is the source of truth for architecture and invariants: [docs/spec_v2.md](docs/spec_v2.md).
-- The package currently has no runtime dependencies, test suite, lint configuration, type-check configuration, CI configuration, or lockfile.
+- `src/` レイアウトを使用する。パッケージコードは `src/rhinestone/` 配下に置き、テストを追加する場合は独立した `tests/` ディレクトリに置く。
+- 設計仕様をアーキテクチャと不変条件の信頼できる唯一の情報源とする：[docs/spec_v2.md](docs/spec_v2.md)。
+- 現在、このパッケージには実行時依存関係、テストスイート、Lint 設定、型チェック設定、CI 設定、ロックファイルが存在しない。
 
-## Development commands
+## 開発コマンド
 
-- Build the distribution with `uv build`.
-- Do not claim that tests, linting, or type checking passed until the corresponding tooling and configuration exist. When adding a feature, add focused tests and document the command here or in project documentation.
-- Preserve compatibility with the `requires-python = ">=3.7"` declaration unless the project configuration is intentionally changed.
+- `uv sync --dev` でプロジェクトと開発ツールをインストールする。
+- `uv run pytest` でテストとカバレッジ計測を実行する。
+- `uv run ruff check .` で Lint を実行する。
+- `uv run ruff format --check .` でフォーマットを確認する。
+- `uv run pyright` で型チェックを実行する。
+- `uv build` で配布物をビルドする。
+- 機能を追加するときは、対象を絞ったテストも追加する。
+- プロジェクト設定を意図的に変更する場合を除き、`requires-python = ">=3.7"` 宣言との互換性を維持する。
 
-## Architecture rules
+## アーキテクチャ規則
 
-- Preserve the access pipeline: `Config -> DataReference -> SourceMetadata -> AccessPlan -> Execution -> Data`.
-- Keep responsibilities separate: a Resolver reads metadata and selects an access plan; a Loader executes a chosen plan and does not select resources; `DataReference` identifies the target but does not contain loader details.
-- Keep provider-specific behavior out of the Domain layer. Prefer existing standards and OSS libraries over reimplementing format or protocol handling.
-- Avoid implicit format conversion, URL guessing, discovery in Core, and HTML scraping. If a decision cannot be made reliably, fail explicitly or require opt-in.
-- Use distinct error types for distinct failure causes rather than collapsing failures into `RuntimeError`.
-- Keep resolution deterministic and explainable: the same config, metadata, and capabilities should produce the same `AccessPlan`.
+- アクセスパイプライン `Config -> DataReference -> SourceMetadata -> AccessPlan -> Execution -> Data` を維持する。
+- 責務を分離する。Resolver はメタデータを読み、アクセスプランを選択する。Loader は選択済みのプランを実行し、リソースを選択しない。`DataReference` は対象を識別するが、Loader の詳細を含まない。
+- プロバイダー固有の振る舞いを Domain 層に持ち込まない。フォーマットやプロトコル処理を再実装するのではなく、既存の標準や OSS ライブラリを優先する。
+- 暗黙のフォーマット変換、URL の推測、Core での探索、HTML スクレイピングを避ける。確実に判断できない場合は、明示的に失敗させるかオプトインを要求する。
+- 異なる失敗原因を `RuntimeError` にまとめず、それぞれ異なるエラー型を使用する。
+- 解決処理を決定的かつ説明可能に保つ。同じ Config、メタデータ、Capability からは同じ `AccessPlan` が生成されなければならない。
 
-## Change discipline
+## 変更時の規律
 
-- Follow specification by example, contract testing, and vertical slicing. For a new provider, add a representative fixture, expected access plan, and contract test.
-- Keep Config immutable and do not discard source metadata without a documented reason.
-- Avoid designing a public plugin API before repeated implementation patterns justify one; an internal registry is sufficient for v0.x.
-- Keep changes minimal, preserve public APIs, and update the specification or documentation when behavior changes.
+- 実例による仕様化、仕様適合テスト、垂直スライスに従う。新しいプロバイダーには、代表的な Fixture、期待されるアクセスプラン、仕様適合テストを追加する。
+- Config を不変に保ち、文書化された理由なしにソースメタデータを破棄しない。
+- 実装パターンが繰り返され、必要性が裏付けられるまでは公開 Plugin API を設計しない。v0.x では内部 Registry で十分である。
+- 変更を最小限に抑え、公開 API を維持し、振る舞いを変更した場合は仕様またはドキュメントを更新する。
