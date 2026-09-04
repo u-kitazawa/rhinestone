@@ -1,15 +1,17 @@
 """Public base class for provider source adapters."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, List, Mapping, Optional, Tuple, cast
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from ..errors import ConfigValidationError, ProviderMetadataError, ProviderResponseError
 from ..models import Config, Source
 
 JsonObject = Mapping[str, Any]
 JsonGetter = Callable[[str, Mapping[str, Any]], Any]
+AuthenticatedJsonGetter = Callable[[str, Mapping[str, Any], Mapping[str, str]], Any]
+JsonTransport = Union[JsonGetter, AuthenticatedJsonGetter]
 
-__all__ = ["JsonGetter", "JsonObject", "ProviderAdapter"]
+__all__ = ["AuthenticatedJsonGetter", "JsonGetter", "JsonObject", "ProviderAdapter"]
 
 
 class ProviderAdapter(ABC):
@@ -25,11 +27,30 @@ class ProviderAdapter(ABC):
 
     def __init__(
         self,
-        get_json: JsonGetter,
+        get_json: JsonTransport,
         endpoint: Optional[str] = None,
+        api_token: Optional[str] = None,
+        api_key: Optional[str] = None,
+        api_key_header: str = "X-API-Key",
+        token_scheme: str = "Bearer",
     ) -> None:
         self._get_json = get_json
         self._endpoint = self._normalize_endpoint(endpoint) if endpoint else None
+        if api_token is not None and api_key is not None:
+            raise ConfigValidationError(
+                "Configure either api_token or api_key, not both"
+            )
+        if api_token is not None and not api_token:
+            raise ConfigValidationError("api_token must be non-empty")
+        if api_key is not None and (not api_key or not api_key_header):
+            raise ConfigValidationError("api_key and api_key_header must be non-empty")
+        self._headers: Dict[str, str] = {}
+        if api_token is not None:
+            self._headers["Authorization"] = (
+                f"{token_scheme} {api_token}" if token_scheme else api_token
+            )
+        elif api_key is not None:
+            self._headers[api_key_header] = api_key
 
     @abstractmethod
     def load(self, config: Config) -> Source:
@@ -63,7 +84,11 @@ class ProviderAdapter(ABC):
 
     def _request(self, url: str, params: Mapping[str, Any]) -> JsonObject:
         try:
-            response = self._get_json(url, params)
+            getter = cast(Any, self._get_json)
+            if self._headers:
+                response = getter(url, params, dict(self._headers))
+            else:
+                response = getter(url, params)
         except Exception as error:
             raise ProviderMetadataError(
                 f"Provider metadata request failed for {url!r}"

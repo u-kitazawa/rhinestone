@@ -47,6 +47,19 @@ callback は lazy import、optional dependency、custom initialization、mock in
 
 JSON ベースの組み込み Adapter は `get_json(url, params)` callback を受け取り、通信実装を利用者側から注入できるようにします。provider 固有の Config と response 解釈は具象クラスが所有します。
 
+### API 認証
+
+認証情報は Adapter のコンストラクタへ注入し、Config、Metadata、Provenance には保存しません。認証なしの既存の2引数 callback はそのまま使えます。認証を使う場合は `get_json(url, params, headers)` の3引数 callbackを実装します。
+
+```python
+CkanAdapter(get_json=get_json, api_token=os.environ["CKAN_TOKEN"])
+StacAdapter(get_json=get_json, api_key=os.environ["STAC_API_KEY"])
+OgcFeaturesAdapter(get_json=get_json, api_token=os.environ["OGC_TOKEN"])
+EStatAdapter(api_key=os.environ["ESTAT_APP_ID"], get_json=get_json)
+```
+
+CKAN の `api_token` は `Authorization` ヘッダー、`api_key` は既定で `X-CKAN-API-Key` ヘッダーへ送ります。STAC/OGC の `api_token` は `Authorization: Bearer ...`、`api_key` は既定で `X-API-Key` です。ヘッダー名は `api_key_header` で明示変更できます。e-Stat の `app_id`（または `api_key`）は公式仕様どおり `appId` query parameter として送信します。
+
 ## 戻り値
 
 Rhinestone はすべての結果を共通 DataFrame や独自形式へ変換しません。Execution Adapter は外部 OSS のデータ型と処理契約を尊重し、利用者は Resource を実行せず URI、Metadata、Provenance だけを利用することもできます。

@@ -12,7 +12,7 @@ from ..models import (
     SearchResult,
     Source,
 )
-from .base import JsonGetter, JsonObject, ProviderAdapter
+from .base import JsonObject, JsonTransport, ProviderAdapter
 
 DEFAULT_ENDPOINT = "https://api.e-stat.go.jp/rest/3.0/app/json"
 
@@ -23,17 +23,23 @@ class EStatAdapter(ProviderAdapter):
 
     def __init__(
         self,
-        app_id: str,
-        get_json: JsonGetter,
+        app_id: Optional[str] = None,
+        get_json: Optional[JsonTransport] = None,
         endpoint: str = DEFAULT_ENDPOINT,
         language: str = "J",
+        api_key: Optional[str] = None,
     ) -> None:
+        if get_json is None:
+            raise ConfigValidationError("get_json callback is required")
+        if app_id is not None and api_key is not None:
+            raise ConfigValidationError("Configure either app_id or api_key, not both")
+        credential = app_id if app_id is not None else api_key
         super().__init__(get_json=get_json, endpoint=endpoint)
-        if not app_id:
-            raise ConfigValidationError("app_id must be a non-empty string")
+        if not credential:
+            raise ConfigValidationError("app_id/api_key must be a non-empty string")
         if language not in {"J", "E"}:
             raise ConfigValidationError("language must be J or E")
-        self._app_id = app_id
+        self._app_id = credential
         self._language = language
 
     def _estat(

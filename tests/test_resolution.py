@@ -73,7 +73,13 @@ def test_unknown_format_fails_instead_of_guessing_from_url_suffix() -> None:
 
 @pytest.mark.parametrize(
     ("format_name", "expected_kind"),
-    (("cog", "remote-dataset"), ("wms", "service-query"), ("csv", "file")),
+    (
+        ("cog", "remote-dataset"),
+        ("wms", "service-query"),
+        ("estat-api", "service-query"),
+        ("ogc-api-features", "service-query"),
+        ("csv", "file"),
+    ),
 )
 def test_known_delivery_shapes_create_explicit_access_plans(
     format_name: str, expected_kind: str

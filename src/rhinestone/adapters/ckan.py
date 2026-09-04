@@ -12,15 +12,29 @@ from ..models import (
     SearchResult,
     Source,
 )
-from .base import JsonGetter, JsonObject, ProviderAdapter
+from .base import JsonObject, JsonTransport, ProviderAdapter
 
 
 class CkanAdapter(ProviderAdapter):
     source_type = "ckan"
     search_conditions = frozenset({"text", "limit"})
 
-    def __init__(self, get_json: JsonGetter, endpoint: Optional[str] = None) -> None:
-        super().__init__(get_json=get_json, endpoint=endpoint)
+    def __init__(
+        self,
+        get_json: JsonTransport,
+        endpoint: Optional[str] = None,
+        api_token: Optional[str] = None,
+        api_key: Optional[str] = None,
+        api_key_header: str = "X-CKAN-API-Key",
+    ) -> None:
+        super().__init__(
+            get_json=get_json,
+            endpoint=endpoint,
+            api_token=api_token,
+            api_key=api_key,
+            api_key_header=api_key_header,
+            token_scheme="",
+        )
 
     def _action(self, endpoint: str, action: str, params: Mapping[str, Any]) -> Any:
         response = self._request(f"{endpoint}/api/3/action/{action}", params)

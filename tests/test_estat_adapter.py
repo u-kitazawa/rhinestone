@@ -1,9 +1,21 @@
 import pytest
 
 from rhinestone.adapters.estat import EStatAdapter
-from rhinestone.errors import ProviderResponseError
+from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json
+
+
+def test_estat_accepts_api_key_alias() -> None:
+    adapter = EStatAdapter(api_key="app-key", get_json=RecordingJsonClient({}))
+    assert getattr(adapter, "_app_id") == "app-key"
+
+
+def test_estat_rejects_missing_callback_and_conflicting_credentials() -> None:
+    with pytest.raises(ConfigValidationError, match="get_json"):
+        EStatAdapter(app_id="app-id")
+    with pytest.raises(ConfigValidationError, match="both"):
+        EStatAdapter(app_id="app-id", api_key="key", get_json=RecordingJsonClient({}))
 
 
 def test_estat_metadata_response_becomes_service_source_without_leaking_app_id() -> (

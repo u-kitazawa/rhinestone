@@ -12,7 +12,7 @@ from ..models import (
     SearchResult,
     Source,
 )
-from .base import JsonGetter, JsonObject, ProviderAdapter
+from .base import JsonObject, JsonTransport, ProviderAdapter
 
 
 class OgcFeaturesAdapter(ProviderAdapter):
@@ -21,11 +21,20 @@ class OgcFeaturesAdapter(ProviderAdapter):
 
     def __init__(
         self,
-        get_json: JsonGetter,
+        get_json: JsonTransport,
         endpoint: Optional[str] = None,
         collection_id: Optional[str] = None,
+        api_token: Optional[str] = None,
+        api_key: Optional[str] = None,
+        api_key_header: str = "X-API-Key",
     ) -> None:
-        super().__init__(get_json=get_json, endpoint=endpoint)
+        super().__init__(
+            get_json=get_json,
+            endpoint=endpoint,
+            api_token=api_token,
+            api_key=api_key,
+            api_key_header=api_key_header,
+        )
         self._collection_id = collection_id
 
     def load(self, config: Config) -> Source:
