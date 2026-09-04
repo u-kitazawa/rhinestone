@@ -1,3 +1,5 @@
+from typing import List
+
 import pytest
 
 from rhinestone.errors import DependencyUnavailableError
@@ -6,7 +8,7 @@ from rhinestone.registry import DependencyRegistry
 
 def test_dependency_callback_is_lazy_and_cached_per_registry() -> None:
     """Optional runtime を import 時に要求せず、利用者所有の実体を遅延取得するために必要である。"""
-    calls = []
+    calls: List[str] = []
     runtime = object()
     registry = DependencyRegistry({"gdal": lambda: calls.append("gdal") or runtime})
 
@@ -14,6 +16,7 @@ def test_dependency_callback_is_lazy_and_cached_per_registry() -> None:
     assert registry.get("gdal") is runtime
     assert registry.get("gdal") is runtime
     assert calls == ["gdal"]
+    assert registry.available == frozenset({"gdal"})
 
 
 def test_missing_dependency_has_a_specific_failure() -> None:

@@ -1,9 +1,15 @@
-from typing import Tuple
+from typing import Tuple, cast
 
 import pytest
 
 from rhinestone.errors import AmbiguousResourceError, UnsupportedAccessError
-from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
+from rhinestone.models import (
+    FileAccessPlan,
+    Metadata,
+    Provenance,
+    ResourceCandidate,
+    Source,
+)
 from rhinestone.resolution import Resolver
 
 
@@ -59,6 +65,68 @@ def test_unknown_format_fails_instead_of_guessing_from_url_suffix() -> None:
         uri="https://example.jp/looks-like.csv",
         format=None,
         media_type=None,
+    )
+
+    with pytest.raises(UnsupportedAccessError):
+        Resolver().resolve(make_source(candidate))
+
+
+@pytest.mark.parametrize(
+    ("format_name", "expected_kind"),
+    (("cog", "remote-dataset"), ("wms", "service-query"), ("csv", "file")),
+)
+def test_known_delivery_shapes_create_explicit_access_plans(
+    format_name: str, expected_kind: str
+) -> None:
+    """File・remote dataset・service query の配信差を明示モデルで保持するために必要である。"""
+    candidate = ResourceCandidate(
+        "https://example.jp/resource", format_name, "application/octet-stream"
+    )
+
+    resource = Resolver().resolve(make_source(candidate))
+
+    assert resource.access_plan.kind == expected_kind
+
+
+def test_archive_knowledge_is_preserved_in_file_plan() -> None:
+    """ZIP Resource の archive 情報を Execution Adapter の翻訳へ渡すために必要である。"""
+    candidate = ResourceCandidate(
+        "https://example.jp/data.zip", "zip", "application/zip"
+    )
+
+    resource = Resolver().resolve(make_source(candidate))
+
+    assert cast(FileAccessPlan, resource.access_plan).archive == "zip"
+
+
+@pytest.mark.parametrize("kind", ("file", "service-query"))
+def test_custom_resolution_rules_support_each_declared_plan(kind: str) -> None:
+    """Provider 知識を Core の分岐追加なしで明示 AccessPlan に変換するために必要である。"""
+    candidate = ResourceCandidate(
+        "https://example.jp/resource", "custom", "application/custom"
+    )
+
+    resource = Resolver(rules=(lambda item: None, lambda item: (100, kind))).resolve(
+        make_source(candidate)
+    )
+
+    assert resource.access_plan.kind == kind
+
+
+def test_unknown_custom_plan_kind_fails_explicitly() -> None:
+    """Adapter rule の未知 access method を推測して実行しないために必要である。"""
+    candidate = ResourceCandidate(
+        "https://example.jp/resource", "custom", "application/custom"
+    )
+
+    with pytest.raises(UnsupportedAccessError, match="mystery"):
+        Resolver(rules=(lambda item: (100, "mystery"),)).resolve(make_source(candidate))
+
+
+def test_media_type_alone_does_not_trigger_format_guessing() -> None:
+    """明示 format がない Resource を media type だけで暗黙変換しないために必要である。"""
+    candidate = ResourceCandidate(
+        "https://example.jp/resource", None, "application/octet-stream"
     )
 
     with pytest.raises(UnsupportedAccessError):

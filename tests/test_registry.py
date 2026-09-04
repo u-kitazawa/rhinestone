@@ -1,6 +1,10 @@
 import pytest
 
-from rhinestone.errors import AdapterRegistrationError, UnsupportedSourceError
+from rhinestone.errors import (
+    AdapterRegistrationError,
+    ExecutionAdapterUnavailableError,
+    UnsupportedSourceError,
+)
 from rhinestone.registry import AdapterRegistry
 
 
@@ -41,3 +45,11 @@ def test_unknown_adapter_lookup_has_a_domain_specific_failure() -> None:
 
     with pytest.raises(UnsupportedSourceError, match="estat"):
         registry.source("estat")
+
+
+def test_unknown_execution_adapter_has_a_domain_specific_failure() -> None:
+    """実行 Adapter 不足を Source 不足や汎用 KeyError と区別するために必要である。"""
+    registry = AdapterRegistry(source_adapters=(), execution_adapters=())
+
+    with pytest.raises(ExecutionAdapterUnavailableError, match="gdal"):
+        registry.execution("gdal")

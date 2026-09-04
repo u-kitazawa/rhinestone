@@ -2,7 +2,11 @@ from typing import List
 
 import pytest
 
-from rhinestone.errors import ProviderMetadataError, UnsupportedSourceError
+from rhinestone.errors import (
+    ConfigValidationError,
+    ProviderMetadataError,
+    UnsupportedSourceError,
+)
 from rhinestone.models import Config, Metadata, Provenance, ResourceCandidate, Source
 from rhinestone.pipeline import AccessPipeline
 from rhinestone.resolution import Resolver
@@ -78,3 +82,38 @@ def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
         pipeline.resolve(Config(source_type="broken", settings={}))
 
     assert captured.value.__cause__ is provider_error
+
+
+def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
+    """Config 不正を metadata 通信失敗へ誤分類しないために必要である。"""
+    expected = ConfigValidationError("dataset is required")
+
+    class RejectingAdapter:
+        source_type = "rejecting"
+
+        def load(self, config: Config) -> Source:
+            raise expected
+
+    pipeline = AccessPipeline(
+        source_adapters=(RejectingAdapter(),), resolver=Resolver()
+    )
+
+    with pytest.raises(ConfigValidationError) as captured:
+        pipeline.resolve(Config(source_type="rejecting", settings={}))
+
+    assert captured.value is expected
+
+
+def test_duplicate_source_adapters_are_rejected_by_pipeline() -> None:
+    """同じ Source type の選択が登録順依存になることを防ぐために必要である。"""
+    events: List[str] = []
+    pipeline = AccessPipeline(
+        source_adapters=(
+            RecordingSourceAdapter(events),
+            RecordingSourceAdapter(events),
+        ),
+        resolver=Resolver(),
+    )
+
+    with pytest.raises(UnsupportedSourceError, match="ambiguous"):
+        pipeline.resolve(Config(source_type="fixture", settings={}))

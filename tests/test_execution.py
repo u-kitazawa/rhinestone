@@ -60,3 +60,11 @@ def test_unavailable_requested_adapter_has_a_specific_failure() -> None:
         ExecutionAdapterSelector((gdal,)).select(
             FakeResource(), frozenset({"gdal"}), requested="rasterio"
         )
+
+
+def test_no_compatible_automatic_adapter_fails_explicitly() -> None:
+    """対応 runtime がないとき暗黙の fallback や import を行わないために必要である。"""
+    gdal = FakeExecutionAdapter("gdal", priority=20, supported_format="shapefile")
+
+    with pytest.raises(ExecutionAdapterUnavailableError, match="No execution"):
+        ExecutionAdapterSelector((gdal,)).select(FakeResource(), frozenset())

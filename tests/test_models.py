@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any, Dict, cast
 
 import pytest
 
@@ -16,14 +17,31 @@ from rhinestone.models import (
 
 def test_config_is_immutable_and_copies_nested_provider_settings() -> None:
     """Config の実行時変化が再現性を壊すため、深い不変性が必要である。"""
-    settings = {"endpoint": "https://example.jp", "filters": {"year": 2024}}
+    settings: Dict[str, Any] = {
+        "endpoint": "https://example.jp",
+        "filters": {"year": 2024},
+    }
     config = Config(source_type="ckan", settings=settings)
 
-    settings["filters"]["year"] = 2025
+    cast(Dict[str, int], settings["filters"])["year"] = 2025
 
     assert config.settings["filters"]["year"] == 2024
     with pytest.raises(TypeError):
-        config.settings["resource_id"] = "changed"
+        cast(Dict[str, Any], config.settings)["resource_id"] = "changed"
+
+
+def test_config_freezes_all_mutable_container_shapes() -> None:
+    """Provider 設定内の list・tuple・set 経由でも Config を変更不能にするために必要である。"""
+    config = Config(
+        source_type="fixture",
+        settings={"list": [1], "tuple": ({"nested": True},), "set": {1, 2}},
+    )
+
+    assert config.settings == {
+        "list": (1,),
+        "tuple": ({"nested": True},),
+        "set": frozenset({1, 2}),
+    }
 
 
 def test_resource_preserves_source_metadata_and_provenance() -> None:
