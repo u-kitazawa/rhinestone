@@ -1,114 +1,113 @@
 # Rhinestone
 
-Rhinestone は、配信元やファイル形式が異なる地理空間・公共データへ、統一された手順でアクセスするための Python ライブラリです。
+Rhinestone は、日本の公的・地理空間データを既存 OSS から利用するための Knowledge / Specification Layer です。配信元、API、フォーマット、配信方式に関する知識を蓄積し、対象データを解釈して、利用可能な Resource と AccessPlan を生成します。
 
-利用するデータがすでに特定されていることを前提に、配信元のメタデータを取得・検証し、説明可能なアクセスプランを作成して、実際の読み込みを既存の OSS ライブラリへ委譲します。
-
-> Reference in, usable data out.
+Rhinestone 自身は GIS データ処理エンジンを実装しません。GDAL、Rasterio、pyogrio、PyArrow などがデータの読み込み・変換・解析を担い、Rhinestone はそれらへ渡す URI、オプション、レイヤーやサブデータセットの指定を組み立てます。
 
 ## 現在の状態
 
-このプロジェクトは設計・初期実装段階です。
+このプロジェクトは設計・初期実装段階です。公開 API と対応 Adapter は、仕様に基づいて段階的に実装します。
 
-- 詳細なアーキテクチャと不変条件は定義済みです。
-- v0.x の実装仕様は提案段階です。
-- パッケージの公開 API は、まだプレースホルダーのみです。
-- 最初の垂直スライスとして、CKAN 上の GeoPackage の読み込みを予定しています。
+## アーキテクチャ
 
-現時点では、実用目的でインストールできる完成版ではありません。
-
-## 目標
-
-Rhinestone は、次の一方向パイプラインを提供します。
+通常のアクセスフローは次のとおりです。
 
 ```text
 Config
-  -> DataReference
-  -> SourceMetadata
+  -> [Source Adapter]
+  -> Source
+  -> [Resolver]
   -> AccessPlan
-  -> Execution
+  -> Resource
+  -> [Execution Adapter Selector]
+  -> [Execution Adapter]
+  -> user-provided dependency
   -> Data
 ```
 
-主な設計目標は次のとおりです。
+検索は各配信元の公式 API へ横断的に問い合わせます。
 
-- 配信元ごとの差異を吸収し、共通の読み込み体験を提供する。
-- メタデータから実行方法を決定する過程を、決定的かつ説明可能にする。
-- データ形式の処理を再実装せず、pyogrio などの既存 OSS に委譲する。
-- 設定、参照、メタデータ、アクセスプランを明確に分離する。
-- 判断できない形式やアクセス方法を暗黙に推測せず、明示的に失敗させる。
+```text
+SearchQuery
+  -> [Search Coordinator]
+  -> [Source Adapter]...
+  -> SearchResult[]
+  -> Config
+```
 
-## 対象外
+SearchResult は Config へ変換した後、通常の検証・解決フローに入ります。
 
-Rhinestone は、データを探すための検索エンジンやカタログではありません。
+## 設計原則
 
-- 自然言語やキーワードによるデータセット検索
-- カタログサイトやデータ一覧 UI
-- GIS ビューアーや可視化機能
-- 公式データの再ホスティング
-- 大規模な結合、空間解析、形式変換などの汎用 ETL
+- データそのものではなく、データへのアクセス方法を統一する。
+- 配信元固有の知識は Source Adapter に閉じ込める。
+- 解決済みの Metadata と Provenance を Resource まで保持する。
+- 実行方法の選択を決定的かつ説明可能にする。
+- 実行時依存は利用者が所有し、callback/factory として供給する。
+- 公式の機械可読インターフェースを使い、Core では HTML scraping を行わない。
+- 確実に判断できない場合は、推測せず失敗させるか明示的な opt-in を求める。
+- 中央検索基盤を必須とせず、各配信元を横断する federated search を行う。
 
-## 予定している API
+## 概念的な利用例
 
-最終的には、次のような簡潔な API を提供する予定です。
+Config は利用したいデータを宣言し、HTTP や GDAL の実装詳細を含めません。
+
+```yaml
+source:
+  type: ckan
+  endpoint: https://example.jp
+  resource_id: abcdef
+```
+
+実行時のライブラリは利用者が供給します。
 
 ```python
-import rhinestone
-
-data = rhinestone.load(
-    {
-        "source": {
-            "type": "ckan",
-            "endpoint": "https://example.jp/api/3",
-            "resource_id": "abcdef",
-        }
+rhinestone.configure(
+    dependencies={
+        "gdal": lambda: osgeo.gdal,
+        "rasterio": lambda: rasterio,
     }
 )
 ```
 
-読み込み前にアクセスプランを確認する経路も提供します。
+Resource は URI だけでなく、format、media type、Metadata、Provenance、AccessPlan、Source を保持します。必要に応じて実行 Adapter を明示できます。
 
 ```python
-access_plan = rhinestone.plan(config)
-data = rhinestone.execute(access_plan)
+resource.open(adapter="gdal")
 ```
 
-これらの API はまだ実装されていません。確定した振る舞いは、実装仕様を参照してください。
+コード例は設計上の概念を示すものであり、未実装の公開 API を保証するものではありません。
+
+## 対象外
+
+- GIS I/O、ファイル解析、空間演算の再実装
+- 全データの GeoDataFrame、GeoJSON、Arrow、xarray などへの強制変換
+- 公式データの再ホスティング
+- Core における HTML scraping や URL の推測
+- 必須の中央検索インデックス
+- GDAL、Rasterio、pyogrio、QGIS などのバージョン管理
 
 ## ドキュメント
 
-- [設計仕様](docs/spec_v2.md)：プロダクトの目的、スコープ、アーキテクチャ
-- [実装仕様](docs/specs/README.md)：v0.x の実装可能・テスト可能な要件
+- [設計仕様](docs/spec_v4.md)：アーキテクチャ、責務境界、不変条件の唯一の規範
+- [実装仕様](docs/specs/README.md)：実装可能・検証可能な単位への整理
+- [コンポーネント仕様](docs/archtecture/README.md)：層とコンポーネントの責務
 - [開発エージェント向けガイド](AGENTS.md)：開発規則と検証コマンド
 
-設計仕様と実装仕様が矛盾する場合は、実装前に文書上で解消します。
+補助文書が設計仕様と矛盾する場合は、設計仕様を優先します。
 
 ## 開発環境
 
-### 必要なもの
-
-- Python 3.7 以上
-- [uv](https://docs.astral.sh/uv/)
-
-### セットアップ
-
-プロジェクトと開発ツールをインストールします。
+Python 3.7 以上と [uv](https://docs.astral.sh/uv/) を使用します。
 
 ```console
 uv sync --dev
-```
-
-### 品質チェック
-
-```console
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run pyright
 uv build
 ```
-
-テストでは Line Coverage と Branch Coverage の両方で 100% を必須とします。
 
 ## ライセンス
 
