@@ -1,4 +1,9 @@
 site_name: Rhinestone
+exclude_docs: |
+  adapter_expansion.md
+  architecture/*
+  spec_v4.md
+  specs/*
 theme:
   name: material
   language: ja
