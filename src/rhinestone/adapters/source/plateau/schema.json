@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone PLATEAU source settings",
+  "type": "object",
+  "properties": {
+    "endpoint": {"type": "string", "minLength": 1},
+    "dataset_id": {"type": "string", "minLength": 1},
+    "resource_id": {"type": "string", "minLength": 1},
+    "format": {"type": "string", "minLength": 1},
+    "archive": {"const": "zip"},
+    "entry_point": {"type": "string", "minLength": 1}
+  },
+  "oneOf": [
+    {"required": ["dataset_id"]},
+    {"required": ["resource_id"]}
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"required": ["entry_point"]},
+      "then": {"properties": {"archive": {"const": "zip"}}, "required": ["archive"]}
+    }
+  ]
+}

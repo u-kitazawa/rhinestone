@@ -9,3 +9,4 @@
 - 注入: `get_json(url, params)`。
 
 すべての distribution を候補として保持し、Resource の選択は Resolver に委ねます。ZIP は安全な相対 `entry_point` を必須とします。
+設定は [schema.json](schema.json) で補完・構造検証できます。

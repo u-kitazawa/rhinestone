@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone GSI fundamental source settings",
+  "type": "object",
+  "properties": {
+    "dataset": {"const": "basic"},
+    "path": {"type": "string", "minLength": 1},
+    "archive": {"enum": ["zip"]},
+    "entry_point": {"type": "string", "minLength": 1},
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "mesh": {"type": "string", "minLength": 1},
+        "feature_type": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1},
+        "download_spec_version": {"type": "string", "minLength": 1},
+        "crs": {"type": "string", "minLength": 1},
+        "source_url": {"type": "string", "minLength": 1}
+      },
+      "required": ["mesh", "feature_type", "schema_version", "download_spec_version", "crs", "source_url"],
+      "additionalProperties": true
+    }
+  },
+  "required": ["dataset", "path", "metadata"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"required": ["entry_point"]},
+      "then": {"properties": {"archive": {"const": "zip"}}, "required": ["archive"]}
+    }
+  ]
+}

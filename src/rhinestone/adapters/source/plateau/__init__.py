@@ -2,7 +2,6 @@
 
 from typing import Any, Dict, List, Mapping, Optional, cast
 
-from ....errors import ConfigValidationError
 from ....models import Config, ResourceCandidate, Source
 from .._knowledge import entry_point, source, string
 from ..base import JsonTransport
@@ -37,11 +36,7 @@ class PlateauAdapter(CkanAdapter):
             "CKAN package",
         )
         resources = self._objects(package.get("resources"), "CKAN resources")
-        if settings.get("archive") not in (None, "zip"):
-            raise ConfigValidationError("Only ZIP archives are supported")
         member = entry_point(settings)
-        if member is not None and settings.get("archive") != "zip":
-            raise ConfigValidationError("entry_point requires archive=zip")
         candidates: List[ResourceCandidate] = []
         for item in resources:
             identifier = string(item, "id")

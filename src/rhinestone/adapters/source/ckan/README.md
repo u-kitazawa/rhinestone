@@ -9,3 +9,4 @@
 - 注入: `get_json(url, params)`。認証は `api_token` または `api_key` のどちらか一方です。
 
 `resource_show` と `package_show` の公式 API だけを使用し、配布 URL は推測しません。
+設定は [schema.json](schema.json) で補完・構造検証できます。

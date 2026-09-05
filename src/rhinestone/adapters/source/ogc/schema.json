@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone OGC API Features source settings",
+  "type": "object",
+  "properties": {
+    "endpoint": {"type": "string", "minLength": 1},
+    "collection_id": {"type": "string", "minLength": 1},
+    "feature_id": {"type": "string", "minLength": 1}
+  },
+  "required": ["collection_id"],
+  "additionalProperties": false
+}

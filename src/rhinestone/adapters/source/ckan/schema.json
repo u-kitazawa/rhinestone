@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone CKAN source settings",
+  "type": "object",
+  "properties": {
+    "endpoint": {"type": "string", "minLength": 1},
+    "resource_id": {"type": "string", "minLength": 1}
+  },
+  "required": ["resource_id"],
+  "additionalProperties": false
+}

@@ -75,20 +75,8 @@ class GsiTileAdapter(ProviderAdapter):
             or any(fmt or conversion for _, _, fmt, conversion in fields)
         ):
             raise ConfigValidationError("Expected HTTPS template with {z}, {x}, {y}")
-        if spec.get("scheme") != "xyz" or spec.get("crs") != "EPSG:3857":
-            raise ConfigValidationError("Only XYZ in EPSG:3857 is supported")
-        if (spec.get("format"), spec.get("media_type")) not in {
-            ("png", "image/png"),
-            ("jpeg", "image/jpeg"),
-        }:
-            raise ConfigValidationError("Expected PNG or JPEG image tiles")
-        for key in ("min_zoom", "max_zoom", "tile_size"):
-            if type(spec.get(key)) is not int:
-                raise ConfigValidationError(f"{key} must be an integer")
         if not 0 <= spec["min_zoom"] <= spec["max_zoom"] <= 30:
             raise ConfigValidationError("Invalid tile zoom range")
-        if spec["tile_size"] != 256:
-            raise ConfigValidationError("Only 256 pixel tiles are supported")
         string(spec, "attribution")
 
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:

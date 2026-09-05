@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone ODPT source settings",
+  "type": "object",
+  "properties": {
+    "dataset": {"enum": ["station", "railway", "train"]},
+    "credential": {"type": "string", "minLength": 1},
+    "filters": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    }
+  },
+  "required": ["dataset", "credential"],
+  "additionalProperties": false
+}

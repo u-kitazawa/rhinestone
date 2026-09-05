@@ -1,7 +1,11 @@
 """Public base class for provider source adapters."""
 
+import json
 from abc import ABC, abstractmethod
+from importlib import resources
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
+
+from jsonschema import Draft202012Validator, ValidationError
 
 from ...errors import (
     ConfigValidationError,
@@ -65,7 +69,28 @@ class ProviderAdapter(ABC):
             raise ConfigValidationError(
                 f"Expected source_type {self.source_type!r}; got {config.source_type!r}"
             )
+        schema = self.config_schema()
+        if schema is not None:
+            try:
+                validator: Any = Draft202012Validator(schema)
+                validator.validate(_json_value(config.settings))
+            except ValidationError as error:
+                location = ".".join(str(item) for item in error.absolute_path)
+                detail = f"{location}: " if location else ""
+                raise ConfigValidationError(detail + error.message) from None
         return config.settings
+
+    def config_schema(self) -> Optional[Mapping[str, Any]]:
+        """Return this built-in adapter's JSON Schema, if it provides one."""
+        try:
+            text = (
+                resources.files(type(self).__module__)
+                .joinpath("schema.json")
+                .read_text()
+            )
+        except (FileNotFoundError, ModuleNotFoundError, TypeError):
+            return None
+        return cast(Mapping[str, Any], json.loads(text))
 
     def _endpoint_from(
         self, settings: Mapping[str, Any], default: Optional[str] = None
@@ -115,3 +140,13 @@ class ProviderAdapter(ABC):
             raise ProviderResponseError(f"{context} must be an object or array")
         values = cast(List[Any], value)
         return tuple(ProviderAdapter._object(item, context) for item in values)
+
+
+def _json_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        mapping = cast(Mapping[Any, Any], value)
+        return {key: _json_value(item) for key, item in mapping.items()}
+    if isinstance(value, tuple):
+        items = cast(Tuple[Any, ...], value)
+        return [_json_value(item) for item in items]
+    return value

@@ -8,3 +8,4 @@
 - 任意設定: `archive: zip`, `entry_point`
 
 ダウンロード、GML 解析、CRS 変換は行いません。ZIP は安全な相対 `entry_point` を必須とします。
+設定は [schema.json](schema.json) で補完・構造検証できます。

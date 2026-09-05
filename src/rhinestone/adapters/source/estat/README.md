@@ -9,3 +9,4 @@
 - 注入: `get_json(url, params)` と `app_id` または `api_key` のどちらか一方。
 
 API の `getMetaInfo` と `getStatsList` を使用し、認証情報を Provenance へ保存しません。
+設定は [schema.json](schema.json) で補完・構造検証できます。

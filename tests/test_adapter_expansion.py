@@ -120,6 +120,18 @@ def test_custom_tile_does_not_infer_provider_id() -> None:
     assert "&amp;" in xml
 
 
+def test_dcat_rejects_an_unsupported_serialization_before_loading() -> None:
+    adapter = DcatAdapter(
+        lambda uri: "",
+        lambda: None,
+        catalog_uri="https://example.test/catalog",
+        serialization="n3",
+    )
+
+    with pytest.raises(ConfigValidationError, match="serialization"):
+        adapter.search(SearchQuery())
+
+
 def plateau_client(url: str, params: Mapping[str, Any]) -> Any:
     package = fixture_json("expansion/plateau.json")
     if url.endswith("resource_show"):

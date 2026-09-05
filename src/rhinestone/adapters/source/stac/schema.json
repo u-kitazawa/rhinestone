@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone STAC source settings",
+  "type": "object",
+  "properties": {
+    "endpoint": {"type": "string", "minLength": 1},
+    "collection_id": {"type": "string", "minLength": 1},
+    "item_id": {"type": "string", "minLength": 1},
+    "asset_key": {"type": "string", "minLength": 1}
+  },
+  "required": ["collection_id", "item_id", "asset_key"],
+  "additionalProperties": false
+}

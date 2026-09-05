@@ -27,20 +27,11 @@ class OdptAdapter(ProviderAdapter):
 
     def load(self, config: Config) -> Source:
         settings = self._config_settings(config)
-        if set(settings) - {"dataset", "credential", "filters"}:
-            raise ConfigValidationError("Unknown ODPT setting; use official filters")
         dataset = string(settings, "dataset")
-        if dataset not in _TYPES:
-            raise ConfigValidationError("Expected station, railway or train")
         credential = string(settings, "credential")
-        filters = settings.get("filters", {})
-        if not isinstance(filters, Mapping):
-            raise ConfigValidationError("filters must be an object")
-        filters = cast(Mapping[str, Any], filters)
+        filters = cast(Mapping[str, Any], settings.get("filters", {}))
         if set(filters) - _FILTERS[dataset]:
             raise ConfigValidationError("Unsupported ODPT filter")
-        for key in filters:
-            string(filters, key)
         uri = _ENDPOINT + _TYPES[dataset]
         raw = {
             "resource_type": _TYPES[dataset],

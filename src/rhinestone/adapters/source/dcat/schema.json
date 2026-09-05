@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone DCAT source settings",
+  "type": "object",
+  "properties": {
+    "uri": {"type": "string", "minLength": 1},
+    "dataset": {"type": "string", "minLength": 1},
+    "distribution": {"type": "string", "minLength": 1},
+    "serialization": {"enum": ["json-ld", "turtle", "xml"]}
+  },
+  "required": ["uri", "dataset"],
+  "additionalProperties": false
+}

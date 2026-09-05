@@ -8,3 +8,4 @@
 - 実行: `JsonServiceAdapter` に `OdptAdapter.prepare_request` を渡します。
 
 この Adapter は API を呼び出しません。consumer key は `CredentialRegistry` から実行時に取得し、Source へ保存しません。
+設定は [schema.json](schema.json) で補完・構造検証できます。

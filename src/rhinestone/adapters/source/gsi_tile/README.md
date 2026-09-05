@@ -8,3 +8,4 @@
 - 対応: HTTPS、XYZ、EPSG:3857、256 px の PNG/JPEG タイル
 
 未知 ID や URL は推測しません。タイルの実行形式への翻訳は `GdalAdapter` の責務です。
+設定は [schema.json](schema.json) で補完・構造検証できます。

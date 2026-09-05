@@ -9,3 +9,4 @@
 - 注入: catalog を読む `get_document(uri)` と利用者所有の `rdf_runtime_factory()`。
 
 Dataset URI と distribution は明示的に検証し、RDF の取得・解析失敗を provider 境界エラーとして返します。
+設定は [schema.json](schema.json) で補完・構造検証できます。

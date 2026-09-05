@@ -2,7 +2,6 @@
 
 from typing import Any, Mapping, Optional, cast
 
-from ....errors import ConfigValidationError
 from ....models import Config, Metadata, Provenance, ResourceCandidate, Source
 from ..base import ProviderAdapter
 
@@ -17,18 +16,10 @@ class DirectAdapter(ProviderAdapter):
 
     def load(self, config: Config) -> Source:
         settings = self._config_settings(config)
-        for forbidden in ("gdal", "rasterio", "pyogrio", "http_client"):
-            if forbidden in settings:
-                raise ConfigValidationError(
-                    f"Runtime or transport detail {forbidden!r} is not allowed"
-                )
         uri = self._required_string(settings, "uri")
         format_name = self._required_string(settings, "format")
         media_type = _optional_string(settings.get("media_type"))
-        supplied_metadata = settings.get("metadata", {})
-        if not isinstance(supplied_metadata, Mapping):
-            raise ConfigValidationError("metadata must be an object")
-        raw_metadata = cast(Mapping[str, Any], supplied_metadata)
+        raw_metadata = cast(Mapping[str, Any], settings.get("metadata", {}))
         attributes = {
             key: settings[key]
             for key in ("archive", "encoding", "layer", "subdataset")

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone direct source settings",
+  "type": "object",
+  "properties": {
+    "uri": {"type": "string", "minLength": 1},
+    "format": {"type": "string", "minLength": 1},
+    "media_type": {"type": "string"},
+    "archive": {"type": "string"},
+    "encoding": {"type": "string"},
+    "layer": {"type": "string"},
+    "subdataset": {"type": "string"},
+    "metadata": {"type": "object"}
+  },
+  "required": ["uri", "format"],
+  "additionalProperties": false
+}

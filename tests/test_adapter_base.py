@@ -1,6 +1,9 @@
+import json
+from importlib import resources
 from typing import Any, Mapping, cast
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from rhinestone.adapters import (
     CkanAdapter,
@@ -15,6 +18,7 @@ from rhinestone.adapters import (
     ProviderAdapter,
     StacAdapter,
 )
+from rhinestone.adapters.source._knowledge import string
 from rhinestone.errors import (
     ConfigValidationError,
     ProviderMetadataError,
@@ -121,3 +125,29 @@ def test_public_base_class_requires_load_implementation() -> None:
 )
 def test_builtin_source_adapters_implement_the_public_base(adapter: Any) -> None:
     assert issubclass(adapter, ProviderAdapter)
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    (
+        CkanAdapter,
+        DcatAdapter,
+        DirectAdapter,
+        EStatAdapter,
+        GsiFundamentalAdapter,
+        GsiTileAdapter,
+        OdptAdapter,
+        OgcFeaturesAdapter,
+        PlateauAdapter,
+        StacAdapter,
+    ),
+)
+def test_builtin_adapter_schema_is_valid_json_schema(adapter: Any) -> None:
+    text = resources.files(adapter.__module__).joinpath("schema.json").read_text()
+
+    Draft202012Validator.check_schema(json.loads(text))
+
+
+def test_internal_string_validation_remains_available_to_custom_adapters() -> None:
+    with pytest.raises(ConfigValidationError, match="name"):
+        string({}, "name")
