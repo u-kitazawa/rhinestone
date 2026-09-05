@@ -4,10 +4,30 @@ from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping
 
 from .errors import (
     AdapterRegistrationError,
+    CredentialLoadError,
+    CredentialUnavailableError,
     DependencyUnavailableError,
     ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
+
+
+class CredentialRegistry:
+    """Resolve user-owned secrets on demand, without caching them."""
+
+    def __init__(self, factories: Mapping[str, Callable[[], str]]) -> None:
+        self._factories = dict(factories)
+
+    def get(self, name: str) -> str:
+        if name not in self._factories:
+            raise CredentialUnavailableError("Credential is not configured")
+        try:
+            secret: Any = self._factories[name]()
+        except Exception:
+            raise CredentialLoadError("Credential factory failed") from None
+        if not isinstance(secret, str) or not secret:
+            raise CredentialLoadError("Credential must be a non-empty string")
+        return secret
 
 
 class DependencyRegistry:

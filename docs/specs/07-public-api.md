@@ -32,12 +32,15 @@ app = rhinestone.configure(
     },
     source_adapters=(...),
     execution_adapters=(...),
+    credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 ```
 
 callback は lazy import、optional dependency、custom initialization、mock injection、環境固有の loading を可能にします。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
 
 `configure()` は process-global state を変更せず、独立した application context を返します。同じ process 内に異なる dependency 構成を共存させることができます。Config から Resource を解決する場合は `app.resolve(config)`、直接Dataを開く場合は `app.open(config, adapter=...)` を使用します。contextから解決されたResourceは同じcontextへ束縛されるため、`resource.open(adapter=...)` も利用できます。dependency callback はResourceの解決時ではなく、Dataを開く時点で初めて評価されます。
+
+`credentials` は Source/Execution Adapter が必要時に解決する logical name と secret factory の対応です。credential factory は `resolve()` 中には評価されず、`open()` の直前に評価されます。secret を Config、Source、Metadata、Provenance に保存してはなりません。
 
 ## Source Adapter 基底クラス
 
@@ -59,6 +62,8 @@ EStatAdapter(api_key=os.environ["ESTAT_APP_ID"], get_json=get_json)
 ```
 
 CKAN の `api_token` は `Authorization` ヘッダー、`api_key` は既定で `X-CKAN-API-Key` ヘッダーへ送ります。STAC/OGC の `api_token` は `Authorization: Bearer ...`、`api_key` は既定で `X-API-Key` です。ヘッダー名は `api_key_header` で明示変更できます。e-Stat の `app_id`（または `api_key`）は公式仕様どおり `appId` query parameter として送信します。
+
+ODPT は `OdptAdapter` と `JsonServiceAdapter(OdptAdapter.prepare_request, "odpt")` を組み合わせます。利用者は requests 互換の `get(url, params=..., headers=..., timeout=..., allow_redirects=...)` runtime を `json-service` dependency として供給します。Adapter が固定の `https://api.odpt.org/api/v4/` endpoint と `acl:consumerKey` query parameter を検証し、redirect は拒否します。
 
 ## 戻り値
 

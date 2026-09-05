@@ -51,3 +51,15 @@ class IntegrityError(RhinestoneError):
 
 class AdapterRegistrationError(RhinestoneError):
     """An adapter registration is invalid or ambiguous."""
+
+
+class ResourceNotFoundError(RhinestoneError):
+    """No candidate matches the explicit resource selection."""
+
+
+class CredentialUnavailableError(RhinestoneError):
+    """A logical credential name has not been configured."""
+
+
+class CredentialLoadError(RhinestoneError):
+    """A credential factory failed or returned an invalid secret."""

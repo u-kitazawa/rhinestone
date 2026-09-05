@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "result": {
+    "id": "plateau-fixture", "title": "3D都市モデル（仕様適合テスト用）",
+    "notes": "Synthetic CKAN distribution fixture; not a live dataset identifier.",
+    "license_title": "CC BY 4.0", "extras": [{"key": "year", "value": "2023"}],
+    "resources": [
+      {"id": "citygml", "package_id": "plateau-fixture", "format": "CityGML", "mimetype": "application/zip", "url": "https://fixture.example/city.zip"},
+      {"id": "gpkg", "package_id": "plateau-fixture", "format": "GeoPackage", "mimetype": "application/geopackage+sqlite3", "url": "https://fixture.example/city.gpkg"}
+    ]
+  }
+}

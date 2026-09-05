@@ -6,7 +6,7 @@ from typing import Tuple
 
 import pytest
 
-EXAMPLES_ROOT = Path(__file__).parents[1] / "docs" / "examples"
+EXAMPLES_ROOT = Path(__file__).parents[1] / "examples"
 EXAMPLE_NAMES: Tuple[str, ...] = (
     "01_direct_resource",
     "02_ckan_shapefile",
@@ -15,6 +15,11 @@ EXAMPLE_NAMES: Tuple[str, ...] = (
     "05_gdal_dependency",
     "06_stac_cog",
     "07_search_and_fetch",
+    "08_gsi_tile",
+    "09_plateau_citygml",
+    "10_gsi_fundamental",
+    "11_dcat_dataset",
+    "12_odpt_station",
 )
 
 
@@ -52,7 +57,7 @@ def test_deterministic_examples_run_without_network_or_optional_runtime(
         check=True,
         capture_output=True,
         text=True,
-        cwd=EXAMPLES_ROOT.parents[1],
+        cwd=EXAMPLES_ROOT.parent,
     )
 
     assert "URI:" in completed.stdout
@@ -95,7 +100,7 @@ def test_live_examples_import_shared_transport_when_run_by_file_path(
         check=False,
         capture_output=True,
         text=True,
-        cwd=EXAMPLES_ROOT.parents[1],
+        cwd=EXAMPLES_ROOT.parent,
         env=environment,
     )
 

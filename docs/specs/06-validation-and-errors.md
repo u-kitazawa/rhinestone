@@ -30,9 +30,13 @@ URL suffix、redirect、HTML、response body の観察から未提示の format 
 - provider metadata の取得失敗
 - provider response の schema/semantic 不正
 - Resource 候補を一意に選択できない
+- 明示条件に一致する Resource 候補がない
+- credential が未設定、または credential factory が失敗した
 - format、protocol、access method が未対応
 - Execution Adapter または runtime dependency が利用不能
 - Resource へのアクセス失敗
 - checksum 等の完全性検証失敗
 
 予期される外部例外は原因を保持した境界エラーへ変換します。Programming Error や内部不変条件違反を無差別に包んではなりません（MUST NOT）。秘密情報、credential、無制限の raw payload をエラーやログへ含めません（MUST NOT）。
+
+Adapter は `ResourceCandidate.attributes` の `matches_config`、`access_kind`、`access_options` を使って明示選択と access-plan 情報を渡せます。`matches_config` は boolean、`access_kind` は `file`、`remote-dataset`、`service-query` のいずれか、`access_options` は object でなければなりません。不一致候補は Source に保持したまま Resolver が除外します。残る候補がゼロなら `ResourceNotFoundError`、複数なら `AmbiguousResourceError` とします。

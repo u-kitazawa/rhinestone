@@ -24,6 +24,19 @@ source:
 - HTTP の実装、GDAL option、外部 runtime の instance などを原則として含めません（MUST NOT）。
 - 不足した URL、format、identifier を推測しません（MUST NOT）。
 - 未知または曖昧な値は明示的な失敗にします（MUST）。
+- credential が必要な Source は、Config に secret ではなく論理 credential 名だけを記述します（MUST）。
+
+## 追加 Source の Config
+
+`gsi-tile` は同梱の公式由来定義から `id` を指定します。初期定義は `std` と `pale` です。独自タイルは `id` を使わず、HTTPS の `{z}`、`{x}`、`{y}` template と、scheme、CRS、format、media type、zoom range、attribution をすべて明示します。
+
+`plateau` は G 空間情報センター CKAN の `dataset_id` または `resource_id` を指定します。ZIP の CityGML を選ぶ場合は `archive: zip` と archive 内の `entry_point` を指定します。市区町村コード・年からの distribution 推測はしません。
+
+`gsi-fundamental` は取得済みのローカル基本項目ファイルを `path` で指定します。`metadata` に mesh、feature type、schema version、download specification version、CRS、公式 source URL を記載します。初期版は DEM とログイン・ダウンロード自動化を扱いません。
+
+`dcat` は RDF 文書の `uri`、`dataset` URI、必要なら `distribution` URI を指定します。`serialization` は `json-ld`、`turtle`、`xml` のいずれかです。実行候補は `dcat:downloadURL` を持つ Distribution に限ります。
+
+`odpt` は `dataset`（`station`、`railway`、`train`）、logical `credential`、公式仕様にある `filters` を指定します。token や任意 URL を Config に記載してはなりません。
 
 ## SearchResult からの変換
 

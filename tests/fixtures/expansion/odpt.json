@@ -1,0 +1,12 @@
+[
+  {
+    "@id": "urn:ucode:_fixture",
+    "@type": "odpt:Station",
+    "owl:sameAs": "odpt.Station:Fixture.Line.Station",
+    "dc:title": "仕様適合テスト駅",
+    "dc:date": "2025-01-01T09:00:00+09:00",
+    "odpt:operator": "odpt.Operator:Fixture",
+    "geo:lat": 35.0,
+    "geo:long": 139.0
+  }
+]

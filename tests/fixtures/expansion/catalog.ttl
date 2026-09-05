@@ -1,0 +1,16 @@
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+<https://fixture.example/dataset> a dcat:Dataset ;
+    dct:title "河川" ; dct:description "River features" ;
+    dct:license <https://fixture.example/license> ;
+    dcat:distribution <https://fixture.example/geojson>, <https://fixture.example/gpkg>,
+        <https://fixture.example/landing> .
+<https://fixture.example/geojson> a dcat:Distribution ;
+    dcat:downloadURL <https://fixture.example/rivers.geojson> ;
+    dcat:mediaType "application/geo+json" ;
+    dct:license <https://fixture.example/distribution-license> .
+<https://fixture.example/gpkg> a dcat:Distribution ;
+    dcat:downloadURL <https://fixture.example/rivers.gpkg> ;
+    dcat:mediaType "application/geopackage+sqlite3" .
+<https://fixture.example/landing> a dcat:Distribution ;
+    dcat:accessURL <https://fixture.example/html> .

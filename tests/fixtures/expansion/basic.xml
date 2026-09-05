@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Dataset xmlns="http://fgd.gsi.go.jp/spec/2008/FGD_GMLSchema" xmlns:gml="http://www.opengis.net/gml/3.2" gml:id="fixture">
+  <BldA gml:id="building-1">
+    <fid>fixture-building-1</fid>
+    <devDate><gml:timePosition>2025-01-01</gml:timePosition></devDate>
+    <orgGILvl>2500</orgGILvl>
+    <area><gml:Surface srsName="urn:ogc:def:crs:EPSG::6668"><gml:patches><gml:PolygonPatch><gml:exterior><gml:LinearRing><gml:posList>35 139 35 139.001 35.001 139.001 35.001 139 35 139</gml:posList></gml:LinearRing></gml:exterior></gml:PolygonPatch></gml:patches></gml:Surface></area>
+    <type>普通建物</type>
+  </BldA>
+</Dataset>
