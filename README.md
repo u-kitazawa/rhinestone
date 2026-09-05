@@ -98,7 +98,7 @@ resource.open(adapter="gdal")
 
 ## 開発環境
 
-Python 3.7 以上と [uv](https://docs.astral.sh/uv/) を使用します。
+Python 3.10 以上と [uv](https://docs.astral.sh/uv/) を使用します。
 
 ```console
 uv sync --dev
@@ -111,4 +111,4 @@ uv build
 
 ## ライセンス
 
-ライセンスはまだ定められていません。
+MIT License です。詳細は [LICENSE](LICENSE) を参照してください。
