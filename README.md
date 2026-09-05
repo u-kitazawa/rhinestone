@@ -89,12 +89,11 @@ resource.open(adapter="gdal")
 
 ## ドキュメント
 
-- [設計仕様](docs/spec_v4.md)：アーキテクチャ、責務境界、不変条件の唯一の規範
-- [実装仕様](docs/specs/README.md)：実装可能・検証可能な単位への整理
-- [コンポーネント仕様](docs/architecture/README.md)：層とコンポーネントの責務
+- [ドキュメント](docs/index.md)：利用者向けの入口
+- [Getting started](docs/getting-started.md)：インストールと最短の利用例
+- [API リファレンス](docs/api.md)：公開 API、モデル、Adapter、エラー
+- [対応状況と既知の非対応](docs/compatibility.md)：provider、format、runtime の互換性
 - [開発エージェント向けガイド](AGENTS.md)：開発規則と検証コマンド
-
-補助文書が設計仕様と矛盾する場合は、設計仕様を優先します。
 
 ## 開発環境
 
