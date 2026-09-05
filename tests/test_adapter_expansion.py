@@ -18,6 +18,7 @@ from rhinestone.adapters import (
     OdptAdapter,
     PlateauAdapter,
 )
+from rhinestone.adapters.execution import GdalAdapter, JsonServiceAdapter
 from rhinestone.errors import (
     AmbiguousResourceError,
     ConfigValidationError,
@@ -30,7 +31,6 @@ from rhinestone.errors import (
     UnsupportedAccessError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.execution_adapters import GdalAdapter, JsonServiceAdapter
 from rhinestone.models import ResourceCandidate, ServiceQueryPlan
 from rhinestone.registry import CredentialRegistry
 from rhinestone.resolution import Resolver
@@ -545,7 +545,7 @@ def test_gdal_null_result_is_an_access_failure() -> None:
 
 
 def test_execution_uses_selected_candidate_attributes_when_uri_is_shared() -> None:
-    from rhinestone.execution_adapters import resource_attributes
+    from rhinestone.adapters.execution import resource_attributes
 
     rejected = ResourceCandidate("same", "gml", None, {"matches_config": False})
     selected = replace(

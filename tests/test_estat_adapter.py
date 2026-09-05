@@ -1,6 +1,6 @@
 import pytest
 
-from rhinestone.adapters.estat import EStatAdapter
+from rhinestone.adapters.source.estat import EStatAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json

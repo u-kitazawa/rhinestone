@@ -1,16 +1,21 @@
-"""Public provider adapter API and built-in implementations."""
+"""Compatibility exports for built-in source adapters."""
 
-from .base import JsonGetter, JsonObject, ProviderAdapter
-from .ckan import CkanAdapter
-from .dcat import DcatAdapter
-from .direct import DirectAdapter
-from .estat import EStatAdapter
-from .gsi_fundamental import GsiFundamentalAdapter
-from .gsi_tile import GsiTileAdapter
-from .odpt import OdptAdapter
-from .ogc import OgcFeaturesAdapter
-from .plateau import PlateauAdapter
-from .stac import StacAdapter
+from .execution import ExecutionAdapter
+from .source import (
+    CkanAdapter,
+    DcatAdapter,
+    DirectAdapter,
+    EStatAdapter,
+    GsiFundamentalAdapter,
+    GsiTileAdapter,
+    JsonGetter,
+    JsonObject,
+    OdptAdapter,
+    OgcFeaturesAdapter,
+    PlateauAdapter,
+    ProviderAdapter,
+    StacAdapter,
+)
 
 __all__ = [
     "CkanAdapter",
@@ -21,6 +26,7 @@ __all__ = [
     "OdptAdapter",
     "PlateauAdapter",
     "EStatAdapter",
+    "ExecutionAdapter",
     "JsonGetter",
     "JsonObject",
     "OgcFeaturesAdapter",

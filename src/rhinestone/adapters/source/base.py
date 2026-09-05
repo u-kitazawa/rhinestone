@@ -3,8 +3,12 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
 
-from ..errors import ConfigValidationError, ProviderMetadataError, ProviderResponseError
-from ..models import Config, Source
+from ...errors import (
+    ConfigValidationError,
+    ProviderMetadataError,
+    ProviderResponseError,
+)
+from ...models import Config, Source
 
 JsonObject = Mapping[str, Any]
 JsonGetter = Callable[[str, Mapping[str, Any]], Any]

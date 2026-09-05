@@ -1,31 +1,15 @@
 """Built-in adapters that delegate selected Resources to user-owned runtimes."""
 
-from typing import Any, Dict, FrozenSet, List, Mapping, cast
+from typing import Any, FrozenSet, List, Mapping, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from ..errors import ResourceAccessError
-from ..models import FileAccessPlan, Resource
-from .json_service import JsonServiceAdapter
-
-__all__ = [
-    "GdalAdapter",
-    "JsonServiceAdapter",
-    "PyogrioAdapter",
-    "RasterioAdapter",
-    "resource_attributes",
-]
+from ....errors import ResourceAccessError
+from ....models import FileAccessPlan, Resource
+from .._resource import resource_attributes
+from ..base import ExecutionAdapter
 
 
-def resource_attributes(resource: Resource) -> Mapping[str, Any]:
-    for candidate in resource.source.candidates:
-        if candidate.uri == resource.uri and candidate.attributes.get(
-            "matches_config", True
-        ):
-            return candidate.attributes
-    return {}
-
-
-class GdalAdapter:
+class GdalAdapter(ExecutionAdapter):
     """Translate Resources into calls understood by a supplied GDAL module."""
 
     name = "gdal"
@@ -105,50 +89,3 @@ class GdalAdapter:
         }.items():
             SubElement(root, key).text = value
         return tostring(root, encoding="unicode")
-
-
-class RasterioAdapter:
-    """Delegate raster Resources to a supplied Rasterio module."""
-
-    name = "rasterio"
-    priority = 15
-    _formats = frozenset({"cog", "geotiff"})
-
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
-        return (
-            resource.format or ""
-        ).lower() in self._formats and self.name in dependencies
-
-    def open(self, resource: Resource, runtime: Any) -> Any:
-        try:
-            return runtime.open(resource.uri)
-        except Exception as error:
-            raise ResourceAccessError(
-                f"Rasterio could not open {resource.uri!r}"
-            ) from error
-
-
-class PyogrioAdapter:
-    """Delegate vector Resources to a supplied pyogrio module."""
-
-    name = "pyogrio"
-    priority = 10
-    _formats = frozenset({"shapefile", "geojson", "gpkg", "flatgeobuf"})
-
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
-        return (
-            resource.format or ""
-        ).lower() in self._formats and self.name in dependencies
-
-    def open(self, resource: Resource, runtime: Any) -> Any:
-        attributes = resource_attributes(resource)
-        options: Dict[str, Any] = {}
-        encoding = attributes.get("encoding")
-        if isinstance(encoding, str):
-            options["encoding"] = encoding
-        try:
-            return runtime.read_dataframe(resource.uri, **options)
-        except Exception as error:
-            raise ResourceAccessError(
-                f"pyogrio could not open {resource.uri!r}"
-            ) from error

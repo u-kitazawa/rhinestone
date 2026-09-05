@@ -2,16 +2,17 @@
 
 from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Tuple, cast
 
-from ..errors import ProviderResponseError, ResourceAccessError
-from ..models import AccessPlan, Resource, ServiceQueryPlan
-from ..registry import CredentialRegistry
+from ....errors import ProviderResponseError, ResourceAccessError
+from ....models import AccessPlan, Resource, ServiceQueryPlan
+from ....registry import CredentialRegistry
+from ..base import ExecutionAdapter
 
 RequestPreparer = Callable[
     [AccessPlan, CredentialRegistry], Tuple[Mapping[str, Any], Mapping[str, str]]
 ]
 
 
-class JsonServiceAdapter:
+class JsonServiceAdapter(ExecutionAdapter):
     name = "json-service"
     priority = 10
 

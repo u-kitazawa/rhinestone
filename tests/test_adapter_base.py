@@ -2,7 +2,19 @@ from typing import Any, Mapping, cast
 
 import pytest
 
-from rhinestone.adapters import ProviderAdapter
+from rhinestone.adapters import (
+    CkanAdapter,
+    DcatAdapter,
+    DirectAdapter,
+    EStatAdapter,
+    GsiFundamentalAdapter,
+    GsiTileAdapter,
+    OdptAdapter,
+    OgcFeaturesAdapter,
+    PlateauAdapter,
+    ProviderAdapter,
+    StacAdapter,
+)
 from rhinestone.errors import (
     ConfigValidationError,
     ProviderMetadataError,
@@ -90,3 +102,22 @@ def test_public_base_class_requires_load_implementation() -> None:
 
     with pytest.raises(TypeError, match="abstract"):
         cast(Any, IncompleteAdapter)(empty_get_json)
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    (
+        CkanAdapter,
+        DcatAdapter,
+        DirectAdapter,
+        EStatAdapter,
+        GsiFundamentalAdapter,
+        GsiTileAdapter,
+        OdptAdapter,
+        OgcFeaturesAdapter,
+        PlateauAdapter,
+        StacAdapter,
+    ),
+)
+def test_builtin_source_adapters_implement_the_public_base(adapter: Any) -> None:
+    assert issubclass(adapter, ProviderAdapter)

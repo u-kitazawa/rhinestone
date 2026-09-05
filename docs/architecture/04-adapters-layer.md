@@ -26,6 +26,8 @@ Resource が持つ provider/format/access knowledge を、外部 OSS が理解�
 
 ### 契約
 
+組み込み Execution Adapter は公開 `ExecutionAdapter` 基底を継承し、`name`、`priority`、`supports()`、`open()` を実装します。
+
 1. Resource と AccessPlan が Adapter の対応条件を満たすことを確認する。
 2. Dependency Registry から利用者提供の runtime を取得する。
 3. URI、option、layer/subdataset 等を決定的に構築する。

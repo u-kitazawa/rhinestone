@@ -6,25 +6,29 @@ from string import Formatter
 from typing import Any, Dict, List, Mapping, Tuple, cast
 from urllib.parse import urlsplit
 
-from ..errors import ConfigValidationError, UnsupportedSearchConditionError
-from ..models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
-from ._knowledge import source, string
+from ....errors import ConfigValidationError, UnsupportedSearchConditionError
+from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
+from .._knowledge import source, string
+from ..base import ProviderAdapter
 
 
-class GsiTileAdapter:
+class GsiTileAdapter(ProviderAdapter):
     source_type = "gsi-tile"
     search_conditions = frozenset({"text", "limit"})
 
     def __init__(self) -> None:
+        super().__init__(get_json=lambda url, params: None)
         self._specs = cast(
             Dict[str, Dict[str, Any]],
-            json.loads(resources.read_text("rhinestone.adapters", "gsi_tiles.json")),
+            json.loads(
+                resources.read_text(
+                    "rhinestone.adapters.source.gsi_tile", "gsi_tiles.json"
+                )
+            ),
         )
 
     def load(self, config: Config) -> Source:
-        if config.source_type != self.source_type:
-            raise ConfigValidationError("Expected gsi-tile Config")
-        settings = config.settings
+        settings = self._config_settings(config)
         if "id" in settings:
             identifier = string(settings, "id")
             if identifier not in self._specs:

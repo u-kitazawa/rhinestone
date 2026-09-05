@@ -31,10 +31,15 @@ still evolve without weakening request, preservation, explicit-selection, and
 failure behaviour.
 
 The first execution vertical slice temporarily places execution adapters in
-`rhinestone.execution_adapters` and connects them through `AccessPipeline.open`.
+`rhinestone.adapters.execution` and connects them through `AccessPipeline.open`.
 Those package and constructor shapes may evolve; the stable contracts are that
 the selected Resource is translated without being re-selected, runtime
 dependencies stay lazy and user-owned, and runtime failures retain their cause.
+
+`rhinestone.adapters.ExecutionAdapter` is the formal public base class for
+built-in Execution Adapters. It requires a stable name, priority, support
+predicate, and runtime-opening operation; Selector composition remains
+behaviour-based.
 
 The following public-composition slice treats `rhinestone.configure()` as a
 factory for an isolated application context rather than mutable process-global

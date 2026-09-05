@@ -2,9 +2,9 @@
 
 from typing import Any, Mapping, Optional, cast
 
-from ..errors import ConfigValidationError
-from ..models import Config, Metadata, Provenance, ResourceCandidate, Source
-from .base import ProviderAdapter
+from ....errors import ConfigValidationError
+from ....models import Config, Metadata, Provenance, ResourceCandidate, Source
+from ..base import ProviderAdapter
 
 
 class DirectAdapter(ProviderAdapter):

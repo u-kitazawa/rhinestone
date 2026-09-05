@@ -2,11 +2,11 @@
 
 from typing import Any, Dict, List, Mapping, Optional, cast
 
-from ..errors import ConfigValidationError
-from ..models import Config, ResourceCandidate, Source
-from ._knowledge import entry_point, source, string
-from .base import JsonTransport
-from .ckan import CkanAdapter
+from ....errors import ConfigValidationError
+from ....models import Config, ResourceCandidate, Source
+from .._knowledge import entry_point, source, string
+from ..base import JsonTransport
+from ..ckan import CkanAdapter
 
 
 class PlateauAdapter(CkanAdapter):

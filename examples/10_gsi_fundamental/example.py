@@ -6,7 +6,7 @@ from osgeo import gdal
 
 from rhinestone import Config, configure
 from rhinestone.adapters import GsiFundamentalAdapter
-from rhinestone.execution_adapters import GdalAdapter
+from rhinestone.adapters.execution import GdalAdapter
 
 app = configure(
     dependencies={"gdal": lambda: gdal},

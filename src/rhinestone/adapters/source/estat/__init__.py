@@ -2,8 +2,8 @@
 
 from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
 
-from ..errors import ConfigValidationError, ProviderResponseError
-from ..models import (
+from ....errors import ConfigValidationError, ProviderResponseError
+from ....models import (
     Config,
     Metadata,
     Provenance,
@@ -12,7 +12,7 @@ from ..models import (
     SearchResult,
     Source,
 )
-from .base import JsonObject, JsonTransport, ProviderAdapter
+from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 DEFAULT_ENDPOINT = "https://api.e-stat.go.jp/rest/3.0/app/json"
 

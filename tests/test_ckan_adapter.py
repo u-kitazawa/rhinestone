@@ -1,6 +1,6 @@
 import pytest
 
-from rhinestone.adapters.ckan import CkanAdapter
+from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.errors import ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json

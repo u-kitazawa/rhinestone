@@ -3,8 +3,8 @@
 from pathlib import PurePosixPath
 from typing import Any, Mapping, Optional, Tuple
 
-from ..errors import ConfigValidationError
-from ..models import Metadata, Provenance, ResourceCandidate, Source
+from ...errors import ConfigValidationError
+from ...models import Metadata, Provenance, ResourceCandidate, Source
 
 
 def string(settings: Mapping[str, Any], name: str) -> str:

@@ -2,9 +2,9 @@ from typing import Any, Dict, List, Mapping, Tuple
 
 import pytest
 
-from rhinestone.adapters.ckan import CkanAdapter
-from rhinestone.adapters.ogc import OgcFeaturesAdapter
-from rhinestone.adapters.stac import StacAdapter
+from rhinestone.adapters.source.ckan import CkanAdapter
+from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
+from rhinestone.adapters.source.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import fixture_json

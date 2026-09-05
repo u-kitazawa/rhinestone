@@ -1,8 +1,8 @@
 from typing import List, Tuple
 
-from rhinestone.adapters.direct import DirectAdapter
+from rhinestone.adapters.execution import GdalAdapter, PyogrioAdapter
+from rhinestone.adapters.source.direct import DirectAdapter
 from rhinestone.execution import ExecutionAdapterSelector
-from rhinestone.execution_adapters import GdalAdapter, PyogrioAdapter
 from rhinestone.models import Config
 from rhinestone.pipeline import AccessPipeline
 from rhinestone.registry import DependencyRegistry

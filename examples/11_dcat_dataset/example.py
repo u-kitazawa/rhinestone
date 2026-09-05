@@ -8,7 +8,7 @@ import requests
 
 from rhinestone import Config, configure
 from rhinestone.adapters import DcatAdapter
-from rhinestone.execution_adapters import PyogrioAdapter
+from rhinestone.adapters.execution import PyogrioAdapter
 
 
 def get_document(uri):

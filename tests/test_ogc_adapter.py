@@ -1,6 +1,6 @@
 import pytest
 
-from rhinestone.adapters.ogc import OgcFeaturesAdapter
+from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json

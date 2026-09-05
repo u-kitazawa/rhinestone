@@ -2,10 +2,11 @@
 
 from typing import Any, Dict, Mapping, Tuple, cast
 
-from ..errors import ConfigValidationError
-from ..models import AccessPlan, Config, ResourceCandidate, Source
-from ..registry import CredentialRegistry
-from ._knowledge import source, string
+from ....errors import ConfigValidationError
+from ....models import AccessPlan, Config, ResourceCandidate, Source
+from ....registry import CredentialRegistry
+from .._knowledge import source, string
+from ..base import ProviderAdapter
 
 _ENDPOINT = "https://api.odpt.org/api/v4/"
 _TYPES = {"station": "odpt:Station", "railway": "odpt:Railway", "train": "odpt:Train"}
@@ -18,13 +19,14 @@ _FILTERS = {
 }
 
 
-class OdptAdapter:
+class OdptAdapter(ProviderAdapter):
     source_type = "odpt"
 
+    def __init__(self) -> None:
+        super().__init__(get_json=lambda url, params: None)
+
     def load(self, config: Config) -> Source:
-        if config.source_type != self.source_type:
-            raise ConfigValidationError("Expected odpt Config")
-        settings = config.settings
+        settings = self._config_settings(config)
         if set(settings) - {"dataset", "credential", "filters"}:
             raise ConfigValidationError("Unknown ODPT setting; use official filters")
         dataset = string(settings, "dataset")

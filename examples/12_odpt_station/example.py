@@ -6,7 +6,7 @@ import requests
 
 from rhinestone import Config, configure
 from rhinestone.adapters import OdptAdapter
-from rhinestone.execution_adapters import JsonServiceAdapter
+from rhinestone.adapters.execution import JsonServiceAdapter
 
 app = configure(
     dependencies={"json-service": lambda: requests},

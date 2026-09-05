@@ -1,6 +1,6 @@
 import pytest
 
-from rhinestone.adapters.stac import StacAdapter
+from rhinestone.adapters.source.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json

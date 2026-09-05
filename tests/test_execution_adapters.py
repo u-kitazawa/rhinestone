@@ -1,10 +1,16 @@
 from dataclasses import replace
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pytest
 
+from rhinestone.adapters.execution import (
+    ExecutionAdapter,
+    GdalAdapter,
+    JsonServiceAdapter,
+    PyogrioAdapter,
+    RasterioAdapter,
+)
 from rhinestone.errors import ResourceAccessError
-from rhinestone.execution_adapters import GdalAdapter, PyogrioAdapter, RasterioAdapter
 from rhinestone.models import (
     FileAccessPlan,
     Metadata,
@@ -211,3 +217,19 @@ def test_execution_uses_empty_attributes_when_candidate_is_not_retained() -> Non
     PyogrioAdapter().open(mismatched, runtime)
 
     assert runtime.calls == [("/data/selected.shp", {})]
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    (GdalAdapter, JsonServiceAdapter, PyogrioAdapter, RasterioAdapter),
+)
+def test_builtin_execution_adapters_implement_the_public_base(adapter: Any) -> None:
+    assert issubclass(adapter, ExecutionAdapter)
+
+
+def test_public_execution_base_requires_its_contract() -> None:
+    class IncompleteAdapter(ExecutionAdapter):
+        pass
+
+    with pytest.raises(TypeError, match="abstract"):
+        cast(Any, IncompleteAdapter)()

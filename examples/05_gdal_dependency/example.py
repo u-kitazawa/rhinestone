@@ -6,7 +6,7 @@ from osgeo import gdal
 
 from rhinestone import Config, configure
 from rhinestone.adapters import DirectAdapter
-from rhinestone.execution_adapters import GdalAdapter
+from rhinestone.adapters.execution import GdalAdapter
 
 data_uri = os.environ["RHINESTONE_GDAL_URI"]
 data_format = os.environ.get("RHINESTONE_GDAL_FORMAT", "geotiff")

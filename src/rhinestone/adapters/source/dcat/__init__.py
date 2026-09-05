@@ -2,15 +2,16 @@
 
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
-from ..errors import (
+from ....errors import (
     ConfigValidationError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from ..models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
-from ._knowledge import source, string
+from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
+from .._knowledge import source, string
+from ..base import ProviderAdapter
 
 _DCAT = "http://www.w3.org/ns/dcat#"
 _DCT = "http://purl.org/dc/terms/"
@@ -21,7 +22,7 @@ _FORMATS = {
 }
 
 
-class DcatAdapter:
+class DcatAdapter(ProviderAdapter):
     source_type = "dcat"
     search_conditions = frozenset({"text", "limit"})
 
@@ -32,6 +33,7 @@ class DcatAdapter:
         catalog_uri: Optional[str] = None,
         serialization: str = "turtle",
     ) -> None:
+        super().__init__(get_json=lambda url, params: None)
         self._get_document = get_document
         self._rdf_runtime_factory = rdf_runtime_factory
         self._catalog_uri = catalog_uri
@@ -62,10 +64,9 @@ class DcatAdapter:
         return values[0] if values else None
 
     def load(self, config: Config) -> Source:
-        if config.source_type != self.source_type:
-            raise ConfigValidationError("Expected dcat Config")
-        rdf, graph, document, uri = self._catalog(config.settings)
-        dataset_uri = string(config.settings, "dataset")
+        settings = self._config_settings(config)
+        rdf, graph, document, uri = self._catalog(settings)
+        dataset_uri = string(settings, "dataset")
         dataset = rdf.URIRef(dataset_uri)
         if (dataset, rdf.URIRef(_RDF_TYPE), rdf.URIRef(_DCAT + "Dataset")) not in graph:
             raise ResourceNotFoundError("DCAT Dataset URI was not found")
@@ -89,7 +90,7 @@ class DcatAdapter:
                         media_type,
                         {
                             "distribution": str(distribution),
-                            "matches_config": config.settings.get(
+                            "matches_config": settings.get(
                                 "distribution", str(distribution)
                             )
                             == str(distribution),

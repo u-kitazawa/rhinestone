@@ -3,18 +3,20 @@
 from pathlib import Path
 from typing import Any, Mapping, cast
 
-from ..errors import ConfigValidationError, ResourceNotFoundError
-from ..models import Config, ResourceCandidate, Source
-from ._knowledge import entry_point, source, string
+from ....errors import ConfigValidationError, ResourceNotFoundError
+from ....models import Config, ResourceCandidate, Source
+from .._knowledge import entry_point, source, string
+from ..base import ProviderAdapter
 
 
-class GsiFundamentalAdapter:
+class GsiFundamentalAdapter(ProviderAdapter):
     source_type = "gsi-fundamental"
 
+    def __init__(self) -> None:
+        super().__init__(get_json=lambda url, params: None)
+
     def load(self, config: Config) -> Source:
-        if config.source_type != self.source_type:
-            raise ConfigValidationError("Expected gsi-fundamental Config")
-        settings = config.settings
+        settings = self._config_settings(config)
         if settings.get("dataset") != "basic":
             raise ConfigValidationError("Initial support is for basic vector data")
         path = Path(string(settings, "path")).absolute()

@@ -91,7 +91,7 @@ resource.open(adapter="gdal")
 
 - [設計仕様](docs/spec_v4.md)：アーキテクチャ、責務境界、不変条件の唯一の規範
 - [実装仕様](docs/specs/README.md)：実装可能・検証可能な単位への整理
-- [コンポーネント仕様](docs/archtecture/README.md)：層とコンポーネントの責務
+- [コンポーネント仕様](docs/architecture/README.md)：層とコンポーネントの責務
 - [開発エージェント向けガイド](AGENTS.md)：開発規則と検証コマンド
 
 補助文書が設計仕様と矛盾する場合は、設計仕様を優先します。

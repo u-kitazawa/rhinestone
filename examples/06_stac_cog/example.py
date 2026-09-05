@@ -8,7 +8,7 @@ import rasterio
 
 from rhinestone import Config, configure
 from rhinestone.adapters import StacAdapter
-from rhinestone.execution_adapters import RasterioAdapter
+from rhinestone.adapters.execution import RasterioAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _support.http_json import get_json  # noqa: E402
