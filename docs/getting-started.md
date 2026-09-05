@@ -93,6 +93,9 @@ with resource.open(adapter="rasterio") as dataset:
 
 ## 次のステップ
 
+- Adapter、HTTP callback、runtime の登録は[アプリケーションを構成する](configuration.md)
+- 検索して `SearchResult` を選ぶ場合は[データを検索する](search.md)
+- 解決結果の確認とエラー対応は[Resource を解決して開く](resolve-and-open.md)
 - 対応する provider と format は[対応状況](compatibility.md)で確認する
-- 実際の provider を使う例は[サンプル集](../examples/README.md)から選ぶ
+- 実際の provider を使う例はリポジトリ checkout の `examples/README.md` から選ぶ
 - 型、エラー、Adapter の契約は[API リファレンス](api.md)を参照する

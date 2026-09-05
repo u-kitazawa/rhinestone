@@ -263,11 +263,20 @@ app = configure(
 Rhinestone の基本的な使い方から始める場合は
 [Getting started](getting-started.md) を参照してください。
 
+アプリへの Adapter 登録、HTTP callback、secret の渡し方は
+[アプリケーションを構成する](configuration.md) を参照してください。
+
+検索結果を選ぶ流れは [データを検索する](search.md)、Resource を確認して runtime で
+開く流れは [Resource を解決して開く](resolve-and-open.md) を参照してください。
+
 利用可能な provider、format、Execution Adapter は
 [対応状況](compatibility.md) にまとめています。
 
-実際の公的データを使った例は
-[サンプル集](../examples/README.md) から確認できます。
+実際の公的データを使った環境変数ベースの例は、リポジトリ checkout の
+`examples/README.md` から確認できます。
 
 公開されているモデル、メソッド、Adapter、エラーの詳細は
 [API リファレンス](api.md) を参照してください。
+
+provider ごとの設定と endpoint は [Source Adapter](api/source-adapters.md)、
+runtime ごとの利用方法は [Execution Adapter](api/execution-adapters.md) を参照してください。

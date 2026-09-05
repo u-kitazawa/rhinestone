@@ -5,7 +5,11 @@
 対応しているものとして扱えません。
 
 [Documentation home](index.md) · [Getting started](getting-started.md) ·
-[Examples](../examples/README.md)
+[Source Adapter](api/source-adapters.md) · [Execution Adapter](api/execution-adapters.md)
+
+初めて使う場合は、このリファレンスを先に読む必要はありません。
+[アプリケーションを構成する](configuration.md) → [データを検索する](search.md) →
+[Resource を解決して開く](resolve-and-open.md)の順に進んでください。
 
 ## アプリケーションを構成する
 
@@ -81,49 +85,6 @@ factory は遅延評価されます。たとえば `lambda: rasterio` は Resour
 `Resource.open(adapter: str | None = None)` は、その Resource を解決した
 `Rhinestone` コンテキストでデータを開きます。コンテキストに結び付いていない
 Resource では `ExecutionAdapterUnavailableError` になります。
-
-## 組み込み Source Adapter
-
-各 Adapter は `rhinestone.adapters` から import します。通信を行う Adapter は、
-コンストラクタの `get_json` callback に公式 API を呼ぶ関数を渡します。
-
-| クラス | `source_type` | `Config.settings` の必須項目 |
-| --- | --- | --- |
-| `DirectAdapter` | `direct` | `uri`, `format` |
-| `CkanAdapter` | `ckan` | `resource_id` |
-| `DcatAdapter` | `dcat` | `uri`, `dataset` |
-| `EStatAdapter` | `estat` | `stats_data_id` |
-| `GsiFundamentalAdapter` | `gsi-fundamental` | `dataset="basic"`, `path`, `metadata` |
-| `GsiTileAdapter` | `gsi-tile` | `id`、または完全な XYZ tile 定義 |
-| `OdptAdapter` | `odpt` | `dataset`, `credential` |
-| `OgcFeaturesAdapter` | `ogc-features` | `collection_id` |
-| `PlateauAdapter` | `plateau` | `dataset_id` または `resource_id` |
-| `StacAdapter` | `stac` | `collection_id`, `item_id`, `asset_key` |
-
-任意項目や provider ごとの制約は、各 Adapter の schema で検証されます。代表例は
-`endpoint`（CKAN、e-Stat、OGC API Features、PLATEAU、STAC）、`archive` と
-`entry_point`（GSI Fundamental、PLATEAU）、`filters`（ODPT）です。設定の具体例は
-[サンプル集](../examples/README.md)を参照してください。
-
-`ProviderAdapter` は独自 Source Adapter の基底クラスです。`source_type` を定義し、
-`load(config: Config) -> Source` を実装します。検索をサポートする場合だけ
-`search(query: SearchQuery)` と `search_conditions` を実装します。
-
-## 組み込み Execution Adapter
-
-Execution Adapter は `rhinestone.adapters.execution` から import します。
-
-| クラス | 選択名 / dependency 名 | 用途 |
-| --- | --- | --- |
-| `GdalAdapter` | `gdal` | GDAL の `OpenEx` へ変換する。|
-| `RasterioAdapter` | `rasterio` | Rasterio の `open` へ変換する。|
-| `PyogrioAdapter` | `pyogrio` | pyogrio の `read_dataframe` へ変換する。|
-| `JsonServiceAdapter` | `json-service` | ODPT の JSON service request を実行する。|
-
-独自 Execution Adapter は `ExecutionAdapter` を継承し、安定した `name` と `priority`、
-`supports(resource, dependencies)`、`open(resource, runtime)` を実装します。Adapter
-は Resource を選択せず、すでに選択された Resource を runtime の呼び出しへ変換
-するだけです。
 
 ## エラー
 
