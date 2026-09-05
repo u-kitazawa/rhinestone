@@ -3,12 +3,14 @@ from typing import List
 import pytest
 
 from rhinestone.errors import (
+    AdapterRegistrationError,
     ConfigValidationError,
     ProviderMetadataError,
     UnsupportedSourceError,
 )
 from rhinestone.models import Config, Metadata, Provenance, ResourceCandidate, Source
 from rhinestone.pipeline import AccessPipeline
+from rhinestone.registry import AdapterRegistry
 from rhinestone.resolution import Resolver
 
 
@@ -45,7 +47,7 @@ def test_access_pipeline_keeps_source_interpretation_before_resolution() -> None
     """Provider 解釈と Resource 選択の責務境界・処理順序を維持するために必要である。"""
     events: List[str] = []
     pipeline = AccessPipeline(
-        source_adapters=(RecordingSourceAdapter(events),),
+        adapter_registry=AdapterRegistry((RecordingSourceAdapter(events),), ()),
         resolver=RecordingResolver(events),
     )
     config = Config(source_type="fixture", settings={"dataset": "data-1"})
@@ -60,7 +62,9 @@ def test_access_pipeline_keeps_source_interpretation_before_resolution() -> None
 
 def test_unknown_source_type_has_a_specific_failure() -> None:
     """未知 provider を別 Adapter や URL へ推測せず明示的に拒否するために必要である。"""
-    pipeline = AccessPipeline(source_adapters=(), resolver=Resolver())
+    pipeline = AccessPipeline(
+        adapter_registry=AdapterRegistry((), ()), resolver=Resolver()
+    )
 
     with pytest.raises(UnsupportedSourceError, match="unknown"):
         pipeline.resolve(Config(source_type="unknown", settings={}))
@@ -76,7 +80,9 @@ def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
         def load(self, config: Config) -> Source:
             raise provider_error
 
-    pipeline = AccessPipeline(source_adapters=(BrokenAdapter(),), resolver=Resolver())
+    pipeline = AccessPipeline(
+        adapter_registry=AdapterRegistry((BrokenAdapter(),), ()), resolver=Resolver()
+    )
 
     with pytest.raises(ProviderMetadataError) as captured:
         pipeline.resolve(Config(source_type="broken", settings={}))
@@ -95,7 +101,7 @@ def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
             raise expected
 
     pipeline = AccessPipeline(
-        source_adapters=(RejectingAdapter(),), resolver=Resolver()
+        adapter_registry=AdapterRegistry((RejectingAdapter(),), ()), resolver=Resolver()
     )
 
     with pytest.raises(ConfigValidationError) as captured:
@@ -107,13 +113,10 @@ def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
 def test_duplicate_source_adapters_are_rejected_by_pipeline() -> None:
     """同じ Source type の選択が登録順依存になることを防ぐために必要である。"""
     events: List[str] = []
-    pipeline = AccessPipeline(
-        source_adapters=(
-            RecordingSourceAdapter(events),
-            RecordingSourceAdapter(events),
-        ),
-        resolver=Resolver(),
-    )
-
-    with pytest.raises(UnsupportedSourceError, match="ambiguous"):
-        pipeline.resolve(Config(source_type="fixture", settings={}))
+    with pytest.raises(AdapterRegistrationError, match="fixture"):
+        AccessPipeline(
+            adapter_registry=AdapterRegistry(
+                (RecordingSourceAdapter(events), RecordingSourceAdapter(events)), ()
+            ),
+            resolver=Resolver(),
+        )

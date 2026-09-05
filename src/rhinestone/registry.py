@@ -1,6 +1,6 @@
 """Internal adapter and user-owned dependency registries."""
 
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping
+from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Tuple
 
 from .errors import (
     AdapterRegistrationError,
@@ -92,3 +92,7 @@ class AdapterRegistry:
             raise ExecutionAdapterUnavailableError(
                 f"Execution adapter {name!r} is not registered"
             )
+
+    @property
+    def execution_adapters(self) -> Tuple[Any, ...]:
+        return tuple(self._executions.values())

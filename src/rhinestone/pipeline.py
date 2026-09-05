@@ -1,44 +1,32 @@
 """Application pipeline from Config through Source to user-owned runtime."""
 
 from dataclasses import replace
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
-from .errors import ProviderMetadataError, RhinestoneError, UnsupportedSourceError
+from .errors import ProviderMetadataError, RhinestoneError
 from .execution import ExecutionAdapterSelector
 from .models import Config, Resource
-from .registry import DependencyRegistry
+from .registry import AdapterRegistry, DependencyRegistry
 from .resolution import Resolver
 
 
 class AccessPipeline:
     def __init__(
         self,
-        source_adapters: Iterable[Any],
+        adapter_registry: AdapterRegistry,
         resolver: Resolver,
         execution_selector: Optional[ExecutionAdapterSelector] = None,
         dependencies: Optional[DependencyRegistry] = None,
     ) -> None:
-        self._source_adapters = tuple(source_adapters)
+        self._adapter_registry = adapter_registry
         self._resolver = resolver
         self._execution_selector = execution_selector
         self._dependencies = dependencies
 
     def resolve(self, config: Config) -> Resource:
-        matches = [
-            adapter
-            for adapter in self._source_adapters
-            if adapter.source_type == config.source_type
-        ]
-        if not matches:
-            raise UnsupportedSourceError(
-                f"Source type {config.source_type!r} is not supported"
-            )
-        if len(matches) > 1:
-            raise UnsupportedSourceError(
-                f"Source type {config.source_type!r} is ambiguous"
-            )
+        adapter = self._adapter_registry.source(config.source_type)
         try:
-            source = matches[0].load(config)
+            source = adapter.load(config)
         except RhinestoneError:
             raise
         except Exception as error:

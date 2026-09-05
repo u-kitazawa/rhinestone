@@ -5,7 +5,7 @@ from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
 from .execution import ExecutionAdapterSelector
 from .models import Config, Resource, SearchQuery
 from .pipeline import AccessPipeline
-from .registry import CredentialRegistry, DependencyRegistry
+from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .resolution import Resolver
 from .search import SearchCoordinator
 
@@ -27,13 +27,14 @@ class Rhinestone:
             return binder(credential_registry) if callable(binder) else adapter
 
         sources = tuple(bind(adapter) for adapter in source_adapters)
+        adapters = AdapterRegistry(
+            sources, (bind(adapter) for adapter in execution_adapters)
+        )
         dependency_registry = DependencyRegistry(dependencies)
         self._pipeline = AccessPipeline(
-            source_adapters=sources,
+            adapter_registry=adapters,
             resolver=Resolver(),
-            execution_selector=ExecutionAdapterSelector(
-                bind(adapter) for adapter in execution_adapters
-            ),
+            execution_selector=ExecutionAdapterSelector(adapters.execution_adapters),
             dependencies=dependency_registry,
         )
         self._search = SearchCoordinator(sources)

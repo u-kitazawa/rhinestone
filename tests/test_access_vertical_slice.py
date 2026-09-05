@@ -5,7 +5,7 @@ from rhinestone.adapters.source.direct import DirectAdapter
 from rhinestone.execution import ExecutionAdapterSelector
 from rhinestone.models import Config
 from rhinestone.pipeline import AccessPipeline
-from rhinestone.registry import DependencyRegistry
+from rhinestone.registry import AdapterRegistry, DependencyRegistry
 from rhinestone.resolution import Resolver
 
 
@@ -26,7 +26,7 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
         {"gdal": lambda: dependency_calls.append("gdal") or runtime}
     )
     pipeline = AccessPipeline(
-        source_adapters=(DirectAdapter(),),
+        adapter_registry=AdapterRegistry((DirectAdapter(),), ()),
         resolver=Resolver(),
         execution_selector=ExecutionAdapterSelector((PyogrioAdapter(), GdalAdapter())),
         dependencies=dependencies,
@@ -57,7 +57,7 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
             return "pyogrio-data"
 
     pipeline = AccessPipeline(
-        source_adapters=(DirectAdapter(),),
+        adapter_registry=AdapterRegistry((DirectAdapter(),), ()),
         resolver=Resolver(),
         execution_selector=ExecutionAdapterSelector((GdalAdapter(), PyogrioAdapter())),
         dependencies=DependencyRegistry({"pyogrio": lambda: FakePyogrio()}),
