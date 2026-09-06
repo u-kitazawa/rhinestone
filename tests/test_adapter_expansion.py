@@ -402,7 +402,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
         dependencies={"json-service": lambda: SimpleNamespace(get=get)},
     )
     with pytest.raises(CredentialUnavailableError):
-        other.open(config)
+        other.open(config, library="json-service")
     for dataset in ("railway", "train"):
         assert (
             odpt_adapter()
