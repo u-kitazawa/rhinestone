@@ -9,18 +9,17 @@ from rhinestone.models import (
     FileAccessPlan,
     Metadata,
     Provenance,
-    ProviderConfig,
     Resource,
     ResourceCandidate,
     SearchResult,
     Source,
+    SourceDefinition,
 )
 
 
-def test_config_is_immutable_and_copies_nested_provider_settings() -> None:
-    """Config の実行時変化が再現性を壊すため、深い不変性が必要である。"""
+def test_config_is_immutable_and_copies_nested_settings() -> None:
     settings: Dict[str, Any] = {
-        "endpoint": "https://example.jp",
+        "resource_id": "resource-1",
         "filters": {"year": 2024},
     }
     config = Config(source_id="ckan", settings=settings)
@@ -32,15 +31,26 @@ def test_config_is_immutable_and_copies_nested_provider_settings() -> None:
         cast(Dict[str, Any], config.settings)["resource_id"] = "changed"
 
 
-def test_provider_and_source_ids_must_be_non_empty() -> None:
+def test_source_definition_and_config_ids_must_be_non_empty() -> None:
+    with pytest.raises(ConfigValidationError, match="source id"):
+        SourceDefinition("", "ckan")
     with pytest.raises(ConfigValidationError, match="adapter_type"):
-        ProviderConfig("")
+        SourceDefinition("catalog", "")
     with pytest.raises(ConfigValidationError, match="source_id"):
         Config("", {})
 
 
+def test_source_definition_is_deeply_immutable() -> None:
+    settings: Dict[str, Any] = {"endpoint": "https://example.jp", "nested": {"x": 1}}
+    source = SourceDefinition("catalog", "ckan", settings)
+    cast(Dict[str, int], settings["nested"])["x"] = 2
+
+    assert source.settings["nested"]["x"] == 1
+    with pytest.raises(TypeError):
+        cast(Dict[str, Any], source.settings)["endpoint"] = "changed"
+
+
 def test_config_freezes_all_mutable_container_shapes() -> None:
-    """Provider 設定内の list・tuple・set 経由でも Config を変更不能にするために必要である。"""
     config = Config(
         source_id="fixture",
         settings={"list": [1], "tuple": ({"nested": True},), "set": {1, 2}},
@@ -54,7 +64,6 @@ def test_config_freezes_all_mutable_container_shapes() -> None:
 
 
 def test_resource_preserves_source_metadata_and_provenance() -> None:
-    """解決後に URI だけを返して確定済み知識を失わないために必要である。"""
     raw = {"provider_only": {"encoding": "cp932"}}
     metadata = Metadata(title="River", raw=raw)
     provenance = Provenance(
@@ -92,15 +101,14 @@ def test_resource_preserves_source_metadata_and_provenance() -> None:
     assert resource.source.raw_metadata == raw
 
 
-def test_search_result_returns_provider_config_without_losing_knowledge() -> None:
-    """検索結果が通常の検証・解決経路を迂回しないため Config 変換が必要である。"""
+def test_search_result_returns_config_without_losing_knowledge() -> None:
     metadata = Metadata(title="Population", raw={"table": "raw-value"})
     provenance = Provenance(provider="estat", raw={"query": "population"})
     result = SearchResult(
         title="Population",
         description="Official statistics",
         source_id="estat",
-        provider_settings={"stats_data_id": "0000000000"},
+        settings={"stats_data_id": "0000000000"},
         metadata=metadata,
         provenance=provenance,
     )
@@ -113,7 +121,6 @@ def test_search_result_returns_provider_config_without_losing_knowledge() -> Non
 
 
 def test_unbound_resource_cannot_open_without_execution_context() -> None:
-    """解決だけを行ったResourceが暗黙runtimeやグローバル状態へfallbackしないために必要である。"""
     candidate = ResourceCandidate("/data/a.csv", "csv", "text/csv")
     source = Source(
         metadata=Metadata(title="A", raw={}),

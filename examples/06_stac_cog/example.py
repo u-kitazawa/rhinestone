@@ -6,7 +6,7 @@ from pathlib import Path
 
 import rasterio
 
-from rhinestone import Config, ProviderConfig, configure
+from rhinestone import Config, SourceDefinition, configure
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _support.http_json import get_json  # noqa: E402
@@ -15,13 +15,8 @@ endpoint = os.environ["RHINESTONE_STAC_ENDPOINT"]
 collection_id = os.environ["RHINESTONE_STAC_COLLECTION_ID"]
 item_id = os.environ["RHINESTONE_STAC_ITEM_ID"]
 asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
-provider_settings = {"endpoint": endpoint}
-if os.environ.get("RHINESTONE_STAC_API_TOKEN"):
-    provider_settings["api_token"] = os.environ["RHINESTONE_STAC_API_TOKEN"]
-elif os.environ.get("RHINESTONE_STAC_API_KEY"):
-    provider_settings["api_key"] = os.environ["RHINESTONE_STAC_API_KEY"]
 app = configure(
-    providers={"earth-search": ProviderConfig("stac", provider_settings)},
+    sources=(SourceDefinition("earth-search", "stac", {"endpoint": endpoint}),),
     dependencies={"http-json": lambda: get_json, "rasterio": lambda: rasterio},
 )
 resource = app.resolve(

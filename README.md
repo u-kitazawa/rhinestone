@@ -1,118 +1,112 @@
 # Rhinestone
 
-Rhinestone は、日本の公的・地理空間データを既存 OSS から利用するための Knowledge / Specification Layer です。配信元、API、フォーマット、配信方式に関する知識を蓄積し、対象データを解釈して、利用可能な Resource と AccessPlan を生成します。
+Rhinestoneは、日本の公的・地理空間データを既存OSSから利用するためのKnowledge / Specification Layerです。配信元、API、フォーマット、アクセス方式に関する知識を保持し、検索結果や明示的なConfigを利用可能なResourceへ解決します。
 
-Rhinestone 自身は GIS データ処理エンジンを実装しません。GDAL、Rasterio、pyogrio、PyArrow などがデータの読み込み・変換・解析を担い、Rhinestone はそれらへ渡す URI、オプション、レイヤーやサブデータセットの指定を組み立てます。
+Rhinestone自身はGISデータ処理エンジンを実装しません。GDAL、Rasterio、pyogrio等が読み込み・変換・解析を担い、Rhinestoneはそれらへ渡すURI、オプション、Resource選択を組み立てます。
 
-## 現在の状態
+## 基本的な使い方
 
-このプロジェクトは設計・初期実装段階です。公開 API と対応 Adapter は、仕様に基づいて段階的に実装します。
+Rhinestoneが知っている組み込みSourceを選択します。
+
+```python
+from rhinestone import configure, sources
+
+app = configure(
+    sources=sources.ALL,
+    dependencies={
+        "http-json": lambda: get_json,
+        "rasterio": lambda: rasterio,
+    },
+    credentials={
+        "estat": lambda: estat_app_id,
+        "odpt": lambda: odpt_consumer_key,
+    },
+)
+```
+
+必要なSourceだけを選択することもできます。
+
+```python
+app = configure(
+    sources=(sources.GEOSPATIAL_JP, sources.PLATEAU),
+)
+```
+
+`sources.ALL`はbuilt-in external Sourcesを並べただけのimmutableなtupleです。`direct`はCore機能なので`ALL`には含まれず、常時利用できます。
+
+検索からResourceまでは同じ流れで接続します。
+
+```python
+from rhinestone import SearchQuery
+
+results = app.search(SearchQuery(text="河川", limit=5))
+result = results["geospatial-jp"][0]
+resource = app.resolve(result.to_config())
+```
+
+## 設計上の境界
+
+- `SourceDefinition`: どのデータ提供元を使うか
+- `Config`: そのSource内で何を使うか
+- Source Adapter: 接続・解決方法の知識
+- dependency: HTTP、GDAL、Rasterio、SDK等のruntime
+- credential: secret
+
+SourceのendpointはSourceDefinition側に属し、検索結果やConfigへ複製しません。secretやruntime dependencyもSourceDefinitionへ保存しません。
 
 ## アーキテクチャ
 
-通常のアクセスフローは次のとおりです。
-
 ```text
-Config
-  -> [Source Adapter]
-  -> Source
-  -> [Resolver]
-  -> AccessPlan
-  -> Resource
-  -> [Execution Adapter Selector]
-  -> [Execution Adapter]
-  -> user-provided dependency
-  -> Data
-```
+SourceDefinition[] + dependencies + credentials
+  -> configure()
+  -> Application
 
-検索は各配信元の公式 API へ横断的に問い合わせます。
-
-```text
 SearchQuery
   -> [Search Coordinator]
   -> [Source Adapter]...
   -> SearchResult[]
   -> Config
+  -> [Source Adapter]
+  -> Source
+  -> [Resolver]
+  -> AccessPlan
+  -> Resource
+  -> [Execution Adapter]
+  -> user-provided dependency
 ```
-
-SearchResult は Config へ変換した後、通常の検証・解決フローに入ります。
 
 ## 設計原則
 
 - データそのものではなく、データへのアクセス方法を統一する。
-- 配信元固有の知識は Source Adapter に閉じ込める。
-- 解決済みの Metadata と Provenance を Resource まで保持する。
-- 実行方法の選択を決定的かつ説明可能にする。
-- 実行時依存は利用者が所有し、callback/factory として供給する。
-- 公式の機械可読インターフェースを使い、Core では HTML scraping を行わない。
-- 確実に判断できない場合は、推測せず失敗させるか明示的な opt-in を求める。
-- 中央検索基盤を必須とせず、各配信元を横断する federated search を行う。
-
-## 概念的な利用例
-
-Config は利用したいデータを宣言し、HTTP や GDAL の実装詳細を含めません。
-
-```yaml
-providers:
-  gspace:
-    adapter_type: ckan
-    settings:
-      endpoint: https://example.jp
-config:
-  source_id: gspace
-  settings:
-    resource_id: abcdef
-```
-
-実行時のライブラリは利用者が供給します。
-
-```python
-rhinestone.configure(
-    providers={
-        "gspace": ProviderConfig(
-            "ckan", {"endpoint": "https://example.jp"}
-        )
-    },
-    dependencies={
-        "http-json": lambda: get_json,
-        "gdal": lambda: osgeo.gdal,
-        "rasterio": lambda: rasterio,
-    }
-)
-```
-
-利用者はprovider設定とdependencyを渡します。Source AdapterとExecution Adapterは
-Rhinestoneが組み立てます。同じAdapter種別を利用する複数providerも、異なるsource idで
-同時に構成できます。
-
-Resource は URI だけでなく、format、media type、Metadata、Provenance、AccessPlan、Source を保持します。必要に応じて実行 Adapter を明示できます。
-
-```python
-resource.open(adapter="gdal")
-```
-
-コード例は設計上の概念を示すものであり、未実装の公開 API を保証するものではありません。
+- 利用者にAdapterやendpointの組み立てを要求せず、既知のSourceを選択させる。
+- 配信元固有の知識はSource Adapterに閉じ込める。
+- 解決済みMetadataとProvenanceをResourceまで保持する。
+- 実行時依存は利用者が所有し、callback/factoryとして供給する。
+- secretはcredential factoryとして分離する。
+- 公式の機械可読インターフェースを使い、CoreではHTML scrapingを行わない。
+- 確実に判断できない場合は推測せず失敗させる。
+- 中央検索基盤を必須とせず、各配信元を横断するfederated searchを行う。
 
 ## 対象外
 
 - GIS I/O、ファイル解析、空間演算の再実装
-- 全データの GeoDataFrame、GeoJSON、Arrow、xarray などへの強制変換
+- 全データのGeoDataFrame、GeoJSON、Arrow、xarray等への強制変換
 - 公式データの再ホスティング
-- Core における HTML scraping や URL の推測
+- CoreにおけるHTML scrapingやURLの推測
 - 必須の中央検索インデックス
-- GDAL、Rasterio、pyogrio、QGIS などのバージョン管理
+- GDAL、Rasterio、pyogrio、QGIS等のバージョン管理
 
 ## ドキュメント
 
-- [ドキュメント](docs/index.md)：利用者向けの入口
-- [Getting started](docs/getting-started.md)：インストールと最短の利用例
-- [API リファレンス](docs/api.md)：公開 API、モデル、Adapter、エラー
-- [対応状況と既知の非対応](docs/compatibility.md)：provider、format、runtime の互換性
-- [開発エージェント向けガイド](AGENTS.md)：開発規則と検証コマンド
+- [Documentation](docs/index.md)
+- [Getting started](docs/getting-started.md)
+- [Configuration](docs/configuration.md)
+- [API reference](docs/api.md)
+- [Compatibility](docs/compatibility.md)
 
 ## 開発環境
 
-Python 3.10 以上と [uv](https://docs.astral.sh/uv/) を使用します。
+Python 3.10以上とuvを使用します。
 
 ```console
 uv sync --dev
@@ -120,9 +114,10 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run pyright
+uv run mkdocs build --strict
 uv build
 ```
 
 ## ライセンス
 
-MIT License です。詳細は [LICENSE](LICENSE) を参照してください。
+MIT Licenseです。詳細は[LICENSE](LICENSE)を参照してください。

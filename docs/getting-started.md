@@ -1,6 +1,6 @@
 # Getting started
 
-Rhinestoneを構成し、Resourceを解決して外部ライブラリで開くまでの最短例です。
+Rhinestoneは、組み込みSourceを選択し、検索・解決したResourceを既存ライブラリへ渡すためのライブラリです。
 
 ## インストール
 
@@ -8,12 +8,73 @@ Rhinestoneを構成し、Resourceを解決して外部ライブラリで開く�
 pip install rhinestone
 ```
 
-GDAL、Rasterio、pyogrio等はRhinestoneの依存ではありません。データを開く場合だけ、
-利用するライブラリを別途インストールします。
+GDAL、Rasterio、pyogrio等はRhinestoneの固定依存ではありません。必要なruntimeだけを利用者側で用意します。
 
-## Resourceを解決する
+## 組み込みSourceを使う
 
-`direct` providerは追加構成なしで利用できます。
+通常はRhinestoneが知っている組み込みSourceをまとめて有効にします。
+
+```python
+from rhinestone import configure, sources
+
+app = configure(
+    sources=sources.ALL,
+)
+```
+
+`sources.ALL`は全built-in external Sourcesを並べたimmutableなtupleです。`direct`はCore機能なので`ALL`には含まれません。
+
+必要なruntimeやcredentialがある場合だけ追加します。
+
+```python
+from rhinestone import configure, sources
+
+app = configure(
+    sources=sources.ALL,
+    dependencies={
+        "http-json": lambda: get_json,
+        "rasterio": lambda: rasterio,
+    },
+    credentials={
+        "estat": lambda: estat_app_id,
+        "odpt": lambda: odpt_consumer_key,
+    },
+)
+```
+
+factoryは遅延評価されます。Sourceを構成しただけではruntimeやsecretを読み込みません。
+
+## Sourceを絞る
+
+必要なSourceだけを選択できます。
+
+```python
+from rhinestone import configure, sources
+
+app = configure(
+    sources=(
+        sources.GEOSPATIAL_JP,
+        sources.PLATEAU,
+    ),
+    dependencies={"http-json": lambda: get_json},
+)
+```
+
+## 検索からResourceを解決する
+
+```python
+from rhinestone import SearchQuery
+
+results = app.search(SearchQuery(text="河川", limit=5))
+result = results["geospatial-jp"][0]
+resource = app.resolve(result.to_config())
+```
+
+検索結果は`source_id`と、そのSource内の対象を識別する`settings`だけをConfigへ引き継ぎます。endpointなどのSource定義はConfigへ複製しません。
+
+## Direct Resource
+
+既知のURIを直接解決する`direct`はSource選択と無関係に常時利用できます。
 
 ```python
 from rhinestone import Config, configure
@@ -29,66 +90,6 @@ resource = app.resolve(
         },
     )
 )
-
-print(resource.uri)
-print(resource.metadata)
-print(resource.provenance)
 ```
 
-`Config.source_id`は構成済みproviderを参照します。RhinestoneはURL suffixから形式を
-推測しないため、direct resourceではURIとformatを明示します。
-
-## データを開く
-
-実行Adapterを登録する必要はありません。使用を許可するruntimeだけをfactoryとして
-渡します。
-
-```python
-import rasterio
-
-app = configure(dependencies={"rasterio": lambda: rasterio})
-resource = app.resolve(
-    Config(
-        source_id="direct",
-        settings={
-            "uri": "https://example.invalid/elevation.tif",
-            "format": "geotiff",
-            "media_type": "image/tiff",
-        },
-    )
-)
-
-with resource.open() as dataset:
-    print(dataset.count)
-```
-
-互換性のあるdependencyが複数ある場合もRhinestoneが決定的に選択します。実行環境を
-固定したい場合だけ`resource.open(adapter="rasterio")`を指定します。
-
-## providerを追加する
-
-```python
-from rhinestone import ProviderConfig
-
-app = configure(
-    providers={
-        "gspace": ProviderConfig(
-            adapter_type="ckan",
-            settings={"endpoint": "https://www.geospatial.jp/ckan"},
-        ),
-    },
-    dependencies={"http-json": lambda: get_json},
-)
-```
-
-利用者が指定するのはprovider設定と外部dependencyです。Source AdapterとExecution
-AdapterはRhinestoneが構成します。
-
-## 次のステップ
-
-- provider、HTTP callback、runtime：[アプリケーションを構成する](configuration.md)
-- 検索から選択・解決：[データを検索する](search.md)
-- Resourceとエラー：[Resourceを解決して開く](resolve-and-open.md)
-- 対応provider・format：[対応状況](compatibility.md)
-- 完全な実行例：リポジトリの`examples/README.md`
-
+次は[アプリケーションを構成する](configuration.md)、[データを検索する](search.md)、[Resourceを解決して開く](resolve-and-open.md)を参照してください。

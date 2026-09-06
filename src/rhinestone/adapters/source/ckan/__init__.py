@@ -122,10 +122,7 @@ class CkanAdapter(ProviderAdapter):
                         title=_optional_string(package.get("title")) or resource_id,
                         description=_optional_string(package.get("notes")),
                         source_id=self.adapter_type,
-                        provider_settings={
-                            "endpoint": endpoint,
-                            "resource_id": resource_id,
-                        },
+                        settings={"resource_id": resource_id},
                         metadata=Metadata(
                             title=_optional_string(package.get("title")), raw=package
                         ),

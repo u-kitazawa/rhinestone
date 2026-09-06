@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from rhinestone import Config, ProviderConfig, configure
+from rhinestone import Config, configure, sources
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _support.http_json import get_json  # noqa: E402
@@ -14,8 +14,9 @@ app_id = (
 )
 stats_data_id = os.environ["RHINESTONE_ESTAT_STATS_DATA_ID"]
 app = configure(
-    providers={"estat": ProviderConfig("estat", {"api_key": app_id})},
+    sources=(sources.ESTAT,),
     dependencies={"http-json": lambda: get_json},
+    credentials={"estat": lambda: app_id},
 )
 resource = app.resolve(
     Config(source_id="estat", settings={"stats_data_id": stats_data_id})

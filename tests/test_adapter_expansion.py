@@ -10,7 +10,7 @@ from xml.etree.ElementTree import fromstring
 
 import pytest
 
-from rhinestone import Config, ProviderConfig, SearchQuery, configure
+from rhinestone import Config, SearchQuery, configure, sources
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
@@ -66,7 +66,7 @@ def test_tile_source_plan_search_and_gdal_translation() -> None:
         return "dataset"
 
     app = configure(
-        providers={"gsi": ProviderConfig("gsi-tile")},
+        sources=(sources.GSI,),
         dependencies={"gdal": lambda: SimpleNamespace(OpenEx=open_ex)},
     )
     assert app.open(Config("gsi", {"id": "std"})) == "dataset"
@@ -403,7 +403,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
         return "rotating-secret"
 
     app = configure(
-        providers={"odpt": ProviderConfig("odpt")},
+        sources=(sources.ODPT,),
         dependencies={"json-service": lambda: SimpleNamespace(get=get)},
         credentials={"odpt": credential},
     )
@@ -421,7 +421,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
     assert resource.open() == data
     assert len(factory_calls) == 2
     other = configure(
-        providers={"odpt": ProviderConfig("odpt")},
+        sources=(sources.ODPT,),
         dependencies={"json-service": lambda: SimpleNamespace(get=get)},
     )
     with pytest.raises(CredentialUnavailableError):

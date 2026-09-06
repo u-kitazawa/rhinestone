@@ -1,14 +1,12 @@
-from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
 import pytest
-import rdflib
 
-from rhinestone import Config, ProviderConfig, SearchQuery, configure
+from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
 from rhinestone.errors import (
     AdapterRegistrationError,
-    ConfigValidationError,
     UnsupportedSearchConditionError,
+    UnsupportedSourceError,
 )
 
 
@@ -33,7 +31,7 @@ def direct_config() -> Config:
     )
 
 
-def test_direct_provider_and_execution_adapters_are_built_in() -> None:
+def test_direct_and_execution_adapters_are_built_in() -> None:
     calls: List[str] = []
     runtime = FakeRasterio("opened")
     app = configure(dependencies={"rasterio": lambda: calls.append("load") or runtime})
@@ -67,7 +65,52 @@ def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
     assert selected == []
 
 
-def test_two_providers_can_share_one_adapter_type() -> None:
+def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
+    assert isinstance(sources.ALL, tuple)
+    assert sources.ALL == (
+        sources.GEOSPATIAL_JP,
+        sources.ESTAT,
+        sources.PLATEAU,
+        sources.GSI,
+        sources.ODPT,
+    )
+    assert all(isinstance(source, SourceDefinition) for source in sources.ALL)
+    assert all(source.id != "direct" for source in sources.ALL)
+
+
+def test_source_definitions_do_not_store_runtime_or_secret_values() -> None:
+    for source in sources.ALL:
+        assert "credentials" not in source.settings
+        assert "dependencies" not in source.settings
+        assert "app_id" not in source.settings
+        assert "api_key" not in source.settings
+        assert "api_token" not in source.settings
+
+
+def test_configure_all_composes_without_loading_dependencies_or_credentials() -> None:
+    dependency_calls: List[bool] = []
+    credential_calls: List[bool] = []
+
+    configure(
+        sources=sources.ALL,
+        dependencies={"http-json": lambda: dependency_calls.append(True)},
+        credentials={"estat": lambda: credential_calls.append(True) or "secret"},
+    )
+
+    assert dependency_calls == []
+    assert credential_calls == []
+
+
+def test_configure_one_source_only_enables_that_source_and_direct() -> None:
+    app = configure(sources=(sources.GSI,))
+
+    assert app.resolve(Config("gsi", {"id": "std"})).provenance.provider == "gsi"
+    assert app.resolve(direct_config()).provenance.provider == "direct"
+    with pytest.raises(UnsupportedSourceError, match="geospatial-jp"):
+        app.resolve(Config("geospatial-jp", {"resource_id": "x"}))
+
+
+def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config() -> None:
     requests: List[str] = []
 
     def get_json(
@@ -120,25 +163,25 @@ def test_two_providers_can_share_one_adapter_type() -> None:
             },
         }
 
+    first = SourceDefinition("catalog-a", "ckan", {"endpoint": "https://first.test"})
+    second = SourceDefinition("catalog-b", "ckan", {"endpoint": "https://second.test"})
     app = configure(
-        providers={
-            "catalog-a": ProviderConfig("ckan", {"endpoint": "https://first.test"}),
-            "catalog-b": ProviderConfig(
-                "ckan",
-                {"endpoint": "https://second.test", "api_key": "secret"},
-            ),
-        },
+        sources=(first, second),
         dependencies={"http-json": lambda: get_json},
     )
 
     grouped = app.search(SearchQuery(text="dataset", limit=1))
 
     assert tuple(grouped) == ("catalog-a", "catalog-b")
-    assert grouped["catalog-a"][0].source_id == "catalog-a"
-    assert grouped["catalog-b"][0].source_id == "catalog-b"
-    first = app.resolve(grouped["catalog-a"][0].to_config())
-    assert first.provenance.provider == "catalog-a"
-    assert first.provenance.adapter == "ckan"
+    result = grouped["catalog-a"][0]
+    assert result.source_id == "catalog-a"
+    assert result.settings == {"resource_id": "first-resource"}
+    assert "endpoint" not in result.settings
+    config = result.to_config()
+    assert config == Config("catalog-a", {"resource_id": "first-resource"})
+    resolved = app.resolve(config)
+    assert resolved.provenance.provider == "catalog-a"
+    assert resolved.provenance.adapter == "ckan"
     assert any(url.startswith("https://first.test") for url in requests)
     assert any(url.startswith("https://second.test") for url in requests)
 
@@ -147,15 +190,28 @@ def test_public_search_exposes_unsupported_conditions_as_domain_error() -> None:
     def unused_get_json(url: str, params: Mapping[str, Any]) -> Dict[str, Any]:
         return {}
 
+    source = SourceDefinition("catalog", "ckan", {"endpoint": "https://example.test"})
     app = configure(
-        providers={
-            "catalog": ProviderConfig("ckan", {"endpoint": "https://example.test"})
-        },
-        dependencies={"http-json": lambda: unused_get_json},
+        sources=(source,), dependencies={"http-json": lambda: unused_get_json}
     )
 
     with pytest.raises(UnsupportedSearchConditionError, match="bbox"):
         app.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
+
+
+def test_duplicate_source_id_is_rejected_during_configuration() -> None:
+    with pytest.raises(AdapterRegistrationError, match="registered more than once"):
+        configure(sources=(sources.GSI, sources.GSI))
+
+
+def test_direct_source_id_is_reserved() -> None:
+    with pytest.raises(AdapterRegistrationError, match="direct"):
+        configure(sources=(SourceDefinition("direct", "gsi-tile"),))
+
+
+def test_unknown_built_in_adapter_type_is_rejected() -> None:
+    with pytest.raises(AdapterRegistrationError, match="unknown"):
+        configure(sources=(SourceDefinition("custom", "unknown"),))
 
 
 def test_configured_contexts_do_not_share_runtime_instances() -> None:
@@ -168,81 +224,6 @@ def test_configured_contexts_do_not_share_runtime_instances() -> None:
     assert second.resolve(direct_config()).open().startswith("second:")
 
 
-def test_unknown_built_in_adapter_type_is_rejected() -> None:
-    with pytest.raises(AdapterRegistrationError, match="unknown"):
-        configure(providers={"custom": ProviderConfig("unknown")})
-
-
-def test_direct_provider_id_is_reserved() -> None:
-    with pytest.raises(AdapterRegistrationError, match="direct"):
-        configure(providers={"direct": ProviderConfig("direct")})
-
-
-def test_empty_provider_id_is_rejected() -> None:
-    with pytest.raises(AdapterRegistrationError, match="non-empty"):
-        configure(providers={"": ProviderConfig("gsi-tile")})
-
-
-@pytest.mark.parametrize(
-    "provider",
-    (
-        ProviderConfig("ckan", {"endpoint": "https://example.test"}),
-        ProviderConfig("estat", {"app_id": "test"}),
-        ProviderConfig("stac", {"endpoint": "https://example.test"}),
-        ProviderConfig(
-            "ogc-features",
-            {"endpoint": "https://example.test", "collection_id": "rivers"},
-        ),
-        ProviderConfig("plateau"),
-        ProviderConfig("gsi-tile"),
-        ProviderConfig("gsi-fundamental"),
-        ProviderConfig("dcat", {"catalog_uri": "https://example.test/catalog"}),
-        ProviderConfig("odpt"),
-    ),
-)
-def test_all_built_in_source_adapter_types_are_composed(
-    provider: ProviderConfig,
-) -> None:
-    configure(providers={"provider": provider})
-
-
-def test_dcat_source_dependencies_are_lazy_and_provider_scoped() -> None:
-    document = (
-        Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
-    ).read_text()
-
-    def get_document(uri: str) -> str:
-        return document
-
-    app = configure(
-        providers={"catalog": ProviderConfig("dcat")},
-        dependencies={
-            "http-text": lambda: get_document,
-            "rdflib": lambda: rdflib,
-        },
-    )
-
-    resource = app.resolve(
-        Config(
-            "catalog",
-            {
-                "uri": "https://fixture.example/catalog",
-                "dataset": "https://fixture.example/dataset",
-                "distribution": "https://fixture.example/geojson",
-                "serialization": "turtle",
-            },
-        )
-    )
-
-    assert resource.uri == "https://fixture.example/rivers.geojson"
-    assert resource.provenance.provider == "catalog"
-
-
-def test_provider_options_reject_typos() -> None:
-    with pytest.raises(ConfigValidationError, match="typo"):
-        configure(providers={"catalog": ProviderConfig("ckan", {"typo": "value"})})
-
-
-def test_legacy_adapter_registration_arguments_are_not_public() -> None:
+def test_legacy_provider_composition_api_is_not_public() -> None:
     with pytest.raises(TypeError):
-        configure(source_adapters=(), execution_adapters=())  # type: ignore[call-arg]
+        configure(providers={})  # type: ignore[call-arg]

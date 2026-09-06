@@ -22,13 +22,16 @@ def _freeze(value: Any) -> Any:
 
 
 @dataclass(frozen=True)
-class ProviderConfig:
-    """Configuration for one named provider backed by a built-in adapter."""
+class SourceDefinition:
+    """Static definition of one selectable data source."""
 
+    id: str
     adapter_type: str
     settings: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if not self.id:
+            raise ConfigValidationError("source id must be a non-empty string")
         if not self.adapter_type:
             raise ConfigValidationError("adapter_type must be a non-empty string")
         object.__setattr__(self, "settings", _freeze(self.settings))
@@ -172,12 +175,12 @@ class SearchResult:
     title: str
     description: Optional[str]
     source_id: str
-    provider_settings: Mapping[str, Any]
+    settings: Mapping[str, Any]
     metadata: Metadata
     provenance: Provenance
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "provider_settings", _freeze(self.provider_settings))
+        object.__setattr__(self, "settings", _freeze(self.settings))
 
     def to_config(self) -> Config:
-        return Config(source_id=self.source_id, settings=self.provider_settings)
+        return Config(source_id=self.source_id, settings=self.settings)

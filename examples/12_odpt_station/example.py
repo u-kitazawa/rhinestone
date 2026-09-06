@@ -4,10 +4,10 @@ import os
 
 import requests
 
-from rhinestone import Config, ProviderConfig, configure
+from rhinestone import Config, configure, sources
 
 app = configure(
-    providers={"odpt": ProviderConfig("odpt")},
+    sources=(sources.ODPT,),
     dependencies={"json-service": lambda: requests},
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )

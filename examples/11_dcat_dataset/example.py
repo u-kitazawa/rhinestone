@@ -6,19 +6,16 @@ import pyogrio
 import rdflib
 import requests
 
-from rhinestone import Config, ProviderConfig, configure
+from rhinestone import Config, SourceDefinition, configure
 
 
 def get_document(uri):
     return requests.get(uri, timeout=30).text
 
 
+catalog_uri = os.environ["RHINESTONE_DCAT_URI"]
 app = configure(
-    providers={
-        "catalog": ProviderConfig(
-            "dcat", {"catalog_uri": os.environ["RHINESTONE_DCAT_URI"]}
-        )
-    },
+    sources=(SourceDefinition("catalog", "dcat", {"catalog_uri": catalog_uri}),),
     dependencies={
         "http-text": lambda: get_document,
         "rdflib": lambda: rdflib,
@@ -29,7 +26,7 @@ resource = app.resolve(
     Config(
         "catalog",
         {
-            "uri": os.environ["RHINESTONE_DCAT_URI"],
+            "uri": catalog_uri,
             "dataset": os.environ["RHINESTONE_DCAT_DATASET_URI"],
             "distribution": os.environ["RHINESTONE_DCAT_DISTRIBUTION_URI"],
             "serialization": os.environ.get("RHINESTONE_DCAT_SERIALIZATION", "turtle"),

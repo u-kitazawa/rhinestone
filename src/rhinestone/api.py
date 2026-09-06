@@ -1,7 +1,7 @@
 """Public composition API."""
 
 from dataclasses import replace
-from typing import Any, Callable, Dict, FrozenSet, Mapping, Optional, Tuple, cast
+from typing import Any, Callable, FrozenSet, Iterable, Mapping, Optional, Tuple, cast
 
 from .adapters.execution import (
     GdalAdapter,
@@ -22,10 +22,16 @@ from .adapters.source import (
     ProviderAdapter,
     StacAdapter,
 )
-from .adapters.source.estat import DEFAULT_ENDPOINT as ESTAT_ENDPOINT
 from .errors import AdapterRegistrationError, ConfigValidationError
 from .execution import ExecutionAdapterSelector
-from .models import Config, ProviderConfig, Resource, SearchQuery, SearchResult, Source
+from .models import (
+    Config,
+    Resource,
+    SearchQuery,
+    SearchResult,
+    Source,
+    SourceDefinition,
+)
 from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .resolution import Resolver
@@ -34,8 +40,8 @@ from .search import SearchCoordinator
 Factory = Callable[[], Any]
 
 
-class _ConfiguredProviderAdapter:
-    """Bind one provider id to one built-in adapter instance."""
+class _ConfiguredSourceAdapter:
+    """Bind one public source id to one built-in adapter instance."""
 
     def __init__(self, source_id: str, adapter: ProviderAdapter) -> None:
         self.source_id = source_id
@@ -68,34 +74,39 @@ class _ConfiguredProviderAdapter:
 
 
 class Rhinestone:
-    """An isolated context composed from providers and user-owned dependencies."""
+    """An isolated context composed from sources and user-owned runtime inputs."""
 
     def __init__(
         self,
         *,
-        providers: Optional[Mapping[str, ProviderConfig]] = None,
+        sources: Iterable[SourceDefinition] = (),
         dependencies: Optional[Mapping[str, Factory]] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     ) -> None:
         dependency_registry = DependencyRegistry(dependencies or {})
         credential_registry = CredentialRegistry(credentials or {})
-        configured: Dict[str, ProviderConfig] = {"direct": ProviderConfig("direct")}
-        for source_id, provider in (providers or {}).items():
-            if not source_id:
-                raise AdapterRegistrationError("Provider id must be non-empty")
-            if source_id in configured:
-                raise AdapterRegistrationError(
-                    f"Provider {source_id!r} is registered more than once"
-                )
-            configured[source_id] = provider
 
-        sources = tuple(
-            _ConfiguredProviderAdapter(
-                source_id,
-                _build_source_adapter(provider, dependency_registry),
+        configured_sources = [_ConfiguredSourceAdapter("direct", DirectAdapter())]
+        configured_ids = {"direct"}
+        for source_definition in sources:
+            source_id = source_definition.id
+            if source_id in configured_ids:
+                raise AdapterRegistrationError(
+                    f"Source {source_id!r} is registered more than once"
+                )
+            configured_ids.add(source_id)
+            configured_sources.append(
+                _ConfiguredSourceAdapter(
+                    source_id,
+                    _build_source_adapter(
+                        source_definition,
+                        dependency_registry,
+                        credential_registry,
+                    ),
+                )
             )
-            for source_id, provider in configured.items()
-        )
+
+        source_adapters = tuple(configured_sources)
         executions = (
             GdalAdapter(),
             RasterioAdapter(),
@@ -107,14 +118,16 @@ class Rhinestone:
             binder = getattr(adapter, "bind_credentials", None)
             return binder(credential_registry) if callable(binder) else adapter
 
-        adapters = AdapterRegistry(sources, (bind(adapter) for adapter in executions))
+        adapters = AdapterRegistry(
+            source_adapters, (bind(adapter) for adapter in executions)
+        )
         self._pipeline = AccessPipeline(
             adapter_registry=adapters,
             resolver=Resolver(),
             execution_selector=ExecutionAdapterSelector(adapters.execution_adapters),
             dependencies=dependency_registry,
         )
-        self._search = SearchCoordinator(sources)
+        self._search = SearchCoordinator(source_adapters)
 
     def resolve(self, config: Config) -> Resource:
         return self._pipeline.resolve(config)
@@ -128,23 +141,25 @@ class Rhinestone:
 
 def configure(
     *,
-    providers: Optional[Mapping[str, ProviderConfig]] = None,
+    sources: Iterable[SourceDefinition] = (),
     dependencies: Optional[Mapping[str, Factory]] = None,
     credentials: Optional[Mapping[str, Callable[[], str]]] = None,
 ) -> Rhinestone:
-    """Compose built-in adapters around named providers and lazy dependencies."""
+    """Compose built-in adapters around selected sources and lazy runtime inputs."""
     return Rhinestone(
-        providers=providers,
+        sources=sources,
         dependencies=dependencies,
         credentials=credentials,
     )
 
 
 def _build_source_adapter(
-    provider: ProviderConfig, dependencies: DependencyRegistry
+    source: SourceDefinition,
+    dependencies: DependencyRegistry,
+    credentials: CredentialRegistry,
 ) -> ProviderAdapter:
-    adapter_type = provider.adapter_type
-    settings = dict(provider.settings)
+    adapter_type = source.adapter_type
+    settings = dict(source.settings)
 
     def json_transport(
         url: str,
@@ -156,43 +171,21 @@ def _build_source_adapter(
             return get_json(url, params, headers)
         return get_json(url, params)
 
-    if adapter_type == "direct":
-        _reject_options(adapter_type, settings, ())
-        return DirectAdapter()
     if adapter_type == "ckan":
-        _reject_options(
-            adapter_type,
-            settings,
-            ("endpoint", "api_token", "api_key", "api_key_header"),
-        )
+        _reject_options(adapter_type, settings, ("endpoint",))
         return CkanAdapter(get_json=json_transport, **settings)
     if adapter_type == "estat":
-        _reject_options(
-            adapter_type,
-            settings,
-            ("app_id", "api_key", "endpoint", "language"),
+        _reject_options(adapter_type, settings, ("endpoint", "language"))
+        return EStatAdapter(
+            get_json=json_transport,
+            credential_factory=lambda: credentials.get("estat"),
+            **settings,
         )
-        settings.setdefault("endpoint", ESTAT_ENDPOINT)
-        return EStatAdapter(get_json=json_transport, **settings)
     if adapter_type == "stac":
-        _reject_options(
-            adapter_type,
-            settings,
-            ("endpoint", "api_token", "api_key", "api_key_header"),
-        )
+        _reject_options(adapter_type, settings, ("endpoint",))
         return StacAdapter(get_json=json_transport, **settings)
     if adapter_type == "ogc-features":
-        _reject_options(
-            adapter_type,
-            settings,
-            (
-                "endpoint",
-                "collection_id",
-                "api_token",
-                "api_key",
-                "api_key_header",
-            ),
-        )
+        _reject_options(adapter_type, settings, ("endpoint", "collection_id"))
         return OgcFeaturesAdapter(get_json=json_transport, **settings)
     if adapter_type == "plateau":
         _reject_options(adapter_type, settings, ("endpoint",))
@@ -231,5 +224,5 @@ def _reject_options(
     unknown = sorted(set(settings) - set(allowed))
     if unknown:
         raise ConfigValidationError(
-            f"Unknown {adapter_type} provider options: {', '.join(unknown)}"
+            f"Unknown {adapter_type} source options: {', '.join(unknown)}"
         )
