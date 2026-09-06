@@ -22,7 +22,7 @@ for source_id, results in grouped.items():
 
 source_id = os.environ.get("RHINESTONE_RESULT_SOURCE", "estat")
 selected = grouped[source_id][0]
-resource = app.resolve(selected.to_config())
+resource = selected.resolve()
 print("selected resource:", resource.uri)
 print("metadata:", resource.metadata)
 print("provenance:", resource.provenance)
