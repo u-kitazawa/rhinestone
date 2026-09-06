@@ -75,7 +75,7 @@ class EStatAdapter(ProviderAdapter):
     def load(self, config: Config) -> Source:
         settings = self._config_settings(config)
         stats_data_id = self._required_string(settings, "stats_data_id")
-        endpoint = self._endpoint_from(settings, DEFAULT_ENDPOINT)
+        endpoint = self._endpoint_from(settings, self._endpoint)
         root = self._estat(
             endpoint,
             "getMetaInfo",
@@ -132,7 +132,7 @@ class EStatAdapter(ProviderAdapter):
             params["searchWord"] = query.text
         if query.limit is not None:
             params["limit"] = query.limit
-        endpoint = self._endpoint_from({}, DEFAULT_ENDPOINT)
+        endpoint = self._endpoint_from({}, self._endpoint)
         root = self._estat(endpoint, "getStatsList", params)
         data_list = self._object(root.get("DATALIST_INF"), "e-Stat DATALIST_INF")
         tables = self._objects(data_list.get("TABLE_INF"), "e-Stat TABLE_INF")

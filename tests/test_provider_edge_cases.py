@@ -72,8 +72,17 @@ def test_estat_validates_constructor_and_optional_search_parameters() -> None:
     with pytest.raises(ConfigValidationError, match="app_id"):
         EStatAdapter(app_id="", get_json=RecordingJsonClient({}))
     with pytest.raises(ConfigValidationError, match="language"):
-        EStatAdapter(app_id="id", language="X", get_json=RecordingJsonClient({}))
-    adapter = EStatAdapter(app_id="id", get_json=RecordingJsonClient({}))
+        EStatAdapter(
+            app_id="id",
+            language="X",
+            endpoint="https://api.e-stat.go.jp/rest/3.0/app/json",
+            get_json=RecordingJsonClient({}),
+        )
+    adapter = EStatAdapter(
+        app_id="id",
+        endpoint="https://api.e-stat.go.jp/rest/3.0/app/json",
+        get_json=RecordingJsonClient({}),
+    )
     with pytest.raises(ConfigValidationError, match="bbox"):
         adapter.search(SearchQuery(bbox=(0.0, 0.0, 1.0, 1.0)))
 
@@ -95,7 +104,11 @@ def test_estat_empty_query_and_scalar_title_are_supported() -> None:
         }
     )
 
-    results = EStatAdapter(app_id="id", get_json=client).search(SearchQuery())
+    results = EStatAdapter(
+        app_id="id",
+        endpoint=endpoint,
+        get_json=client,
+    ).search(SearchQuery())
 
     assert results[0].title == "Scalar title"
     assert results[0].metadata.publisher is None

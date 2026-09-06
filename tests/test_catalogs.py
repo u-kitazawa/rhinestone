@@ -22,7 +22,9 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
 
 
 def test_catalog_contains_service_configuration_but_not_runtime_values() -> None:
-    assert sources.GEOSPATIAL_JP.settings["endpoint"] == "https://www.geospatial.jp/ckan"
+    assert sources.GEOSPATIAL_JP.settings["endpoint"] == (
+        "https://www.geospatial.jp/ckan"
+    )
     assert sources.ESTAT.settings["endpoint"] == (
         "https://api.e-stat.go.jp/rest/3.0/app/json"
     )
