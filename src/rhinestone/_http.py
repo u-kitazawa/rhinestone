@@ -1,0 +1,97 @@
+"""Built-in standard-library HTTP transport."""
+
+import json
+from typing import Any, Mapping, Optional
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+
+_TIMEOUT_SECONDS = 30
+_DEFAULT_HEADERS = {
+    "Accept": "application/json",
+    "User-Agent": "rhinestone",
+}
+
+
+def get_json(
+    url: str,
+    params: Mapping[str, Any],
+    headers: Optional[Mapping[str, str]] = None,
+) -> Any:
+    """Fetch and decode JSON over HTTP using the standard library."""
+    request = _request(url, params, headers)
+    with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+        return json.load(response)
+
+
+def get_text(url: str) -> str:
+    """Fetch a text document over HTTP using the standard library."""
+    request = Request(url, headers={"User-Agent": "rhinestone"})
+    with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+        charset = response.headers.get_content_charset() or "utf-8"
+        return response.read().decode(charset)
+
+
+class JsonServiceRuntime:
+    """Small requests-compatible runtime used by ``JsonServiceAdapter``."""
+
+    def get(
+        self,
+        url: str,
+        *,
+        params: Mapping[str, Any],
+        headers: Mapping[str, str],
+        timeout: int,
+        allow_redirects: bool,
+    ) -> "JsonResponse":
+        request = _request(url, params, headers)
+        opener = build_opener(_NoRedirectHandler())
+        try:
+            response = opener.open(request, timeout=timeout)
+        except HTTPError as error:
+            response = error
+        with response:
+            charset = response.headers.get_content_charset() or "utf-8"
+            return JsonResponse(response.getcode(), response.read(), charset)
+
+
+class JsonResponse:
+    """Subset of the requests response contract used by ``JsonServiceAdapter``."""
+
+    def __init__(self, status_code: int, body: bytes, charset: str) -> None:
+        self.status_code = status_code
+        self._body = body
+        self._charset = charset
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise OSError(f"HTTP request failed with status {self.status_code}")
+
+    def json(self) -> Any:
+        return json.loads(self._body.decode(self._charset))
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Optional[Request]:
+        return None
+
+
+def _request(
+    url: str,
+    params: Mapping[str, Any],
+    headers: Optional[Mapping[str, str]] = None,
+) -> Request:
+    query = urlencode(params, doseq=True)
+    request_url = url + ("?" + query if query else "")
+    return Request(
+        request_url,
+        headers={**_DEFAULT_HEADERS, **dict(headers or {})},
+    )
