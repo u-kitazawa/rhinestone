@@ -49,9 +49,7 @@ def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
         "GSI",
         "ODPT",
     }
-    assert {"GEOSPATIAL_JP", "ESTAT", "PLATEAU", "GSI", "ODPT"} <= set(
-        dir(sources)
-    )
+    assert {"GEOSPATIAL_JP", "ESTAT", "PLATEAU", "GSI", "ODPT"} <= set(dir(sources))
     with pytest.raises(AttributeError):
         getattr(sources, "MISSING")
 
