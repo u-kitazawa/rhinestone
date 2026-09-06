@@ -1,3 +1,5 @@
+from typing import List
+
 import pytest
 
 from rhinestone.adapters.source.estat import EStatAdapter
@@ -26,7 +28,7 @@ def test_estat_credential_factory_is_lazy_and_used_for_requests() -> None:
     client = RecordingJsonClient(
         {search_url: fixture_json("estat/get_stats_list.json")}
     )
-    calls = []
+    calls: List[bool] = []
 
     def credential() -> str:
         calls.append(True)
