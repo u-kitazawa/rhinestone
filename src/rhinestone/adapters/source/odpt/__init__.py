@@ -113,7 +113,8 @@ def _string_mapping(value: Any, name: str) -> Dict[str, str]:
     if not isinstance(value, Mapping) or not value:
         raise ConfigValidationError(f"{name} must be a non-empty object")
     result: Dict[str, str] = {}
-    for key, item in value.items():
+    values = cast(Mapping[Any, Any], value)
+    for key, item in values.items():
         if not isinstance(key, str) or not key.strip() or not isinstance(item, str):
             raise ConfigValidationError(f"{name} must map strings to strings")
         if not item.strip():
@@ -126,7 +127,8 @@ def _filter_mapping(value: Any) -> Dict[str, FrozenSet[str]]:
     if not isinstance(value, Mapping) or not value:
         raise ConfigValidationError("filter_fields must be a non-empty object")
     result: Dict[str, FrozenSet[str]] = {}
-    for key, raw_fields in value.items():
+    values = cast(Mapping[Any, Any], value)
+    for key, raw_fields in values.items():
         if not isinstance(key, str) or not key.strip():
             raise ConfigValidationError("filter_fields keys must be non-empty strings")
         if not isinstance(raw_fields, (list, tuple, set, frozenset)):

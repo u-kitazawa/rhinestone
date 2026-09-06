@@ -10,7 +10,7 @@ from ..models import SourceDefinition
 _CATALOG_PACKAGE = "rhinestone.catalogs"
 
 
-def load_catalog_resource(name: str) -> Any:
+def load_catalog_resource(name: object) -> Any:
     """Load one JSON resource from the repository-managed catalog."""
     if (
         not isinstance(name, str)
@@ -43,12 +43,14 @@ def load_source_definitions(
     document = load_catalog_resource(name)
     if not isinstance(document, Mapping):
         raise ConfigValidationError("Source catalog must be an object")
-    raw_sources = document.get("sources")
+    document_mapping = cast(Mapping[str, Any], document)
+    raw_sources = document_mapping.get("sources")
     if not isinstance(raw_sources, Mapping) or not raw_sources:
         raise ConfigValidationError("Source catalog must define sources")
 
+    source_entries = cast(Mapping[Any, Any], raw_sources)
     definitions: List[SourceDefinition] = []
-    for raw_id, raw_definition in raw_sources.items():
+    for raw_id, raw_definition in source_entries.items():
         if not isinstance(raw_id, str) or not raw_id.strip():
             raise ConfigValidationError("Source catalog ids must be non-empty strings")
         if not isinstance(raw_definition, Mapping):

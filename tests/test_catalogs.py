@@ -1,4 +1,4 @@
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence, cast
 
 import pytest
 
@@ -39,13 +39,17 @@ def test_catalog_contains_service_configuration_but_not_runtime_values() -> None
 
 def test_gsi_tiles_are_defined_in_sources_catalog() -> None:
     assert sources.GSI.adapter_type == "static"
-    items = sources.GSI.settings["items"]
-    assert isinstance(items, Mapping)
+    raw_items = sources.GSI.settings["items"]
+    assert isinstance(raw_items, Mapping)
+    items = cast(Mapping[str, Any], raw_items)
     assert set(items) == {"std", "pale"}
-    standard = items["std"]
-    assert isinstance(standard, Mapping)
-    assert standard["metadata"]["title"] == "標準地図"
-    assert standard["candidates"][0]["uri"].endswith("/std/{z}/{x}/{y}.png")
+    raw_standard = items["std"]
+    assert isinstance(raw_standard, Mapping)
+    standard = cast(Mapping[str, Any], raw_standard)
+    metadata = cast(Mapping[str, Any], standard["metadata"])
+    assert metadata["title"] == "標準地図"
+    candidates = cast(Sequence[Mapping[str, Any]], standard["candidates"])
+    assert candidates[0]["uri"].endswith("/std/{z}/{x}/{y}.png")
 
 
 @pytest.mark.parametrize("name", (None, "", "../sources.json", "a\\b", ".", ".."))
@@ -70,11 +74,10 @@ def test_catalog_resource_errors_are_normalized(
         def joinpath(self, name: str) -> FakeResource:
             return FakeResource("missing" if name == "missing.json" else "{")
 
-    monkeypatch.setattr(
-        catalog_module.resources,
-        "files",
-        lambda package: FakePackage(),
-    )
+    def fake_files(package: Any) -> FakePackage:
+        return FakePackage()
+
+    monkeypatch.setattr(catalog_module.resources, "files", fake_files)
     with pytest.raises(ConfigValidationError, match="not found"):
         load_catalog_resource("missing.json")
     with pytest.raises(ConfigValidationError, match="invalid JSON"):
@@ -98,10 +101,11 @@ def test_catalog_resource_errors_are_normalized(
 def test_source_catalog_manifest_shapes_are_rejected(
     document: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    def fake_load_catalog_resource(name: str) -> Any:
+        return document
+
     monkeypatch.setattr(
-        catalog_module,
-        "load_catalog_resource",
-        lambda name: document,
+        catalog_module, "load_catalog_resource", fake_load_catalog_resource
     )
     with pytest.raises(ConfigValidationError):
         load_source_definitions("fixture.json")

@@ -47,7 +47,7 @@ class EStatAdapter(ProviderAdapter):
         super().__init__(get_json=get_json, endpoint=endpoint)
         self._app_id = credential
         self._credential_factory = credential_factory
-        self._language = cast(str, language)
+        self._language = language
 
     def _credential(self) -> str:
         if self._credential_factory is not None:

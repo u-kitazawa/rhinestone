@@ -5,7 +5,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Mapping, cast
+from typing import Any, Dict, List, Mapping, Tuple, cast
 
 import pytest
 
@@ -317,7 +317,7 @@ def test_odpt_rejects_unknown_or_secret_settings(settings: Mapping[str, Any]) ->
 
 
 def test_odpt_catalog_shapes_are_rejected() -> None:
-    changes = (
+    changes: Tuple[Mapping[str, Any], ...] = (
         {"endpoint": None},
         {"endpoint": ""},
         {"resource_types": None},
@@ -341,7 +341,7 @@ def test_odpt_catalog_shapes_are_rejected() -> None:
     )
     for change in changes:
         kwargs = dict(sources.ODPT.settings)
-        kwargs.update(cast(Mapping[str, Any], change))
+        kwargs.update(change)
         with pytest.raises(ConfigValidationError):
             OdptAdapter(**kwargs)
 
