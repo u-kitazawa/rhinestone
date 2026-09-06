@@ -85,7 +85,9 @@ def test_get_json_builds_query_and_headers(monkeypatch: pytest.MonkeyPatch) -> N
     assert calls["timeout"] == 30
 
 
-def test_get_json_without_query_or_extra_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_json_without_query_or_extra_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: Dict[str, Any] = {}
 
     def open_url(request: Request, *, timeout: int) -> _Response:
@@ -179,6 +181,8 @@ def test_no_redirect_handler_rejects_redirect() -> None:
     request = Request("https://example.test")
 
     assert (
-        handler.redirect_request(request, None, 302, "redirect", {}, "https://other.test")
+        handler.redirect_request(
+            request, None, 302, "redirect", {}, "https://other.test"
+        )
         is None
     )
