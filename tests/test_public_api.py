@@ -185,9 +185,14 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     assert resolved.provenance.adapter == "ckan"
     assert any(url.startswith("https://first.test") for url in requests)
     assert any(url.startswith("https://second.test") for url in requests)
+    assert len(grouped) == 2
+    assert list(grouped) == [grouped[0], grouped[1]]
     assert grouped[0].source_id == "catalog-a"
     assert tuple(grouped[:1]) == (grouped[0],)
+    assert grouped.get("catalog-a") == grouped["catalog-a"]
     assert grouped.get("missing") == ()
+    assert tuple(grouped.values())[0] == grouped["catalog-a"]
+    assert tuple(grouped.items())[0][0] == "catalog-a"
 
     simple = app.search("dataset")
     assert simple[0].title == "first"
