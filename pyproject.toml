@@ -3,7 +3,7 @@ name = "rhinestone"
 version = "0.1.0"
 description = "Knowledge and specification layer for Japanese public and geospatial data"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 license-files = ["LICENSE"]
 authors = [
     { name = "kitazawa", email = "88121050+U-KITAZAWA@users.noreply.github.com" }
