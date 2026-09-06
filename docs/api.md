@@ -85,7 +85,7 @@ SourceDefinition(
 | `SearchResult` | `title`, `description`, `source_id`, `settings`, `metadata`, `provenance` | 検索結果。Source endpointは`settings`へ複製しない。|
 | `SearchResult` | `to_config() -> Config` | 通常の解決フローへ戻すConfigを作る。|
 | `SearchResult` | `resolve() -> Resource` | `app.search()`から得た結果を直接解決する。|
-| `SearchResults` | sequence / source group access | `results[0]`、`results["source-id"]`、`items()`で利用する。|`
+| `SearchResults` | sequence / source group access | `results[0]`、`results["source-id"]`、`items()`で利用する。|
 
 ### 解決結果
 
