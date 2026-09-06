@@ -1,15 +1,10 @@
 """Resolve a STAC asset and open its COG with user-owned Rasterio."""
 
 import os
-import sys
-from pathlib import Path
 
 import rasterio
 
 from rhinestone import Config, SourceDefinition, configure
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _support.http_json import get_json  # noqa: E402
 
 endpoint = os.environ["RHINESTONE_STAC_ENDPOINT"]
 collection_id = os.environ["RHINESTONE_STAC_COLLECTION_ID"]
@@ -17,7 +12,7 @@ item_id = os.environ["RHINESTONE_STAC_ITEM_ID"]
 asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
 app = configure(
     sources=(SourceDefinition("earth-search", "stac", {"endpoint": endpoint}),),
-    dependencies={"http-json": lambda: get_json, "rasterio": lambda: rasterio},
+    dependencies={"rasterio": lambda: rasterio},
 )
 resource = app.resolve(
     Config(
