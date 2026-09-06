@@ -6,7 +6,7 @@
 
 ## 設定と検索
 
-`Config.settings` は `resource_id` が必須です。組み込み Source の endpoint は `sources.GEOSPATIAL_JP` の Catalog 定義から渡されます。検索では `text` と `limit` を使えます。
+`Config.settings` は `resource_id` が必須です。組み込み Source の endpoint は `sources.GEOSPATIAL_JP` の Catalog 定義から渡されます。検索では `text` と `limit` を使えます。HTTP通信にはRhinestoneの組み込みtransportを使用します。
 
 配布 URL は API response から取得し、推測しません。
 
@@ -17,7 +17,6 @@ from rhinestone import Config, configure, sources
 
 app = configure(
     sources=(sources.GEOSPATIAL_JP,),
-    dependencies={"http-json": lambda: get_json},
 )
 resource = app.resolve(
     Config("geospatial-jp", {"resource_id": "resource-uuid"})
