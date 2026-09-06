@@ -10,7 +10,7 @@
 
 ## Endpoint と実行
 
-endpoint、resource type、許可される filter は `sources.ODPT` の Catalog 定義から Adapter へ渡されます。利用者は provider や requests 互換 runtime、credential factory を構成します。
+endpoint、resource type、許可される filter は `sources.ODPT` の Catalog 定義から Adapter へ渡されます。HTTP実行runtimeはRhinestoneに組み込まれているため、利用者はcredential factoryだけを構成します。
 
 ```python
 import os
@@ -19,7 +19,6 @@ from rhinestone import Config, configure, sources
 
 app = configure(
     sources=(sources.ODPT,),
-    dependencies={"json-service": lambda: requests},
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 ```
