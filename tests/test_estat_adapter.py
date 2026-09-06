@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List
 
 import pytest
 
@@ -6,6 +6,16 @@ from rhinestone.adapters.source.estat import EStatAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json
+
+
+@pytest.mark.parametrize("endpoint", (None, ""))
+def test_estat_requires_catalog_endpoint(endpoint: Any) -> None:
+    with pytest.raises(ConfigValidationError, match="endpoint"):
+        EStatAdapter(
+            app_id="id",
+            endpoint=endpoint,
+            get_json=RecordingJsonClient({}),
+        )
 
 
 def test_estat_accepts_api_key_alias() -> None:

@@ -54,6 +54,12 @@ def fail(*args: Any, **kwargs: Any) -> Any:
     raise ValueError("secret-in-underlying-error")
 
 
+def test_gsi_tile_catalog_shapes_are_rejected() -> None:
+    for specs in ({}, {1: {}}, {"std": []}):
+        with pytest.raises(ConfigValidationError):
+            GsiTileAdapter(cast(Any, specs))
+
+
 def test_tile_source_plan_search_and_gdal_translation() -> None:
     adapter = gsi_tile_adapter()
     results = adapter.search(SearchQuery(text="標準", limit=1))
@@ -150,6 +156,11 @@ def plateau_client(url: str, params: Mapping[str, Any]) -> Any:
     if url.endswith("package_search"):
         return {"success": True, "result": {"results": [package["result"]]}}
     return package
+
+
+def test_plateau_requires_catalog_endpoint() -> None:
+    with pytest.raises(ConfigValidationError, match="endpoint"):
+        PlateauAdapter(plateau_client)
 
 
 def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> None:
@@ -397,6 +408,52 @@ def test_odpt_rejects_unknown_or_secret_settings(settings: Mapping[str, Any]) ->
         odpt_adapter().load(Config("odpt", settings))
 
 
+def test_odpt_catalog_shapes_are_rejected() -> None:
+    changes = (
+        {},
+        {"endpoint": ""},
+        {"resource_types": None},
+        {"resource_types": {}},
+        {"resource_types": {1: "odpt:Station"}},
+        {"resource_types": {"station": 1}},
+        {"resource_types": {"station": ""}},
+        {
+            "resource_types": {
+                "station": "odpt:Station",
+                "railway": "odpt:Railway",
+            }
+        },
+        {"filter_fields": None},
+        {"filter_fields": {}},
+        {"filter_fields": {1: []}},
+        {"filter_fields": {"station": "dc:title"}},
+        {"filter_fields": {"station": [1]}},
+        {"spec_source": None},
+        {"terms_url": ""},
+    )
+    for change in changes:
+        kwargs = dict(sources.ODPT.settings)
+        kwargs.update(cast(Mapping[str, Any], change))
+        with pytest.raises(ConfigValidationError):
+            OdptAdapter(**kwargs)
+
+
+def test_odpt_runtime_filters_are_validated() -> None:
+    adapter = odpt_adapter()
+    adapter.config_schema = lambda: None  # type: ignore[method-assign]
+    with pytest.raises(ConfigValidationError, match="filters"):
+        adapter.load(
+            Config(
+                "odpt",
+                {
+                    "dataset": "station",
+                    "credential": "odpt",
+                    "filters": [],
+                },
+            )
+        )
+
+
 def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None:
     calls: Dict[str, Any] = {}
     data = json.loads((FIXTURES / "odpt.json").read_text())
@@ -452,6 +509,19 @@ def test_credential_errors_do_not_expose_factory_secrets() -> None:
             CredentialRegistry({"key": factory}).get("key")
         assert "secret-in-underlying-error" not in str(error.value)
         assert error.value.__context__ is None or error.value.__suppress_context__
+
+
+def test_odpt_rejects_incomplete_service_plan() -> None:
+    endpoint = "https://api.odpt.org/api/v4/odpt:Station"
+    plan = ServiceQueryPlan(
+        uri=endpoint,
+        options={
+            "service": "odpt",
+            "endpoint": endpoint,
+        },
+    )
+    with pytest.raises(ConfigValidationError, match="incomplete"):
+        OdptAdapter.prepare_request(plan, CredentialRegistry({}))
 
 
 def test_odpt_authentication_cannot_be_redirected_to_another_provider() -> None:

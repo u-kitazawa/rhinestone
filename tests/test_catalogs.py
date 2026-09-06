@@ -1,7 +1,8 @@
-from typing import Mapping
+from typing import Any, Mapping
 
 import pytest
 
+import rhinestone.catalogs as catalog_module
 from rhinestone import SourceDefinition, sources
 from rhinestone.catalogs import load_catalog_resource, load_source_definitions
 from rhinestone.errors import ConfigValidationError
@@ -48,6 +49,107 @@ def test_tile_adapter_catalog_is_loaded_independently_from_the_adapter() -> None
     assert standard["format"] == "png"
 
 
-def test_catalog_resource_rejects_path_traversal() -> None:
+@pytest.mark.parametrize("name", (None, "", "../sources.json", "a\\b", ".", ".."))
+def test_catalog_resource_rejects_invalid_names(name: Any) -> None:
     with pytest.raises(ConfigValidationError):
-        load_catalog_resource("../sources.json")
+        load_catalog_resource(name)
+
+
+def test_catalog_resource_errors_are_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResource:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+        def read_text(self, encoding: str) -> str:
+            if self.text == "missing":
+                raise FileNotFoundError
+            return self.text
+
+    class FakePackage:
+        def joinpath(self, name: str) -> FakeResource:
+            return FakeResource("missing" if name == "missing.json" else "{")
+
+    monkeypatch.setattr(
+        catalog_module.resources,
+        "files",
+        lambda package: FakePackage(),
+    )
+    with pytest.raises(ConfigValidationError, match="not found"):
+        load_catalog_resource("missing.json")
+    with pytest.raises(ConfigValidationError, match="invalid JSON"):
+        load_catalog_resource("invalid.json")
+
+
+@pytest.mark.parametrize(
+    "document",
+    (
+        [],
+        {"sources": None},
+        {"sources": {}},
+        {"sources": {1: {}}},
+        {"sources": {"broken": []}},
+        {"sources": {"broken": {}}},
+        {"sources": {"broken": {"adapter_type": None}}},
+        {"sources": {"broken": {"adapter_type": ""}}},
+        {"sources": {"broken": {"adapter_type": "static", "settings": []}}},
+    ),
+)
+def test_source_catalog_manifest_shapes_are_rejected(
+    document: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        catalog_module,
+        "load_catalog_resource",
+        lambda name: document,
+    )
+    with pytest.raises(ConfigValidationError):
+        load_source_definitions("fixture.json")
+
+
+def test_source_catalog_item_resource_shapes_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    documents = (
+        {
+            "sources": {
+                "gsi": {
+                    "adapter_type": "static",
+                    "settings": {"items": {}, "items_resource": "items.json"},
+                }
+            }
+        },
+        {
+            "sources": {
+                "gsi": {
+                    "adapter_type": "static",
+                    "settings": {"items_resource": 0},
+                }
+            }
+        },
+        {
+            "sources": {
+                "gsi": {
+                    "adapter_type": "static",
+                    "settings": {"items_resource": ""},
+                }
+            }
+        },
+        {
+            "sources": {
+                "gsi": {
+                    "adapter_type": "static",
+                    "settings": {"items_resource": "items.json"},
+                }
+            }
+        },
+    )
+    for document in documents:
+        monkeypatch.setattr(
+            catalog_module,
+            "load_catalog_resource",
+            lambda name, document=document: (
+                [] if name == "items.json" else document
+            ),
+        )
+        with pytest.raises(ConfigValidationError):
+            load_source_definitions("fixture.json")
