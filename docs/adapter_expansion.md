@@ -69,54 +69,38 @@ AdapterはProvider固有の知識を持つが、CoreへProvider固有構造を�
 
 ## 4.2 Adapter
 
-```text
-［GsiTileAdapter］
-```
+GSIタイル専用のAdapterは追加しない。既存の汎用 `StaticAdapter` を使用し、
+GSI固有の固定知識はCatalog itemとして管理する。
 
-を追加する。
-
-`type` は以下とする。
+`SourceDefinition` は次のように構成する。
 
 ```yaml
 source:
-  type: gsi-tile
+  id: gsi
+  adapter_type: static
 ```
 
 ---
 
 ## 4.3 Config
 
-最小Config:
+Catalogの `sources.json` に定義されたitem名を `id` で指定する。
 
-```yaml
-source:
-  type: gsi-tile
-  id: std
+```python
+from rhinestone import Config
+
+Config("gsi", {"id": "std"})
+Config("gsi", {"id": "pale"})
 ```
 
-例:
-
-```yaml
-source:
-  type: gsi-tile
-  id: pale
-```
-
-必要に応じて明示的URL templateも指定可能とする。
-
-```yaml
-source:
-  type: gsi-tile
-  url: https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png
-```
-
-ただし公式dataset IDが既知の場合は `id` を優先する。
+URL templateをConfigへ直接指定せず、接続先とtile仕様はCatalogに保持する。
+これにより、Configは選択対象だけを表し、CoreやAdapterがGSI固有の名前を知る必要がない。
 
 ---
 
 ## 4.4 Specとして保持する知識
 
-［GsiTileAdapter］は最低限以下を知る。
+［StaticAdapter］は最低限以下を知る。
 
 ```text
 tile id
@@ -226,7 +210,7 @@ URL templateをAccessPlanに保持する。
 ［QgisAdapter］
 ```
 
-ただし［GsiTileAdapter］自身がMapLibreやGDALに依存してはならない。
+ただし［StaticAdapter］自身がMapLibreやGDALに依存してはならない。
 
 ---
 
@@ -237,7 +221,7 @@ URL templateをAccessPlanに保持する。
 例:
 
 ```python
-rs.search("標準地図", adapters=["gsi-tile"])
+app.search(SearchQuery(text="標準地図"))
 ```
 
 結果には、
@@ -1247,7 +1231,7 @@ ODPT API
 ## Phase 1
 
 ```text
-［GsiTileAdapter］
+［StaticAdapter］
 ```
 
 目的:
@@ -1373,7 +1357,7 @@ Authenticated Transport API
                             ↓
        ┌────────────────────┼────────────────────┐
        ↓                    ↓                    ↓
-［GsiTileAdapter］  ［PlateauAdapter］       ...
+［StaticAdapter］  ［PlateauAdapter］       ...
 ［DcatAdapter］     ［OdptAdapter］
        │                    │
        └────────────────────┼────────────────────┘
