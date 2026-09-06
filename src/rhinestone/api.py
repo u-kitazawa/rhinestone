@@ -1,16 +1,7 @@
 """Public composition API."""
 
 from dataclasses import replace
-from typing import (
-    Any,
-    Callable,
-    FrozenSet,
-    Iterable,
-    Mapping,
-    Optional,
-    Tuple,
-    cast,
-)
+from typing import Any, Callable, FrozenSet, Iterable, Mapping, Optional, Tuple, cast
 
 from .adapters.execution import (
     GdalAdapter,
