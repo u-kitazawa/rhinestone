@@ -1,6 +1,6 @@
 # アプリケーションを構成する
 
-Rhinestoneは`configure()`で作成した`app`を入口に使います。利用者はAdapterを組み立てず、利用するSourceと外部runtime・credentialを宣言します。
+Rhinestoneは`configure()`で作成した`app`を入口に使います。利用者はAdapterを組み立てず、利用するSourceと外部runtime・credentialを宣言します。HTTP transportはRhinestoneに組み込まれています。
 
 ## 組み込みSource
 
@@ -50,32 +50,28 @@ app = configure(
             settings={"endpoint": "https://stac.example/api"},
         ),
     ),
-    dependencies={"http-json": lambda: get_json},
 )
 ```
 
-通常のGetting Startedでは組み込み`rhinestone.sources`を優先します。
+HTTP metadata取得にも組み込みtransportが使われます。通常のGetting Startedでは組み込み`rhinestone.sources`を優先します。
 
 ## runtime dependency
 
-外部runtimeはfactoryとして渡します。
+Rhinestoneが実装しない外部runtimeだけをfactoryとして渡します。
 
 ```python
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "http-json": lambda: get_json,
-        "http-text": lambda: get_text,
         "rdflib": lambda: rdflib,
         "gdal": lambda: gdal,
         "rasterio": lambda: rasterio,
         "pyogrio": lambda: pyogrio,
-        "json-service": lambda: requests,
     },
 )
 ```
 
-factoryは必要になるまで評価されません。
+factoryは必要になるまで評価されません。HTTP JSON、HTTP text、JSON serviceの通信runtimeを利用者が登録する必要はありません。
 
 ## credential
 
@@ -84,10 +80,6 @@ secretはSourceDefinitionやConfigへ保存せず、logical nameに対応するf
 ```python
 app = configure(
     sources=(sources.ESTAT, sources.ODPT),
-    dependencies={
-        "http-json": lambda: get_json,
-        "json-service": lambda: requests,
-    },
     credentials={
         "estat": lambda: os.environ["ESTAT_APP_ID"],
         "odpt": lambda: os.environ["ODPT_CONSUMER_KEY"],
@@ -99,7 +91,8 @@ app = configure(
 
 - `SourceDefinition`: 静的な提供元情報
 - Source Adapter: 接続・解決方法の知識
-- dependency: HTTP、GDAL、Rasterio、SDK等の実行能力
+- built-in HTTP: metadata・文書・JSON serviceの通信
+- dependency: GDAL、Rasterio、RDFLib等の外部実行能力
 - credential: secret
 - `Config`: 選択したSource内で利用する対象
 
