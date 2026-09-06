@@ -1,7 +1,7 @@
 """Built-in standard-library HTTP transport."""
 
 import json
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
@@ -52,7 +52,8 @@ class JsonServiceRuntime:
             response = error
         with response:
             charset = response.headers.get_content_charset() or "utf-8"
-            return JsonResponse(response.getcode(), response.read(), charset)
+            status_code = cast(int, response.getcode())
+            return JsonResponse(status_code, response.read(), charset)
 
 
 class JsonResponse:
