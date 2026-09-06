@@ -16,8 +16,8 @@ from ....models import (
     SearchResult,
     Source,
 )
-from ..base import ProviderAdapter
 from .._knowledge import string
+from ..base import ProviderAdapter
 
 
 class StaticAdapter(ProviderAdapter):
