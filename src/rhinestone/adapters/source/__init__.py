@@ -11,6 +11,7 @@ from .odpt import OdptAdapter
 from .ogc import OgcFeaturesAdapter
 from .plateau import PlateauAdapter
 from .stac import StacAdapter
+from .static import StaticAdapter
 
 __all__ = [
     "CkanAdapter",
@@ -26,4 +27,5 @@ __all__ = [
     "PlateauAdapter",
     "ProviderAdapter",
     "StacAdapter",
+    "StaticAdapter",
 ]

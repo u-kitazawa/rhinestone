@@ -15,21 +15,23 @@ from .source import (
     PlateauAdapter,
     ProviderAdapter,
     StacAdapter,
+    StaticAdapter,
 )
 
 __all__ = [
     "CkanAdapter",
     "DirectAdapter",
     "DcatAdapter",
+    "EStatAdapter",
     "GsiFundamentalAdapter",
     "GsiTileAdapter",
-    "OdptAdapter",
-    "PlateauAdapter",
-    "EStatAdapter",
-    "ExecutionAdapter",
     "JsonGetter",
     "JsonObject",
+    "OdptAdapter",
     "OgcFeaturesAdapter",
+    "PlateauAdapter",
     "ProviderAdapter",
     "StacAdapter",
+    "StaticAdapter",
+    "ExecutionAdapter",
 ]
