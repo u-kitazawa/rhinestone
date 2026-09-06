@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, List, Mapping, Optional, cast
 
+from ....errors import ConfigValidationError
 from ....models import Config, ResourceCandidate, Source
 from .._knowledge import entry_point, source, string
 from ..base import JsonTransport
@@ -14,8 +15,10 @@ class PlateauAdapter(CkanAdapter):
     def __init__(
         self,
         get_json: JsonTransport,
-        endpoint: str = "https://www.geospatial.jp/ckan",
+        endpoint: Optional[str] = None,
     ) -> None:
+        if not isinstance(endpoint, str) or not endpoint.strip():
+            raise ConfigValidationError("PLATEAU endpoint must be configured")
         super().__init__(get_json, endpoint=endpoint)
 
     def load(self, config: Config) -> Source:

@@ -14,8 +14,6 @@ from ....models import (
 )
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
-DEFAULT_ENDPOINT = "https://api.e-stat.go.jp/rest/3.0/app/json"
-
 
 class EStatAdapter(ProviderAdapter):
     adapter_type = "estat"
@@ -25,8 +23,8 @@ class EStatAdapter(ProviderAdapter):
         self,
         app_id: Optional[str] = None,
         get_json: Optional[JsonTransport] = None,
-        endpoint: str = DEFAULT_ENDPOINT,
-        language: str = "J",
+        endpoint: Optional[str] = None,
+        language: Optional[str] = None,
         api_key: Optional[str] = None,
         credential_factory: Optional[Callable[[], str]] = None,
     ) -> None:
@@ -42,12 +40,14 @@ class EStatAdapter(ProviderAdapter):
         credential = app_id if app_id is not None else api_key
         if credential is not None and not credential:
             raise ConfigValidationError("app_id/api_key must be a non-empty string")
+        if not isinstance(endpoint, str) or not endpoint.strip():
+            raise ConfigValidationError("e-Stat endpoint must be configured")
+        if language not in {"J", "E"}:
+            raise ConfigValidationError("language must be J or E")
         super().__init__(get_json=get_json, endpoint=endpoint)
         self._app_id = credential
         self._credential_factory = credential_factory
-        if language not in {"J", "E"}:
-            raise ConfigValidationError("language must be J or E")
-        self._language = language
+        self._language = cast(str, language)
 
     def _credential(self) -> str:
         if self._credential_factory is not None:

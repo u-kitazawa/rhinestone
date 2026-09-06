@@ -1,54 +1,26 @@
-"""Built-in external source definitions."""
+"""Public facade for built-in Source definitions."""
 
-import json
-from importlib import resources
-from typing import Any, Dict, Tuple, cast
+from typing import Dict, Tuple
 
+from .catalogs import load_source_definitions
 from .models import SourceDefinition
 
-
-def _load_catalog(name: str) -> Dict[str, Any]:
-    return cast(
-        Dict[str, Any],
-        json.loads(resources.read_text("rhinestone.catalogs", name)),
-    )
+_BUILTINS: Dict[str, SourceDefinition] = {
+    source.id: source for source in load_source_definitions()
+}
 
 
-GEOSPATIAL_JP = SourceDefinition(
-    id="geospatial-jp",
-    adapter_type="ckan",
-    settings={"endpoint": "https://www.geospatial.jp/ckan"},
-)
+def _builtin(source_id: str) -> SourceDefinition:
+    return _BUILTINS[source_id]
 
-ESTAT = SourceDefinition(
-    id="estat",
-    adapter_type="estat",
-)
 
-PLATEAU = SourceDefinition(
-    id="plateau",
-    adapter_type="plateau",
-    settings={"endpoint": "https://www.geospatial.jp/ckan"},
-)
+GEOSPATIAL_JP = _builtin("geospatial-jp")
+ESTAT = _builtin("estat")
+PLATEAU = _builtin("plateau")
+GSI = _builtin("gsi")
+ODPT = _builtin("odpt")
 
-GSI = SourceDefinition(
-    id="gsi",
-    adapter_type="static",
-    settings={"items": _load_catalog("gsi_tiles.json")},
-)
-
-ODPT = SourceDefinition(
-    id="odpt",
-    adapter_type="odpt",
-)
-
-ALL: Tuple[SourceDefinition, ...] = (
-    GEOSPATIAL_JP,
-    ESTAT,
-    PLATEAU,
-    GSI,
-    ODPT,
-)
+ALL: Tuple[SourceDefinition, ...] = tuple(_BUILTINS.values())
 
 __all__ = [
     "ALL",

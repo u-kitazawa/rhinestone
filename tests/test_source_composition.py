@@ -4,7 +4,7 @@ from typing import Any, Dict, Mapping, Optional
 import pytest
 import rdflib
 
-from rhinestone import Config, SearchQuery, SourceDefinition, configure
+from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import ConfigValidationError
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
@@ -20,10 +20,10 @@ from tests.provider_support import fixture_json
             "ogc-features",
             {"endpoint": "https://ogc.test", "collection_id": "rivers"},
         ),
-        SourceDefinition("plateau-source", "plateau"),
+        SourceDefinition("plateau-source", "plateau", sources.PLATEAU.settings),
         SourceDefinition("fundamental-source", "gsi-fundamental"),
         SourceDefinition("dcat-source", "dcat"),
-        SourceDefinition("odpt-source", "odpt"),
+        SourceDefinition("odpt-source", "odpt", sources.ODPT.settings),
     ),
 )
 def test_advanced_source_definitions_compose(source: SourceDefinition) -> None:

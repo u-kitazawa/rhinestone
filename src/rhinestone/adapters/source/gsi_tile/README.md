@@ -1,9 +1,10 @@
 # GSI Tile Source Adapter
 
-`GsiTileAdapter` は国土地理院タイル定義を XYZ Resource に変換します。
+`GsiTileAdapter` は注入された国土地理院タイル仕様を XYZ Resource に変換します。
+カタログ定義の読み込みは `rhinestone.catalogs` が担当し、Adapter はカタログの保存場所を知りません。
 
 - `source_type`: `gsi-tile`
-- 設定: 組み込み定義の `id`、または完全なタイル仕様
+- 設定: 注入された定義の `id`、または完全なタイル仕様
 - 検索: `text`, `limit`
 - 対応: HTTPS、XYZ、EPSG:3857、256 px の PNG/JPEG タイル
 

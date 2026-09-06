@@ -9,7 +9,7 @@ from tests.provider_support import RecordingJsonClient, fixture_json
 
 
 def test_estat_accepts_api_key_alias() -> None:
-    adapter = EStatAdapter(api_key="app-key", get_json=RecordingJsonClient({}))
+    adapter = EStatAdapter(api_key="app-key", endpoint="https://api.e-stat.go.jp/rest/3.0/app/json", get_json=RecordingJsonClient({}))
     assert getattr(adapter, "_app_id") == "app-key"
 
 
@@ -19,7 +19,7 @@ def test_estat_rejects_missing_callback_and_conflicting_credentials() -> None:
     with pytest.raises(ConfigValidationError):
         EStatAdapter(app_id="app-id", api_key="key", get_json=RecordingJsonClient({}))
     with pytest.raises(ConfigValidationError, match="credential"):
-        EStatAdapter(get_json=RecordingJsonClient({})).search(SearchQuery())
+        EStatAdapter(endpoint="https://api.e-stat.go.jp/rest/3.0/app/json", get_json=RecordingJsonClient({})).search(SearchQuery())
 
 
 def test_estat_credential_factory_is_lazy_and_used_for_requests() -> None:
@@ -34,7 +34,7 @@ def test_estat_credential_factory_is_lazy_and_used_for_requests() -> None:
         calls.append(True)
         return "factory-app-id"
 
-    adapter = EStatAdapter(credential_factory=credential, get_json=client)
+    adapter = EStatAdapter(credential_factory=credential, endpoint=endpoint, get_json=client)
     assert calls == []
     adapter.search(SearchQuery(limit=1))
     assert calls == [True]
@@ -49,7 +49,7 @@ def test_estat_metadata_response_becomes_service_source_without_leaking_app_id()
     client = RecordingJsonClient(
         {metadata_url: fixture_json("estat/get_meta_info.json")}
     )
-    adapter = EStatAdapter(app_id="secret-app-id", get_json=client)
+    adapter = EStatAdapter(app_id="secret-app-id", endpoint=endpoint, get_json=client)
     source = adapter.load(Config("estat", {"stats_data_id": "0000000001"}))
     assert client.calls == [
         (
@@ -113,6 +113,6 @@ def test_estat_nonzero_result_status_is_rejected() -> None:
         }
     )
     with pytest.raises(ProviderResponseError, match="認証"):
-        EStatAdapter(app_id="invalid", get_json=client).load(
+        EStatAdapter(app_id="invalid", endpoint=endpoint, get_json=client).load(
             Config("estat", {"stats_data_id": "0000000001"})
         )

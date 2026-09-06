@@ -1,7 +1,5 @@
 """GSI image tile definitions, with explicit XYZ access semantics."""
 
-import json
-from importlib import resources
 from string import Formatter
 from typing import Any, Dict, List, Mapping, Tuple, cast
 from urllib.parse import urlsplit
@@ -16,16 +14,23 @@ class GsiTileAdapter(ProviderAdapter):
     adapter_type = "gsi-tile"
     search_conditions = frozenset({"text", "limit"})
 
-    def __init__(self) -> None:
+    def __init__(self, specs: Mapping[str, Mapping[str, Any]]) -> None:
         super().__init__(get_json=lambda url, params: None)
-        self._specs = cast(
-            Dict[str, Dict[str, Any]],
-            json.loads(
-                resources.read_text(
-                    "rhinestone.adapters.source.gsi_tile", "gsi_tiles.json"
+        if not isinstance(specs, Mapping) or not specs:
+            raise ConfigValidationError("GSI tile catalog must be a non-empty object")
+        raw_specs = cast(Mapping[str, Mapping[str, Any]], specs)
+        validated: Dict[str, Dict[str, Any]] = {}
+        for identifier, raw_spec in raw_specs.items():
+            if not isinstance(identifier, str) or not identifier.strip():
+                raise ConfigValidationError(
+                    "GSI tile catalog ids must be non-empty strings"
                 )
-            ),
-        )
+            if not isinstance(raw_spec, Mapping):
+                raise ConfigValidationError(
+                    f"GSI tile catalog item {identifier!r} must be an object"
+                )
+            validated[identifier] = dict(raw_spec)
+        self._specs = validated
 
     def load(self, config: Config) -> Source:
         settings = self._config_settings(config)

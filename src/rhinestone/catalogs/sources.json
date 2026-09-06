@@ -1,0 +1,61 @@
+{
+  "sources": {
+    "geospatial-jp": {
+      "adapter_type": "ckan",
+      "settings": {
+        "endpoint": "https://www.geospatial.jp/ckan"
+      }
+    },
+    "estat": {
+      "adapter_type": "estat",
+      "settings": {
+        "endpoint": "https://api.e-stat.go.jp/rest/3.0/app/json",
+        "language": "J"
+      }
+    },
+    "plateau": {
+      "adapter_type": "plateau",
+      "settings": {
+        "endpoint": "https://www.geospatial.jp/ckan"
+      }
+    },
+    "gsi": {
+      "adapter_type": "static",
+      "settings": {
+        "items_resource": "gsi_tiles.json"
+      }
+    },
+    "odpt": {
+      "adapter_type": "odpt",
+      "settings": {
+        "endpoint": "https://api.odpt.org/api/v4",
+        "resource_types": {
+          "station": "odpt:Station",
+          "railway": "odpt:Railway",
+          "train": "odpt:Train"
+        },
+        "filter_fields": {
+          "station": [
+            "owl:sameAs",
+            "dc:title",
+            "odpt:operator",
+            "odpt:railway"
+          ],
+          "railway": [
+            "owl:sameAs",
+            "dc:title",
+            "odpt:operator"
+          ],
+          "train": [
+            "owl:sameAs",
+            "odpt:operator",
+            "odpt:railway",
+            "odpt:trainNumber"
+          ]
+        },
+        "spec_source": "https://developer.odpt.org/documents",
+        "terms_url": "https://developer.odpt.org/terms/data_basic_license.html"
+      }
+    }
+  }
+}
