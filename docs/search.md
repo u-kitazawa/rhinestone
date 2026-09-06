@@ -7,7 +7,7 @@
 ```python
 import os
 
-from rhinestone import configure, sources
+from rhinestone import SearchQuery, configure, sources
 
 app = configure(
     sources=(sources.GEOSPATIAL_JP, sources.ESTAT),
