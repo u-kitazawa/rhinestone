@@ -1,6 +1,6 @@
 # データを検索する
 
-`app.search()`は、構成済みで検索Capabilityを持つSourceを横断して検索します。戻り値は`source_id`ごとにグループ化された`SearchResult`の辞書です。
+`app.search()`は、構成済みで検索Capabilityを持つSourceを横断して検索します。戻り値は`source_id`ごとにグループ化された`SearchResult`の辞書です。HTTP通信はRhinestoneの組み込みtransportを使います。
 
 ## 組み込みSourceを検索する
 
@@ -11,7 +11,6 @@ from rhinestone import SearchQuery, configure, sources
 
 app = configure(
     sources=(sources.GEOSPATIAL_JP, sources.ESTAT),
-    dependencies={"http-json": lambda: get_json},
     credentials={"estat": lambda: os.environ["ESTAT_APP_ID"]},
 )
 
@@ -68,7 +67,6 @@ stac_app = configure(
             {"endpoint": "https://stac.example/api"},
         ),
     ),
-    dependencies={"http-json": lambda: get_json},
 )
 results = stac_app.search(
     SearchQuery(bbox=(139.5, 35.5, 140.0, 36.0), limit=10)
