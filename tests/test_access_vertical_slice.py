@@ -30,7 +30,7 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
     )
 
     assert dependency_calls == []
-    data = app.open(config)
+    data = app.open(config, library="gdal")
 
     assert data is not None
     assert dependency_calls == ["gdal"]
@@ -50,4 +50,4 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
         settings={"uri": "/data/rivers.shp", "format": "shapefile"},
     )
 
-    assert app.open(config, adapter="pyogrio") == "pyogrio-data"
+    assert app.open(config, library="pyogrio") == "pyogrio-data"
