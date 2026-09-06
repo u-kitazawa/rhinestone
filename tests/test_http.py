@@ -123,7 +123,11 @@ def test_json_service_runtime_wraps_successful_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     opener = _Opener(_Response(b'{"ok": true}', charset="utf-8"))
-    monkeypatch.setattr(_http, "build_opener", lambda handler: opener)
+
+    def build_test_opener(_handler: object) -> _Opener:
+        return opener
+
+    monkeypatch.setattr(_http, "build_opener", build_test_opener)
 
     response = _http.JsonServiceRuntime().get(
         "https://example.test/api",
@@ -154,7 +158,11 @@ def test_json_service_runtime_preserves_http_status(
         io.BytesIO(b"{}"),
     )
     opener = _Opener(redirect)
-    monkeypatch.setattr(_http, "build_opener", lambda handler: opener)
+
+    def build_test_opener(_handler: object) -> _Opener:
+        return opener
+
+    monkeypatch.setattr(_http, "build_opener", build_test_opener)
 
     response = _http.JsonServiceRuntime().get(
         "https://example.test/api",
