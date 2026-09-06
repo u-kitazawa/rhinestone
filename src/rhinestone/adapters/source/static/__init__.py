@@ -135,18 +135,19 @@ class StaticAdapter(ProviderAdapter):
             raise ConfigValidationError(
                 f"static source item {identifier!r} candidate must be an object"
             )
-        uri = candidate.get("uri")
+        candidate_values = cast(Mapping[str, Any], candidate)
+        uri = candidate_values.get("uri")
         if not isinstance(uri, str) or not uri.strip():
             raise ConfigValidationError(
                 f"static source item {identifier!r} candidate uri must be non-empty"
             )
         for field in ("format", "media_type"):
-            value = candidate.get(field)
+            value = candidate_values.get(field)
             if value is not None and not isinstance(value, str):
                 raise ConfigValidationError(
                     f"static source item {identifier!r} candidate {field} must be a string"
                 )
-        attributes = candidate.get("attributes", {})
+        attributes = candidate_values.get("attributes", {})
         if not isinstance(attributes, Mapping):
             raise ConfigValidationError(
                 f"static source item {identifier!r} candidate attributes must be an object"
@@ -161,7 +162,7 @@ class StaticAdapter(ProviderAdapter):
             )
 
         candidates: List[ResourceCandidate] = []
-        for candidate_value in cast(Any, item["candidates"]):
+        for candidate_value in item["candidates"]:
             candidate = cast(Mapping[str, Any], candidate_value)
             candidates.append(
                 ResourceCandidate(
@@ -176,13 +177,15 @@ class StaticAdapter(ProviderAdapter):
             cast(Tuple[str, ...], tuple(item.get("capabilities", ())))
         )
         provenance_values = cast(Mapping[str, Any], item.get("provenance", {}))
-        query_parameters = provenance_values.get("query_parameters", {})
+        query_parameters = cast(
+            Mapping[str, Any], provenance_values.get("query_parameters", {})
+        )
         if not isinstance(query_parameters, Mapping):
             raise ConfigValidationError(
                 f"static source item {identifier!r} provenance.query_parameters must be an object"
             )
 
-        raw_item = cast(Mapping[str, Any], item)
+        raw_item = item
         provenance = Provenance(
             provider=self.adapter_type,
             dataset_identifier=_optional_string(

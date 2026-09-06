@@ -1,4 +1,4 @@
-from typing import Any, Mapping
+from typing import Any, Mapping, Tuple
 
 import pytest
 
@@ -39,6 +39,23 @@ def item(identifier: str = "one") -> Mapping[str, Any]:
     }
 
 
+INVALID_ITEMS: Tuple[Any, ...] = (
+    {},
+    [],
+    {"": item()},
+    {"one": []},
+    {"one": {"metadata": []}},
+    {"one": {"candidates": []}},
+    {"one": {"candidates": [{}]}},
+    {"one": {"candidates": [{"uri": "https://example.test", "format": 1}]}},
+    {"one": {"candidates": [{"uri": "https://example.test", "media_type": 1}]}},
+    {"one": {"candidates": [{"uri": "https://example.test", "attributes": []}]}},
+    {"one": {"capabilities": []}},
+    {"one": {"capabilities": [1]}},
+    {"one": {"provenance": []}},
+)
+
+
 def test_static_adapter_restores_source_and_provenance() -> None:
     adapter = StaticAdapter({"one": item()})
 
@@ -49,7 +66,7 @@ def test_static_adapter_restores_source_and_provenance() -> None:
     assert source.metadata.raw["checked"] is True
     assert source.candidates[0].uri.endswith("/one")
     assert source.provenance.dataset_identifier == "one"
-    assert source.provenance.original_url.endswith("/one")
+    assert source.provenance.original_url == "https://example.test/one"
 
 
 def test_static_adapter_search_is_deterministic_and_returns_configs() -> None:
@@ -75,21 +92,7 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
 
 @pytest.mark.parametrize(
     "items",
-    (
-        {},
-        [],
-        {"": item()},
-        {"one": []},
-        {"one": {"metadata": []}},
-        {"one": {"candidates": []}},
-        {"one": {"candidates": [{}]}},
-        {"one": {"candidates": [{"uri": "https://example.test", "format": 1}]}},
-        {"one": {"candidates": [{"uri": "https://example.test", "media_type": 1}]}},
-        {"one": {"candidates": [{"uri": "https://example.test", "attributes": []}]}},
-        {"one": {"capabilities": []}},
-        {"one": {"capabilities": [1]}},
-        {"one": {"provenance": []}},
-    ),
+    INVALID_ITEMS,
 )
 def test_static_adapter_rejects_invalid_catalog(items: Any) -> None:
     with pytest.raises(ConfigValidationError):
