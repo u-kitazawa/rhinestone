@@ -44,6 +44,10 @@ def fail(*args: Any, **kwargs: Any) -> Any:
 
 
 
+def odpt_adapter() -> OdptAdapter:
+    return OdptAdapter(**dict(sources.ODPT.settings))
+
+
 def test_dcat_rejects_an_unsupported_serialization_before_loading() -> None:
     adapter = DcatAdapter(
         lambda uri: "",
