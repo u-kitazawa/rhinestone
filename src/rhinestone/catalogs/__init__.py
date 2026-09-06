@@ -2,7 +2,7 @@
 
 import json
 from importlib import resources
-from typing import Any, Dict, List, Mapping, Tuple, cast
+from typing import Any, List, Mapping, Tuple, cast
 
 from ..errors import ConfigValidationError
 from ..models import SourceDefinition
@@ -66,10 +66,7 @@ def load_source_definitions(
             raise ConfigValidationError(
                 f"Source catalog entry {raw_id!r} settings must be an object"
             )
-        settings = _resolve_settings(
-            raw_id,
-            cast(Mapping[str, Any], settings_value),
-        )
+        settings = cast(Mapping[str, Any], settings_value)
         definitions.append(
             SourceDefinition(
                 id=raw_id,
@@ -78,31 +75,6 @@ def load_source_definitions(
             )
         )
     return tuple(definitions)
-
-
-def _resolve_settings(
-    source_id: str,
-    settings: Mapping[str, Any],
-) -> Dict[str, Any]:
-    resolved = dict(settings)
-    resource_name = resolved.pop("items_resource", None)
-    if resource_name is None:
-        return resolved
-    if "items" in resolved:
-        raise ConfigValidationError(
-            f"Source catalog entry {source_id!r} cannot define items and items_resource"
-        )
-    if not isinstance(resource_name, str) or not resource_name:
-        raise ConfigValidationError(
-            f"Source catalog entry {source_id!r} items_resource must be a file name"
-        )
-    items = load_catalog_resource(resource_name)
-    if not isinstance(items, Mapping) or not items:
-        raise ConfigValidationError(
-            f"Source catalog entry {source_id!r} items_resource must contain an object"
-        )
-    resolved["items"] = cast(Mapping[str, Any], items)
-    return resolved
 
 
 __all__ = ["load_catalog_resource", "load_source_definitions"]

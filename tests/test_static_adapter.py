@@ -1,8 +1,10 @@
-from typing import Any, Mapping, Tuple, cast
+from types import SimpleNamespace
+from typing import Any, Dict, Mapping, Tuple, cast
+from xml.etree.ElementTree import fromstring
 
 import pytest
 
-from rhinestone import Config, SearchQuery, SourceDefinition, configure
+from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
 from rhinestone.adapters import StaticAdapter
 from rhinestone.errors import (
     ConfigValidationError,
@@ -112,6 +114,28 @@ def test_static_adapter_rejects_invalid_metadata_and_query_parameters() -> None:
     query_item["provenance"] = {"query_parameters": []}
     with pytest.raises(ConfigValidationError):
         StaticAdapter({"one": query_item}).load(Config("static", {"id": "one"}))
+
+
+def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
+    captured: Dict[str, Any] = {}
+
+    def open_ex(uri: str, **kwargs: Any) -> str:
+        captured["uri"] = uri
+        return "dataset"
+
+    app = configure(
+        sources=(sources.GSI,),
+        dependencies={"gdal": lambda: SimpleNamespace(OpenEx=open_ex)},
+    )
+    resource = app.resolve(Config("gsi", {"id": "std"}))
+
+    assert resource.access_plan.kind == "remote-dataset"
+    assert resource.format == "png"
+    assert resource.metadata.raw["attribution"] == "国土地理院"
+    assert resource.open() == "dataset"
+    xml = fromstring(captured["uri"])
+    assert xml.findtext("DataWindow/YOrigin") == "top"
+    assert "${z}/${x}/${y}.png" in cast(str, xml.findtext("Service/ServerUrl"))
 
 
 def test_static_source_composes_through_public_api() -> None:

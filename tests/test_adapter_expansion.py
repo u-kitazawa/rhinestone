@@ -1,4 +1,4 @@
-"""Executable provider contracts and failures for the five expansion adapters."""
+"""Executable provider contracts and failures for the four expansion adapters."""
 
 import importlib
 import json
@@ -6,7 +6,6 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Mapping, cast
-from xml.etree.ElementTree import fromstring
 
 import pytest
 
@@ -14,12 +13,10 @@ from rhinestone import Config, SearchQuery, configure, sources
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
-    GsiTileAdapter,
     OdptAdapter,
     PlateauAdapter,
 )
 from rhinestone.adapters.execution import GdalAdapter, JsonServiceAdapter
-from rhinestone.catalogs import load_catalog_resource
 from rhinestone.errors import (
     AmbiguousResourceError,
     ConfigValidationError,
@@ -41,100 +38,10 @@ from tests.test_resolution import make_source
 FIXTURES = Path(__file__).parent / "fixtures" / "expansion"
 
 
-def gsi_tile_adapter() -> GsiTileAdapter:
-    specs = load_catalog_resource("gsi_tile_specs.json")
-    return GsiTileAdapter(cast(Mapping[str, Mapping[str, Any]], specs))
-
-
-def odpt_adapter() -> OdptAdapter:
-    return OdptAdapter(**dict(sources.ODPT.settings))
-
 
 def fail(*args: Any, **kwargs: Any) -> Any:
     raise ValueError("secret-in-underlying-error")
 
-
-def test_gsi_tile_catalog_shapes_are_rejected() -> None:
-    for specs in ({}, {1: {}}, {"std": []}):
-        with pytest.raises(ConfigValidationError):
-            GsiTileAdapter(cast(Any, specs))
-
-
-def test_tile_source_plan_search_and_gdal_translation() -> None:
-    adapter = gsi_tile_adapter()
-    results = adapter.search(SearchQuery(text="標準", limit=1))
-    assert len(results) == 1
-    item = adapter.load(results[0].to_config())
-    resource = Resolver().resolve(item)
-    assert resource.access_plan.kind == "remote-dataset"
-    assert resource.format == "png"
-    assert resource.access_plan.options["tile"]["min_zoom"] == 2
-    assert resource.metadata.raw["attribution"] == "国土地理院"
-    assert resource.source.raw_metadata == resource.provenance.raw
-    assert len(adapter.search(SearchQuery())) == 2
-    assert adapter.search(SearchQuery(text="absent")) == ()
-    # ID takes priority; never turn a known ID into a user-supplied URL.
-    assert adapter.load(Config("gsi-tile", {"id": "std", "url": "ignored"})) == item
-    captured: Dict[str, Any] = {}
-
-    def open_ex(uri: str, **kwargs: Any) -> Any:
-        captured["uri"] = uri
-        return "dataset"
-
-    app = configure(
-        sources=(sources.GSI,),
-        dependencies={"gdal": lambda: SimpleNamespace(OpenEx=open_ex)},
-    )
-    assert app.open(Config("gsi", {"id": "std"})) == "dataset"
-    xml = fromstring(captured["uri"])
-    assert xml.findtext("DataWindow/YOrigin") == "top"
-    assert xml.findtext("DataWindow/TileLevel") == "18"
-    assert xml.findtext("OverviewCount") == "16"
-    assert "${z}/${x}/${y}.png" in cast(str, xml.findtext("Service/ServerUrl"))
-
-
-@pytest.mark.parametrize("settings", ({"id": "unknown"}, {"id": ""}, {}))
-def test_unknown_tile_never_guesses_url(settings: Mapping[str, Any]) -> None:
-    with pytest.raises(ConfigValidationError):
-        gsi_tile_adapter().load(Config("gsi-tile", settings))
-
-
-@pytest.mark.parametrize(
-    "changes",
-    [
-        {"url": "https://tiles.example/{"},
-        {"url": "https://[invalid/{z}/{x}/{y}"},
-        {"url": "https://tiles.example/{zoom}/{x}/{y}"},
-        {"url": "http://tiles.example/{z}/{x}/{y}"},
-        {"url": "https://tiles.example/{z!r}/{x}/{y}"},
-        {"scheme": "tms"},
-        {"crs": "EPSG:4326"},
-        {"format": "pbf"},
-        {"min_zoom": True},
-        {"max_zoom": 1},
-        {"tile_size": 512},
-        {"attribution": ""},
-    ],
-)
-def test_explicit_tile_requires_valid_execution_metadata(
-    changes: Mapping[str, Any],
-) -> None:
-    spec = dict(gsi_tile_adapter().load(Config("gsi-tile", {"id": "std"})).raw_metadata)
-    spec.update(changes)
-    with pytest.raises(ConfigValidationError):
-        gsi_tile_adapter().load(Config("gsi-tile", spec))
-
-
-def test_custom_tile_does_not_infer_provider_id() -> None:
-    spec = dict(
-        gsi_tile_adapter().load(Config("gsi-tile", {"id": "pale"})).raw_metadata
-    )
-    spec["url"] = "https://tiles.example/{z}/{x}/{y}?a=1&b=2"
-    spec.pop("title")
-    item = gsi_tile_adapter().load(Config("gsi-tile", spec))
-    assert item.provenance.dataset_identifier == spec["url"]
-    xml = GdalAdapter.tile_xml(spec)
-    assert "&amp;" in xml
 
 
 def test_dcat_rejects_an_unsupported_serialization_before_loading() -> None:
@@ -368,7 +275,7 @@ def test_dcat_distinguishes_bad_config_fetch_parse_and_missing_dataset() -> None
         dcat_adapter().load(dcat_config(dataset="https://absent.example"))
 
 
-@pytest.mark.parametrize("adapter", [gsi_tile_adapter(), dcat_adapter()])
+@pytest.mark.parametrize("adapter", [dcat_adapter()])
 def test_local_search_rejects_unsupported_conditions(adapter: Any) -> None:
     with pytest.raises(UnsupportedSearchConditionError):
         adapter.search(SearchQuery(bbox=(0, 0, 1, 1)))
@@ -381,7 +288,6 @@ def test_local_search_rejects_unsupported_conditions(adapter: Any) -> None:
 @pytest.mark.parametrize(
     "adapter",
     [
-        gsi_tile_adapter(),
         GsiFundamentalAdapter(),
         dcat_adapter(),
         odpt_adapter(),

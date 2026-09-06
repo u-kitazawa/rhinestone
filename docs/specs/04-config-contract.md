@@ -50,11 +50,11 @@ config:
 
 `sources.json` は組み込み Source の接続先・サービス仕様を保持します。利用者が独自の接続先を使う場合は、既存 Adapter に対する `SourceDefinition` を明示して `configure(sources=...)` に渡します。
 
-`gsi_tile_specs.json` のような Adapter 固有 Catalog は、その Adapter の constructor へ明示的に注入します。Adapter がリポジトリのパスや Catalog loader を直接知る必要はありません。
+`sources.json` の `gsi.settings.items` に `std`、`pale` などの名前と仕様を定義します。Config は `Config("gsi", {"id": "std"})` のように、その名前だけを指定します。GSI タイルの専用 Adapter や専用 loader はありません。
 
 ## 追加 Source の Config
 
-`gsi-tile` は同梱の公式由来定義から `id` を指定します。初期定義は `std` と `pale` です。独自タイルは `id` を使わず、HTTPS の `{z}`、`{x}`、`{y}` template と、scheme、CRS、format、media type、zoom range、attribution をすべて明示します。
+`gsi` は `sources.json` に定義された `std`、`pale` などの item 名を `id` で指定します。独自の静的 Source も `SourceDefinition` の `settings.items` に名前と仕様を明示します。
 
 `plateau` は G 空間情報センター CKAN の `dataset_id` または `resource_id` を指定します。ZIP の CityGML を選ぶ場合は `archive: zip` と archive 内の `entry_point` を指定します。市区町村コード・年からの distribution 推測はしません。
 

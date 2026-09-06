@@ -22,7 +22,130 @@
     "gsi": {
       "adapter_type": "static",
       "settings": {
-        "items_resource": "gsi_tiles.json"
+        "items": {
+          "std": {
+            "metadata": {
+              "title": "標準地図",
+              "description": "日本全国と周辺地域。国外は低ズームのみ。",
+              "publisher": "国土地理院",
+              "raw": {
+                "title": "標準地図",
+                "url": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "scheme": "xyz",
+                "crs": "EPSG:3857",
+                "tile_size": 256,
+                "min_zoom": 2,
+                "max_zoom": 18,
+                "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                "attribution": "国土地理院",
+                "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                "spec_checked_at": "2026-09-05"
+              }
+            },
+            "candidates": [
+              {
+                "uri": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "attributes": {
+                  "access_kind": "remote-dataset",
+                  "access_options": {
+                    "tile": {
+                      "title": "標準地図",
+                      "url": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                      "format": "png",
+                      "media_type": "image/png",
+                      "scheme": "xyz",
+                      "crs": "EPSG:3857",
+                      "tile_size": 256,
+                      "min_zoom": 2,
+                      "max_zoom": 18,
+                      "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                      "attribution": "国土地理院",
+                      "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                      "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                      "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                      "spec_checked_at": "2026-09-05"
+                    }
+                  }
+                }
+              }
+            ],
+            "capabilities": [
+              "remote-dataset",
+              "search"
+            ],
+            "provenance": {
+              "dataset_identifier": "std",
+              "original_url": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
+            }
+          },
+          "pale": {
+            "metadata": {
+              "title": "淡色地図",
+              "description": "日本全国と周辺地域。国外は低ズームのみ。",
+              "publisher": "国土地理院",
+              "raw": {
+                "title": "淡色地図",
+                "url": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "scheme": "xyz",
+                "crs": "EPSG:3857",
+                "tile_size": 256,
+                "min_zoom": 2,
+                "max_zoom": 18,
+                "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                "attribution": "国土地理院",
+                "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                "spec_checked_at": "2026-09-05"
+              }
+            },
+            "candidates": [
+              {
+                "uri": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "attributes": {
+                  "access_kind": "remote-dataset",
+                  "access_options": {
+                    "tile": {
+                      "title": "淡色地図",
+                      "url": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
+                      "format": "png",
+                      "media_type": "image/png",
+                      "scheme": "xyz",
+                      "crs": "EPSG:3857",
+                      "tile_size": 256,
+                      "min_zoom": 2,
+                      "max_zoom": 18,
+                      "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                      "attribution": "国土地理院",
+                      "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                      "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                      "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                      "spec_checked_at": "2026-09-05"
+                    }
+                  }
+                }
+              }
+            ],
+            "capabilities": [
+              "remote-dataset",
+              "search"
+            ],
+            "provenance": {
+              "dataset_identifier": "pale",
+              "original_url": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"
+            }
+          }
+        }
       }
     },
     "odpt": {

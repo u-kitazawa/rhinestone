@@ -37,16 +37,15 @@ def test_catalog_contains_service_configuration_but_not_runtime_values() -> None
         assert "api_token" not in source.settings
 
 
-def test_tile_adapter_catalog_is_loaded_independently_from_the_adapter() -> None:
-    specs = load_catalog_resource("gsi_tile_specs.json")
-
-    assert isinstance(specs, Mapping)
-    assert "std" in specs
-    standard = specs["std"]
+def test_gsi_tiles_are_defined_in_sources_catalog() -> None:
+    assert sources.GSI.adapter_type == "static"
+    items = sources.GSI.settings["items"]
+    assert isinstance(items, Mapping)
+    assert set(items) == {"std", "pale"}
+    standard = items["std"]
     assert isinstance(standard, Mapping)
-    assert standard["url"].startswith("https://")
-    assert standard["scheme"] == "xyz"
-    assert standard["format"] == "png"
+    assert standard["metadata"]["title"] == "標準地図"
+    assert standard["candidates"][0]["uri"].endswith("/std/{z}/{x}/{y}.png")
 
 
 @pytest.mark.parametrize("name", (None, "", "../sources.json", "a\\b", ".", ".."))
@@ -104,52 +103,3 @@ def test_source_catalog_manifest_shapes_are_rejected(
     )
     with pytest.raises(ConfigValidationError):
         load_source_definitions("fixture.json")
-
-
-def test_source_catalog_item_resource_shapes_are_rejected(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    documents = (
-        {
-            "sources": {
-                "gsi": {
-                    "adapter_type": "static",
-                    "settings": {"items": {}, "items_resource": "items.json"},
-                }
-            }
-        },
-        {
-            "sources": {
-                "gsi": {
-                    "adapter_type": "static",
-                    "settings": {"items_resource": 0},
-                }
-            }
-        },
-        {
-            "sources": {
-                "gsi": {
-                    "adapter_type": "static",
-                    "settings": {"items_resource": ""},
-                }
-            }
-        },
-        {
-            "sources": {
-                "gsi": {
-                    "adapter_type": "static",
-                    "settings": {"items_resource": "items.json"},
-                }
-            }
-        },
-    )
-    for document in documents:
-        monkeypatch.setattr(
-            catalog_module,
-            "load_catalog_resource",
-            lambda name, document=document: (
-                [] if name == "items.json" else document
-            ),
-        )
-        with pytest.raises(ConfigValidationError):
-            load_source_definitions("fixture.json")

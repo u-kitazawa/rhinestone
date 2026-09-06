@@ -7,9 +7,9 @@ Core は次のデータ／モデルを扱います。provider や外部ライブ
 Catalog は、接続先やサービス固有の固定知識を宣言するリポジトリ管理のデータです。通常は JSON として `src/rhinestone/catalogs/` に置きます。
 
 - `sources.json`: 組み込み Source の識別子、Adapter 種別、接続先などを定義する。
-- `gsi_tile_specs.json` など: Adapter が解釈する個別仕様を定義する。
+- `sources.json`: `gsi` のような静的 Source の item 名と仕様も定義する。
 
-Catalog は実行時の secret や外部 runtime を保持しません。Catalog を読み込んだ結果が、アプリケーションへ渡す `SourceDefinition` になります。
+Catalog は実行時の secret や外部 runtime を保持しません。Catalog を読み込んだ結果が、アプリケーションへ渡す `SourceDefinition` になります。GSI タイルも専用 Adapter ではなく、Catalog の item として StaticAdapter が扱います。
 
 ## SourceDefinition
 

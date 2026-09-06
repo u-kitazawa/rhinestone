@@ -27,9 +27,7 @@ Source Adapter は次を満たさなければなりません。
 
 ## 組み込み追加 Adapter
 
-`StaticAdapter` はリポジトリまたは利用者が管理する静的なサービス定義を `Source` として扱います。組み込みの国土地理院タイル定義は Catalog から `sources.GSI` へ注入し、`GdalAdapter` が選択済み XYZ template を GDAL TMS 定義へ翻訳します。URL から tile ID は推測しません。
-
-`GsiTileAdapter` はタイル仕様の mapping を constructor から受け取ります。`gsi_tile_specs.json` の読み込みは Catalog loader またはアプリケーションの責務であり、Adapter はリポジトリ構造を知りません。
+`StaticAdapter` はリポジトリまたは利用者が管理する静的なサービス定義を `Source` として扱います。組み込みの国土地理院タイルも `sources.json` の `gsi.settings.items` に名前と仕様を定義し、`sources.GSI` を通じて StaticAdapter へ渡します。`GdalAdapter` が選択済み XYZ template を GDAL TMS 定義へ翻訳し、URL から tile ID は推測しません。
 
 `PlateauAdapter` は Catalog から渡された G 空間情報センター CKAN endpoint を使って distribution を読み、PLATEAU と配布基盤の由来を残します。`GsiFundamentalAdapter` はユーザーが取得済みの基本項目ファイルのみを扱い、ログイン画面や HTML を操作しません。
 
