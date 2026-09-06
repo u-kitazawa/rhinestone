@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Mapping, Optional
 import pytest
 
 from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
+from rhinestone import _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import (
     AdapterRegistrationError,
     UnsupportedSearchConditionError,
@@ -93,7 +94,7 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
 
     configure(
         sources=sources.ALL,
-        dependencies={"http-json": lambda: dependency_calls.append(True)},
+        dependencies={"rasterio": lambda: dependency_calls.append(True)},
         credentials={"estat": lambda: credential_calls.append(True) or "secret"},
     )
 
@@ -110,7 +111,9 @@ def test_configure_one_source_only_enables_that_source_and_direct() -> None:
         app.resolve(Config("geospatial-jp", {"resource_id": "x"}))
 
 
-def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config() -> None:
+def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     requests: List[str] = []
 
     def get_json(
@@ -163,12 +166,10 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config() -> 
             },
         }
 
+    monkeypatch.setattr(_http, "get_json", get_json)
     first = SourceDefinition("catalog-a", "ckan", {"endpoint": "https://first.test"})
     second = SourceDefinition("catalog-b", "ckan", {"endpoint": "https://second.test"})
-    app = configure(
-        sources=(first, second),
-        dependencies={"http-json": lambda: get_json},
-    )
+    app = configure(sources=(first, second))
 
     grouped = app.search(SearchQuery(text="dataset", limit=1))
 
@@ -187,13 +188,8 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config() -> 
 
 
 def test_public_search_exposes_unsupported_conditions_as_domain_error() -> None:
-    def unused_get_json(url: str, params: Mapping[str, Any]) -> Dict[str, Any]:
-        return {}
-
     source = SourceDefinition("catalog", "ckan", {"endpoint": "https://example.test"})
-    app = configure(
-        sources=(source,), dependencies={"http-json": lambda: unused_get_json}
-    )
+    app = configure(sources=(source,))
 
     with pytest.raises(UnsupportedSearchConditionError, match="bbox"):
         app.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
