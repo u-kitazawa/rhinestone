@@ -80,7 +80,9 @@ class StaticAdapter(ProviderAdapter):
         cls, items: Mapping[str, Mapping[str, Any]]
     ) -> Dict[str, Mapping[str, Any]]:
         if not isinstance(items, Mapping) or not items:
-            raise ConfigValidationError("static source items must be a non-empty object")
+            raise ConfigValidationError(
+                "static source items must be a non-empty object"
+            )
 
         validated: Dict[str, Mapping[str, Any]] = {}
         for identifier, item in items.items():
@@ -166,9 +168,7 @@ class StaticAdapter(ProviderAdapter):
                     uri=cast(str, candidate["uri"]),
                     format=_optional_string(candidate.get("format")),
                     media_type=_optional_string(candidate.get("media_type")),
-                    attributes=cast(
-                        Mapping[str, Any], candidate.get("attributes", {})
-                    ),
+                    attributes=cast(Mapping[str, Any], candidate.get("attributes", {})),
                 )
             )
 

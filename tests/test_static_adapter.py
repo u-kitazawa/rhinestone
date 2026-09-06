@@ -84,13 +84,7 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
         {"one": {"candidates": []}},
         {"one": {"candidates": [{}]}},
         {"one": {"candidates": [{"uri": "https://example.test", "format": 1}]}},
-        {
-            "one": {
-                "candidates": [
-                    {"uri": "https://example.test", "media_type": 1}
-                ]
-            }
-        },
+        {"one": {"candidates": [{"uri": "https://example.test", "media_type": 1}]}},
         {"one": {"candidates": [{"uri": "https://example.test", "attributes": []}]}},
         {"one": {"capabilities": []}},
         {"one": {"capabilities": [1]}},
