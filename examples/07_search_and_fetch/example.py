@@ -1,20 +1,14 @@
 """Search built-in CKAN and e-Stat sources, then resolve a selected result."""
 
 import os
-import sys
-from pathlib import Path
 
 from rhinestone import SearchQuery, configure, sources
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _support.http_json import get_json  # noqa: E402
 
 estat_key = (
     os.environ.get("RHINESTONE_ESTAT_APP_ID") or os.environ["RHINESTONE_ESTAT_API_KEY"]
 )
 app = configure(
     sources=(sources.GEOSPATIAL_JP, sources.ESTAT),
-    dependencies={"http-json": lambda: get_json},
     credentials={"estat": lambda: estat_key},
 )
 grouped = app.search(
