@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Mapping, Optional
 
 import pytest
 
-from rhinestone import _http  # pyright: ignore[reportPrivateUsage]
+import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
 from rhinestone.errors import (
     AdapterRegistrationError,
