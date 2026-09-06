@@ -124,9 +124,17 @@ def test_catalog_resource_errors_are_normalized(
         {"sources": {1: {}}},
         {"sources": {"broken": []}},
         {"sources": {"broken": {}}},
-        {"sources": {"broken": {"adapter_type": None}}},
-        {"sources": {"broken": {"adapter_type": ""}}},
-        {"sources": {"broken": {"adapter_type": "static", "settings": []}}},
+        {"sources": {"broken": {"name": "BROKEN", "adapter_type": None}}},
+        {"sources": {"broken": {"name": "BROKEN", "adapter_type": ""}}},
+        {
+            "sources": {
+                "broken": {
+                    "name": "BROKEN",
+                    "adapter_type": "static",
+                    "settings": [],
+                }
+            }
+        },
         {"sources": {"broken": {"adapter_type": "static"}}},
         {"sources": {"broken": {"name": None, "adapter_type": "static"}}},
         {"sources": {"broken": {"name": "", "adapter_type": "static"}}},
