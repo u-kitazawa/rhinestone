@@ -15,9 +15,7 @@ def test_estat_rejects_missing_callback_and_conflicting_credentials() -> None:
     with pytest.raises(ConfigValidationError, match="get_json"):
         EStatAdapter(app_id="app-id")
     with pytest.raises(ConfigValidationError):
-        EStatAdapter(
-            app_id="app-id", api_key="key", get_json=RecordingJsonClient({})
-        )
+        EStatAdapter(app_id="app-id", api_key="key", get_json=RecordingJsonClient({}))
     with pytest.raises(ConfigValidationError, match="credential"):
         EStatAdapter(get_json=RecordingJsonClient({})).search(SearchQuery())
 
@@ -41,7 +39,9 @@ def test_estat_credential_factory_is_lazy_and_used_for_requests() -> None:
     assert client.calls[0][1]["appId"] == "factory-app-id"
 
 
-def test_estat_metadata_response_becomes_service_source_without_leaking_app_id() -> None:
+def test_estat_metadata_response_becomes_service_source_without_leaking_app_id() -> (
+    None
+):
     endpoint = "https://api.e-stat.go.jp/rest/3.0/app/json"
     metadata_url = endpoint + "/getMetaInfo"
     client = RecordingJsonClient(
