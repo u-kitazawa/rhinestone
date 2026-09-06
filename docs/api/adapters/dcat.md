@@ -11,10 +11,8 @@
 
 ## Catalog と runtime
 
-コンストラクタには document を取得する `get_document(uri)` と、RDF runtime を返す
-`rdf_runtime_factory()` を渡します。`dcat:downloadURL` を持つ Distribution のみを
-候補にし、`accessURL` だけの Distribution は解決しません。検索は `text` と
-`limit` を使えます。
+標準の`configure()`経路ではDCAT文書の取得にRhinestoneの組み込みHTTP transportを使い、RDF解釈runtimeだけを`dependencies={"rdflib": ...}`として利用者が供給します。`dcat:downloadURL` を持つ Distribution のみを候補にし、`accessURL` だけの Distribution は解決しません。検索は `text` と `limit` を使えます。
 
-Distribution URI を指定して pyogrio で開く例は、リポジトリ checkout の
-`examples/11_dcat_dataset/README.md` にあります。
+Adapterを直接構築する内部テストや再利用用途では、document取得callbackとRDF runtime factoryをconstructorへ注入できます。
+
+Distribution URI を指定して pyogrio で開く例は、リポジトリ checkout の `examples/11_dcat_dataset/README.md` にあります。
