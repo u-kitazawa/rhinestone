@@ -4,7 +4,7 @@
 
 公開 API は、名前付き Source の構成、Config から Resource を解決する経路、Resource を外部 OSS へ接続する経路、SearchQuery から SearchResult を得る経路を提供します。
 
-利用者は Source Adapter または Execution Adapter の instance を登録しません（MUST NOT）。Rhinestone が `SourceDefinition` と dependency から組み込み Adapter を構成・選択します。
+利用者は Source Adapter または Execution Adapter の instance を登録しません（MUST NOT）。Rhinestone が `SourceDefinition` と dependency から組み込み Adapter を構成・選択します。HTTP transport はRhinestoneが組み込みで提供します。
 
 ```python
 from rhinestone import Config, configure, sources
@@ -12,7 +12,6 @@ from rhinestone import Config, configure, sources
 app = configure(
     sources=(sources.GEOSPATIAL_JP,),
     dependencies={
-        "http-json": lambda: get_json,
         "gdal": lambda: osgeo.gdal,
     },
 )
@@ -60,9 +59,9 @@ resource.access_plan
 
 ## runtime dependency
 
-利用者は使用を許可する外部 runtime を factory として供給します。組み込み Execution Adapter は常に Rhinestone 側で構成され、登録済み dependency との互換性から選択されます。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
+利用者はRhinestoneが実装しない外部 runtime を factory として供給します。組み込み Execution Adapter はRhinestone側で構成され、登録済みdependencyとの互換性から選択されます。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
 
-`http-json` は JSON API 用 callback、`http-text` は文書取得 callback、`rdflib` は DCAT 解釈 runtime です。GIS 実行には `gdal`、`rasterio`、`pyogrio` を使用します。factory は実際に必要になるまで評価しません。
+Source metadataのJSON取得、DCAT文書取得、JSON serviceのHTTP通信はRhinestoneの組み込みtransportを使用します（MUST）。利用者にHTTP callbackまたはrequests互換runtimeの登録を要求してはなりません（MUST NOT）。`rdflib` は DCAT 解釈 runtime、GIS 実行には `gdal`、`rasterio`、`pyogrio` を使用します。外部runtime factoryは実際に必要になるまで評価しません。
 
 ```python
 resource.open()
