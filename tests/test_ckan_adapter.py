@@ -10,10 +10,20 @@ def test_ckan_resource_and_package_responses_become_a_complete_source() -> None:
     endpoint = "https://catalog.example"
     resource_url = endpoint + "/api/3/action/resource_show"
     package_url = endpoint + "/api/3/action/package_show"
-    client = RecordingJsonClient({resource_url: fixture_json("ckan/resource_show.json"), package_url: fixture_json("ckan/package_show.json")})
+    client = RecordingJsonClient(
+        {
+            resource_url: fixture_json("ckan/resource_show.json"),
+            package_url: fixture_json("ckan/package_show.json"),
+        }
+    )
     adapter = CkanAdapter(get_json=client)
-    source = adapter.load(Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"}))
-    assert client.calls == [(resource_url, {"id": "resource-1"}), (package_url, {"id": "dataset-1"})]
+    source = adapter.load(
+        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+    )
+    assert client.calls == [
+        (resource_url, {"id": "resource-1"}),
+        (package_url, {"id": "dataset-1"}),
+    ]
     assert source.metadata.title == "River Dataset"
     assert source.metadata.publisher == "River Agency"
     assert source.metadata.license == "CC BY 4.0"
@@ -41,6 +51,15 @@ def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None
 def test_ckan_unsuccessful_action_response_is_rejected() -> None:
     endpoint = "https://catalog.example"
     resource_url = endpoint + "/api/3/action/resource_show"
-    client = RecordingJsonClient({resource_url: {"success": False, "error": {"message": "Not found"}}})
+    client = RecordingJsonClient(
+        {
+            resource_url: {
+                "success": False,
+                "error": {"message": "Not found"},
+            }
+        }
+    )
     with pytest.raises(ProviderResponseError, match="Not found"):
-        CkanAdapter(get_json=client).load(Config("ckan", {"endpoint": endpoint, "resource_id": "missing"}))
+        CkanAdapter(get_json=client).load(
+            Config("ckan", {"endpoint": endpoint, "resource_id": "missing"})
+        )
