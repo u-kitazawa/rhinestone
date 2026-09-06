@@ -1,8 +1,18 @@
 """Built-in external source definitions."""
 
-from typing import Tuple
+import json
+from importlib import resources
+from typing import Any, Dict, Tuple, cast
 
 from .models import SourceDefinition
+
+
+def _load_catalog(name: str) -> Dict[str, Any]:
+    return cast(
+        Dict[str, Any],
+        json.loads(resources.read_text("rhinestone.catalogs", name)),
+    )
+
 
 GEOSPATIAL_JP = SourceDefinition(
     id="geospatial-jp",
@@ -23,7 +33,8 @@ PLATEAU = SourceDefinition(
 
 GSI = SourceDefinition(
     id="gsi",
-    adapter_type="gsi-tile",
+    adapter_type="static",
+    settings={"items": _load_catalog("gsi_tiles.json")},
 )
 
 ODPT = SourceDefinition(

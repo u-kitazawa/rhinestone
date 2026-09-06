@@ -1,16 +1,22 @@
-# GsiTileAdapter
+# GSIタイル
 
-`GsiTileAdapter` は国土地理院のタイル定義を XYZ Resource として解決します。
+国土地理院タイルは、組み込みの \`sources.GSI\` が提供する静的サービス定義として
+扱います。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `gsi-tile`
+[StaticAdapter](static.md) · source id: \`gsi\`
 
 ## 設定
 
-組み込み定義の `id` を指定するか、HTTPS URL、`scheme="xyz"`、`crs="EPSG:3857"`、
-PNG/JPEG、zoom 範囲、`tile_size=256`、attribution を含む完全な定義を指定します。
+\`\`\`python
+from rhinestone import Config
 
-検索条件は `text` と `limit` です。未知の ID や URL は推測しません。タイルを GDAL
-形式へ翻訳するには `GdalAdapter` を使います。
+Config("gsi", {"id": "std"})
+Config("gsi", {"id": "pale"})
+\`\`\`
 
-組み込みの標準地図（`id="std"`）を GDAL で開く例は、リポジトリ checkout の
-`examples/08_gsi_tile/README.md` にあります。
+定義にはHTTPS URL、XYZ、CRS、format、media type、zoom範囲、tile size、帰属表示、
+利用条件URL、仕様確認日が含まれます。定義はリポジトリでレビュー・管理され、実行時
+に国土地理院へメタデータ取得を行いません。
+
+選択済みResourceをGDALで開く場合は、既存の \`GdalAdapter\` がXYZ定義をGDALの
+TMS設定へ翻訳します。

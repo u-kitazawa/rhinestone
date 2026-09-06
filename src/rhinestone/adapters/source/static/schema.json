@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rhinestone static source settings",
+  "type": "object",
+  "properties": {
+    "id": {"type": "string", "minLength": 1}
+  },
+  "required": ["id"],
+  "additionalProperties": false
+}

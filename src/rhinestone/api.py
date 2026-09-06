@@ -15,12 +15,12 @@ from .adapters.source import (
     DirectAdapter,
     EStatAdapter,
     GsiFundamentalAdapter,
-    GsiTileAdapter,
     OdptAdapter,
     OgcFeaturesAdapter,
     PlateauAdapter,
     ProviderAdapter,
     StacAdapter,
+    StaticAdapter,
 )
 from .errors import AdapterRegistrationError, ConfigValidationError
 from .execution import ExecutionAdapterSelector
@@ -190,9 +190,12 @@ def _build_source_adapter(
     if adapter_type == "plateau":
         _reject_options(adapter_type, settings, ("endpoint",))
         return PlateauAdapter(get_json=json_transport, **settings)
-    if adapter_type == "gsi-tile":
-        _reject_options(adapter_type, settings, ())
-        return GsiTileAdapter()
+    if adapter_type == "static":
+        _reject_options(adapter_type, settings, ("items",))
+        items = settings.get("items")
+        if not isinstance(items, Mapping):
+            raise ConfigValidationError("static source requires items")
+        return StaticAdapter(cast(Mapping[str, Mapping[str, Any]], items))
     if adapter_type == "gsi-fundamental":
         _reject_options(adapter_type, settings, ())
         return GsiFundamentalAdapter()
