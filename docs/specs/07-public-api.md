@@ -2,69 +2,81 @@
 
 ## 基本境界
 
-利用インターフェースは、Config から Resource を解決する経路、Resource を外部 OSS へ接続する経路、SearchQuery から SearchResult を得る経路を提供します。
+公開APIは、名前付きproviderの構成、ConfigからResourceを解決する経路、Resourceを
+外部OSSへ接続する経路、SearchQueryからSearchResultを得る経路を提供します。
 
-Resource は次の情報へ直接アクセスできる必要があります。
+利用者はSource AdapterまたはExecution Adapterのinstanceを登録しません（MUST NOT）。
+RhinestoneがProviderConfigとdependencyから組み込みAdapterを構成・選択します。
+
+```python
+from rhinestone import Config, ProviderConfig, configure
+
+app = configure(
+    providers={
+        "gspace": ProviderConfig(
+            adapter_type="ckan",
+            settings={"endpoint": "https://www.geospatial.jp/ckan"},
+        ),
+    },
+    dependencies={
+        "http-json": lambda: get_json,
+        "gdal": lambda: osgeo.gdal,
+        "rasterio": lambda: rasterio,
+    },
+)
+resource = app.resolve(
+    Config(source_id="gspace", settings={"resource_id": "..."})
+)
+```
+
+providerのmapping keyが安定した`source_id`、ProviderConfigの`adapter_type`が
+解釈方式です。異なる`source_id`へ同じ`adapter_type`を割り当てられます（MUST）。
+
+`direct` providerは常に組み込まれます。利用者定義providerで上書きできません。
+未知のadapter type、空のsource id、未知のprovider optionは明示的に失敗します。
+
+## 公開モデル
+
+`Config`は`source_id`とprovider固有`settings`を保持します。
+`SearchResult.to_config()`は同じsource idを保持して通常の解決フローへ戻します。
+`Provenance.provider`にはsource id、`Provenance.adapter`にはAdapter種別を記録します。
+
+Resource は少なくとも次へ直接アクセスできます。
 
 ```python
 resource.uri
 resource.metadata
 resource.provenance
+resource.access_plan
 ```
 
-Execution Adapter Selector が通常の実行 Adapter を選び、利用者は必要な場合だけ明示指定できます。
+## runtime dependency
+
+利用者は使用を許可する外部runtimeをfactoryとして供給します。組み込みExecution
+Adapterは常にRhinestone側で構成され、登録済みdependencyとの互換性から選択されます。
+CoreがGDAL等を直接importしてはなりません（MUST NOT）。
+
+`http-json`はJSON API用callback、`http-text`は文書取得callback、`rdflib`は
+DCAT解釈runtimeです。GIS実行には`gdal`、`rasterio`、`pyogrio`を使用します。
+factoryは実際に必要になるまで評価しません。
 
 ```python
-resource.open(adapter="gdal")
+resource.open()                  # 自動選択
+resource.open(adapter="gdal")    # 必要な場合だけ固定
 ```
 
-コード例は概念的なインターフェースです。公開 API を実装するときは、[設計仕様](../spec_v4.md)のモデルと責務境界を保ちます。
+`configure()`はprocess-global stateを変更せず、独立したapplication contextを返します。
+同じprocess内に異なるprovider・dependency構成を共存させられます。
 
-## runtime dependency の供給
+## credential
 
-利用者は、使用を許可する外部 runtime を callback/factory として Dependency Registry へ供給します。
-
-```python
-app = rhinestone.configure(
-    dependencies={
-        "gdal": lambda: osgeo.gdal,
-        "rasterio": lambda: rasterio,
-    },
-    source_adapters=(...),
-    execution_adapters=(...),
-    credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
-)
-```
-
-callback は lazy import、optional dependency、custom initialization、mock injection、環境固有の loading を可能にします。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
-
-`configure()` は process-global state を変更せず、独立した application context を返します。同じ process 内に異なる dependency 構成を共存させることができます。Config から Resource を解決する場合は `app.resolve(config)`、直接Dataを開く場合は `app.open(config, adapter=...)` を使用します。contextから解決されたResourceは同じcontextへ束縛されるため、`resource.open(adapter=...)` も利用できます。dependency callback はResourceの解決時ではなく、Dataを開く時点で初めて評価されます。
-
-`credentials` は Source/Execution Adapter が必要時に解決する logical name と secret factory の対応です。credential factory は `resolve()` 中には評価されず、`open()` の直前に評価されます。secret を Config、Source、Metadata、Provenance に保存してはなりません。
-
-## Source Adapter 基底クラス
-
-`rhinestone.adapters.ProviderAdapter` を Source Adapter の公開基底クラスとします。
-具象クラスは `source_type` を宣言し、`load(config) -> Source` を実装します。
-検索はすべての Adapter に必須ではないため、基底クラスの抽象契約には含めません。
-
-JSON ベースの組み込み Adapter は `get_json(url, params)` callback を受け取り、通信実装を利用者側から注入できるようにします。provider 固有の Config と response 解釈は具象クラスが所有します。
-
-### API 認証
-
-認証情報は Adapter のコンストラクタへ注入し、Config、Metadata、Provenance には保存しません。認証なしの既存の2引数 callback はそのまま使えます。認証を使う場合は `get_json(url, params, headers)` の3引数 callbackを実装します。
-
-```python
-CkanAdapter(get_json=get_json, api_token=os.environ["CKAN_TOKEN"])
-StacAdapter(get_json=get_json, api_key=os.environ["STAC_API_KEY"])
-OgcFeaturesAdapter(get_json=get_json, api_token=os.environ["OGC_TOKEN"])
-EStatAdapter(api_key=os.environ["ESTAT_APP_ID"], get_json=get_json)
-```
-
-CKAN の `api_token` は `Authorization` ヘッダー、`api_key` は既定で `X-CKAN-API-Key` ヘッダーへ送ります。STAC/OGC の `api_token` は `Authorization: Bearer ...`、`api_key` は既定で `X-API-Key` です。ヘッダー名は `api_key_header` で明示変更できます。e-Stat の `app_id`（または `api_key`）は公式仕様どおり `appId` query parameter として送信します。
-
-ODPT は `OdptAdapter` と `JsonServiceAdapter(OdptAdapter.prepare_request, "odpt")` を組み合わせます。利用者は requests 互換の `get(url, params=..., headers=..., timeout=..., allow_redirects=...)` runtime を `json-service` dependency として供給します。Adapter が固定の `https://api.odpt.org/api/v4/` endpoint と `acl:consumerKey` query parameter を検証し、redirect は拒否します。
+`credentials`はlogical nameとsecret factoryの対応です。secretをConfig、Source、
+Metadata、Provenanceへ保存してはなりません（MUST NOT）。Source API認証の評価時点と
+統一方法は別途credential契約で定義します。
 
 ## 戻り値
 
-Rhinestone はすべての結果を共通 DataFrame や独自形式へ変換しません。Execution Adapter は外部 OSS のデータ型と処理契約を尊重し、利用者は Resource を実行せず URI、Metadata、Provenance だけを利用することもできます。
+Rhinestoneは結果を共通DataFrameや独自形式へ変換しません。Execution Adapterは
+外部OSSのデータ型と処理契約を尊重します。利用者はResourceを実行せず、URI、
+Metadata、Provenanceだけを利用することもできます。
+

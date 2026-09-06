@@ -16,7 +16,7 @@ from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
 class StacAdapter(ProviderAdapter):
-    source_type = "stac"
+    adapter_type = "stac"
     search_conditions = frozenset({"bbox", "time", "limit"})
 
     def __init__(
@@ -94,7 +94,7 @@ class StacAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    source_type=self.source_type,
+                    source_id=self.adapter_type,
                     provider_settings={
                         "endpoint": endpoint,
                         "collection_id": collection_id,

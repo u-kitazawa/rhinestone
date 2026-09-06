@@ -11,28 +11,25 @@
 ```python
 import os
 
-from rhinestone import SearchQuery, configure
-from rhinestone.adapters import CkanAdapter, EStatAdapter
+from rhinestone import ProviderConfig, SearchQuery, configure
 
 app = configure(
-    dependencies={},
-    source_adapters=(
-        CkanAdapter(
-            get_json=get_json,
-            endpoint="https://www.geospatial.jp/ckan",
+    providers={
+        "gspace": ProviderConfig(
+            "ckan",
+            {"endpoint": "https://www.geospatial.jp/ckan"},
         ),
-        EStatAdapter(
-            get_json=get_json,
-            app_id=os.environ["ESTAT_APP_ID"],
+        "estat": ProviderConfig(
+            "estat",
+            {"app_id": os.environ["ESTAT_APP_ID"]},
         ),
-    ),
-    execution_adapters=(),
+    },
+    dependencies={"http-json": lambda: get_json},
 )
 ```
 
-e-Stat は application ID が必要です。CKAN の protected API を使う場合は
-`CkanAdapter(..., api_token=...)` または `api_key=...` を指定します。一方だけを指定
-してください。
+e-Stat は application ID が必要です。provider固有のendpointや認証設定は
+`ProviderConfig.settings`へ記述します。
 
 ## 検索して結果を表示する
 
@@ -46,11 +43,11 @@ for provider, results in results_by_provider.items():
         print(" ", result.description or "説明なし")
 ```
 
-`results_by_provider["ckan"]` のように provider を選んでください。検索結果が空の
+`results_by_provider["gspace"]` のように source id を選んでください。検索結果が空の
 provider もあり得るため、インデックスで選ぶ前に件数を確認します。
 
 ```python
-ckan_results = results_by_provider.get("ckan", ())
+ckan_results = results_by_provider.get("gspace", ())
 if not ckan_results:
     raise LookupError("CKAN で該当するデータが見つかりませんでした")
 
@@ -85,9 +82,12 @@ CKAN と e-Stat は `text` と `limit`、STAC と OGC API Features は `bbox`、
 
 ```python
 stac_app = configure(
-    dependencies={},
-    source_adapters=(stac_adapter,),
-    execution_adapters=(),
+    providers={
+        "imagery": ProviderConfig(
+            "stac", {"endpoint": "https://stac.example/api"}
+        )
+    },
+    dependencies={"http-json": lambda: get_json},
 )
 results = stac_app.search(
     SearchQuery(bbox=(139.5, 35.5, 140.0, 36.0), limit=10)

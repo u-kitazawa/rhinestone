@@ -62,7 +62,7 @@ class AdapterRegistry:
     def __init__(
         self, source_adapters: Iterable[Any], execution_adapters: Iterable[Any]
     ) -> None:
-        self._sources = self._index(source_adapters, "source_type")
+        self._sources = self._index(source_adapters, "source_id")
         self._executions = self._index(execution_adapters, "name")
 
     @staticmethod
@@ -77,13 +77,11 @@ class AdapterRegistry:
             indexed[identity] = adapter
         return indexed
 
-    def source(self, source_type: str) -> Any:
+    def source(self, source_id: str) -> Any:
         try:
-            return self._sources[source_type]
+            return self._sources[source_id]
         except KeyError:
-            raise UnsupportedSourceError(
-                f"Source type {source_type!r} is not supported"
-            )
+            raise UnsupportedSourceError(f"Source {source_id!r} is not configured")
 
     def execution(self, name: str) -> Any:
         try:

@@ -1,12 +1,6 @@
 from typing import List, Tuple
 
-from rhinestone.adapters.execution import GdalAdapter, PyogrioAdapter
-from rhinestone.adapters.source.direct import DirectAdapter
-from rhinestone.execution import ExecutionAdapterSelector
-from rhinestone.models import Config
-from rhinestone.pipeline import AccessPipeline
-from rhinestone.registry import AdapterRegistry, DependencyRegistry
-from rhinestone.resolution import Resolver
+from rhinestone import Config, configure
 
 
 class FakeGdal:
@@ -22,17 +16,11 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
     """Specの全アクセス順序とruntime callbackの遅延評価を垂直スライスで保証するために必要である。"""
     runtime = FakeGdal()
     dependency_calls: List[str] = []
-    dependencies = DependencyRegistry(
-        {"gdal": lambda: dependency_calls.append("gdal") or runtime}
-    )
-    pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((DirectAdapter(),), ()),
-        resolver=Resolver(),
-        execution_selector=ExecutionAdapterSelector((PyogrioAdapter(), GdalAdapter())),
-        dependencies=dependencies,
+    app = configure(
+        dependencies={"gdal": lambda: dependency_calls.append("gdal") or runtime}
     )
     config = Config(
-        source_type="direct",
+        source_id="direct",
         settings={
             "uri": "https://files.example/rivers.zip",
             "format": "shapefile",
@@ -42,7 +30,7 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
     )
 
     assert dependency_calls == []
-    data = pipeline.open(config)
+    data = app.open(config)
 
     assert data is not None
     assert dependency_calls == ["gdal"]
@@ -56,15 +44,10 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
         def read_dataframe(self, uri: str, **options: object) -> str:
             return "pyogrio-data"
 
-    pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((DirectAdapter(),), ()),
-        resolver=Resolver(),
-        execution_selector=ExecutionAdapterSelector((GdalAdapter(), PyogrioAdapter())),
-        dependencies=DependencyRegistry({"pyogrio": lambda: FakePyogrio()}),
-    )
+    app = configure(dependencies={"pyogrio": lambda: FakePyogrio()})
     config = Config(
-        source_type="direct",
+        source_id="direct",
         settings={"uri": "/data/rivers.shp", "format": "shapefile"},
     )
 
-    assert pipeline.open(config, adapter="pyogrio") == "pyogrio-data"
+    assert app.open(config, adapter="pyogrio") == "pyogrio-data"

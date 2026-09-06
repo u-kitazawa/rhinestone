@@ -31,7 +31,7 @@ class ProviderAdapter(ABC):
     contract.
     """
 
-    source_type = ""
+    adapter_type = ""
 
     def __init__(
         self,
@@ -65,9 +65,9 @@ class ProviderAdapter(ABC):
         """Interpret a provider config and return its knowledge-preserving source."""
 
     def _config_settings(self, config: Config) -> Mapping[str, Any]:
-        if config.source_type != self.source_type:
+        if config.source_id != self.adapter_type:
             raise ConfigValidationError(
-                f"Expected source_type {self.source_type!r}; got {config.source_type!r}"
+                f"Expected adapter type {self.adapter_type!r}; got {config.source_id!r}"
             )
         schema = self.config_schema()
         if schema is not None:

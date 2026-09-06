@@ -5,7 +5,7 @@ from datetime import datetime
 from types import MappingProxyType
 from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
 
-from .errors import ExecutionAdapterUnavailableError
+from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
 
 
 def _freeze(value: Any) -> Any:
@@ -22,11 +22,26 @@ def _freeze(value: Any) -> Any:
 
 
 @dataclass(frozen=True)
+class ProviderConfig:
+    """Configuration for one named provider backed by a built-in adapter."""
+
+    adapter_type: str
+    settings: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.adapter_type:
+            raise ConfigValidationError("adapter_type must be a non-empty string")
+        object.__setattr__(self, "settings", _freeze(self.settings))
+
+
+@dataclass(frozen=True)
 class Config:
-    source_type: str
+    source_id: str
     settings: Mapping[str, Any]
 
     def __post_init__(self) -> None:
+        if not self.source_id:
+            raise ConfigValidationError("source_id must be a non-empty string")
         object.__setattr__(self, "settings", _freeze(self.settings))
 
 
@@ -156,7 +171,7 @@ class SearchQuery:
 class SearchResult:
     title: str
     description: Optional[str]
-    source_type: str
+    source_id: str
     provider_settings: Mapping[str, Any]
     metadata: Metadata
     provenance: Provenance
@@ -165,4 +180,4 @@ class SearchResult:
         object.__setattr__(self, "provider_settings", _freeze(self.provider_settings))
 
     def to_config(self) -> Config:
-        return Config(source_type=self.source_type, settings=self.provider_settings)
+        return Config(source_id=self.source_id, settings=self.provider_settings)

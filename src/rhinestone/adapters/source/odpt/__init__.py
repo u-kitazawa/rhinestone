@@ -20,7 +20,7 @@ _FILTERS = {
 
 
 class OdptAdapter(ProviderAdapter):
-    source_type = "odpt"
+    adapter_type = "odpt"
 
     def __init__(self) -> None:
         super().__init__(get_json=lambda url, params: None)
@@ -40,7 +40,7 @@ class OdptAdapter(ProviderAdapter):
             "terms_url": "https://developer.odpt.org/terms/data_basic_license.html",
         }
         return source(
-            self.source_type,
+            self.adapter_type,
             _TYPES[dataset],
             raw,
             (

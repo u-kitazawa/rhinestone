@@ -5,7 +5,7 @@ Execution Adapter は選択済みの `Resource` を、利用者が供給する r
 
 [API リファレンス](../api.md) · [Source Adapter](source-adapters.md)
 
-登録方法と `resource.open()` の使い方は[Resource を解決して開く](../resolve-and-open.md)
+dependencyの供給方法と `resource.open()` の使い方は[Resource を解決して開く](../resolve-and-open.md)
 を参照してください。runtime dependency は `dependencies` に factory として渡します。
 
 | Adapter | 選択名 / dependency 名 | runtime |

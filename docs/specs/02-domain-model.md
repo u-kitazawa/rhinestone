@@ -4,9 +4,17 @@ Core は次のデータ／モデルを扱います。provider や外部ライブ
 
 ## Config
 
-利用したいデータを宣言します。Source Adapter の選択に必要な provider 固有設定は保持しますが、HTTP クライアントや GDAL option などの実行詳細は原則として含めません。
+利用したいデータを宣言します。`source_id` は構成済み provider を参照し、`settings`
+はその provider 固有の対象指定を保持します。HTTP クライアントや GDAL option などの
+実行詳細は含めません。
 
 Config は実行によって暗黙に変化してはなりません（MUST NOT）。
+
+## ProviderConfig
+
+一つの名前付き provider を、組み込み Source Adapter の `adapter_type` と構成用
+`settings`へ対応付けます。同じ `adapter_type`を複数の`source_id`から利用できます。
+ProviderConfig は Adapter instance を公開APIへ露出させません。
 
 ## Source
 
@@ -65,4 +73,6 @@ provider、dataset/resource identifier、API endpoint、original URL、query par
 
 SearchQuery の共通条件は `text`、`bbox`、`time`、`limit` など必要最小限にします。Source Adapter は未対応の検索条件を黙って無視してはなりません（MUST NOT）。
 
-SearchResult は title、description、Adapter/source type、provider 固有 Config、Metadata、Provenance を保持します。データ取得時には Config に変換し、通常の検証・解決フローへ渡します。
+SearchResult は title、description、`source_id`、provider 固有 Config、Metadata、
+Provenance を保持します。Adapter種別はProvenanceに記録します。データ取得時には
+Config に変換し、通常の検証・解決フローへ渡します。

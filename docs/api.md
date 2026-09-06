@@ -14,12 +14,18 @@
 ## アプリケーションを構成する
 
 ```python
-from rhinestone import configure
+from rhinestone import ProviderConfig, configure
 
 app = configure(
-    dependencies={"rasterio": lambda: rasterio},
-    source_adapters=(...),
-    execution_adapters=(...),
+    providers={
+        "gspace": ProviderConfig(
+            "ckan", {"endpoint": "https://www.geospatial.jp/ckan"}
+        )
+    },
+    dependencies={
+        "http-json": lambda: get_json,
+        "rasterio": lambda: rasterio,
+    },
     credentials={"odpt": lambda: "consumer-key"},
 )
 ```
@@ -31,9 +37,8 @@ app = configure(
 
 | 引数 | 型 | 説明 |
 | --- | --- | --- |
-| `dependencies` | `Mapping[str, Callable[[], Any]]` | Execution Adapter 名と、対応 runtime を返す factory の対応。|
-| `source_adapters` | `Iterable[ProviderAdapter]` | 使用する Source Adapter。|
-| `execution_adapters` | `Iterable[ExecutionAdapter]` | 使用する Execution Adapter。|
+| `providers` | `Mapping[str, ProviderConfig] \| None` | source idと組み込みAdapter種別・provider設定の対応。|
+| `dependencies` | `Mapping[str, Callable[[], Any]] \| None` | HTTP callbackやGIS runtimeを返すfactory。|
 | `credentials` | `Mapping[str, Callable[[], str]] \| None` | logical credential 名と secret factory の対応。ODPT など、対応する Adapter だけが利用する。|
 
 factory は遅延評価されます。たとえば `lambda: rasterio` は Resource を解決する
@@ -62,10 +67,11 @@ factory は遅延評価されます。たとえば `lambda: rasterio` は Resour
 
 | 型 | フィールド / メソッド | 説明 |
 | --- | --- | --- |
-| `Config` | `source_type: str`, `settings: Mapping[str, Any]` | Source Adapter への宣言的入力。|
+| `ProviderConfig` | `adapter_type: str`, `settings: Mapping[str, Any]` | 名前付きproviderに使う組み込みAdapter種別と構成。|
+| `Config` | `source_id: str`, `settings: Mapping[str, Any]` | 構成済みproviderへの宣言的入力。|
 | `SearchQuery` | `text`, `bbox`, `time`, `limit` | 横断検索の条件。`bbox` は `(west, south, east, north)`、`time` は `(start, end)`。各値は省略可能。|
 | `SearchQuery` | `supplied_conditions` | 指定済みの条件名を返す読み取り専用集合。|
-| `SearchResult` | `title`, `description`, `source_type`, `provider_settings`, `metadata`, `provenance` | 検索結果。|
+| `SearchResult` | `title`, `description`, `source_id`, `provider_settings`, `metadata`, `provenance` | 検索結果。|
 | `SearchResult` | `to_config() -> Config` | 検索結果を通常の解決フローへ渡す Config に変換する。|
 
 ### 解決結果
@@ -93,7 +99,7 @@ Resource では `ExecutionAdapterUnavailableError` になります。
 | エラー | 発生原因 |
 | --- | --- |
 | `ConfigValidationError` | Config または Adapter の設定が不正。|
-| `UnsupportedSourceError` | `source_type` に対応する Adapter が未登録。|
+| `UnsupportedSourceError` | `source_id` に対応するproviderが未構成。|
 | `UnsupportedSearchConditionError` | いずれかの検索 Adapter が指定条件を扱えない。|
 | `ProviderMetadataError` | provider metadata の取得に失敗。|
 | `ProviderResponseError` | provider response が契約に合わない。|

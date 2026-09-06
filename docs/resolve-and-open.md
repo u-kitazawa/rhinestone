@@ -11,7 +11,7 @@ from rhinestone import Config
 
 resource = app.resolve(
     Config(
-        source_type="direct",
+        source_id="direct",
         settings={
             "uri": "https://example.invalid/boundaries.geojson",
             "format": "geojson",
@@ -71,10 +71,10 @@ dataset = app.open(config, adapter="gdal")
 
 | 状況 | 確認すること |
 | --- | --- |
-| `UnsupportedSourceError` | `source_type` と Source Adapter の登録が一致しているか |
+| `UnsupportedSourceError` | `source_id`に対応するproviderが構成されているか |
 | `ConfigValidationError` | 必須設定、format、entry point、credential 名が正しいか |
 | `ProviderMetadataError` | API endpoint、ネットワーク、認証情報を確認する |
-| `ExecutionAdapterUnavailableError` | Execution Adapter、dependency 名、対応 format を確認する |
+| `ExecutionAdapterUnavailableError` | dependency 名と対応 format を確認する |
 | `DependencyUnavailableError` | `dependencies` に runtime factory があるか、factory が import に成功するか |
 
 より具体的な provider の設定は [Source Adapter 一覧](api/source-adapters.md) を参照してください。

@@ -4,14 +4,11 @@ import os
 
 import requests
 
-from rhinestone import Config, configure
-from rhinestone.adapters import OdptAdapter
-from rhinestone.adapters.execution import JsonServiceAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 app = configure(
+    providers={"odpt": ProviderConfig("odpt")},
     dependencies={"json-service": lambda: requests},
-    source_adapters=(OdptAdapter(),),
-    execution_adapters=(JsonServiceAdapter(OdptAdapter.prepare_request, "odpt"),),
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 records = app.open(

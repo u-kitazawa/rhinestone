@@ -6,31 +6,29 @@
 
 ## 設定と検索
 
-`Config.settings` は `resource_id` が必須です。`endpoint` は Config または
-コンストラクタに指定します。検索では `text` と `limit` を使えます。
+`Config.settings` は `resource_id` が必須です。`endpoint` はProviderConfigに
+指定します。検索では `text` と `limit` を使えます。
 
 ## Endpoint と認証
 
 `{endpoint}/api/3/action/resource_show` と `package_show` を呼びます。検索では
-`package_search` を使います。`get_json(url, params)` を注入し、必要なら
-`api_token` または `api_key` の一方をコンストラクタへ渡します。
+`package_search` を使います。`http-json` dependencyを注入し、必要なら
+`api_token` または `api_key` の一方をProviderConfigへ渡します。
 
 配布 URL は API response から取得し、推測しません。
 
 ## 解決する例
 
 ```python
-from rhinestone import Config, configure
-from rhinestone.adapters import CkanAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 endpoint = "https://www.geospatial.jp/ckan"
 app = configure(
-    dependencies={},
-    source_adapters=(CkanAdapter(get_json=get_json, endpoint=endpoint),),
-    execution_adapters=(),
+    providers={"gspace": ProviderConfig("ckan", {"endpoint": endpoint})},
+    dependencies={"http-json": lambda: get_json},
 )
 resource = app.resolve(
-    Config("ckan", {"endpoint": endpoint, "resource_id": "resource-uuid"})
+    Config("gspace", {"resource_id": "resource-uuid"})
 )
 ```
 

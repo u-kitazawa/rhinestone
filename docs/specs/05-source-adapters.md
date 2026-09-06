@@ -35,4 +35,11 @@ Source Adapter は次を満たさなければなりません。
 
 ## Adapter Registry
 
-Source Adapter と Execution Adapter の登録状態は Adapter Registry が管理します。初期実装では内部 Registry を使用し、外部拡張機構は反復可能な契約が実例で確認された場合に設計します。
+Source Adapter と Execution Adapter の登録状態は内部 Adapter Registry が管理します。
+利用者は Adapter instanceを登録しません（MUST NOT）。Composition Rootは
+`ProviderConfig.adapter_type`から組み込みSource Adapterを生成し、利用可能なdependency
+に対応する組み込みExecution Adapterを構成します。
+
+RegistryはSource Adapter種別ではなく`source_id`でproviderを識別します。同じ
+Adapter種別を利用する複数providerを同時に登録できなければなりません（MUST）。
+外部拡張機構は反復可能な契約が実例で確認された場合にのみ設計します。

@@ -16,7 +16,7 @@ from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
 class CkanAdapter(ProviderAdapter):
-    source_type = "ckan"
+    adapter_type = "ckan"
     search_conditions = frozenset({"text", "limit"})
 
     def __init__(
@@ -121,7 +121,7 @@ class CkanAdapter(ProviderAdapter):
                     SearchResult(
                         title=_optional_string(package.get("title")) or resource_id,
                         description=_optional_string(package.get("notes")),
-                        source_type=self.source_type,
+                        source_id=self.adapter_type,
                         provider_settings={
                             "endpoint": endpoint,
                             "resource_id": resource_id,

@@ -28,7 +28,7 @@ from rhinestone.models import Config, Source
 
 
 class ProbeAdapter(ProviderAdapter):
-    source_type = "probe"
+    adapter_type = "probe"
 
     def load(self, config: Config) -> Source:
         raise NotImplementedError
@@ -59,7 +59,7 @@ def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
     assert adapter.endpoint({}) == "https://example.test"
     assert adapter.required({"id": "known"}, "id") == "known"
     assert adapter.settings(Config("probe", {"id": "known"}))["id"] == "known"
-    with pytest.raises(ConfigValidationError, match="source_type"):
+    with pytest.raises(ConfigValidationError, match="adapter type"):
         adapter.settings(Config("other", {}))
     with pytest.raises(ConfigValidationError, match="endpoint"):
         ProbeAdapter(lambda url, params: {}).endpoint({})

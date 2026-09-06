@@ -4,14 +4,11 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, configure
-from rhinestone.adapters import GsiFundamentalAdapter
-from rhinestone.adapters.execution import GdalAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 app = configure(
+    providers={"gsi-fundamental": ProviderConfig("gsi-fundamental")},
     dependencies={"gdal": lambda: gdal},
-    source_adapters=(GsiFundamentalAdapter(),),
-    execution_adapters=(GdalAdapter(),),
 )
 resource = app.resolve(
     Config(

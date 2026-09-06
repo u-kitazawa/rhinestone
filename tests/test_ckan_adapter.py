@@ -21,7 +21,7 @@ def test_ckan_resource_and_package_responses_become_a_complete_source() -> None:
 
     source = adapter.load(
         Config(
-            source_type="ckan",
+            source_id="ckan",
             settings={"endpoint": endpoint, "resource_id": "resource-1"},
         )
     )
@@ -53,7 +53,7 @@ def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None
     assert client.calls == [(search_url, {"q": "river", "rows": 5})]
     assert len(results) == 1
     assert results[0].to_config() == Config(
-        source_type="ckan",
+        source_id="ckan",
         settings={"endpoint": endpoint, "resource_id": "resource-1"},
     )
     assert results[0].metadata.raw["id"] == "dataset-1"
@@ -70,7 +70,7 @@ def test_ckan_unsuccessful_action_response_is_rejected() -> None:
     with pytest.raises(ProviderResponseError, match="Not found"):
         CkanAdapter(get_json=client).load(
             Config(
-                source_type="ckan",
+                source_id="ckan",
                 settings={"endpoint": endpoint, "resource_id": "missing"},
             )
         )

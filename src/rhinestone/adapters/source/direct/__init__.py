@@ -9,7 +9,7 @@ from ..base import ProviderAdapter
 class DirectAdapter(ProviderAdapter):
     """Interpret a complete direct-resource declaration without guessing."""
 
-    source_type = "direct"
+    adapter_type = "direct"
 
     def __init__(self) -> None:
         super().__init__(get_json=lambda url, params: None)

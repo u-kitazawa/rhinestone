@@ -16,7 +16,7 @@ from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
 class OgcFeaturesAdapter(ProviderAdapter):
-    source_type = "ogc-features"
+    adapter_type = "ogc-features"
     search_conditions = frozenset({"bbox", "time", "limit"})
 
     def __init__(
@@ -97,7 +97,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    source_type=self.source_type,
+                    source_id=self.adapter_type,
                     provider_settings={
                         "endpoint": endpoint,
                         "collection_id": self._collection_id,

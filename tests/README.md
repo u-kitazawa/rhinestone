@@ -24,11 +24,10 @@ official CKAN Action API, e-Stat API 3.0, STAC API 1.0.0, and OGC API Features
 1.0 contracts. They specify only behaviour supported by those standards and
 their fixtures; deployment-specific extensions remain out of scope.
 
-`rhinestone.adapters.ProviderAdapter` is the formal public base class for Source
-Adapters. Its `load(config)` method and injected `get_json(url, params)`
-transport are public contracts. Provider-specific constructor arguments may
-still evolve without weakening request, preservation, explicit-selection, and
-failure behaviour.
+Source Adapter classes are internal contracts. The public composition API maps
+named `ProviderConfig` values to built-in adapters, allowing multiple provider
+ids to share one adapter type. Tests may instantiate adapters directly to verify
+their request, preservation, explicit-selection, and failure behaviour.
 
 The first execution vertical slice temporarily places execution adapters in
 `rhinestone.adapters.execution` and connects them through `AccessPipeline.open`.
@@ -36,10 +35,9 @@ Those package and constructor shapes may evolve; the stable contracts are that
 the selected Resource is translated without being re-selected, runtime
 dependencies stay lazy and user-owned, and runtime failures retain their cause.
 
-`rhinestone.adapters.ExecutionAdapter` is the formal public base class for
-built-in Execution Adapters. It requires a stable name, priority, support
-predicate, and runtime-opening operation; Selector composition remains
-behaviour-based.
+Execution Adapter classes are also composed internally. Their stable name,
+priority, support predicate, and runtime-opening operation remain internal
+contracts; users provide only runtime dependency factories.
 
 The following public-composition slice treats `rhinestone.configure()` as a
 factory for an isolated application context rather than mutable process-global

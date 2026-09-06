@@ -10,7 +10,7 @@ from ..base import ProviderAdapter
 
 
 class GsiFundamentalAdapter(ProviderAdapter):
-    source_type = "gsi-fundamental"
+    adapter_type = "gsi-fundamental"
 
     def __init__(self) -> None:
         super().__init__(get_json=lambda url, params: None)
@@ -35,7 +35,7 @@ class GsiFundamentalAdapter(ProviderAdapter):
             },
         )
         return source(
-            self.source_type,
+            self.adapter_type,
             metadata["mesh"],
             metadata,
             (candidate,),

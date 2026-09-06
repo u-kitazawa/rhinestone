@@ -15,7 +15,7 @@ from rhinestone.resolution import Resolver
 
 
 class RecordingSourceAdapter:
-    source_type = "fixture"
+    source_id = "fixture"
 
     def __init__(self, events: List[str]) -> None:
         self.events = events
@@ -50,14 +50,14 @@ def test_access_pipeline_keeps_source_interpretation_before_resolution() -> None
         adapter_registry=AdapterRegistry((RecordingSourceAdapter(events),), ()),
         resolver=RecordingResolver(events),
     )
-    config = Config(source_type="fixture", settings={"dataset": "data-1"})
+    config = Config(source_id="fixture", settings={"dataset": "data-1"})
 
     resource = pipeline.resolve(config)
 
     assert events == ["source-adapter", "resolver"]
     assert resource.source.raw_metadata == {"original": True}
     assert resource.provenance.raw == {"request": "known"}
-    assert config == Config(source_type="fixture", settings={"dataset": "data-1"})
+    assert config == Config(source_id="fixture", settings={"dataset": "data-1"})
 
 
 def test_unknown_source_type_has_a_specific_failure() -> None:
@@ -67,7 +67,7 @@ def test_unknown_source_type_has_a_specific_failure() -> None:
     )
 
     with pytest.raises(UnsupportedSourceError, match="unknown"):
-        pipeline.resolve(Config(source_type="unknown", settings={}))
+        pipeline.resolve(Config(source_id="unknown", settings={}))
 
 
 def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
@@ -75,7 +75,7 @@ def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
     provider_error = OSError("connection closed")
 
     class BrokenAdapter:
-        source_type = "broken"
+        source_id = "broken"
 
         def load(self, config: Config) -> Source:
             raise provider_error
@@ -85,7 +85,7 @@ def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
     )
 
     with pytest.raises(ProviderMetadataError) as captured:
-        pipeline.resolve(Config(source_type="broken", settings={}))
+        pipeline.resolve(Config(source_id="broken", settings={}))
 
     assert captured.value.__cause__ is provider_error
 
@@ -95,7 +95,7 @@ def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
     expected = ConfigValidationError("dataset is required")
 
     class RejectingAdapter:
-        source_type = "rejecting"
+        source_id = "rejecting"
 
         def load(self, config: Config) -> Source:
             raise expected
@@ -105,7 +105,7 @@ def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
     )
 
     with pytest.raises(ConfigValidationError) as captured:
-        pipeline.resolve(Config(source_type="rejecting", settings={}))
+        pipeline.resolve(Config(source_id="rejecting", settings={}))
 
     assert captured.value is expected
 

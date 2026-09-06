@@ -8,7 +8,7 @@ from rhinestone.models import Config
 def test_direct_adapter_preserves_explicit_resource_knowledge() -> None:
     """公式direct URIをprovider通信なしでSourceへ変換し、利用者が示した知識を保持するために必要である。"""
     config = Config(
-        source_type="direct",
+        source_id="direct",
         settings={
             "uri": "https://files.example/rivers.zip",
             "format": "shapefile",
@@ -42,13 +42,13 @@ def test_direct_adapter_requires_uri_and_format(missing: str) -> None:
     del settings[missing]
 
     with pytest.raises(ConfigValidationError, match=missing):
-        DirectAdapter().load(Config(source_type="direct", settings=settings))
+        DirectAdapter().load(Config(source_id="direct", settings=settings))
 
 
 def test_direct_adapter_rejects_runtime_and_transport_details() -> None:
     """宣言的ConfigへGDAL instanceやHTTP実装詳細が混入するのを防ぐために必要である。"""
     config = Config(
-        source_type="direct",
+        source_id="direct",
         settings={
             "uri": "https://files.example/rivers.geojson",
             "format": "geojson",
@@ -63,7 +63,7 @@ def test_direct_adapter_rejects_runtime_and_transport_details() -> None:
 def test_direct_adapter_rejects_non_object_metadata() -> None:
     """構造不正の利用者metadataをraw knowledgeとして取り込まないために必要である。"""
     config = Config(
-        source_type="direct",
+        source_id="direct",
         settings={"uri": "/data/a.csv", "format": "csv", "metadata": "invalid"},
     )
 

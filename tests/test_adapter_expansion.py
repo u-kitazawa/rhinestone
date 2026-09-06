@@ -10,7 +10,7 @@ from xml.etree.ElementTree import fromstring
 
 import pytest
 
-from rhinestone import Config, SearchQuery, configure
+from rhinestone import Config, ProviderConfig, SearchQuery, configure
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
@@ -66,11 +66,10 @@ def test_tile_source_plan_search_and_gdal_translation() -> None:
         return "dataset"
 
     app = configure(
-        {"gdal": lambda: SimpleNamespace(OpenEx=open_ex)},
-        [adapter],
-        [GdalAdapter()],
+        providers={"gsi": ProviderConfig("gsi-tile")},
+        dependencies={"gdal": lambda: SimpleNamespace(OpenEx=open_ex)},
     )
-    assert app.open(Config("gsi-tile", {"id": "std"})) == "dataset"
+    assert app.open(Config("gsi", {"id": "std"})) == "dataset"
     xml = fromstring(captured["uri"])
     assert xml.findtext("DataWindow/YOrigin") == "top"
     assert xml.findtext("DataWindow/TileLevel") == "18"
@@ -169,7 +168,7 @@ def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> No
         == "/vsizip//vsicurl/https://fixture.example/city.zip/udx/bldg/city.gml"
     )
     found = adapter.search(SearchQuery(text="都市"))
-    assert found[0].to_config().source_type == "plateau"
+    assert found[0].to_config().source_id == "plateau"
     assert Resolver().resolve(adapter.load(found[0].to_config())).format == "citygml"
 
 
@@ -397,7 +396,6 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
             status_code=200, raise_for_status=lambda: None, json=lambda: data
         )
 
-    execution = JsonServiceAdapter(OdptAdapter.prepare_request, "odpt")
     factory_calls: List[bool] = []
 
     def credential() -> str:
@@ -405,9 +403,8 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
         return "rotating-secret"
 
     app = configure(
-        {"json-service": lambda: SimpleNamespace(get=get)},
-        [OdptAdapter()],
-        [execution],
+        providers={"odpt": ProviderConfig("odpt")},
+        dependencies={"json-service": lambda: SimpleNamespace(get=get)},
         credentials={"odpt": credential},
     )
     config = Config(
@@ -424,7 +421,8 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
     assert resource.open() == data
     assert len(factory_calls) == 2
     other = configure(
-        {"json-service": lambda: SimpleNamespace(get=get)}, [OdptAdapter()], [execution]
+        providers={"odpt": ProviderConfig("odpt")},
+        dependencies={"json-service": lambda: SimpleNamespace(get=get)},
     )
     with pytest.raises(CredentialUnavailableError):
         other.open(config)

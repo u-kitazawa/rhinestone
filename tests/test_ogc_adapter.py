@@ -15,7 +15,7 @@ def test_ogc_collection_items_link_becomes_service_resource() -> None:
 
     source = adapter.load(
         Config(
-            source_type="ogc-features",
+            source_id="ogc-features",
             settings={"endpoint": endpoint, "collection_id": "rivers"},
         )
     )
@@ -54,7 +54,7 @@ def test_ogc_search_uses_items_endpoint_and_standard_query_parameters() -> None:
     assert client.calls == [(items_url, {"bbox": "139.0,35.0,140.0,36.0", "limit": 10})]
     assert results[0].title == "Example River"
     assert results[0].to_config() == Config(
-        source_type="ogc-features",
+        source_id="ogc-features",
         settings={
             "endpoint": "https://features.example",
             "collection_id": "rivers",
@@ -91,7 +91,7 @@ def test_ogc_collection_without_items_link_is_rejected() -> None:
     with pytest.raises(ProviderResponseError, match="items"):
         OgcFeaturesAdapter(get_json=client).load(
             Config(
-                source_type="ogc-features",
+                source_id="ogc-features",
                 settings={"endpoint": endpoint, "collection_id": "rivers"},
             )
         )

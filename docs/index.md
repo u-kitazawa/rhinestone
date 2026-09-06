@@ -190,8 +190,6 @@ app = configure(
     dependencies={
         "rasterio": lambda: rasterio,
     },
-    source_adapters=(...),
-    execution_adapters=(...),
 )
 ```
 
@@ -199,7 +197,7 @@ app = configure(
 検索や Resource の解決だけを行う場合には読み込まれません。
 
 既存の GIS 環境を維持したまま、
-必要な Execution Adapter だけを組み合わせられます。
+必要な実行環境だけを供給できます。
 
 ## Rhinestone の役割
 
@@ -244,15 +242,15 @@ pip install rhinestone
 たとえば Rasterio を利用する場合は、
 Rhinestone とは別に Rasterio を環境へ導入します。
 
-アプリケーションでは、利用する Source Adapter と Execution Adapter を登録します。
+アプリケーションでは、provider設定と利用するdependencyを登録します。Adapterは
+Rhinestoneが構成します。
 
 ```python
-from rhinestone import configure
+from rhinestone import ProviderConfig, configure
 
 app = configure(
+    providers={"catalog": ProviderConfig("ckan", {"endpoint": "..."})},
     dependencies={...},
-    source_adapters=(...),
-    execution_adapters=(...),
 )
 ```
 
@@ -263,7 +261,7 @@ app = configure(
 Rhinestone の基本的な使い方から始める場合は
 [Getting started](getting-started.md) を参照してください。
 
-アプリへの Adapter 登録、HTTP callback、secret の渡し方は
+provider構成、HTTP callback、secret の渡し方は
 [アプリケーションを構成する](configuration.md) を参照してください。
 
 検索結果を選ぶ流れは [データを検索する](search.md)、Resource を確認して runtime で

@@ -13,7 +13,7 @@ from ..base import ProviderAdapter
 
 
 class GsiTileAdapter(ProviderAdapter):
-    source_type = "gsi-tile"
+    adapter_type = "gsi-tile"
     search_conditions = frozenset({"text", "limit"})
 
     def __init__(self) -> None:
@@ -48,7 +48,7 @@ class GsiTileAdapter(ProviderAdapter):
             },
         )
         return source(
-            self.source_type,
+            self.adapter_type,
             identifier,
             spec,
             (candidate,),
@@ -88,7 +88,7 @@ class GsiTileAdapter(ProviderAdapter):
             raise ConfigValidationError("limit must be a non-negative integer")
         results: List[SearchResult] = []
         for identifier in sorted(self._specs):
-            item = self.load(Config(self.source_type, {"id": identifier}))
+            item = self.load(Config(self.adapter_type, {"id": identifier}))
             if (
                 query.text
                 and query.text.casefold()
@@ -99,7 +99,7 @@ class GsiTileAdapter(ProviderAdapter):
                 SearchResult(
                     item.metadata.title or identifier,
                     item.metadata.description,
-                    self.source_type,
+                    self.adapter_type,
                     {"id": identifier},
                     item.metadata,
                     item.provenance,

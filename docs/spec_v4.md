@@ -220,21 +220,34 @@ HTTP通信方法、GDALオプション等の内部実装詳細は原則として
 例:
 
 ```yaml
-source:
-  type: ckan
-  endpoint: https://example.jp
-  resource_id: abcdef
+providers:
+  gspace:
+    adapter_type: ckan
+    settings:
+      endpoint: https://example.jp
+config:
+  source_id: gspace
+  settings:
+    resource_id: abcdef
 ```
 
 e-Statの場合:
 
 ```yaml
-source:
-  type: estat
-  stats_data_id: "0000000000"
+providers:
+  estat:
+    adapter_type: estat
+config:
+  source_id: estat
+  settings:
+    stats_data_id: "0000000000"
 ```
 
 Source固有の設定項目は［Source Adapter］が管理する。
+
+Configの`source_id`は構成済みproviderを参照する。provider識別子と
+［Source Adapter］種別を同一視してはならない。同じAdapter種別を利用する複数providerを
+同時に構成できなければならない。
 
 Core側に巨大なprovider union schemaを持たせない。
 
@@ -753,7 +766,7 @@ SearchResultは検索結果を表すデータモデルである。
 SearchResult
 ├ title
 ├ description
-├ adapter/source type
+├ source_id
 ├ provider-specific configuration
 ├ Metadata
 └ Provenance
@@ -1130,6 +1143,11 @@ QGIS環境のGDAL等を［Dependency Registry］へcallbackとして注入でき
 ## 37. ［Adapter Registry］
 
 ［Source Adapter］および［Execution Adapter］の登録状態は［Adapter Registry］が管理する。
+［Adapter Registry］は内部実装であり、利用者はAdapter instanceを登録しない。
+
+Composition Rootは、名前付きproviderの`ProviderConfig.adapter_type`から組み込み
+［Source Adapter］を生成し、利用者が供給したdependencyに対応する組み込み
+［Execution Adapter］を構成する。Source側はAdapter種別ではなく`source_id`で索引する。
 
 初期段階では複雑なplugin systemを必須としない。
 
