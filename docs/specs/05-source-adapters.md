@@ -19,13 +19,13 @@ Source Adapter は次を満たさなければなりません。
 
 ## 組み込み追加 Adapter
 
-\`StaticAdapter\` はリポジトリまたは利用者が管理する静的なサービス定義を \`Source\` として扱います。組み込みの国土地理院タイル定義は \`sources.GSI\` に同梱し、\`GdalAdapter\` が選択済み XYZ template を GDAL TMS 定義へ翻訳します。URL から tile ID は推測しません。
+`StaticAdapter` はリポジトリまたは利用者が管理する静的なサービス定義を `Source` として扱います。組み込みの国土地理院タイル定義は `sources.GSI` に同梱し、`GdalAdapter` が選択済み XYZ template を GDAL TMS 定義へ翻訳します。URL から tile ID は推測しません。
 
-\`PlateauAdapter\` は G 空間情報センターの CKAN Action API から distribution を読み、PLATEAU と配布基盤の由来を残します。\`GsiFundamentalAdapter\` はユーザーが取得済みの基本項目ファイルのみを扱い、ログイン画面や HTML を操作しません。
+`PlateauAdapter` は G 空間情報センターの CKAN Action API から distribution を読み、PLATEAU と配布基盤の由来を残します。`GsiFundamentalAdapter` はユーザーが取得済みの基本項目ファイルのみを扱い、ログイン画面や HTML を操作しません。
 
-\`DcatAdapter\` は利用者が渡す RDF runtime と文書取得 callback で JSON-LD、Turtle、RDF/XML を解釈します。Dataset は Source、\`downloadURL\` を持つ Distribution は候補になります。\`accessURL\` だけの landing page は候補にしません。
+`DcatAdapter` は利用者が渡す RDF runtime と文書取得 callback で JSON-LD、Turtle、RDF/XML を解釈します。Dataset は Source、`downloadURL` を持つ Distribution は候補になります。`accessURL` だけの landing page は候補にしません。
 
-\`OdptAdapter\` は ODPT v4 の固定 endpoint、dataset type、公式 filter を検証して ServiceQueryPlan を作ります。\`JsonServiceAdapter\` が選択済みの Plan を requests 互換 runtime へ渡し、credential factory から得た secret をその直前に \`acl:consumerKey\` として付与します。
+`OdptAdapter` は ODPT v4 の固定 endpoint、dataset type、公式 filter を検証して ServiceQueryPlan を作ります。`JsonServiceAdapter` が選択済みの Plan を requests 互換 runtime へ渡し、credential factory から得た secret をその直前に `acl:consumerKey` として付与します。
 
 ## Search Capability
 
@@ -35,9 +35,9 @@ Source Adapter は次を満たさなければなりません。
 
 Source Adapter と Execution Adapter の登録状態は内部 Adapter Registry が管理します。
 利用者は Adapter instanceを登録しません（MUST）。Composition Rootは
-\`SourceDefinition.adapter_type\`から組み込みSource Adapterを生成し、利用者が供給したdependency
+`SourceDefinition.adapter_type`から組み込みSource Adapterを生成し、利用者が供給したdependency
 に対応する組み込みExecution Adapterを構成します。
 
-RegistryはSource Adapter種別ではなく\`source_id\`でproviderを識別します。同じ
+RegistryはSource Adapter種別ではなく`source_id`でproviderを識別します。同じ
 Adapter種別を利用する複数providerを同時に登録できなければなりません（MUST）。
 外部拡張機構は反復可能な契約が実例で確認された場合にのみ設計します。
