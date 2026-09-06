@@ -44,6 +44,6 @@ contracts; users provide only runtime dependency factories.
 The following public-composition slice treats `rhinestone.configure()` as a
 factory for an isolated application context rather than mutable process-global
 configuration. A Resource resolved by that context is bound to its executor so
-`resource.open(adapter=...)` can follow the documented interface. The binding
+`resource.open(library)` can follow the documented interface. The binding
 mechanism is not itself a permanent API; context isolation, lazy dependencies,
 normal resolution, and explicit adapter selection are the guarantees.
