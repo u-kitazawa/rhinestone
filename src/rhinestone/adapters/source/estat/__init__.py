@@ -18,7 +18,7 @@ DEFAULT_ENDPOINT = "https://api.e-stat.go.jp/rest/3.0/app/json"
 
 
 class EStatAdapter(ProviderAdapter):
-    source_type = "estat"
+    adapter_type = "estat"
     search_conditions = frozenset({"text", "limit"})
 
     def __init__(
@@ -128,7 +128,7 @@ class EStatAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(table.get("DESCRIPTION")),
-                    source_type=self.source_type,
+                    source_id=self.adapter_type,
                     provider_settings={"stats_data_id": stats_data_id},
                     metadata=Metadata(
                         title=title,

@@ -4,26 +4,25 @@ import os
 import sys
 from pathlib import Path
 
-from rhinestone import SearchQuery, configure
-from rhinestone.adapters import CkanAdapter, EStatAdapter
+from rhinestone import ProviderConfig, SearchQuery, configure
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _support.http_json import get_json  # noqa: E402
 
-ckan_kwargs = {"get_json": get_json}
+ckan_settings = {"endpoint": os.environ["RHINESTONE_CKAN_ENDPOINT"]}
 if os.environ.get("RHINESTONE_CKAN_API_TOKEN"):
-    ckan_kwargs["api_token"] = os.environ["RHINESTONE_CKAN_API_TOKEN"]
+    ckan_settings["api_token"] = os.environ["RHINESTONE_CKAN_API_TOKEN"]
 elif os.environ.get("RHINESTONE_CKAN_API_KEY"):
-    ckan_kwargs["api_key"] = os.environ["RHINESTONE_CKAN_API_KEY"]
-ckan = CkanAdapter(endpoint=os.environ["RHINESTONE_CKAN_ENDPOINT"], **ckan_kwargs)
+    ckan_settings["api_key"] = os.environ["RHINESTONE_CKAN_API_KEY"]
 estat_key = (
     os.environ.get("RHINESTONE_ESTAT_APP_ID") or os.environ["RHINESTONE_ESTAT_API_KEY"]
 )
-estat = EStatAdapter(api_key=estat_key, get_json=get_json)
 app = configure(
-    dependencies={},
-    source_adapters=(ckan, estat),
-    execution_adapters=(),
+    providers={
+        "open-data": ProviderConfig("ckan", ckan_settings),
+        "estat": ProviderConfig("estat", {"api_key": estat_key}),
+    },
+    dependencies={"http-json": lambda: get_json},
 )
 grouped = app.search(
     SearchQuery(text=os.environ.get("RHINESTONE_QUERY", "人口"), limit=3)

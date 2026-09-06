@@ -4,8 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from rhinestone import Config, configure
-from rhinestone.adapters import EStatAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _support.http_json import get_json  # noqa: E402
@@ -15,12 +14,11 @@ app_id = (
 )
 stats_data_id = os.environ["RHINESTONE_ESTAT_STATS_DATA_ID"]
 app = configure(
-    dependencies={},
-    source_adapters=(EStatAdapter(api_key=app_id, get_json=get_json),),
-    execution_adapters=(),
+    providers={"estat": ProviderConfig("estat", {"api_key": app_id})},
+    dependencies={"http-json": lambda: get_json},
 )
 resource = app.resolve(
-    Config(source_type="estat", settings={"stats_data_id": stats_data_id})
+    Config(source_id="estat", settings={"stats_data_id": stats_data_id})
 )
 
 print("URI:", resource.uri)

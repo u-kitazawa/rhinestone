@@ -6,8 +6,8 @@
 
 ## 設定と検索
 
-`Config.settings` の必須項目は `stats_data_id` です。`endpoint` は Config または
-コンストラクタに指定します。検索条件は `text` と `limit` です。
+`Config.settings` の必須項目は `stats_data_id` です。`endpoint` はProviderConfigに
+指定します。検索条件は `text` と `limit` です。
 
 ## Endpoint と認証
 
@@ -19,13 +19,13 @@
 ```python
 import os
 
-from rhinestone import Config, configure
-from rhinestone.adapters import EStatAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 app = configure(
-    dependencies={},
-    source_adapters=(EStatAdapter(get_json=get_json, app_id=os.environ["ESTAT_APP_ID"]),),
-    execution_adapters=(),
+    providers={
+        "estat": ProviderConfig("estat", {"app_id": os.environ["ESTAT_APP_ID"]})
+    },
+    dependencies={"http-json": lambda: get_json},
 )
 resource = app.resolve(Config("estat", {"stats_data_id": "table-id"}))
 ```

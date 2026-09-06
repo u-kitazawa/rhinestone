@@ -6,7 +6,8 @@
 
 ## 設定と検索
 
-`endpoint`、`collection_id`、`item_id`、`asset_key` が必須です。検索には `bbox`、
+ProviderConfigでは`endpoint`、Configでは`collection_id`、`item_id`、`asset_key`が
+必須です。検索には `bbox`、
 `time`、`limit` を使えます。
 
 ## Endpoint と認証
@@ -20,18 +21,18 @@ asset がちょうど一件である必要があり、asset URL や format は�
 ```python
 import rasterio
 
-from rhinestone import Config, configure
-from rhinestone.adapters import StacAdapter
-from rhinestone.adapters.execution import RasterioAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 app = configure(
-    dependencies={"rasterio": lambda: rasterio},
-    source_adapters=(StacAdapter(get_json=get_json, endpoint="https://stac.example/api"),),
-    execution_adapters=(RasterioAdapter(),),
+    providers={
+        "imagery": ProviderConfig(
+            "stac", {"endpoint": "https://stac.example/api"}
+        )
+    },
+    dependencies={"http-json": lambda: get_json, "rasterio": lambda: rasterio},
 )
 resource = app.resolve(
-    Config("stac", {
-        "endpoint": "https://stac.example/api",
+    Config("imagery", {
         "collection_id": "collection-id",
         "item_id": "item-id",
         "asset_key": "asset-key",

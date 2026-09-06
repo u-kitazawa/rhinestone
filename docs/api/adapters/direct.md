@@ -19,13 +19,11 @@ URL、形式、runtime は推測しません。
 
 ```python
 from rhinestone import Config, configure
-from rhinestone.adapters import DirectAdapter
-
-app = configure({}, (DirectAdapter(),), ())
+app = configure()
 resource = app.resolve(
     Config("direct", {"uri": "https://example.invalid/data.geojson", "format": "geojson"})
 )
 ```
 
-実在するデータを開くには、対応する Execution Adapter も登録します。手順は
+実在するデータを開くには、対応するruntime dependencyも登録します。手順は
 [Resource を解決して開く](../../resolve-and-open.md)を参照してください。

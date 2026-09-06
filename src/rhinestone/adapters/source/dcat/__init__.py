@@ -23,7 +23,7 @@ _FORMATS = {
 
 
 class DcatAdapter(ProviderAdapter):
-    source_type = "dcat"
+    adapter_type = "dcat"
     search_conditions = frozenset({"text", "limit"})
 
     def __init__(
@@ -102,7 +102,7 @@ class DcatAdapter(ProviderAdapter):
                     )
                 )
         return source(
-            self.source_type,
+            self.adapter_type,
             dataset_uri,
             {"document": document, "catalog_uri": uri},
             tuple(candidates),
@@ -141,7 +141,7 @@ class DcatAdapter(ProviderAdapter):
             ):
                 continue
             item = source(
-                self.source_type,
+                self.adapter_type,
                 str(dataset),
                 {"document": document},
                 (),
@@ -153,7 +153,7 @@ class DcatAdapter(ProviderAdapter):
                 SearchResult(
                     title,
                     description,
-                    self.source_type,
+                    self.adapter_type,
                     dict(settings, dataset=str(dataset)),
                     item.metadata,
                     item.provenance,

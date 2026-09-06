@@ -24,14 +24,14 @@ class AccessPipeline:
         self._dependencies = dependencies
 
     def resolve(self, config: Config) -> Resource:
-        adapter = self._adapter_registry.source(config.source_type)
+        adapter = self._adapter_registry.source(config.source_id)
         try:
             source = adapter.load(config)
         except RhinestoneError:
             raise
         except Exception as error:
             raise ProviderMetadataError(
-                f"Provider metadata for {config.source_type!r} could not be loaded"
+                f"Provider metadata for {config.source_id!r} could not be loaded"
             ) from error
         resource = self._resolver.resolve(source)
         if self._execution_selector is None or self._dependencies is None:

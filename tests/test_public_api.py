@@ -1,72 +1,18 @@
-from typing import FrozenSet, List, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional
 
 import pytest
+import rdflib
 
-from rhinestone import configure
-from rhinestone.errors import UnsupportedSearchConditionError
-from rhinestone.models import (
-    Config,
-    Metadata,
-    Provenance,
-    ResourceCandidate,
-    SearchQuery,
-    SearchResult,
-    Source,
+from rhinestone import Config, ProviderConfig, SearchQuery, configure
+from rhinestone.errors import (
+    AdapterRegistrationError,
+    ConfigValidationError,
+    UnsupportedSearchConditionError,
 )
 
 
-class MemorySourceAdapter:
-    source_type = "memory"
-    search_conditions = frozenset({"text", "limit"})
-
-    def __init__(self) -> None:
-        self.loaded: List[Config] = []
-        self.searched: List[SearchQuery] = []
-
-    def load(self, config: Config) -> Source:
-        self.loaded.append(config)
-        name = str(config.settings["name"])
-        candidate = ResourceCandidate(
-            uri="memory://" + name,
-            format="memory",
-            media_type="application/x-memory",
-        )
-        return Source(
-            metadata=Metadata(title=name, raw={"name": name}),
-            candidates=(candidate,),
-            capabilities=frozenset({"search"}),
-            provenance=Provenance(provider="memory", raw={"name": name}),
-            raw_metadata={"name": name},
-        )
-
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
-        self.searched.append(query)
-        return (
-            SearchResult(
-                title="result",
-                description=None,
-                source_type="memory",
-                provider_settings={"name": "result"},
-                metadata=Metadata(title="result", raw={}),
-                provenance=Provenance(provider="memory", raw={}),
-            ),
-        )
-
-
-class MemoryExecutionAdapter:
-    name = "memory-runtime"
-    priority = 10
-
-    def supports(self, resource: object, dependencies: FrozenSet[str]) -> bool:
-        return (
-            getattr(resource, "format", None) == "memory" and self.name in dependencies
-        )
-
-    def open(self, resource: object, runtime: object) -> object:
-        return getattr(runtime, "open")(getattr(resource, "uri"))
-
-
-class MemoryRuntime:
+class FakeRasterio:
     def __init__(self, label: str) -> None:
         self.label = label
         self.calls: List[str] = []
@@ -76,92 +22,136 @@ class MemoryRuntime:
         return self.label + ":" + uri
 
 
-def test_configure_returns_isolated_context_without_loading_dependencies() -> None:
-    """利用者runtimeをグローバル共有せず、実際にopenする時までcallbackを呼ばないために必要である。"""
-    callback_calls: List[str] = []
-    runtime = MemoryRuntime("first")
-
-    app = configure(
-        dependencies={
-            "memory-runtime": lambda: callback_calls.append("load") or runtime
+def direct_config() -> Config:
+    return Config(
+        "direct",
+        {
+            "uri": "https://example.test/dataset.tif",
+            "format": "geotiff",
+            "media_type": "image/tiff",
         },
-        source_adapters=(MemorySourceAdapter(),),
-        execution_adapters=(MemoryExecutionAdapter(),),
     )
 
-    assert callback_calls == []
-    resource = app.resolve(Config("memory", {"name": "dataset"}))
-    assert callback_calls == []
-    assert resource.open() == "first:memory://dataset"
-    assert callback_calls == ["load"]
+
+def test_direct_provider_and_execution_adapters_are_built_in() -> None:
+    calls: List[str] = []
+    runtime = FakeRasterio("opened")
+    app = configure(dependencies={"rasterio": lambda: calls.append("load") or runtime})
+
+    resource = app.resolve(direct_config())
+
+    assert calls == []
+    assert resource.open() == "opened:https://example.test/dataset.tif"
+    assert calls == ["load"]
 
 
-def test_resource_open_honours_explicit_adapter_name() -> None:
-    """公開Resource APIからの明示指定をExecution Adapter Selectorへ確実に渡すために必要である。"""
+def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
     selected: List[str] = []
 
-    class LowerPriorityAdapter(MemoryExecutionAdapter):
-        name = "explicit"
-        priority = 1
+    class FakeGdal:
+        def OpenEx(self, uri: str, **options: object) -> str:
+            selected.append("gdal")
+            return "gdal-data"
 
-        def open(self, resource: object, runtime: object) -> object:
-            selected.append(self.name)
-            return "explicit-data"
-
+    rasterio = FakeRasterio("rasterio")
     app = configure(
         dependencies={
-            "memory-runtime": lambda: MemoryRuntime("automatic"),
-            "explicit": lambda: object(),
+            "gdal": lambda: FakeGdal(),
+            "rasterio": lambda: rasterio,
+        }
+    )
+
+    resource = app.resolve(direct_config())
+
+    assert resource.open(adapter="rasterio").startswith("rasterio:")
+    assert selected == []
+
+
+def test_two_providers_can_share_one_adapter_type() -> None:
+    requests: List[str] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Dict[str, Any]:
+        requests.append(url)
+        catalog = "first" if url.startswith("https://first.test") else "second"
+        resource_id = catalog + "-resource"
+        if url.endswith("package_search"):
+            return {
+                "success": True,
+                "result": {
+                    "results": [
+                        {
+                            "id": catalog + "-dataset",
+                            "title": catalog,
+                            "notes": catalog,
+                            "resources": [
+                                {
+                                    "id": resource_id,
+                                    "url": f"https://data.test/{resource_id}.geojson",
+                                    "format": "geojson",
+                                    "mimetype": "application/geo+json",
+                                }
+                            ],
+                        }
+                    ]
+                },
+            }
+        if url.endswith("resource_show"):
+            return {
+                "success": True,
+                "result": {
+                    "id": resource_id,
+                    "package_id": catalog + "-dataset",
+                    "url": f"https://data.test/{resource_id}.geojson",
+                    "format": "geojson",
+                    "mimetype": "application/geo+json",
+                },
+            }
+        return {
+            "success": True,
+            "result": {
+                "id": catalog + "-dataset",
+                "title": catalog,
+                "notes": catalog,
+                "resources": [],
+            },
+        }
+
+    app = configure(
+        providers={
+            "catalog-a": ProviderConfig("ckan", {"endpoint": "https://first.test"}),
+            "catalog-b": ProviderConfig(
+                "ckan",
+                {"endpoint": "https://second.test", "api_key": "secret"},
+            ),
         },
-        source_adapters=(MemorySourceAdapter(),),
-        execution_adapters=(MemoryExecutionAdapter(), LowerPriorityAdapter()),
+        dependencies={"http-json": lambda: get_json},
     )
 
-    resource = app.resolve(Config("memory", {"name": "dataset"}))
+    grouped = app.search(SearchQuery(text="dataset", limit=1))
 
-    assert resource.open(adapter="explicit") == "explicit-data"
-    assert selected == ["explicit"]
-
-
-def test_application_search_keeps_results_grouped_by_provider() -> None:
-    """公開検索でも比較不能なprovider scoreを混合せずCoordinatorのgroupingを保持するために必要である。"""
-    source = MemorySourceAdapter()
-    app = configure(
-        dependencies={},
-        source_adapters=(source,),
-        execution_adapters=(),
-    )
-    query = SearchQuery(text="result", limit=1)
-
-    grouped = app.search(query)
-
-    assert tuple(grouped) == ("memory",)
-    assert grouped["memory"][0].title == "result"
-    assert source.searched == [query]
-
-
-def test_search_result_config_uses_the_normal_resolution_path() -> None:
-    """SearchResultから直接Resourceを作らず、Config検証とSource解釈を再利用するために必要である。"""
-    source = MemorySourceAdapter()
-    app = configure(
-        dependencies={},
-        source_adapters=(source,),
-        execution_adapters=(),
-    )
-    result = app.search(SearchQuery(text="result"))["memory"][0]
-
-    resource = app.resolve(result.to_config())
-
-    assert resource.uri == "memory://result"
-    assert source.loaded == [Config("memory", {"name": "result"})]
+    assert tuple(grouped) == ("catalog-a", "catalog-b")
+    assert grouped["catalog-a"][0].source_id == "catalog-a"
+    assert grouped["catalog-b"][0].source_id == "catalog-b"
+    first = app.resolve(grouped["catalog-a"][0].to_config())
+    assert first.provenance.provider == "catalog-a"
+    assert first.provenance.adapter == "ckan"
+    assert any(url.startswith("https://first.test") for url in requests)
+    assert any(url.startswith("https://second.test") for url in requests)
 
 
 def test_public_search_exposes_unsupported_conditions_as_domain_error() -> None:
-    """公開APIが未対応検索条件を削除せず、呼び出し側へ安定した型で通知するために必要である。"""
+    def unused_get_json(url: str, params: Mapping[str, Any]) -> Dict[str, Any]:
+        return {}
+
     app = configure(
-        dependencies={},
-        source_adapters=(MemorySourceAdapter(),),
-        execution_adapters=(),
+        providers={
+            "catalog": ProviderConfig("ckan", {"endpoint": "https://example.test"})
+        },
+        dependencies={"http-json": lambda: unused_get_json},
     )
 
     with pytest.raises(UnsupportedSearchConditionError, match="bbox"):
@@ -169,33 +159,90 @@ def test_public_search_exposes_unsupported_conditions_as_domain_error() -> None:
 
 
 def test_configured_contexts_do_not_share_runtime_instances() -> None:
-    """複数利用者設定間でruntime callback/cacheが漏れず、所有権境界を守るために必要である。"""
-    first_runtime = MemoryRuntime("first")
-    second_runtime = MemoryRuntime("second")
-    source = MemorySourceAdapter()
-    adapters = (MemoryExecutionAdapter(),)
-    first = configure(
-        dependencies={"memory-runtime": lambda: first_runtime},
-        source_adapters=(source,),
-        execution_adapters=adapters,
-    )
-    second = configure(
-        dependencies={"memory-runtime": lambda: second_runtime},
-        source_adapters=(source,),
-        execution_adapters=adapters,
-    )
-    config = Config("memory", {"name": "dataset"})
+    first_runtime = FakeRasterio("first")
+    second_runtime = FakeRasterio("second")
+    first = configure(dependencies={"rasterio": lambda: first_runtime})
+    second = configure(dependencies={"rasterio": lambda: second_runtime})
 
-    assert first.resolve(config).open() == "first:memory://dataset"
-    assert second.resolve(config).open() == "second:memory://dataset"
+    assert first.resolve(direct_config()).open().startswith("first:")
+    assert second.resolve(direct_config()).open().startswith("second:")
 
 
-def test_application_open_is_a_convenience_for_resolve_then_open() -> None:
-    """ConfigからDataへの公開短縮経路も同じ選択・依存注入pipelineを通るために必要である。"""
+def test_unknown_built_in_adapter_type_is_rejected() -> None:
+    with pytest.raises(AdapterRegistrationError, match="unknown"):
+        configure(providers={"custom": ProviderConfig("unknown")})
+
+
+def test_direct_provider_id_is_reserved() -> None:
+    with pytest.raises(AdapterRegistrationError, match="direct"):
+        configure(providers={"direct": ProviderConfig("direct")})
+
+
+def test_empty_provider_id_is_rejected() -> None:
+    with pytest.raises(AdapterRegistrationError, match="non-empty"):
+        configure(providers={"": ProviderConfig("gsi-tile")})
+
+
+@pytest.mark.parametrize(
+    "provider",
+    (
+        ProviderConfig("ckan", {"endpoint": "https://example.test"}),
+        ProviderConfig("estat", {"app_id": "test"}),
+        ProviderConfig("stac", {"endpoint": "https://example.test"}),
+        ProviderConfig(
+            "ogc-features",
+            {"endpoint": "https://example.test", "collection_id": "rivers"},
+        ),
+        ProviderConfig("plateau"),
+        ProviderConfig("gsi-tile"),
+        ProviderConfig("gsi-fundamental"),
+        ProviderConfig("dcat", {"catalog_uri": "https://example.test/catalog"}),
+        ProviderConfig("odpt"),
+    ),
+)
+def test_all_built_in_source_adapter_types_are_composed(
+    provider: ProviderConfig,
+) -> None:
+    configure(providers={"provider": provider})
+
+
+def test_dcat_source_dependencies_are_lazy_and_provider_scoped() -> None:
+    document = (
+        Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
+    ).read_text()
+
+    def get_document(uri: str) -> str:
+        return document
+
     app = configure(
-        dependencies={"memory-runtime": lambda: MemoryRuntime("app")},
-        source_adapters=(MemorySourceAdapter(),),
-        execution_adapters=(MemoryExecutionAdapter(),),
+        providers={"catalog": ProviderConfig("dcat")},
+        dependencies={
+            "http-text": lambda: get_document,
+            "rdflib": lambda: rdflib,
+        },
     )
 
-    assert app.open(Config("memory", {"name": "dataset"})) == ("app:memory://dataset")
+    resource = app.resolve(
+        Config(
+            "catalog",
+            {
+                "uri": "https://fixture.example/catalog",
+                "dataset": "https://fixture.example/dataset",
+                "distribution": "https://fixture.example/geojson",
+                "serialization": "turtle",
+            },
+        )
+    )
+
+    assert resource.uri == "https://fixture.example/rivers.geojson"
+    assert resource.provenance.provider == "catalog"
+
+
+def test_provider_options_reject_typos() -> None:
+    with pytest.raises(ConfigValidationError, match="typo"):
+        configure(providers={"catalog": ProviderConfig("ckan", {"typo": "value"})})
+
+
+def test_legacy_adapter_registration_arguments_are_not_public() -> None:
+    with pytest.raises(TypeError):
+        configure(source_adapters=(), execution_adapters=())  # type: ignore[call-arg]

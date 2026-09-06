@@ -3,12 +3,13 @@ from typing import Any, Dict, cast
 
 import pytest
 
-from rhinestone.errors import ExecutionAdapterUnavailableError
+from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailableError
 from rhinestone.models import (
     Config,
     FileAccessPlan,
     Metadata,
     Provenance,
+    ProviderConfig,
     Resource,
     ResourceCandidate,
     SearchResult,
@@ -22,7 +23,7 @@ def test_config_is_immutable_and_copies_nested_provider_settings() -> None:
         "endpoint": "https://example.jp",
         "filters": {"year": 2024},
     }
-    config = Config(source_type="ckan", settings=settings)
+    config = Config(source_id="ckan", settings=settings)
 
     cast(Dict[str, int], settings["filters"])["year"] = 2025
 
@@ -31,10 +32,17 @@ def test_config_is_immutable_and_copies_nested_provider_settings() -> None:
         cast(Dict[str, Any], config.settings)["resource_id"] = "changed"
 
 
+def test_provider_and_source_ids_must_be_non_empty() -> None:
+    with pytest.raises(ConfigValidationError, match="adapter_type"):
+        ProviderConfig("")
+    with pytest.raises(ConfigValidationError, match="source_id"):
+        Config("", {})
+
+
 def test_config_freezes_all_mutable_container_shapes() -> None:
     """Provider 設定内の list・tuple・set 経由でも Config を変更不能にするために必要である。"""
     config = Config(
-        source_type="fixture",
+        source_id="fixture",
         settings={"list": [1], "tuple": ({"nested": True},), "set": {1, 2}},
     )
 
@@ -91,7 +99,7 @@ def test_search_result_returns_provider_config_without_losing_knowledge() -> Non
     result = SearchResult(
         title="Population",
         description="Official statistics",
-        source_type="estat",
+        source_id="estat",
         provider_settings={"stats_data_id": "0000000000"},
         metadata=metadata,
         provenance=provenance,
@@ -99,9 +107,7 @@ def test_search_result_returns_provider_config_without_losing_knowledge() -> Non
 
     config = result.to_config()
 
-    assert config == Config(
-        source_type="estat", settings={"stats_data_id": "0000000000"}
-    )
+    assert config == Config(source_id="estat", settings={"stats_data_id": "0000000000"})
     assert result.metadata is metadata
     assert result.provenance is provenance
 

@@ -8,7 +8,7 @@ from rhinestone.search import SearchCoordinator
 
 
 class SearchableAdapter:
-    source_type = "searchable"
+    source_id = "searchable"
     search_conditions = frozenset({"text", "limit"})
 
     def __init__(self) -> None:
@@ -20,7 +20,7 @@ class SearchableAdapter:
 
 
 class ResolveOnlyAdapter:
-    source_type = "resolve-only"
+    source_id = "resolve-only"
 
     def __init__(self) -> None:
         self.called = False
@@ -56,9 +56,9 @@ def test_unsupported_search_condition_is_not_silently_ignored() -> None:
 def test_results_remain_grouped_by_provider() -> None:
     """比較不能な provider 固有 ranking score を一つの順位へ混ぜないために必要である。"""
     first = SearchableAdapter()
-    first.source_type = "ckan"
+    first.source_id = "ckan"
     second = SearchableAdapter()
-    second.source_type = "stac"
+    second.source_id = "stac"
 
     grouped = SearchCoordinator((second, first)).search(SearchQuery(text="river"))
 

@@ -1,44 +1,27 @@
 # Getting started
 
-このガイドでは、Rhinestone を構成し、Resource を解決して外部ライブラリで開く
-までを扱います。
+Rhinestoneを構成し、Resourceを解決して外部ライブラリで開くまでの最短例です。
 
 ## インストール
-
-Rhinestone は Python 3.10 以上に対応します。公開パッケージを使う場合は次を実行
-します。
 
 ```console
 pip install rhinestone
 ```
 
-GDAL、Rasterio、pyogrio は Rhinestone の依存ではありません。データを開く場合は、
-使いたいライブラリを利用者の環境へ別途インストールしてください。
+GDAL、Rasterio、pyogrio等はRhinestoneの依存ではありません。データを開く場合だけ、
+利用するライブラリを別途インストールします。
 
-リポジトリから試す場合は、開発依存を含めて同期します。
+## Resourceを解決する
 
-```console
-uv sync --dev
-```
-
-## Resource を解決する
-
-まず、URI と形式を明示した Direct resource を解決します。この例はネットワーク
-アクセスを行いません。
+`direct` providerは追加構成なしで利用できます。
 
 ```python
 from rhinestone import Config, configure
-from rhinestone.adapters import DirectAdapter
 
-app = configure(
-    dependencies={},
-    source_adapters=(DirectAdapter(),),
-    execution_adapters=(),
-)
-
+app = configure()
 resource = app.resolve(
     Config(
-        source_type="direct",
+        source_id="direct",
         settings={
             "uri": "https://example.invalid/boundaries.geojson",
             "format": "geojson",
@@ -52,29 +35,21 @@ print(resource.metadata)
 print(resource.provenance)
 ```
 
-`Config` は「利用したいデータ」の宣言です。HTTP の実装詳細や GDAL の option は
-含めません。Rhinestone は URL suffix や応答内容から形式を推測しないため、Direct
-resource では `uri` と `format` を指定します。
+`Config.source_id`は構成済みproviderを参照します。RhinestoneはURL suffixから形式を
+推測しないため、direct resourceではURIとformatを明示します。
 
 ## データを開く
 
-COG または GeoTIFF を Rasterio で開くには、Rasterio を dependency factory として
-渡し、`RasterioAdapter` を登録します。
+実行Adapterを登録する必要はありません。使用を許可するruntimeだけをfactoryとして
+渡します。
 
 ```python
 import rasterio
 
-from rhinestone.adapters.execution import RasterioAdapter
-
-app = configure(
-    dependencies={"rasterio": lambda: rasterio},
-    source_adapters=(DirectAdapter(),),
-    execution_adapters=(RasterioAdapter(),),
-)
-
+app = configure(dependencies={"rasterio": lambda: rasterio})
 resource = app.resolve(
     Config(
-        source_type="direct",
+        source_id="direct",
         settings={
             "uri": "https://example.invalid/elevation.tif",
             "format": "geotiff",
@@ -83,19 +58,37 @@ resource = app.resolve(
     )
 )
 
-with resource.open(adapter="rasterio") as dataset:
+with resource.open() as dataset:
     print(dataset.count)
 ```
 
-`resource.open()` を省略指定で呼ぶと、登録済みで互換性のある Execution Adapter
-が選ばれます。複数の Adapter を登録して選択を固定したい場合は、例のように
-`adapter="rasterio"` を指定します。
+互換性のあるdependencyが複数ある場合もRhinestoneが決定的に選択します。実行環境を
+固定したい場合だけ`resource.open(adapter="rasterio")`を指定します。
+
+## providerを追加する
+
+```python
+from rhinestone import ProviderConfig
+
+app = configure(
+    providers={
+        "gspace": ProviderConfig(
+            adapter_type="ckan",
+            settings={"endpoint": "https://www.geospatial.jp/ckan"},
+        ),
+    },
+    dependencies={"http-json": lambda: get_json},
+)
+```
+
+利用者が指定するのはprovider設定と外部dependencyです。Source AdapterとExecution
+AdapterはRhinestoneが構成します。
 
 ## 次のステップ
 
-- Adapter、HTTP callback、runtime の登録は[アプリケーションを構成する](configuration.md)
-- 検索して `SearchResult` を選ぶ場合は[データを検索する](search.md)
-- 解決結果の確認とエラー対応は[Resource を解決して開く](resolve-and-open.md)
-- 対応する provider と format は[対応状況](compatibility.md)で確認する
-- 実際の provider を使う例はリポジトリ checkout の `examples/README.md` から選ぶ
-- 型、エラー、Adapter の契約は[API リファレンス](api.md)を参照する
+- provider、HTTP callback、runtime：[アプリケーションを構成する](configuration.md)
+- 検索から選択・解決：[データを検索する](search.md)
+- Resourceとエラー：[Resourceを解決して開く](resolve-and-open.md)
+- 対応provider・format：[対応状況](compatibility.md)
+- 完全な実行例：リポジトリの`examples/README.md`
+

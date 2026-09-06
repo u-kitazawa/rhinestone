@@ -2,17 +2,14 @@
 
 from osgeo import gdal
 
-from rhinestone import Config, configure
-from rhinestone.adapters import GsiTileAdapter
-from rhinestone.adapters.execution import GdalAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 app = configure(
+    providers={"gsi": ProviderConfig("gsi-tile")},
     dependencies={"gdal": lambda: gdal},
-    source_adapters=(GsiTileAdapter(),),
-    execution_adapters=(GdalAdapter(),),
 )
 
-resource = app.resolve(Config("gsi-tile", {"id": "std"}))
+resource = app.resolve(Config("gsi", {"id": "std"}))
 dataset = resource.open("gdal")
 print("URI:", resource.uri)
 print("provenance:", resource.provenance)

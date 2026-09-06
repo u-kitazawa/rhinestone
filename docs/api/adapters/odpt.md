@@ -13,14 +13,17 @@
 ## Endpoint と実行
 
 endpoint は `https://api.odpt.org/api/v4/` 配下の `odpt:Station`、`odpt:Railway`、
-`odpt:Train` に固定です。次のように request preparer と credential factory を登録します。
+`odpt:Train` に固定です。AdapterはRhinestoneが構成するため、provider、requests互換
+runtime、credential factoryだけを登録します。
 
 ```python
-from rhinestone.adapters import OdptAdapter
-from rhinestone.adapters.execution import JsonServiceAdapter
+from rhinestone import ProviderConfig, configure
 
-source = OdptAdapter()
-execution = JsonServiceAdapter(OdptAdapter.prepare_request, "odpt")
+app = configure(
+    providers={"odpt": ProviderConfig("odpt")},
+    dependencies={"json-service": lambda: requests},
+    credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
+)
 ```
 
 `acl:consumerKey` は open 時に credential factory から取得し、Config や Source には保存しません。

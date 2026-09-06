@@ -11,5 +11,5 @@ runtime は次の形の `get` を提供します。
 get(uri, params=..., headers=..., timeout=30, allow_redirects=False)
 ```
 
-ODPT では `JsonServiceAdapter(OdptAdapter.prepare_request, "odpt")` として作ります。
+ODPT向けのAdapterとrequest preparerはRhinestoneが自動構成します。
 redirect は拒否し、secret を含む可能性のある下位例外は公開しません。

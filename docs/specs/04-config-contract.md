@@ -5,21 +5,32 @@
 Config は「何のデータを利用したいか」を表す宣言的入力です。Source Adapter が provider 固有の schema と検証を所有し、Core に巨大な provider union schema を置きません。
 
 ```yaml
-source:
-  type: ckan
-  endpoint: https://example.jp
-  resource_id: abcdef
+providers:
+  gspace:
+    adapter_type: ckan
+    settings:
+      endpoint: https://example.jp
+config:
+  source_id: gspace
+  settings:
+    resource_id: abcdef
 ```
 
 ```yaml
-source:
-  type: estat
-  stats_data_id: "0000000000"
+providers:
+  estat:
+    adapter_type: estat
+config:
+  source_id: estat
+  settings:
+    stats_data_id: "0000000000"
 ```
 
 ## 不変条件
 
 - Config は実行によって暗黙に変更されません（MUST NOT）。
+- `source_id` は `configure()`で構成されたproviderを参照します（MUST）。
+- Adapter種別とprovider識別子を同一視しません（MUST NOT）。
 - provider と対象を解釈するのに必要な情報を明示します（MUST）。
 - HTTP の実装、GDAL option、外部 runtime の instance などを原則として含めません（MUST NOT）。
 - 不足した URL、format、identifier を推測しません（MUST NOT）。

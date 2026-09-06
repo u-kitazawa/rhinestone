@@ -6,9 +6,7 @@ import pyogrio
 import rdflib
 import requests
 
-from rhinestone import Config, configure
-from rhinestone.adapters import DcatAdapter
-from rhinestone.adapters.execution import PyogrioAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 
 def get_document(uri):
@@ -16,19 +14,20 @@ def get_document(uri):
 
 
 app = configure(
-    dependencies={"pyogrio": lambda: pyogrio},
-    source_adapters=(
-        DcatAdapter(
-            get_document,
-            lambda: rdflib,
-            os.environ["RHINESTONE_DCAT_URI"],
-        ),
-    ),
-    execution_adapters=(PyogrioAdapter(),),
+    providers={
+        "catalog": ProviderConfig(
+            "dcat", {"catalog_uri": os.environ["RHINESTONE_DCAT_URI"]}
+        )
+    },
+    dependencies={
+        "http-text": lambda: get_document,
+        "rdflib": lambda: rdflib,
+        "pyogrio": lambda: pyogrio,
+    },
 )
 resource = app.resolve(
     Config(
-        "dcat",
+        "catalog",
         {
             "uri": os.environ["RHINESTONE_DCAT_URI"],
             "dataset": os.environ["RHINESTONE_DCAT_DATASET_URI"],

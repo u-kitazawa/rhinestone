@@ -15,7 +15,7 @@ def test_stac_load_selects_only_the_explicit_asset_and_preserves_item() -> None:
 
     source = adapter.load(
         Config(
-            source_type="stac",
+            source_id="stac",
             settings={
                 "endpoint": endpoint,
                 "collection_id": "sentinel-2",
@@ -60,7 +60,7 @@ def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
         )
     ]
     assert results[0].to_config() == Config(
-        source_type="stac",
+        source_id="stac",
         settings={
             "endpoint": endpoint,
             "collection_id": "sentinel-2",
@@ -76,7 +76,7 @@ def test_stac_requires_explicit_asset_key() -> None:
     with pytest.raises(ConfigValidationError, match="asset_key"):
         StacAdapter(get_json=RecordingJsonClient({})).load(
             Config(
-                source_type="stac",
+                source_id="stac",
                 settings={
                     "endpoint": "https://stac.example",
                     "collection_id": "sentinel-2",
@@ -95,7 +95,7 @@ def test_stac_missing_requested_asset_is_a_response_error() -> None:
     with pytest.raises(ProviderResponseError, match="missing"):
         StacAdapter(get_json=client).load(
             Config(
-                source_type="stac",
+                source_id="stac",
                 settings={
                     "endpoint": endpoint,
                     "collection_id": "sentinel-2",

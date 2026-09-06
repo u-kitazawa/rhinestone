@@ -30,7 +30,7 @@ def test_estat_metadata_response_becomes_service_source_without_leaking_app_id()
     adapter = EStatAdapter(app_id="secret-app-id", get_json=client)
 
     source = adapter.load(
-        Config(source_type="estat", settings={"stats_data_id": "0000000001"})
+        Config(source_id="estat", settings={"stats_data_id": "0000000001"})
     )
 
     assert client.calls == [
@@ -70,7 +70,7 @@ def test_estat_search_maps_text_and_limit_to_official_parameter_names() -> None:
     ]
     assert results[0].title == "年齢別人口"
     assert results[0].to_config() == Config(
-        source_type="estat", settings={"stats_data_id": "0000000001"}
+        source_id="estat", settings={"stats_data_id": "0000000001"}
     )
     assert "secret-app-id" not in repr(results[0].provenance)
 
@@ -91,5 +91,5 @@ def test_estat_nonzero_result_status_is_rejected() -> None:
 
     with pytest.raises(ProviderResponseError, match="認証"):
         EStatAdapter(app_id="invalid", get_json=client).load(
-            Config(source_type="estat", settings={"stats_data_id": "0000000001"})
+            Config(source_id="estat", settings={"stats_data_id": "0000000001"})
         )

@@ -9,8 +9,8 @@ from rhinestone.registry import AdapterRegistry
 
 
 class SourceAdapter:
-    def __init__(self, source_type: str) -> None:
-        self.source_type = source_type
+    def __init__(self, source_id: str) -> None:
+        self.source_id = source_id
 
 
 class ExecutionAdapter:

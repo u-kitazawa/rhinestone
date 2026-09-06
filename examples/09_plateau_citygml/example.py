@@ -4,9 +4,7 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, configure
-from rhinestone.adapters import PlateauAdapter
-from rhinestone.adapters.execution import GdalAdapter
+from rhinestone import Config, ProviderConfig, configure
 
 
 def get_json(url, params):
@@ -16,9 +14,8 @@ def get_json(url, params):
 
 
 app = configure(
-    dependencies={"gdal": lambda: gdal},
-    source_adapters=(PlateauAdapter(get_json),),
-    execution_adapters=(GdalAdapter(),),
+    providers={"plateau": ProviderConfig("plateau")},
+    dependencies={"http-json": lambda: get_json, "gdal": lambda: gdal},
 )
 resource = app.resolve(
     Config(

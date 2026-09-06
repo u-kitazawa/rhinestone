@@ -9,7 +9,7 @@ from ..ckan import CkanAdapter
 
 
 class PlateauAdapter(CkanAdapter):
-    source_type = "plateau"
+    adapter_type = "plateau"
 
     def __init__(
         self,
@@ -64,7 +64,7 @@ class PlateauAdapter(CkanAdapter):
             "distribution_provider": "G Spatial Information Center",
         }
         return source(
-            self.source_type,
+            self.adapter_type,
             package_id,
             raw,
             tuple(candidates),

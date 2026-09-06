@@ -53,22 +53,37 @@ SearchResult は Config へ変換した後、通常の検証・解決フロー�
 Config は利用したいデータを宣言し、HTTP や GDAL の実装詳細を含めません。
 
 ```yaml
-source:
-  type: ckan
-  endpoint: https://example.jp
-  resource_id: abcdef
+providers:
+  gspace:
+    adapter_type: ckan
+    settings:
+      endpoint: https://example.jp
+config:
+  source_id: gspace
+  settings:
+    resource_id: abcdef
 ```
 
 実行時のライブラリは利用者が供給します。
 
 ```python
 rhinestone.configure(
+    providers={
+        "gspace": ProviderConfig(
+            "ckan", {"endpoint": "https://example.jp"}
+        )
+    },
     dependencies={
+        "http-json": lambda: get_json,
         "gdal": lambda: osgeo.gdal,
         "rasterio": lambda: rasterio,
     }
 )
 ```
+
+利用者はprovider設定とdependencyを渡します。Source AdapterとExecution Adapterは
+Rhinestoneが組み立てます。同じAdapter種別を利用する複数providerも、異なるsource idで
+同時に構成できます。
 
 Resource は URI だけでなく、format、media type、Metadata、Provenance、AccessPlan、Source を保持します。必要に応じて実行 Adapter を明示できます。
 
