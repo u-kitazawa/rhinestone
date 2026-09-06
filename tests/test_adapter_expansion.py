@@ -410,7 +410,7 @@ def test_odpt_rejects_unknown_or_secret_settings(settings: Mapping[str, Any]) ->
 
 def test_odpt_catalog_shapes_are_rejected() -> None:
     changes = (
-        {},
+        {"endpoint": None},
         {"endpoint": ""},
         {"resource_types": None},
         {"resource_types": {}},
