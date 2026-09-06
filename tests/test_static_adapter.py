@@ -39,23 +39,6 @@ def item(identifier: str = "one") -> Mapping[str, Any]:
     }
 
 
-INVALID_ITEMS: Tuple[Any, ...] = (
-    {},
-    [],
-    {"": item()},
-    {"one": []},
-    {"one": {"metadata": []}},
-    {"one": {"candidates": []}},
-    {"one": {"candidates": [{}]}},
-    {"one": {"candidates": [{"uri": "https://example.test", "format": 1}]}},
-    {"one": {"candidates": [{"uri": "https://example.test", "media_type": 1}]}},
-    {"one": {"candidates": [{"uri": "https://example.test", "attributes": []}]}},
-    {"one": {"capabilities": []}},
-    {"one": {"capabilities": [1]}},
-    {"one": {"provenance": []}},
-)
-
-
 def test_static_adapter_restores_source_and_provenance() -> None:
     adapter = StaticAdapter({"one": item()})
 
@@ -90,13 +73,25 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
         adapter.search(SearchQuery(limit=-1))
 
 
-@pytest.mark.parametrize(
-    "items",
-    INVALID_ITEMS,
-)
-def test_static_adapter_rejects_invalid_catalog(items: Any) -> None:
-    with pytest.raises(ConfigValidationError):
-        StaticAdapter(items)
+def test_static_adapter_rejects_invalid_catalog() -> None:
+    invalid_items: Tuple[Any, ...] = (
+        {},
+        [],
+        {"": item()},
+        {"one": []},
+        {"one": {"metadata": []}},
+        {"one": {"candidates": []}},
+        {"one": {"candidates": [{}]}},
+        {"one": {"candidates": [{"uri": "https://example.test", "format": 1}]}},
+        {"one": {"candidates": [{"uri": "https://example.test", "media_type": 1}]}},
+        {"one": {"candidates": [{"uri": "https://example.test", "attributes": []}]}},
+        {"one": {"capabilities": []}},
+        {"one": {"capabilities": [1]}},
+        {"one": {"provenance": []}},
+    )
+    for items in invalid_items:
+        with pytest.raises(ConfigValidationError):
+            StaticAdapter(items)
 
 
 def test_static_adapter_rejects_invalid_candidate_shapes() -> None:

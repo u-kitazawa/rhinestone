@@ -76,46 +76,47 @@ class StaticAdapter(ProviderAdapter):
         return tuple(results[: query.limit])
 
     @classmethod
-    def _validate_items(
-        cls, items: Mapping[str, Mapping[str, Any]]
-    ) -> Dict[str, Mapping[str, Any]]:
+    def _validate_items(cls, items: Any) -> Dict[str, Mapping[str, Any]]:
         if not isinstance(items, Mapping) or not items:
             raise ConfigValidationError(
                 "static source items must be a non-empty object"
             )
 
+        item_values = cast(Mapping[Any, Any], items)
         validated: Dict[str, Mapping[str, Any]] = {}
-        for identifier, item in items.items():
-            if not isinstance(identifier, str) or not identifier.strip():
+        for raw_identifier, raw_item in item_values.items():
+            if not isinstance(raw_identifier, str) or not raw_identifier.strip():
                 raise ConfigValidationError(
                     "static source item ids must be non-empty strings"
                 )
-            if not isinstance(item, Mapping):
+            if not isinstance(raw_item, Mapping):
                 raise ConfigValidationError(
-                    f"static source item {identifier!r} must be an object"
+                    f"static source item {raw_identifier!r} must be an object"
                 )
+            identifier = raw_identifier
+            item = cast(Mapping[str, Any], raw_item)
 
             metadata = item.get("metadata", {})
             if not isinstance(metadata, Mapping):
                 raise ConfigValidationError(
                     f"static source item {identifier!r} metadata must be an object"
                 )
-            candidates = item.get("candidates")
-            if not isinstance(candidates, (list, tuple)) or not candidates:
+            candidates_value = item.get("candidates")
+            if not isinstance(candidates_value, (list, tuple)) or not candidates_value:
                 raise ConfigValidationError(
                     f"static source item {identifier!r} must define candidates"
                 )
-            for candidate in candidates:
+            for candidate in cast(Any, candidates_value):
                 cls._validate_candidate(identifier, candidate)
 
-            capabilities = item.get("capabilities", ())
-            if not isinstance(capabilities, (list, tuple)):
+            capabilities_value = item.get("capabilities", ())
+            if not isinstance(capabilities_value, (list, tuple)):
                 raise ConfigValidationError(
                     f"static source item {identifier!r} capabilities must be an array"
                 )
             if any(
                 not isinstance(capability, str) or not capability.strip()
-                for capability in capabilities
+                for capability in cast(Any, capabilities_value)
             ):
                 raise ConfigValidationError(
                     f"static source item {identifier!r} capabilities must be strings"
@@ -155,11 +156,12 @@ class StaticAdapter(ProviderAdapter):
 
     def _source(self, identifier: str, item: Mapping[str, Any]) -> Source:
         metadata_values = cast(Mapping[str, Any], item.get("metadata", {}))
-        metadata_raw = metadata_values.get("raw", metadata_values)
-        if not isinstance(metadata_raw, Mapping):
+        metadata_raw_value: Any = metadata_values.get("raw", metadata_values)
+        if not isinstance(metadata_raw_value, Mapping):
             raise ConfigValidationError(
                 f"static source item {identifier!r} metadata.raw must be an object"
             )
+        metadata_raw = cast(Mapping[str, Any], metadata_raw_value)
 
         candidates: List[ResourceCandidate] = []
         for candidate_value in item["candidates"]:
@@ -185,7 +187,7 @@ class StaticAdapter(ProviderAdapter):
                 f"static source item {identifier!r} provenance.query_parameters must be an object"
             )
 
-        raw_item = item
+        raw_item: Mapping[str, Any] = item
         provenance = Provenance(
             provider=self.adapter_type,
             dataset_identifier=_optional_string(
