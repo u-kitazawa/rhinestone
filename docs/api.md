@@ -12,7 +12,6 @@ from rhinestone import configure, sources
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "http-json": lambda: get_json,
         "rasterio": lambda: rasterio,
     },
     credentials={
@@ -22,15 +21,17 @@ app = configure(
 )
 ```
 
+HTTP transportはRhinestoneに組み込まれています。
+
 ### `configure(...) -> Rhinestone`
 
 | 引数 | 型 | 説明 |
 | --- | --- | --- |
 | `sources` | `Iterable[SourceDefinition]` | 利用するexternal Source。既定は空。`direct`は別途常時利用可能。|
-| `dependencies` | `Mapping[str, Callable[[], Any]] \| None` | HTTP callbackやGIS runtimeを返すfactory。|
+| `dependencies` | `Mapping[str, Callable[[], Any]] \| None` | GDAL、Rasterio、RDFLib等の外部runtimeを返すfactory。|
 | `credentials` | `Mapping[str, Callable[[], str]] \| None` | logical credential名とsecret factory。|
 
-runtimeとcredentialのfactoryは遅延評価されます。
+runtimeとcredentialのfactoryは遅延評価されます。Source metadata、DCAT文書、JSON serviceのHTTP通信にdependency登録は不要です。
 
 ### `rhinestone.sources`
 
@@ -115,7 +116,7 @@ SourceDefinition(
 | `ResourceNotFoundError` | 明示したResourceが候補にない。|
 | `UnsupportedAccessError` | 既知のアクセス方法がない。|
 | `ExecutionAdapterUnavailableError` | 指定または互換のExecution Adapterがない。|
-| `DependencyUnavailableError` | 必要なruntime dependencyが未登録または読み込めない。|
+| `DependencyUnavailableError` | 必要な外部runtime dependencyが未登録または読み込めない。|
 | `ResourceAccessError` | Resourceへのアクセスに失敗。|
 | `AdapterRegistrationError` | Source/Adapter構成が重複または不正。|
 | `CredentialUnavailableError` | logical credentialが未設定。|

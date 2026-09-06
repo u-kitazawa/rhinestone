@@ -12,7 +12,8 @@ PyPIからインストールできます。
 python -m pip install rhinestone
 ```
 
-RhinestoneのCoreは、HTTP通信やGISデータ処理ライブラリを直接固定依存しません。必要なruntime dependencyは利用者側で用意し、callback/factoryとして注入します。
+HTTP通信はRhinestoneに組み込まれています。GISデータ処理やRDF解釈などの外部runtime dependencyだけを利用者側で用意し、callback/factoryとして注入します。
+
 ## 基本的な使い方
 
 Rhinestoneが知っている組み込みSourceを選択します。
@@ -23,7 +24,6 @@ from rhinestone import configure, sources
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "http-json": lambda: get_json,
         "rasterio": lambda: rasterio,
     },
     credentials={
@@ -58,10 +58,10 @@ resource = app.resolve(result.to_config())
 - `SourceDefinition`: どのデータ提供元を使うか
 - `Config`: そのSource内で何を使うか
 - Source Adapter: 接続・解決方法の知識
-- dependency: HTTP、GDAL、Rasterio、SDK等のruntime
+- dependency: GDAL、Rasterio、RDFLib等の外部runtime
 - credential: secret
 
-SourceのendpointはSourceDefinition側に属し、検索結果やConfigへ複製しません。secretやruntime dependencyもSourceDefinitionへ保存しません。
+SourceのendpointはSourceDefinition側に属し、検索結果やConfigへ複製しません。secretやruntime dependencyもSourceDefinitionへ保存しません。HTTP transportはRhinestone内部の共通基盤として扱い、Sourceごとの設定対象にはしません。
 
 ## アーキテクチャ
 
@@ -81,7 +81,7 @@ SearchQuery
   -> AccessPlan
   -> Resource
   -> [Execution Adapter]
-  -> user-provided dependency
+  -> built-in HTTP or user-provided runtime
 ```
 
 ## 設計原則
@@ -90,7 +90,7 @@ SearchQuery
 - 利用者にAdapterやendpointの組み立てを要求せず、既知のSourceを選択させる。
 - 配信元固有の知識はSource Adapterに閉じ込める。
 - 解決済みMetadataとProvenanceをResourceまで保持する。
-- 実行時依存は利用者が所有し、callback/factoryとして供給する。
+- HTTP transportは組み込みとし、GIS/RDF等の外部runtimeは利用者が所有する。
 - secretはcredential factoryとして分離する。
 - 公式の機械可読インターフェースを使い、CoreではHTML scrapingを行わない。
 - 確実に判断できない場合は推測せず失敗させる。

@@ -10,7 +10,7 @@ SourceDefinition の `settings` へ `endpoint`、Config へ `collection_id`、`i
 
 ## Endpoint と認証
 
-Item と Search の公式 STAC API endpoint を `get_json(url, params)` で呼びます。`api_token` または `api_key` を既存 Adapter の直接利用時に指定できます。検索結果では data role の asset がちょうど一件である必要があり、asset URL や format は推測しません。
+Item と Search の公式 STAC API endpoint はRhinestoneの組み込みHTTP transportで呼びます。`api_token` または `api_key` を既存 Adapter の直接利用時に指定できます。検索結果では data role の asset がちょうど一件である必要があり、asset URL や format は推測しません。
 
 ## 解決して Rasterio で開く例
 
@@ -27,7 +27,7 @@ app = configure(
             settings={"endpoint": "https://stac.example/api"},
         ),
     ),
-    dependencies={"http-json": lambda: get_json, "rasterio": lambda: rasterio},
+    dependencies={"rasterio": lambda: rasterio},
 )
 resource = app.resolve(
     Config("imagery", {

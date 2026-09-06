@@ -19,6 +19,8 @@ Source Adapter は次を満たさなければなりません。
 
 公式 API、STAC API、OGC API、DCAT、documented REST/GraphQL API、direct resource URL、レビュー済みの静的定義などの確実なインターフェースがない provider は unsupported とします。
 
+HTTP通信はComposition RootからRhinestone組み込みtransportとして供給し、標準の公開APIで利用者にtransport callbackを要求しません（MUST）。Adapterを直接構築するテストや内部再利用ではtransportを注入可能な境界を維持します。
+
 ## Catalog loading
 
 `rhinestone.catalogs` が Catalog resource を読み込み、`SourceDefinition` を生成します。Catalogの `name` は公開facade名だけを定義し、Adapterの種類や実行処理には影響しません。`rhinestone.sources` は組み込み定義を公開する facade です。Source Adapter は Catalog のファイル名・パッケージ配置・loader を参照せず、constructor 引数または `SourceDefinition.settings` として宣言値を受け取ります。
@@ -31,9 +33,9 @@ Source Adapter は次を満たさなければなりません。
 
 `PlateauAdapter` は Catalog から渡された G 空間情報センター CKAN endpoint を使って distribution を読み、PLATEAU と配布基盤の由来を残します。`GsiFundamentalAdapter` はユーザーが取得済みの基本項目ファイルのみを扱い、ログイン画面や HTML を操作しません。
 
-`DcatAdapter` は利用者が渡す RDF runtime と文書取得 callback で JSON-LD、Turtle、RDF/XML を解釈します。Dataset は Source、`downloadURL` を持つ Distribution は候補になります。`accessURL` だけの landing page は候補にしません。
+`DcatAdapter` は利用者が渡す RDF runtime とRhinestone組み込みの文書取得transportで JSON-LD、Turtle、RDF/XML を解釈します。Dataset は Source、`downloadURL` を持つ Distribution は候補になります。`accessURL` だけの landing page は候補にしません。
 
-`OdptAdapter` は Catalog から渡された v4 endpoint、dataset type、公式 filter を検証して ServiceQueryPlan を作ります。`JsonServiceAdapter` が選択済みの Plan を requests 互換 runtime へ渡し、credential factory から得た secret をその直前に `acl:consumerKey` として付与します。
+`OdptAdapter` は Catalog から渡された v4 endpoint、dataset type、公式 filter を検証して ServiceQueryPlan を作ります。`JsonServiceAdapter` が選択済みの Plan をRhinestone組み込みHTTP runtimeへ渡し、credential factory から得た secret をその直前に `acl:consumerKey` として付与します。
 
 ## Search Capability
 
@@ -41,6 +43,6 @@ Source Adapter は次を満たさなければなりません。
 
 ## Adapter Registry
 
-Source Adapter と Execution Adapter の登録状態は内部 Adapter Registry が管理します。利用者は Adapter instance を登録しません（MUST NOT）。Composition Root は `SourceDefinition.adapter_type` から組み込み Source Adapter を生成し、利用者が供給した dependency に対応する組み込み Execution Adapter を構成します。
+Source Adapter と Execution Adapter の登録状態は内部 Adapter Registry が管理します。利用者は Adapter instance を登録しません（MUST NOT）。Composition Root は `SourceDefinition.adapter_type` から組み込み Source Adapter を生成し、利用者が供給した外部dependencyと組み込みHTTP runtimeに対応する組み込み Execution Adapter を構成します。
 
 Registry は Source Adapter 種別ではなく `source_id` で Source を識別します。同じ Adapter 種別を利用する複数 Source を同時に登録できなければなりません（MUST）。外部拡張機構は反復可能な契約が実例で確認された場合にのみ設計します。

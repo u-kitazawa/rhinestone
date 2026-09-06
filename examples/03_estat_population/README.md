@@ -16,12 +16,14 @@ uv sync --dev
 export RHINESTONE_ESTAT_APP_ID="your-application-id"
 # Alternatively: export RHINESTONE_ESTAT_API_KEY="your-application-id"
 export RHINESTONE_ESTAT_STATS_DATA_ID="your-current-stats-data-id"
-uv run python docs/examples/03_estat_population/example.py
+uv run python examples/03_estat_population/example.py
 ```
 
 Use the `statsDataId` from a currently available table in e-Stat search results;
 the government statistics code (`statsCode`) is a different value. The
 application ID/API key is supplied as the official `appId` query parameter and
-is not stored in Provenance.
+is not stored in Provenance. HTTP communication uses Rhinestone's built-in
+transport.
+
 This example resolves metadata; fetching statistical values is a later execution
 slice. The command requires network access to e-Stat API 3.0.

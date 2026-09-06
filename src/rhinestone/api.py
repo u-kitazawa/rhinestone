@@ -3,6 +3,7 @@
 from dataclasses import replace
 from typing import Any, Callable, FrozenSet, Iterable, Mapping, Optional, Tuple, cast
 
+from . import _http
 from .adapters.execution import (
     GdalAdapter,
     JsonServiceAdapter,
@@ -83,7 +84,11 @@ class Rhinestone:
         dependencies: Optional[Mapping[str, Factory]] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     ) -> None:
-        dependency_registry = DependencyRegistry(dependencies or {})
+        runtime_dependencies = dict(dependencies or {})
+        runtime_dependencies.setdefault(
+            "json-service", lambda: _http.JsonServiceRuntime()
+        )
+        dependency_registry = DependencyRegistry(runtime_dependencies)
         credential_registry = CredentialRegistry(credentials or {})
 
         configured_sources = [_ConfiguredSourceAdapter("direct", DirectAdapter())]
@@ -166,10 +171,7 @@ def _build_source_adapter(
         params: Mapping[str, Any],
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
-        get_json = dependencies.get("http-json")
-        if headers:
-            return get_json(url, params, headers)
-        return get_json(url, params)
+        return _http.get_json(url, params, headers)
 
     if adapter_type == "ckan":
         _reject_options(adapter_type, settings, ("endpoint",))
@@ -203,7 +205,7 @@ def _build_source_adapter(
         _reject_options(adapter_type, settings, ("catalog_uri", "serialization"))
 
         def get_document(uri: str) -> str:
-            return cast(str, dependencies.get("http-text")(uri))
+            return _http.get_text(uri)
 
         def rdf_runtime() -> Any:
             return dependencies.get("rdflib")

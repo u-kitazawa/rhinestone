@@ -6,7 +6,7 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 [API リファレンス](../api.md) · [Execution Adapter](execution-adapters.md)
 
 初めてproviderを構成する場合は、先に[アプリケーションを構成する](../configuration.md)
-を読んでください。HTTP を使う provider には `http-json` dependency が必要です。各ページの
+を読んでください。HTTPを使うproviderはRhinestoneの組み込みtransportを使用します。各ページの
 `Config.settings` は Adapter が検証する値であり、認証 secret 自体を入れる場所ではありません。
 
 | Adapter | adapter type | API / 配布元 |

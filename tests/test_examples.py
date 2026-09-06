@@ -85,10 +85,8 @@ def test_service_examples_use_formats_known_to_create_service_plans() -> None:
     "name",
     ("02_ckan_shapefile", "03_estat_population", "07_search_and_fetch"),
 )
-def test_live_examples_import_shared_transport_when_run_by_file_path(
-    name: str,
-) -> None:
-    """README記載のfile-path起動で共有HTTP transportのimportに失敗しないために必要である。"""
+def test_live_examples_fail_on_missing_environment_before_network(name: str) -> None:
+    """HTTPが組み込みでも必須環境変数不足をnetwork requestより先に報告するために必要である。"""
     script = EXAMPLES_ROOT / name / "example.py"
     environment = dict(os.environ)
     for key in tuple(environment):
