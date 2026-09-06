@@ -4,20 +4,13 @@ import os
 
 import pyogrio
 import rdflib
-import requests
 
 from rhinestone import Config, SourceDefinition, configure
-
-
-def get_document(uri):
-    return requests.get(uri, timeout=30).text
-
 
 catalog_uri = os.environ["RHINESTONE_DCAT_URI"]
 app = configure(
     sources=(SourceDefinition("catalog", "dcat", {"catalog_uri": catalog_uri}),),
     dependencies={
-        "http-text": lambda: get_document,
         "rdflib": lambda: rdflib,
         "pyogrio": lambda: pyogrio,
     },
