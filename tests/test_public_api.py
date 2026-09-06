@@ -34,7 +34,9 @@ def direct_config() -> Config:
 def test_direct_and_execution_adapters_are_built_in() -> None:
     calls: List[str] = []
     runtime = FakeRasterio("opened")
-    app = configure(dependencies={"rasterio": lambda: calls.append("load") or runtime})
+    app = configure(
+        dependencies={"rasterio": lambda: calls.append("load") or runtime}
+    )
 
     resource = app.resolve(direct_config())
 
