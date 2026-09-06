@@ -2,10 +2,10 @@
 
 from osgeo import gdal
 
-from rhinestone import Config, ProviderConfig, configure
+from rhinestone import Config, configure, sources
 
 app = configure(
-    providers={"gsi": ProviderConfig("gsi-tile")},
+    sources=(sources.GSI,),
     dependencies={"gdal": lambda: gdal},
 )
 
