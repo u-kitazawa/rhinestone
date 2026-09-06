@@ -132,7 +132,7 @@ def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
     assert resource.access_plan.kind == "remote-dataset"
     assert resource.format == "png"
     assert resource.metadata.raw["attribution"] == "国土地理院"
-    assert resource.open() == "dataset"
+    assert resource.open("gdal") == "dataset"
     xml = fromstring(captured["uri"])
     assert xml.findtext("DataWindow/YOrigin") == "top"
     assert "${z}/${x}/${y}.png" in cast(str, xml.findtext("Service/ServerUrl"))
