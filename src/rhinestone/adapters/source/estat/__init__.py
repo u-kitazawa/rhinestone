@@ -24,7 +24,7 @@ class EStatAdapter(ProviderAdapter):
         app_id: Optional[str] = None,
         get_json: Optional[JsonTransport] = None,
         endpoint: Optional[str] = None,
-        language: Optional[str] = None,
+        language: Optional[str] = "J",
         api_key: Optional[str] = None,
         credential_factory: Optional[Callable[[], str]] = None,
     ) -> None:
