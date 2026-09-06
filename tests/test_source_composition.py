@@ -5,6 +5,7 @@ import pytest
 import rdflib
 
 from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
+from rhinestone import _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import ConfigValidationError
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
@@ -30,7 +31,9 @@ def test_advanced_source_definitions_compose(source: SourceDefinition) -> None:
     configure(sources=(source,))
 
 
-def test_dcat_dependencies_are_lazy_and_source_scoped() -> None:
+def test_dcat_dependencies_are_lazy_and_source_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     document = (
         Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
     ).read_text()
@@ -38,12 +41,10 @@ def test_dcat_dependencies_are_lazy_and_source_scoped() -> None:
     def get_document(uri: str) -> str:
         return document
 
+    monkeypatch.setattr(_http, "get_text", get_document)
     app = configure(
         sources=(SourceDefinition("catalog", "dcat"),),
-        dependencies={
-            "http-text": lambda: get_document,
-            "rdflib": lambda: rdflib,
-        },
+        dependencies={"rdflib": lambda: rdflib},
     )
     resource = app.resolve(
         Config(
@@ -70,7 +71,9 @@ def test_source_options_reject_unknown_values() -> None:
         )
 
 
-def test_configured_json_transport_supports_adapter_headers() -> None:
+def test_configured_json_transport_supports_adapter_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     endpoint = "https://catalog.example"
     search_url = endpoint + "/api/3/action/package_search"
     seen: Dict[str, Any] = {}
@@ -83,9 +86,10 @@ def test_configured_json_transport_supports_adapter_headers() -> None:
         seen["headers"] = headers
         return fixture_json("ckan/package_search.json")
 
+    monkeypatch.setattr(_http, "get_json", get_json)
     adapter = _build_source_adapter(
         SourceDefinition("catalog", "ckan", {"endpoint": endpoint}),
-        DependencyRegistry({"http-json": lambda: get_json}),
+        DependencyRegistry({}),
         CredentialRegistry({}),
     )
     adapter._headers["X-Test"] = "value"  # type: ignore[attr-defined]
