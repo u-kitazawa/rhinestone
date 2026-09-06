@@ -1,7 +1,7 @@
 """Public composition API."""
 
 from dataclasses import replace
-from typing import Any, Callable, FrozenSet, Iterable, Mapping, Optional, Tuple, cast
+from typing import Any, Callable, FrozenSet, Iterable, Mapping, Optional, Tuple, Union, cast
 
 from . import _http
 from .adapters.execution import (
@@ -27,6 +27,8 @@ from .errors import AdapterRegistrationError, ConfigValidationError
 from .execution import ExecutionAdapterSelector
 from .models import (
     Config,
+    Dependencies,
+    LibraryName,
     Resource,
     SearchQuery,
     SearchResult,
@@ -36,9 +38,7 @@ from .models import (
 from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .resolution import Resolver
-from .search import SearchCoordinator
-
-Factory = Callable[[], Any]
+from .search import SearchCoordinator, SearchResults
 
 
 class _ConfiguredSourceAdapter:
@@ -81,7 +81,7 @@ class Rhinestone:
         self,
         *,
         sources: Iterable[SourceDefinition] = (),
-        dependencies: Optional[Mapping[str, Factory]] = None,
+        dependencies: Optional[Dependencies] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     ) -> None:
         runtime_dependencies = dict(dependencies or {})
@@ -137,20 +137,28 @@ class Rhinestone:
     def resolve(self, config: Config) -> Resource:
         return self._pipeline.resolve(config)
 
-    def open(self, config: Config, adapter: Optional[str] = None) -> Any:
-        return self._pipeline.open(config, adapter=adapter)
+    def open(self, config: Config, library: LibraryName) -> object:
+        return self._pipeline.open(config, library=library)
 
-    def search(self, query: SearchQuery) -> Mapping[str, Tuple[SearchResult, ...]]:
-        return self._search.search(query)
+    def search(self, query: Union[SearchQuery, str]) -> SearchResults:
+        normalized_query = (
+            SearchQuery(text=query) if isinstance(query, str) else query
+        )
+        grouped = self._search.search(normalized_query)
+        typed_grouped = cast(
+            Mapping[str, Tuple[SearchResult, ...]],
+            grouped,
+        )
+        return SearchResults.from_grouped(typed_grouped).bind_resolver(self.resolve)
 
 
 def configure(
     *,
     sources: Iterable[SourceDefinition] = (),
-    dependencies: Optional[Mapping[str, Factory]] = None,
+    dependencies: Optional[Dependencies] = None,
     credentials: Optional[Mapping[str, Callable[[], str]]] = None,
 ) -> Rhinestone:
-    """Compose built-in adapters around selected sources and lazy runtime inputs."""
+    """Compose built-in adapters around selected sources and runtime inputs."""
     return Rhinestone(
         sources=sources,
         dependencies=dependencies,
