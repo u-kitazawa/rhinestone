@@ -2,23 +2,30 @@
 
 Core は次のデータ／モデルを扱います。provider や外部ライブラリ固有の型を共通モデルへ漏らしてはなりません（MUST NOT）。
 
+## Catalog
+
+Catalog は、接続先やサービス固有の固定知識を宣言するリポジトリ管理のデータです。通常は JSON として `src/rhinestone/catalogs/` に置きます。
+
+- `sources.json`: 組み込み Source の識別子、Adapter 種別、接続先などを定義する。
+- `gsi_tile_specs.json` など: Adapter が解釈する個別仕様を定義する。
+
+Catalog は実行時の secret や外部 runtime を保持しません。Catalog を読み込んだ結果が、アプリケーションへ渡す `SourceDefinition` になります。
+
+## SourceDefinition
+
+`SourceDefinition` は、Catalog または利用者が宣言した「選択可能な Source」です。`id` はアプリケーション内で安定した識別子、`adapter_type` は解釈方式、`settings` は接続先などの静的設定を表します。同じ Adapter 種別を複数の `id` で利用できます。
+
+`rhinestone.sources` は Catalog の所有者ではありません。Catalog を読み込んだ `SourceDefinition` を、後方互換性のある便利な名前で公開する薄い facade です。
+
 ## Config
 
-利用したいデータを宣言します。`source_id` は構成済み provider を参照し、`settings`
-はその provider 固有の対象指定を保持します。HTTP クライアントや GDAL option などの
-実行詳細は含めません。
+利用したいデータを宣言します。`source_id` は `configure()` で構成された `SourceDefinition` を参照し、`settings` はその Source 内の対象指定を保持します。HTTP クライアント、GDAL option、endpoint などの実行詳細は原則含めません。
 
 Config は実行によって暗黙に変化してはなりません（MUST NOT）。
 
-## ProviderConfig
-
-一つの名前付き provider を、組み込み Source Adapter の `adapter_type` と構成用
-`settings`へ対応付けます。同じ `adapter_type`を複数の`source_id`から利用できます。
-ProviderConfig は Adapter instance を公開APIへ露出させません。
-
 ## Source
 
-Source Adapter が外部 provider を解釈した結果です。
+Source Adapter が外部 provider を解釈した結果です。Catalog の定義や `SourceDefinition` と混同しません。
 
 ```text
 Source
@@ -73,6 +80,4 @@ provider、dataset/resource identifier、API endpoint、original URL、query par
 
 SearchQuery の共通条件は `text`、`bbox`、`time`、`limit` など必要最小限にします。Source Adapter は未対応の検索条件を黙って無視してはなりません（MUST NOT）。
 
-SearchResult は title、description、`source_id`、provider 固有 Config、Metadata、
-Provenance を保持します。Adapter種別はProvenanceに記録します。データ取得時には
-Config に変換し、通常の検証・解決フローへ渡します。
+SearchResult は title、description、`source_id`、provider 固有 Config、Metadata、Provenance を保持します。Adapter 種別は Provenance に記録します。データ取得時には Config に変換し、通常の検証・解決フローへ渡します。
