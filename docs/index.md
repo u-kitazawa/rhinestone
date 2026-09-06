@@ -26,6 +26,8 @@ app = configure(
 )
 ```
 
+HTTP通信はRhinestoneに組み込まれているため、Sourceの検索やmetadata取得のためのtransportを利用者が注入する必要はありません。
+
 ## 検索からResourceへ
 
 ```python
@@ -52,7 +54,6 @@ Rhinestone自身はGIS I/O・変換・解析を再実装しません。GDAL、Ra
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "http-json": lambda: get_json,
         "rasterio": lambda: rasterio,
     },
 )
@@ -66,7 +67,8 @@ with resource.open(adapter="rasterio") as dataset:
 - `SourceDefinition`: どのデータ提供元を使うか
 - `Config`: そのSource内で何を使うか
 - Source Adapter: 接続・解決方法の知識
-- dependency: HTTP、GDAL、Rasterio、SDK等のruntime
+- built-in HTTP: metadata・文書・JSON serviceの通信
+- dependency: GDAL、Rasterio、RDFLib等の外部runtime
 - credential: secret
 
 `direct`はexternal SourceではなくCore機能なので、`sources.ALL`と無関係に常時利用できます。
