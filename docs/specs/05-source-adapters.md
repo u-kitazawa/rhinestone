@@ -21,7 +21,7 @@ Source Adapter は次を満たさなければなりません。
 
 ## Catalog loading
 
-`rhinestone.catalogs` が Catalog resource を読み込み、`SourceDefinition` を生成します。`rhinestone.sources` は組み込み定義を公開する facade です。Source Adapter は Catalog のファイル名・パッケージ配置・loader を参照せず、constructor 引数または `SourceDefinition.settings` として宣言値を受け取ります。
+`rhinestone.catalogs` が Catalog resource を読み込み、`SourceDefinition` を生成します。Catalogの `name` は公開facade名だけを定義し、Adapterの種類や実行処理には影響しません。`rhinestone.sources` は組み込み定義を公開する facade です。Source Adapter は Catalog のファイル名・パッケージ配置・loader を参照せず、constructor 引数または `SourceDefinition.settings` として宣言値を受け取ります。
 
 この分離により、Catalog を JSON 以外の配布形態へ変更しても、また Adapter を別ライブラリで再利用しても、Adapter の接続コードを変更せずに済みます。
 

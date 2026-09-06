@@ -1,6 +1,7 @@
 """Repository-managed Source Catalog loading."""
 
 import json
+from dataclasses import dataclass
 from importlib import resources
 from typing import Any, List, Mapping, Tuple, cast
 
@@ -36,10 +37,18 @@ def load_catalog_resource(name: object) -> Any:
         ) from None
 
 
-def load_source_definitions(
+@dataclass(frozen=True)
+class CatalogSource:
+    """A catalog entry with its public facade name."""
+
+    name: str
+    definition: SourceDefinition
+
+
+def load_source_catalog(
     name: str = "sources.json",
-) -> Tuple[SourceDefinition, ...]:
-    """Load and validate the built-in Source definitions in catalog order."""
+) -> Tuple[CatalogSource, ...]:
+    """Load and validate built-in Source catalog entries in catalog order."""
     document = load_catalog_resource(name)
     if not isinstance(document, Mapping):
         raise ConfigValidationError("Source catalog must be an object")
@@ -49,7 +58,7 @@ def load_source_definitions(
         raise ConfigValidationError("Source catalog must define sources")
 
     source_entries = cast(Mapping[Any, Any], raw_sources)
-    definitions: List[SourceDefinition] = []
+    entries: List[CatalogSource] = []
     for raw_id, raw_definition in source_entries.items():
         if not isinstance(raw_id, str) or not raw_id.strip():
             raise ConfigValidationError("Source catalog ids must be non-empty strings")
@@ -58,6 +67,15 @@ def load_source_definitions(
                 f"Source catalog entry {raw_id!r} must be an object"
             )
         definition = cast(Mapping[str, Any], raw_definition)
+        public_name = definition.get("name")
+        if not isinstance(public_name, str) or not public_name.strip():
+            raise ConfigValidationError(
+                f"Source catalog entry {raw_id!r} requires name"
+            )
+        if any(entry.name == public_name for entry in entries):
+            raise ConfigValidationError(
+                f"Source catalog name {public_name!r} is duplicated"
+            )
         adapter_type = definition.get("adapter_type")
         if not isinstance(adapter_type, str) or not adapter_type.strip():
             raise ConfigValidationError(
@@ -69,14 +87,29 @@ def load_source_definitions(
                 f"Source catalog entry {raw_id!r} settings must be an object"
             )
         settings = cast(Mapping[str, Any], settings_value)
-        definitions.append(
-            SourceDefinition(
-                id=raw_id,
-                adapter_type=adapter_type,
-                settings=settings,
+        entries.append(
+            CatalogSource(
+                name=public_name,
+                definition=SourceDefinition(
+                    id=raw_id,
+                    adapter_type=adapter_type,
+                    settings=settings,
+                ),
             )
         )
-    return tuple(definitions)
+    return tuple(entries)
 
 
-__all__ = ["load_catalog_resource", "load_source_definitions"]
+def load_source_definitions(
+    name: str = "sources.json",
+) -> Tuple[SourceDefinition, ...]:
+    """Load built-in Source definitions in catalog order."""
+    return tuple(entry.definition for entry in load_source_catalog(name))
+
+
+__all__ = [
+    "CatalogSource",
+    "load_catalog_resource",
+    "load_source_catalog",
+    "load_source_definitions",
+]

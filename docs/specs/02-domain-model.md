@@ -14,7 +14,7 @@ Catalog は実行時の secret や外部 runtime を保持しません。Catalog
 
 `SourceDefinition` は、Catalog または利用者が宣言した「選択可能な Source」です。`id` はアプリケーション内で安定した識別子、`adapter_type` は解釈方式、`settings` は接続先などの静的設定を表します。同じ Adapter 種別を複数の `id` で利用できます。
 
-`rhinestone.sources` は Catalog の所有者ではありません。Catalog を読み込んだ `SourceDefinition` を、後方互換性のある便利な名前で公開する薄い facade です。
+`rhinestone.sources` は Catalog の所有者ではありません。Catalog の `name` を使って、読み込んだ `SourceDefinition` を便利な名前で公開する薄い facade です。
 
 ## Config
 

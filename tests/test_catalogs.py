@@ -4,7 +4,11 @@ import pytest
 
 import rhinestone.catalogs as catalog_module
 from rhinestone import SourceDefinition, sources
-from rhinestone.catalogs import load_catalog_resource, load_source_definitions
+from rhinestone.catalogs import (
+    load_catalog_resource,
+    load_source_catalog,
+    load_source_definitions,
+)
 from rhinestone.errors import ConfigValidationError
 
 
@@ -18,8 +22,35 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "gsi",
         "odpt",
     )
+    catalog_entries = load_source_catalog()
+    assert tuple(entry.definition for entry in catalog_entries) == definitions
+    assert tuple(entry.name for entry in catalog_entries) == (
+        "GEOSPATIAL_JP",
+        "ESTAT",
+        "PLATEAU",
+        "GSI",
+        "ODPT",
+    )
     assert definitions == sources.ALL
     assert all(isinstance(definition, SourceDefinition) for definition in sources.ALL)
+
+
+def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
+    assert sources.GEOSPATIAL_JP is sources.ALL[0]
+    assert sources.ESTAT is sources.ALL[1]
+    assert sources.PLATEAU is sources.ALL[2]
+    assert sources.GSI is sources.ALL[3]
+    assert sources.ODPT is sources.ALL[4]
+    assert set(sources.__all__) == {
+        "ALL",
+        "GEOSPATIAL_JP",
+        "ESTAT",
+        "PLATEAU",
+        "GSI",
+        "ODPT",
+    }
+    with pytest.raises(AttributeError):
+        getattr(sources, "MISSING")
 
 
 def test_catalog_contains_service_configuration_but_not_runtime_values() -> None:
@@ -96,6 +127,15 @@ def test_catalog_resource_errors_are_normalized(
         {"sources": {"broken": {"adapter_type": None}}},
         {"sources": {"broken": {"adapter_type": ""}}},
         {"sources": {"broken": {"adapter_type": "static", "settings": []}}},
+        {"sources": {"broken": {"adapter_type": "static"}}},
+        {"sources": {"broken": {"name": None, "adapter_type": "static"}}},
+        {"sources": {"broken": {"name": "", "adapter_type": "static"}}},
+        {
+            "sources": {
+                "first": {"name": "DUPLICATE", "adapter_type": "static"},
+                "second": {"name": "DUPLICATE", "adapter_type": "static"},
+            }
+        },
     ),
 )
 def test_source_catalog_manifest_shapes_are_rejected(

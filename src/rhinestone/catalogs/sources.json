@@ -4,20 +4,23 @@
       "adapter_type": "ckan",
       "settings": {
         "endpoint": "https://www.geospatial.jp/ckan"
-      }
+      },
+      "name": "GEOSPATIAL_JP"
     },
     "estat": {
       "adapter_type": "estat",
       "settings": {
         "endpoint": "https://api.e-stat.go.jp/rest/3.0/app/json",
         "language": "J"
-      }
+      },
+      "name": "ESTAT"
     },
     "plateau": {
       "adapter_type": "plateau",
       "settings": {
         "endpoint": "https://www.geospatial.jp/ckan"
-      }
+      },
+      "name": "PLATEAU"
     },
     "gsi": {
       "adapter_type": "static",
@@ -146,7 +149,8 @@
             }
           }
         }
-      }
+      },
+      "name": "GSI"
     },
     "odpt": {
       "adapter_type": "odpt",
@@ -178,7 +182,8 @@
         },
         "spec_source": "https://developer.odpt.org/documents",
         "terms_url": "https://developer.odpt.org/terms/data_basic_license.html"
-      }
+      },
+      "name": "ODPT"
     }
   }
 }

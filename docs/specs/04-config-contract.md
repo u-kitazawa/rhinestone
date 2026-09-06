@@ -50,7 +50,7 @@ config:
 
 `sources.json` は組み込み Source の接続先・サービス仕様を保持します。利用者が独自の接続先を使う場合は、既存 Adapter に対する `SourceDefinition` を明示して `configure(sources=...)` に渡します。
 
-`sources.json` の `gsi.settings.items` に `std`、`pale` などの名前と仕様を定義します。Config は `Config("gsi", {"id": "std"})` のように、その名前だけを指定します。GSI タイルの専用 Adapter や専用 loader はありません。
+`sources.json` の各Sourceエントリに `name` を定義し、`rhinestone.sources` の公開名を決めます。`gsi.settings.items` には `std`、`pale` などの対象名と仕様を定義します。Config は `Config("gsi", {"id": "std"})` のように、その名前だけを指定します。GSI タイルの専用 Adapter や専用 loader はありません。
 
 ## 追加 Source の Config
 
