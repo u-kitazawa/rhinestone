@@ -45,7 +45,7 @@ sources.ODPT
 sources.ALL
 ```
 
-`sources.ALL`は上記built-in SourceDefinitionを並べたimmutableなtupleで、Coreによる特別扱いはありません。
+`sources.ALL`は上記built-in SourceDefinitionを並べたimmutableなtupleで、Coreによる特別扱いはありません。個別名はCatalogの`name`から動的に公開されます。
 
 ### `SourceDefinition`
 

@@ -1,0 +1,189 @@
+{
+  "sources": {
+    "geospatial-jp": {
+      "adapter_type": "ckan",
+      "settings": {
+        "endpoint": "https://www.geospatial.jp/ckan"
+      },
+      "name": "GEOSPATIAL_JP"
+    },
+    "estat": {
+      "adapter_type": "estat",
+      "settings": {
+        "endpoint": "https://api.e-stat.go.jp/rest/3.0/app/json",
+        "language": "J"
+      },
+      "name": "ESTAT"
+    },
+    "plateau": {
+      "adapter_type": "plateau",
+      "settings": {
+        "endpoint": "https://www.geospatial.jp/ckan"
+      },
+      "name": "PLATEAU"
+    },
+    "gsi": {
+      "adapter_type": "static",
+      "settings": {
+        "items": {
+          "std": {
+            "metadata": {
+              "title": "標準地図",
+              "description": "日本全国と周辺地域。国外は低ズームのみ。",
+              "publisher": "国土地理院",
+              "raw": {
+                "title": "標準地図",
+                "url": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "scheme": "xyz",
+                "crs": "EPSG:3857",
+                "tile_size": 256,
+                "min_zoom": 2,
+                "max_zoom": 18,
+                "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                "attribution": "国土地理院",
+                "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                "spec_checked_at": "2026-09-05"
+              }
+            },
+            "candidates": [
+              {
+                "uri": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "attributes": {
+                  "access_kind": "remote-dataset",
+                  "access_options": {
+                    "tile": {
+                      "title": "標準地図",
+                      "url": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                      "format": "png",
+                      "media_type": "image/png",
+                      "scheme": "xyz",
+                      "crs": "EPSG:3857",
+                      "tile_size": 256,
+                      "min_zoom": 2,
+                      "max_zoom": 18,
+                      "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                      "attribution": "国土地理院",
+                      "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                      "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                      "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#std",
+                      "spec_checked_at": "2026-09-05"
+                    }
+                  }
+                }
+              }
+            ],
+            "capabilities": [
+              "remote-dataset",
+              "search"
+            ],
+            "provenance": {
+              "dataset_identifier": "std",
+              "original_url": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
+            }
+          },
+          "pale": {
+            "metadata": {
+              "title": "淡色地図",
+              "description": "日本全国と周辺地域。国外は低ズームのみ。",
+              "publisher": "国土地理院",
+              "raw": {
+                "title": "淡色地図",
+                "url": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "scheme": "xyz",
+                "crs": "EPSG:3857",
+                "tile_size": 256,
+                "min_zoom": 2,
+                "max_zoom": 18,
+                "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                "attribution": "国土地理院",
+                "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                "spec_checked_at": "2026-09-05"
+              }
+            },
+            "candidates": [
+              {
+                "uri": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
+                "format": "png",
+                "media_type": "image/png",
+                "attributes": {
+                  "access_kind": "remote-dataset",
+                  "access_options": {
+                    "tile": {
+                      "title": "淡色地図",
+                      "url": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png",
+                      "format": "png",
+                      "media_type": "image/png",
+                      "scheme": "xyz",
+                      "crs": "EPSG:3857",
+                      "tile_size": 256,
+                      "min_zoom": 2,
+                      "max_zoom": 18,
+                      "coverage": "日本全国と周辺地域。国外は低ズームのみ。",
+                      "attribution": "国土地理院",
+                      "usage_url": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                      "usage_notes": "ズームと地域により基本測量成果等の区分が異なる。リンク先の利用条件を参照。",
+                      "spec_source": "https://maps.gsi.go.jp/development/ichiran.html#pale",
+                      "spec_checked_at": "2026-09-05"
+                    }
+                  }
+                }
+              }
+            ],
+            "capabilities": [
+              "remote-dataset",
+              "search"
+            ],
+            "provenance": {
+              "dataset_identifier": "pale",
+              "original_url": "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png"
+            }
+          }
+        }
+      },
+      "name": "GSI"
+    },
+    "odpt": {
+      "adapter_type": "odpt",
+      "settings": {
+        "endpoint": "https://api.odpt.org/api/v4",
+        "resource_types": {
+          "station": "odpt:Station",
+          "railway": "odpt:Railway",
+          "train": "odpt:Train"
+        },
+        "filter_fields": {
+          "station": [
+            "owl:sameAs",
+            "dc:title",
+            "odpt:operator",
+            "odpt:railway"
+          ],
+          "railway": [
+            "owl:sameAs",
+            "dc:title",
+            "odpt:operator"
+          ],
+          "train": [
+            "owl:sameAs",
+            "odpt:operator",
+            "odpt:railway",
+            "odpt:trainNumber"
+          ]
+        },
+        "spec_source": "https://developer.odpt.org/documents",
+        "terms_url": "https://developer.odpt.org/terms/data_basic_license.html"
+      },
+      "name": "ODPT"
+    }
+  }
+}

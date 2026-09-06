@@ -1,26 +1,24 @@
 # OdptAdapter
 
-`OdptAdapter` は ODPT v4 の service query を解決します。データ取得は行わず、
-`JsonServiceAdapter` が実行します。
+`OdptAdapter` は ODPT v4 の service query を解決します。データ取得は行わず、`JsonServiceAdapter` が実行します。
 
 [Source Adapter 一覧](../source-adapters.md) · source type: `odpt`
 
 ## 設定
 
-`dataset`（`station`、`railway`、`train`）と logical credential 名の `credential` が
-必須です。公式フィールドだけを含む `filters` は任意です。
+`dataset`（`station`、`railway`、`train`）と logical credential 名の `credential` が必須です。公式フィールドだけを含む `filters` は任意です。
 
 ## Endpoint と実行
 
-endpoint は `https://api.odpt.org/api/v4/` 配下の `odpt:Station`、`odpt:Railway`、
-`odpt:Train` に固定です。AdapterはRhinestoneが構成するため、provider、requests互換
-runtime、credential factoryだけを登録します。
+endpoint、resource type、許可される filter は `sources.ODPT` の Catalog 定義から Adapter へ渡されます。利用者は provider や requests 互換 runtime、credential factory を構成します。
 
 ```python
-from rhinestone import ProviderConfig, configure
+import os
+
+from rhinestone import Config, configure, sources
 
 app = configure(
-    providers={"odpt": ProviderConfig("odpt")},
+    sources=(sources.ODPT,),
     dependencies={"json-service": lambda: requests},
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
@@ -43,6 +41,4 @@ records = app.open(
 )
 ```
 
-この例の `"odpt"` は `credentials={"odpt": ...}` の key と一致させます。consumer key
-そのものではありません。`app` の構成を含む完全な例は、リポジトリ checkout の
-`examples/12_odpt_station/README.md` を参照してください。
+この例の `"odpt"` は `credentials={"odpt": ...}` の key と一致させます。consumer key そのものではありません。`app` の構成を含む完全な例は、リポジトリ checkout の `examples/12_odpt_station/README.md` を参照してください。

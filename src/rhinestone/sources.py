@@ -1,60 +1,32 @@
-"""Built-in external source definitions."""
+"""Public facade for built-in Source definitions."""
 
-import json
-from importlib import resources
-from typing import Any, Dict, Tuple, cast
+from typing import Dict, List, Tuple
 
+from .catalogs import CatalogSource, load_source_catalog
 from .models import SourceDefinition
 
+_CATALOG: Tuple[CatalogSource, ...] = load_source_catalog()
+_BUILTINS: Dict[str, SourceDefinition] = {
+    entry.definition.id: entry.definition for entry in _CATALOG
+}
+_BY_NAME: Dict[str, SourceDefinition] = {
+    entry.name: entry.definition for entry in _CATALOG
+}
 
-def _load_catalog(name: str) -> Dict[str, Any]:
-    return cast(
-        Dict[str, Any],
-        json.loads(resources.read_text("rhinestone.catalogs", name)),
-    )
+ALL: Tuple[SourceDefinition, ...] = tuple(_BUILTINS.values())
 
 
-GEOSPATIAL_JP = SourceDefinition(
-    id="geospatial-jp",
-    adapter_type="ckan",
-    settings={"endpoint": "https://www.geospatial.jp/ckan"},
-)
+def __getattr__(name: str) -> SourceDefinition:
+    try:
+        return _BY_NAME[name]
+    except KeyError:
+        raise AttributeError(
+            f"module {__name__!r} has no source named {name!r}"
+        ) from None
 
-ESTAT = SourceDefinition(
-    id="estat",
-    adapter_type="estat",
-)
 
-PLATEAU = SourceDefinition(
-    id="plateau",
-    adapter_type="plateau",
-    settings={"endpoint": "https://www.geospatial.jp/ckan"},
-)
+def __dir__() -> List[str]:
+    return sorted(set(globals()) | set(_BY_NAME))
 
-GSI = SourceDefinition(
-    id="gsi",
-    adapter_type="static",
-    settings={"items": _load_catalog("gsi_tiles.json")},
-)
 
-ODPT = SourceDefinition(
-    id="odpt",
-    adapter_type="odpt",
-)
-
-ALL: Tuple[SourceDefinition, ...] = (
-    GEOSPATIAL_JP,
-    ESTAT,
-    PLATEAU,
-    GSI,
-    ODPT,
-)
-
-__all__ = [
-    "ALL",
-    "ESTAT",
-    "GEOSPATIAL_JP",
-    "GSI",
-    "ODPT",
-    "PLATEAU",
-]
+__all__ = ["ALL", *sorted(_BY_NAME)]  # pyright: ignore[reportUnsupportedDunderAll]

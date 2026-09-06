@@ -1,12 +1,11 @@
-"""Executable provider contracts and failures for the five expansion adapters."""
+"""Executable provider contracts and failures for the four expansion adapters."""
 
 import importlib
 import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Mapping, cast
-from xml.etree.ElementTree import fromstring
+from typing import Any, Dict, List, Mapping, Tuple, cast
 
 import pytest
 
@@ -14,7 +13,6 @@ from rhinestone import Config, SearchQuery, configure, sources
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
-    GsiTileAdapter,
     OdptAdapter,
     PlateauAdapter,
 )
@@ -44,79 +42,8 @@ def fail(*args: Any, **kwargs: Any) -> Any:
     raise ValueError("secret-in-underlying-error")
 
 
-def test_tile_source_plan_search_and_gdal_translation() -> None:
-    adapter = GsiTileAdapter()
-    results = adapter.search(SearchQuery(text="標準", limit=1))
-    assert len(results) == 1
-    item = adapter.load(results[0].to_config())
-    resource = Resolver().resolve(item)
-    assert resource.access_plan.kind == "remote-dataset"
-    assert resource.format == "png"
-    assert resource.access_plan.options["tile"]["min_zoom"] == 2
-    assert resource.metadata.raw["attribution"] == "国土地理院"
-    assert resource.source.raw_metadata == resource.provenance.raw
-    assert len(adapter.search(SearchQuery())) == 2
-    assert adapter.search(SearchQuery(text="absent")) == ()
-    # ID takes priority; never turn a known ID into a user-supplied URL.
-    assert adapter.load(Config("gsi-tile", {"id": "std", "url": "ignored"})) == item
-    captured: Dict[str, Any] = {}
-
-    def open_ex(uri: str, **kwargs: Any) -> Any:
-        captured["uri"] = uri
-        return "dataset"
-
-    app = configure(
-        sources=(sources.GSI,),
-        dependencies={"gdal": lambda: SimpleNamespace(OpenEx=open_ex)},
-    )
-    assert app.open(Config("gsi", {"id": "std"})) == "dataset"
-    xml = fromstring(captured["uri"])
-    assert xml.findtext("DataWindow/YOrigin") == "top"
-    assert xml.findtext("DataWindow/TileLevel") == "18"
-    assert xml.findtext("OverviewCount") == "16"
-    assert "${z}/${x}/${y}.png" in cast(str, xml.findtext("Service/ServerUrl"))
-
-
-@pytest.mark.parametrize("settings", ({"id": "unknown"}, {"id": ""}, {}))
-def test_unknown_tile_never_guesses_url(settings: Mapping[str, Any]) -> None:
-    with pytest.raises(ConfigValidationError):
-        GsiTileAdapter().load(Config("gsi-tile", settings))
-
-
-@pytest.mark.parametrize(
-    "changes",
-    [
-        {"url": "https://tiles.example/{"},
-        {"url": "https://[invalid/{z}/{x}/{y}"},
-        {"url": "https://tiles.example/{zoom}/{x}/{y}"},
-        {"url": "http://tiles.example/{z}/{x}/{y}"},
-        {"url": "https://tiles.example/{z!r}/{x}/{y}"},
-        {"scheme": "tms"},
-        {"crs": "EPSG:4326"},
-        {"format": "pbf"},
-        {"min_zoom": True},
-        {"max_zoom": 1},
-        {"tile_size": 512},
-        {"attribution": ""},
-    ],
-)
-def test_explicit_tile_requires_valid_execution_metadata(
-    changes: Mapping[str, Any],
-) -> None:
-    spec = dict(GsiTileAdapter().load(Config("gsi-tile", {"id": "std"})).raw_metadata)
-    spec.update(changes)
-    with pytest.raises(ConfigValidationError):
-        GsiTileAdapter().load(Config("gsi-tile", spec))
-
-
-def test_custom_tile_does_not_infer_provider_id() -> None:
-    spec = dict(GsiTileAdapter().load(Config("gsi-tile", {"id": "pale"})).raw_metadata)
-    spec["url"] = "https://tiles.example/{z}/{x}/{y}?a=1&b=2"
-    spec.pop("title")
-    item = GsiTileAdapter().load(Config("gsi-tile", spec))
-    assert item.provenance.dataset_identifier == spec["url"]
-    xml = GdalAdapter.tile_xml(spec)
-    assert "&amp;" in xml
+def odpt_adapter() -> OdptAdapter:
+    return OdptAdapter(**dict(sources.ODPT.settings))
 
 
 def test_dcat_rejects_an_unsupported_serialization_before_loading() -> None:
@@ -140,8 +67,13 @@ def plateau_client(url: str, params: Mapping[str, Any]) -> Any:
     return package
 
 
+def test_plateau_requires_catalog_endpoint() -> None:
+    with pytest.raises(ConfigValidationError, match="endpoint"):
+        PlateauAdapter(plateau_client)
+
+
 def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> None:
-    adapter = PlateauAdapter(plateau_client)
+    adapter = PlateauAdapter(plateau_client, endpoint="https://fixture.example")
     settings = {
         "resource_id": "citygml",
         "archive": "zip",
@@ -173,7 +105,7 @@ def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> No
 
 
 def test_plateau_selection_is_decided_by_resolver() -> None:
-    adapter = PlateauAdapter(plateau_client)
+    adapter = PlateauAdapter(plateau_client, endpoint="https://fixture.example")
     with pytest.raises(AmbiguousResourceError):
         Resolver().resolve(adapter.load(Config("plateau", {"dataset_id": "fixture"})))
     resource = Resolver().resolve(
@@ -217,7 +149,7 @@ def test_plateau_rejects_unsafe_or_incomplete_archive_selection(
     settings: Mapping[str, Any],
 ) -> None:
     with pytest.raises(ConfigValidationError):
-        PlateauAdapter(plateau_client).load(
+        PlateauAdapter(plateau_client, endpoint="https://fixture.example").load(
             Config("plateau", dict(settings, dataset_id="fixture"))
         )
 
@@ -345,7 +277,7 @@ def test_dcat_distinguishes_bad_config_fetch_parse_and_missing_dataset() -> None
         dcat_adapter().load(dcat_config(dataset="https://absent.example"))
 
 
-@pytest.mark.parametrize("adapter", [GsiTileAdapter(), dcat_adapter()])
+@pytest.mark.parametrize("adapter", [dcat_adapter()])
 def test_local_search_rejects_unsupported_conditions(adapter: Any) -> None:
     with pytest.raises(UnsupportedSearchConditionError):
         adapter.search(SearchQuery(bbox=(0, 0, 1, 1)))
@@ -358,10 +290,9 @@ def test_local_search_rejects_unsupported_conditions(adapter: Any) -> None:
 @pytest.mark.parametrize(
     "adapter",
     [
-        GsiTileAdapter(),
         GsiFundamentalAdapter(),
         dcat_adapter(),
-        OdptAdapter(),
+        odpt_adapter(),
     ],
 )
 def test_expansion_adapters_reject_wrong_source_type(adapter: Any) -> None:
@@ -382,7 +313,53 @@ def test_expansion_adapters_reject_wrong_source_type(adapter: Any) -> None:
 )
 def test_odpt_rejects_unknown_or_secret_settings(settings: Mapping[str, Any]) -> None:
     with pytest.raises(ConfigValidationError):
-        OdptAdapter().load(Config("odpt", settings))
+        odpt_adapter().load(Config("odpt", settings))
+
+
+def test_odpt_catalog_shapes_are_rejected() -> None:
+    changes: Tuple[Mapping[str, Any], ...] = (
+        {"endpoint": None},
+        {"endpoint": ""},
+        {"resource_types": None},
+        {"resource_types": {}},
+        {"resource_types": {1: "odpt:Station"}},
+        {"resource_types": {"station": 1}},
+        {"resource_types": {"station": ""}},
+        {
+            "resource_types": {
+                "station": "odpt:Station",
+                "railway": "odpt:Railway",
+            }
+        },
+        {"filter_fields": None},
+        {"filter_fields": {}},
+        {"filter_fields": {1: []}},
+        {"filter_fields": {"station": "dc:title"}},
+        {"filter_fields": {"station": [1]}},
+        {"spec_source": None},
+        {"terms_url": ""},
+    )
+    for change in changes:
+        kwargs = dict(sources.ODPT.settings)
+        kwargs.update(change)
+        with pytest.raises(ConfigValidationError):
+            OdptAdapter(**kwargs)
+
+
+def test_odpt_runtime_filters_are_validated() -> None:
+    adapter = odpt_adapter()
+    adapter.config_schema = lambda: None  # type: ignore[method-assign]
+    with pytest.raises(ConfigValidationError, match="filters"):
+        adapter.load(
+            Config(
+                "odpt",
+                {
+                    "dataset": "station",
+                    "credential": "odpt",
+                    "filters": [],
+                },
+            )
+        )
 
 
 def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None:
@@ -428,7 +405,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
         other.open(config)
     for dataset in ("railway", "train"):
         assert (
-            OdptAdapter()
+            odpt_adapter()
             .load(Config("odpt", {"dataset": dataset, "credential": "odpt"}))
             .candidates
         )
@@ -440,6 +417,19 @@ def test_credential_errors_do_not_expose_factory_secrets() -> None:
             CredentialRegistry({"key": factory}).get("key")
         assert "secret-in-underlying-error" not in str(error.value)
         assert error.value.__context__ is None or error.value.__suppress_context__
+
+
+def test_odpt_rejects_incomplete_service_plan() -> None:
+    endpoint = "https://api.odpt.org/api/v4/odpt:Station"
+    plan = ServiceQueryPlan(
+        uri=endpoint,
+        options={
+            "service": "odpt",
+            "endpoint": endpoint,
+        },
+    )
+    with pytest.raises(ConfigValidationError, match="incomplete"):
+        OdptAdapter.prepare_request(plan, CredentialRegistry({}))
 
 
 def test_odpt_authentication_cannot_be_redirected_to_another_provider() -> None:
@@ -478,7 +468,7 @@ def test_odpt_authentication_cannot_be_redirected_to_another_provider() -> None:
 def test_json_service_errors_are_distinct_and_redacted(
     response: Any, expected: Any
 ) -> None:
-    item = OdptAdapter().load(
+    item = odpt_adapter().load(
         Config("odpt", {"dataset": "station", "credential": "odpt"})
     )
     execution = JsonServiceAdapter(

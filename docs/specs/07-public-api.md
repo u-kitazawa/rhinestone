@@ -2,44 +2,52 @@
 
 ## 基本境界
 
-公開APIは、名前付きproviderの構成、ConfigからResourceを解決する経路、Resourceを
-外部OSSへ接続する経路、SearchQueryからSearchResultを得る経路を提供します。
+公開 API は、名前付き Source の構成、Config から Resource を解決する経路、Resource を外部 OSS へ接続する経路、SearchQuery から SearchResult を得る経路を提供します。
 
-利用者はSource AdapterまたはExecution Adapterのinstanceを登録しません（MUST NOT）。
-RhinestoneがProviderConfigとdependencyから組み込みAdapterを構成・選択します。
+利用者は Source Adapter または Execution Adapter の instance を登録しません（MUST NOT）。Rhinestone が `SourceDefinition` と dependency から組み込み Adapter を構成・選択します。
 
 ```python
-from rhinestone import Config, ProviderConfig, configure
+from rhinestone import Config, configure, sources
 
 app = configure(
-    providers={
-        "gspace": ProviderConfig(
-            adapter_type="ckan",
-            settings={"endpoint": "https://www.geospatial.jp/ckan"},
-        ),
-    },
+    sources=(sources.GEOSPATIAL_JP,),
     dependencies={
         "http-json": lambda: get_json,
         "gdal": lambda: osgeo.gdal,
-        "rasterio": lambda: rasterio,
     },
 )
 resource = app.resolve(
-    Config(source_id="gspace", settings={"resource_id": "..."})
+    Config(source_id="geospatial-jp", settings={"resource_id": "..."})
 )
 ```
 
-providerのmapping keyが安定した`source_id`、ProviderConfigの`adapter_type`が
-解釈方式です。異なる`source_id`へ同じ`adapter_type`を割り当てられます（MUST）。
+Catalog の `sources.json` が接続先を持ち、`sources.py` は読み込んだ `SourceDefinition` を便利な名前で公開します。`Config` は対象指定だけを保持します。
 
-`direct` providerは常に組み込まれます。利用者定義providerで上書きできません。
-未知のadapter type、空のsource id、未知のprovider optionは明示的に失敗します。
+独自の Source を構成する場合は `SourceDefinition` を明示します。
+
+```python
+from rhinestone import SourceDefinition, configure
+
+app = configure(
+    sources=(
+        SourceDefinition(
+            id="my-stac",
+            adapter_type="stac",
+            settings={"endpoint": "https://stac.example/api"},
+        ),
+    ),
+)
+```
+
+同じ `adapter_type` を異なる `source_id` へ割り当てられます（MUST）。未知の adapter type、空の source id、未知の Source option は明示的に失敗します。
+
+`direct` Source は常に組み込まれます。利用者が上書きすることはできません。
 
 ## 公開モデル
 
-`Config`は`source_id`とprovider固有`settings`を保持します。
-`SearchResult.to_config()`は同じsource idを保持して通常の解決フローへ戻します。
-`Provenance.provider`にはsource id、`Provenance.adapter`にはAdapter種別を記録します。
+`SourceDefinition` は Catalog から読み込まれた静的な構成、`Config` は選択した Source 内の対象、`Source` は Adapter が外部情報を解釈した実行時の結果です。これらを同じ「source情報」として混同しません。
+
+`SearchResult.to_config()` は同じ source id を保持して通常の解決フローへ戻します。`Provenance.provider` には source id、`Provenance.adapter` には Adapter 種別を記録します。
 
 Resource は少なくとも次へ直接アクセスできます。
 
@@ -52,31 +60,21 @@ resource.access_plan
 
 ## runtime dependency
 
-利用者は使用を許可する外部runtimeをfactoryとして供給します。組み込みExecution
-Adapterは常にRhinestone側で構成され、登録済みdependencyとの互換性から選択されます。
-CoreがGDAL等を直接importしてはなりません（MUST NOT）。
+利用者は使用を許可する外部 runtime を factory として供給します。組み込み Execution Adapter は常に Rhinestone 側で構成され、登録済み dependency との互換性から選択されます。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
 
-`http-json`はJSON API用callback、`http-text`は文書取得callback、`rdflib`は
-DCAT解釈runtimeです。GIS実行には`gdal`、`rasterio`、`pyogrio`を使用します。
-factoryは実際に必要になるまで評価しません。
+`http-json` は JSON API 用 callback、`http-text` は文書取得 callback、`rdflib` は DCAT 解釈 runtime です。GIS 実行には `gdal`、`rasterio`、`pyogrio` を使用します。factory は実際に必要になるまで評価しません。
 
 ```python
-resource.open()                  # 自動選択
-resource.open(adapter="gdal")    # 必要な場合だけ固定
+resource.open()
+resource.open(adapter="gdal")
 ```
 
-`configure()`はprocess-global stateを変更せず、独立したapplication contextを返します。
-同じprocess内に異なるprovider・dependency構成を共存させられます。
+`configure()` は process-global state を変更せず、独立した application context を返します。同じ process 内に異なる Source・dependency 構成を共存させられます。
 
 ## credential
 
-`credentials`はlogical nameとsecret factoryの対応です。secretをConfig、Source、
-Metadata、Provenanceへ保存してはなりません（MUST NOT）。Source API認証の評価時点と
-統一方法は別途credential契約で定義します。
+`credentials` は logical name と secret factory の対応です。secret を Catalog、SourceDefinition、Config、Source、Metadata、Provenance へ保存してはなりません（MUST NOT）。Source API 認証の評価時点と統一方法は別途 credential 契約で定義します。
 
 ## 戻り値
 
-Rhinestoneは結果を共通DataFrameや独自形式へ変換しません。Execution Adapterは
-外部OSSのデータ型と処理契約を尊重します。利用者はResourceを実行せず、URI、
-Metadata、Provenanceだけを利用することもできます。
-
+Rhinestone は結果を共通 DataFrame や独自形式へ変換しません。Execution Adapter は外部 OSS のデータ型と処理契約を尊重します。利用者は Resource を実行せず、URI、Metadata、Provenance だけを利用することもできます。

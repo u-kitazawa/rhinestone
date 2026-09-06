@@ -19,7 +19,6 @@ nav:
               - Direct: api/adapters/direct.md
               - e-Stat: api/adapters/estat.md
               - 基盤地図情報: api/adapters/gsi-fundamental.md
-              - 国土地理院タイル: api/adapters/gsi-tile.md
               - ODPT: api/adapters/odpt.md
               - OGC API Features: api/adapters/ogc-features.md
               - PLATEAU: api/adapters/plateau.md

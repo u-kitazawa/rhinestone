@@ -220,13 +220,14 @@ HTTP通信方法、GDALオプション等の内部実装詳細は原則として
 例:
 
 ```yaml
-providers:
-  gspace:
-    adapter_type: ckan
-    settings:
-      endpoint: https://example.jp
+catalog:
+  sources:
+    geospatial-jp:
+      adapter_type: ckan
+      settings:
+        endpoint: https://www.geospatial.jp/ckan
 config:
-  source_id: gspace
+  source_id: geospatial-jp
   settings:
     resource_id: abcdef
 ```
@@ -234,20 +235,24 @@ config:
 e-Statの場合:
 
 ```yaml
-providers:
-  estat:
-    adapter_type: estat
+catalog:
+  sources:
+    estat:
+      adapter_type: estat
+      settings:
+        endpoint: https://api.e-stat.go.jp/rest/3.0/app/json
+        language: J
 config:
   source_id: estat
   settings:
     stats_data_id: "0000000000"
 ```
 
-Source固有の設定項目は［Source Adapter］が管理する。
+Source固有の固定値はCatalogの`SourceDefinition.settings`が管理し、対象指定はConfigへ置く。
 
-Configの`source_id`は構成済みproviderを参照する。provider識別子と
-［Source Adapter］種別を同一視してはならない。同じAdapter種別を利用する複数providerを
-同時に構成できなければならない。
+Configの`source_id`は`configure()`で構成済みのSourceDefinitionを参照する。
+Source識別子と［Source Adapter］種別を同一視してはならない。同じAdapter種別を利用する
+複数Sourceを同時に構成できなければならない。
 
 Core側に巨大なprovider union schemaを持たせない。
 
@@ -1145,9 +1150,11 @@ QGIS環境のGDAL等を［Dependency Registry］へcallbackとして注入でき
 ［Source Adapter］および［Execution Adapter］の登録状態は［Adapter Registry］が管理する。
 ［Adapter Registry］は内部実装であり、利用者はAdapter instanceを登録しない。
 
-Composition Rootは、名前付きproviderの`ProviderConfig.adapter_type`から組み込み
+Composition Rootは、Catalogから読み込んだ`SourceDefinition.adapter_type`から組み込み
 ［Source Adapter］を生成し、利用者が供給したdependencyに対応する組み込み
 ［Execution Adapter］を構成する。Source側はAdapter種別ではなく`source_id`で索引する。
+Catalogは接続先や公式サービス仕様を宣言し、secretやruntime instanceは保持しない。
+`rhinestone.sources`はCatalogから生成された組み込みSourceDefinitionを公開するfacadeである。
 
 初期段階では複雑なplugin systemを必須としない。
 

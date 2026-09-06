@@ -25,9 +25,11 @@ official CKAN Action API, e-Stat API 3.0, STAC API 1.0.0, and OGC API Features
 their fixtures; deployment-specific extensions remain out of scope.
 
 Source Adapter classes are internal contracts. The public composition API maps
-named `ProviderConfig` values to built-in adapters, allowing multiple provider
-ids to share one adapter type. Tests may instantiate adapters directly to verify
-their request, preservation, explicit-selection, and failure behaviour.
+named `SourceDefinition` values to built-in adapters, allowing multiple source
+ids to share one adapter type. Repository-managed Catalog values are loaded into
+SourceDefinition objects before composition. Tests may instantiate adapters
+directly to verify their request, preservation, explicit-selection, and failure
+behaviour.
 
 The first execution vertical slice temporarily places execution adapters in
 `rhinestone.adapters.execution` and connects them through `AccessPipeline.open`.

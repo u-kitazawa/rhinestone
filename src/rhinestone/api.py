@@ -214,8 +214,18 @@ def _build_source_adapter(
             **settings,
         )
     if adapter_type == "odpt":
-        _reject_options(adapter_type, settings, ())
-        return OdptAdapter()
+        _reject_options(
+            adapter_type,
+            settings,
+            (
+                "endpoint",
+                "resource_types",
+                "filter_fields",
+                "spec_source",
+                "terms_url",
+            ),
+        )
+        return OdptAdapter(**settings)
     raise AdapterRegistrationError(
         f"Built-in source adapter {adapter_type!r} is not supported"
     )

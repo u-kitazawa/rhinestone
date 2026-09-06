@@ -6,7 +6,6 @@ from .dcat import DcatAdapter
 from .direct import DirectAdapter
 from .estat import EStatAdapter
 from .gsi_fundamental import GsiFundamentalAdapter
-from .gsi_tile import GsiTileAdapter
 from .odpt import OdptAdapter
 from .ogc import OgcFeaturesAdapter
 from .plateau import PlateauAdapter
@@ -19,7 +18,6 @@ __all__ = [
     "DcatAdapter",
     "EStatAdapter",
     "GsiFundamentalAdapter",
-    "GsiTileAdapter",
     "JsonGetter",
     "JsonObject",
     "OdptAdapter",

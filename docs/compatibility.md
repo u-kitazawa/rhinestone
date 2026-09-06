@@ -19,7 +19,7 @@
 | `direct` | provider 非依存 | 利用者が明示する URI / format | format、media type、実行方法の推測はしない。 |
 | `estat` | e-Stat API 3.0 | 統計表 metadata と検索結果 | 統計データ本体を開く built-in Execution Adapter はない。 |
 | `gsi-fundamental` | 基盤地図情報の取得済み basic vector | ローカル GML、ZIP 内の明示 entry point | DEM、ログイン、ダウンロード自動化、ZIP 以外の archive は非対応。 |
-| `gsi-tile` | 同梱定義の `std` / `pale`、または明示 XYZ | HTTPS / XYZ / EPSG:3857 / 256 px の PNG・JPEG tile | WMTS、TMS、別 CRS、別 tile size、未定義 tile ID は非対応。 |
+| `static` | Catalog または利用者が管理する静的定義（組み込み GSI は `sources.json` の `gsi`） | HTTPS / XYZ / EPSG:3857 / 256 px の PNG・JPEG tile など、定義済み Resource | 定義外 item、未定義のアクセス方式、仕様の推測は非対応。 |
 | `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Config 内の secret、他 resource type は非対応。 |
 | `ogc-features` | OGC API Features 1.0 | collection または feature の service query | WFS、他 OGC API、built-in data reader は非対応。 |
 | `plateau` | G 空間情報センター CKAN Action API | 指定 dataset / resource の配布物 | 市区町村・年度からの配布物推測、ZIP 以外の archive は非対応。 |
