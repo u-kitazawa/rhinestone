@@ -9,7 +9,7 @@ from rhinestone import Config, configure
 data_uri = os.environ["RHINESTONE_GDAL_URI"]
 data_format = os.environ.get("RHINESTONE_GDAL_FORMAT", "geotiff")
 app = configure(
-    dependencies={"gdal": lambda: gdal},
+    dependencies={"gdal": gdal},
 )
 resource = app.resolve(
     Config(
@@ -18,6 +18,6 @@ resource = app.resolve(
     )
 )
 
-dataset = resource.open(adapter="gdal")
+dataset = resource.open("gdal")
 print("resource:", resource.uri)
 print("GDAL dataset:", dataset)
