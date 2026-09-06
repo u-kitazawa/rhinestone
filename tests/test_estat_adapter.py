@@ -9,7 +9,11 @@ from tests.provider_support import RecordingJsonClient, fixture_json
 
 
 def test_estat_accepts_api_key_alias() -> None:
-    adapter = EStatAdapter(api_key="app-key", endpoint="https://api.e-stat.go.jp/rest/3.0/app/json", get_json=RecordingJsonClient({}))
+    adapter = EStatAdapter(
+        api_key="app-key",
+        endpoint="https://api.e-stat.go.jp/rest/3.0/app/json",
+        get_json=RecordingJsonClient({}),
+    )
     assert getattr(adapter, "_app_id") == "app-key"
 
 
@@ -19,7 +23,10 @@ def test_estat_rejects_missing_callback_and_conflicting_credentials() -> None:
     with pytest.raises(ConfigValidationError):
         EStatAdapter(app_id="app-id", api_key="key", get_json=RecordingJsonClient({}))
     with pytest.raises(ConfigValidationError, match="credential"):
-        EStatAdapter(endpoint="https://api.e-stat.go.jp/rest/3.0/app/json", get_json=RecordingJsonClient({})).search(SearchQuery())
+        EStatAdapter(
+            endpoint="https://api.e-stat.go.jp/rest/3.0/app/json",
+            get_json=RecordingJsonClient({}),
+        ).search(SearchQuery())
 
 
 def test_estat_credential_factory_is_lazy_and_used_for_requests() -> None:
@@ -34,7 +41,11 @@ def test_estat_credential_factory_is_lazy_and_used_for_requests() -> None:
         calls.append(True)
         return "factory-app-id"
 
-    adapter = EStatAdapter(credential_factory=credential, endpoint=endpoint, get_json=client)
+    adapter = EStatAdapter(
+        credential_factory=credential,
+        endpoint=endpoint,
+        get_json=client,
+    )
     assert calls == []
     adapter.search(SearchQuery(limit=1))
     assert calls == [True]
@@ -79,7 +90,11 @@ def test_estat_search_maps_text_and_limit_to_official_parameter_names() -> None:
     client = RecordingJsonClient(
         {search_url: fixture_json("estat/get_stats_list.json")}
     )
-    adapter = EStatAdapter(app_id="secret-app-id", get_json=client)
+    adapter = EStatAdapter(
+        app_id="secret-app-id",
+        endpoint=endpoint,
+        get_json=client,
+    )
     results = adapter.search(SearchQuery(text="人口", limit=10))
     assert client.calls == [
         (

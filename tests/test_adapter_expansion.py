@@ -11,7 +11,6 @@ from xml.etree.ElementTree import fromstring
 import pytest
 
 from rhinestone import Config, SearchQuery, configure, sources
-from rhinestone.catalogs import load_catalog_resource
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
@@ -20,6 +19,7 @@ from rhinestone.adapters import (
     PlateauAdapter,
 )
 from rhinestone.adapters.execution import GdalAdapter, JsonServiceAdapter
+from rhinestone.catalogs import load_catalog_resource
 from rhinestone.errors import (
     AmbiguousResourceError,
     ConfigValidationError,
@@ -120,7 +120,9 @@ def test_explicit_tile_requires_valid_execution_metadata(
 
 
 def test_custom_tile_does_not_infer_provider_id() -> None:
-    spec = dict(gsi_tile_adapter().load(Config("gsi-tile", {"id": "pale"})).raw_metadata)
+    spec = dict(
+        gsi_tile_adapter().load(Config("gsi-tile", {"id": "pale"})).raw_metadata
+    )
     spec["url"] = "https://tiles.example/{z}/{x}/{y}?a=1&b=2"
     spec.pop("title")
     item = gsi_tile_adapter().load(Config("gsi-tile", spec))
