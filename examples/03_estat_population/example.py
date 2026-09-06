@@ -1,13 +1,8 @@
 """Resolve e-Stat metadata as a service-query Resource."""
 
 import os
-import sys
-from pathlib import Path
 
 from rhinestone import Config, configure, sources
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _support.http_json import get_json  # noqa: E402
 
 app_id = (
     os.environ.get("RHINESTONE_ESTAT_APP_ID") or os.environ["RHINESTONE_ESTAT_API_KEY"]
@@ -15,7 +10,6 @@ app_id = (
 stats_data_id = os.environ["RHINESTONE_ESTAT_STATS_DATA_ID"]
 app = configure(
     sources=(sources.ESTAT,),
-    dependencies={"http-json": lambda: get_json},
     credentials={"estat": lambda: app_id},
 )
 resource = app.resolve(
