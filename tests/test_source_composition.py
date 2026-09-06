@@ -5,7 +5,7 @@ import pytest
 import rdflib
 
 from rhinestone import Config, SearchQuery, SourceDefinition, configure
-from rhinestone.api import _build_source_adapter
+from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import ConfigValidationError
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
 from tests.provider_support import fixture_json
@@ -35,10 +35,13 @@ def test_dcat_dependencies_are_lazy_and_source_scoped() -> None:
         Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
     ).read_text()
 
+    def get_document(uri: str) -> str:
+        return document
+
     app = configure(
         sources=(SourceDefinition("catalog", "dcat"),),
         dependencies={
-            "http-text": lambda: lambda uri: document,
+            "http-text": lambda: get_document,
             "rdflib": lambda: rdflib,
         },
     )
