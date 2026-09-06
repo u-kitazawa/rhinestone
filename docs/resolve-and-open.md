@@ -41,15 +41,15 @@ entry point などを明示してください。
 Rasterio を登録した COG/GeoTIFF Resource は、次のように開きます。
 
 ```python
-with resource.open(adapter="rasterio") as dataset:
+with resource.open("rasterio") as dataset:
     print(dataset.width, dataset.height)
 ```
 
-`adapter` を省略すると、互換性のある登録済み Adapter が自動選択されます。複数の
+`open()`にはruntime library名を必ず指定します。RhinestoneがResourceに対して自動選択することはありません。複数の
 runtime を登録して再現性を保ちたい場合は、名前を指定してください。
 
 ```python
-dataset = resource.open(adapter="gdal")
+dataset = resource.open("gdal")
 ```
 
 対応する runtime が未登録、または format が非対応の場合は
@@ -61,7 +61,7 @@ dataset = resource.open(adapter="gdal")
 中間の Resource が不要なら、`app.open(config, adapter=...)` を使えます。
 
 ```python
-dataset = app.open(config, adapter="gdal")
+dataset = app.open(config, library="gdal")
 ```
 
 ただし、license、配布元、選ばれた URI を記録したいときは、先に `resolve()` して
@@ -75,6 +75,6 @@ dataset = app.open(config, adapter="gdal")
 | `ConfigValidationError` | 必須設定、format、entry point、credential 名が正しいか |
 | `ProviderMetadataError` | API endpoint、ネットワーク、認証情報を確認する |
 | `ExecutionAdapterUnavailableError` | dependency 名と対応 format を確認する |
-| `DependencyUnavailableError` | `dependencies` に runtime factory があるか、factory が import に成功するか |
+| `DependencyUnavailableError` | `dependencies` に runtime object または factory が登録されているか、factory が import に成功するか |
 
 より具体的な provider の設定は [Source Adapter 一覧](api/source-adapters.md) を参照してください。
