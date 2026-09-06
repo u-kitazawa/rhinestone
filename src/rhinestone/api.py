@@ -85,7 +85,9 @@ class Rhinestone:
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     ) -> None:
         runtime_dependencies = dict(dependencies or {})
-        runtime_dependencies.setdefault("json-service", lambda: _http.JsonServiceRuntime())
+        runtime_dependencies.setdefault(
+            "json-service", lambda: _http.JsonServiceRuntime()
+        )
         dependency_registry = DependencyRegistry(runtime_dependencies)
         credential_registry = CredentialRegistry(credentials or {})
 
