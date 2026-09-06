@@ -34,7 +34,7 @@ Source Adapter は次を満たさなければなりません。
 ## Adapter Registry
 
 Source Adapter と Execution Adapter の登録状態は内部 Adapter Registry が管理します。
-利用者は Adapter instanceを登録しません（MUST）。Composition Rootは
+利用者は Adapter instanceを登録しません（MUST NOT）。Composition Rootは
 `SourceDefinition.adapter_type`から組み込みSource Adapterを生成し、利用者が供給したdependency
 に対応する組み込みExecution Adapterを構成します。
 
