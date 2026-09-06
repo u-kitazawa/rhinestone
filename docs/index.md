@@ -31,12 +31,9 @@ HTTP通信はRhinestoneに組み込まれているため、Sourceの検索やmet
 ## 検索からResourceへ
 
 ```python
-from rhinestone import SearchQuery
-
-results = app.search(SearchQuery(text="河川", limit=5))
-result = results["geospatial-jp"][0]
-config = result.to_config()
-resource = app.resolve(config)
+results = app.search("河川")
+result = results[0]
+resource = result.resolve()
 
 print(resource.uri)
 print(resource.format)
@@ -54,11 +51,11 @@ Rhinestone自身はGIS I/O・変換・解析を再実装しません。GDAL、Ra
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "rasterio": lambda: rasterio,
+        "rasterio": rasterio,
     },
 )
 
-with resource.open(adapter="rasterio") as dataset:
+with resource.open("rasterio") as dataset:
     ...
 ```
 
