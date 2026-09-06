@@ -1,9 +1,43 @@
 site_name: Rhinestone
+
+nav:
+  - ホーム: index.md
+  - はじめに:
+      - インストールと最初の一歩: getting-started.md
+      - アプリケーションを構成する: configuration.md
+  - ガイド:
+      - データを検索する: search.md
+      - Resourceを解決して開く: resolve-and-open.md
+  - リファレンス:
+      - 対応状況: compatibility.md
+      - APIリファレンス:
+          - 概要: api.md
+          - Source Adapter:
+              - 概要: api/source-adapters.md
+              - CKAN: api/adapters/ckan.md
+              - DCAT: api/adapters/dcat.md
+              - Direct: api/adapters/direct.md
+              - e-Stat: api/adapters/estat.md
+              - 基盤地図情報: api/adapters/gsi-fundamental.md
+              - 国土地理院タイル: api/adapters/gsi-tile.md
+              - ODPT: api/adapters/odpt.md
+              - OGC API Features: api/adapters/ogc-features.md
+              - PLATEAU: api/adapters/plateau.md
+              - STAC: api/adapters/stac.md
+              - Static: api/adapters/static.md
+          - Execution Adapter:
+              - 概要: api/execution-adapters.md
+              - GDAL: api/adapters/gdal.md
+              - JSON service: api/adapters/json-service.md
+              - pyogrio: api/adapters/pyogrio.md
+              - Rasterio: api/adapters/rasterio.md
+
 exclude_docs: |
   adapter_expansion.md
   architecture/*
   spec_v4.md
   specs/*
+
 theme:
   name: material
   language: ja
