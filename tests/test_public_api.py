@@ -34,9 +34,7 @@ def direct_config() -> Config:
 def test_direct_and_execution_adapters_are_built_in() -> None:
     calls: List[str] = []
     runtime = FakeRasterio("opened")
-    app = configure(
-        dependencies={"rasterio": lambda: calls.append("load") or runtime}
-    )
+    app = configure(dependencies={"rasterio": lambda: calls.append("load") or runtime})
 
     resource = app.resolve(direct_config())
 
@@ -165,12 +163,8 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config() -> 
             },
         }
 
-    first = SourceDefinition(
-        "catalog-a", "ckan", {"endpoint": "https://first.test"}
-    )
-    second = SourceDefinition(
-        "catalog-b", "ckan", {"endpoint": "https://second.test"}
-    )
+    first = SourceDefinition("catalog-a", "ckan", {"endpoint": "https://first.test"})
+    second = SourceDefinition("catalog-b", "ckan", {"endpoint": "https://second.test"})
     app = configure(
         sources=(first, second),
         dependencies={"http-json": lambda: get_json},
@@ -196,9 +190,7 @@ def test_public_search_exposes_unsupported_conditions_as_domain_error() -> None:
     def unused_get_json(url: str, params: Mapping[str, Any]) -> Dict[str, Any]:
         return {}
 
-    source = SourceDefinition(
-        "catalog", "ckan", {"endpoint": "https://example.test"}
-    )
+    source = SourceDefinition("catalog", "ckan", {"endpoint": "https://example.test"})
     app = configure(
         sources=(source,), dependencies={"http-json": lambda: unused_get_json}
     )
