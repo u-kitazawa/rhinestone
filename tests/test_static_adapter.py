@@ -1,4 +1,4 @@
-from typing import Any, Mapping, Tuple
+from typing import Any, Mapping, Tuple, cast
 
 import pytest
 
@@ -74,7 +74,7 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
 
 
 def test_static_adapter_rejects_invalid_catalog() -> None:
-    invalid_items: Tuple[Any, ...] = (
+    invalid_items: Tuple[object, ...] = (
         {},
         [],
         {"": item()},
@@ -91,7 +91,7 @@ def test_static_adapter_rejects_invalid_catalog() -> None:
     )
     for items in invalid_items:
         with pytest.raises(ConfigValidationError):
-            StaticAdapter(items)
+            StaticAdapter(cast(Any, items))
 
 
 def test_static_adapter_rejects_invalid_candidate_shapes() -> None:

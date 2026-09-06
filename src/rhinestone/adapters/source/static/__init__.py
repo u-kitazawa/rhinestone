@@ -179,13 +179,12 @@ class StaticAdapter(ProviderAdapter):
             cast(Tuple[str, ...], tuple(item.get("capabilities", ())))
         )
         provenance_values = cast(Mapping[str, Any], item.get("provenance", {}))
-        query_parameters = cast(
-            Mapping[str, Any], provenance_values.get("query_parameters", {})
-        )
-        if not isinstance(query_parameters, Mapping):
+        query_parameters_value: Any = provenance_values.get("query_parameters", {})
+        if not isinstance(query_parameters_value, Mapping):
             raise ConfigValidationError(
                 f"static source item {identifier!r} provenance.query_parameters must be an object"
             )
+        query_parameters = cast(Mapping[str, Any], query_parameters_value)
 
         raw_item: Mapping[str, Any] = item
         provenance = Provenance(
