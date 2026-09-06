@@ -10,6 +10,7 @@ from .errors import (
     ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
+from .models import DependencyValue
 
 
 class CredentialRegistry:
@@ -31,21 +32,23 @@ class CredentialRegistry:
 
 
 class DependencyRegistry:
-    def __init__(self, factories: Mapping[str, Callable[[], Any]]) -> None:
-        self._factories = dict(factories)
+    """Resolve injected runtime objects, supporting optional lazy factories."""
+
+    def __init__(self, values: Mapping[str, DependencyValue]) -> None:
+        self._values = dict(values)
         self._instances: Dict[str, Any] = {}
 
     def get(self, name: str) -> Any:
         if name in self._instances:
             return self._instances[name]
         try:
-            factory = self._factories[name]
+            value = self._values[name]
         except KeyError:
             raise DependencyUnavailableError(
                 f"Runtime dependency {name!r} is not configured"
             )
         try:
-            instance = factory()
+            instance = value() if callable(value) else value
         except Exception as error:
             raise DependencyUnavailableError(
                 f"Runtime dependency {name!r} could not be loaded"
@@ -55,7 +58,7 @@ class DependencyRegistry:
 
     @property
     def available(self) -> FrozenSet[str]:
-        return frozenset(self._factories)
+        return frozenset(self._values)
 
 
 class AdapterRegistry:
