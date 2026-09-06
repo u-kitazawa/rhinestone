@@ -9,9 +9,7 @@ from tests.provider_support import RecordingJsonClient, fixture_json
 def test_ogc_collection_items_link_becomes_service_resource() -> None:
     endpoint = "https://features.example"
     collection_url = endpoint + "/collections/rivers"
-    client = RecordingJsonClient(
-        {collection_url: fixture_json("ogc/collection.json")}
-    )
+    client = RecordingJsonClient({collection_url: fixture_json("ogc/collection.json")})
     adapter = OgcFeaturesAdapter(get_json=client)
     source = adapter.load(
         Config(
@@ -22,8 +20,7 @@ def test_ogc_collection_items_link_becomes_service_resource() -> None:
     assert client.calls == [(collection_url, {})]
     assert source.metadata.title == "Rivers"
     assert (
-        source.candidates[0].uri
-        == "https://features.example/collections/rivers/items"
+        source.candidates[0].uri == "https://features.example/collections/rivers/items"
     )
     assert source.candidates[0].media_type == "application/geo+json"
     assert source.candidates[0].format == "ogc-api-features"
@@ -46,12 +43,8 @@ def test_ogc_search_uses_items_endpoint_and_standard_query_parameters() -> None:
         collection_id="rivers",
         get_json=client,
     )
-    results = adapter.search(
-        SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0), limit=10)
-    )
-    assert client.calls == [
-        (items_url, {"bbox": "139.0,35.0,140.0,36.0", "limit": 10})
-    ]
+    results = adapter.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0), limit=10))
+    assert client.calls == [(items_url, {"bbox": "139.0,35.0,140.0,36.0", "limit": 10})]
     assert results[0].title == "Example River"
     assert results[0].to_config() == Config(
         "ogc-features",
