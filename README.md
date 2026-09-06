@@ -4,6 +4,15 @@ Rhinestoneは、日本の公的・地理空間データを既存OSSから利用�
 
 Rhinestone自身はGISデータ処理エンジンを実装しません。GDAL、Rasterio、pyogrio等が読み込み・変換・解析を担い、Rhinestoneはそれらへ渡すURI、オプション、Resource選択を組み立てます。
 
+## インストール
+
+PyPIからインストールできます。
+
+```console
+python -m pip install rhinestone
+```
+
+RhinestoneのCoreは、HTTP通信やGISデータ処理ライブラリを直接固定依存しません。必要なruntime dependencyは利用者側で用意し、callback/factoryとして注入します。
 ## 基本的な使い方
 
 Rhinestoneが知っている組み込みSourceを選択します。
