@@ -98,8 +98,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
                     title=title,
                     description=_optional_string(properties.get("description")),
                     source_id=self.adapter_type,
-                    provider_settings={
-                        "endpoint": endpoint,
+                    settings={
                         "collection_id": self._collection_id,
                         "feature_id": feature_id,
                     },

@@ -1,6 +1,6 @@
 """e-Stat API 3.0 source adapter."""
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, cast
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
@@ -28,19 +28,35 @@ class EStatAdapter(ProviderAdapter):
         endpoint: str = DEFAULT_ENDPOINT,
         language: str = "J",
         api_key: Optional[str] = None,
+        credential_factory: Optional[Callable[[], str]] = None,
     ) -> None:
         if get_json is None:
             raise ConfigValidationError("get_json callback is required")
-        if app_id is not None and api_key is not None:
-            raise ConfigValidationError("Configure either app_id or api_key, not both")
+        configured = sum(
+            value is not None for value in (app_id, api_key, credential_factory)
+        )
+        if configured > 1:
+            raise ConfigValidationError(
+                "Configure only one of app_id, api_key, or credential_factory"
+            )
         credential = app_id if app_id is not None else api_key
-        super().__init__(get_json=get_json, endpoint=endpoint)
-        if not credential:
+        if credential is not None and not credential:
             raise ConfigValidationError("app_id/api_key must be a non-empty string")
+        super().__init__(get_json=get_json, endpoint=endpoint)
+        self._app_id = credential
+        self._credential_factory = credential_factory
         if language not in {"J", "E"}:
             raise ConfigValidationError("language must be J or E")
-        self._app_id = credential
         self._language = language
+
+    def _credential(self) -> str:
+        if self._credential_factory is not None:
+            value = self._credential_factory()
+        else:
+            value = self._app_id
+        if not isinstance(value, str) or not value:
+            raise ConfigValidationError("e-Stat credential must be configured")
+        return value
 
     def _estat(
         self, endpoint: str, operation: str, params: Mapping[str, Any]
@@ -64,7 +80,7 @@ class EStatAdapter(ProviderAdapter):
             endpoint,
             "getMetaInfo",
             {
-                "appId": self._app_id,
+                "appId": self._credential(),
                 "statsDataId": stats_data_id,
                 "lang": self._language,
             },
@@ -109,7 +125,7 @@ class EStatAdapter(ProviderAdapter):
                 f"Unsupported e-Stat search conditions: {', '.join(sorted(unsupported))}"
             )
         params: Dict[str, Any] = {
-            "appId": self._app_id,
+            "appId": self._credential(),
             "lang": self._language,
         }
         if query.text is not None:
@@ -129,7 +145,7 @@ class EStatAdapter(ProviderAdapter):
                     title=title,
                     description=_optional_string(table.get("DESCRIPTION")),
                     source_id=self.adapter_type,
-                    provider_settings={"stats_data_id": stats_data_id},
+                    settings={"stats_data_id": stats_data_id},
                     metadata=Metadata(
                         title=title,
                         publisher=_localized(table.get("GOV_ORG")),

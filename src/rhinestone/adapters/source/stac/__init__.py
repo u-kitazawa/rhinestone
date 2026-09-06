@@ -95,8 +95,7 @@ class StacAdapter(ProviderAdapter):
                     title=title,
                     description=_optional_string(properties.get("description")),
                     source_id=self.adapter_type,
-                    provider_settings={
-                        "endpoint": endpoint,
+                    settings={
                         "collection_id": collection_id,
                         "item_id": item_id,
                         "asset_key": asset_key,
