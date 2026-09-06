@@ -10,7 +10,7 @@
 
 ## Endpoint と認証
 
-解決には `getMetaInfo`、検索には `getStatsList` を使います。`http-json` dependency と、logical credential `estat` を注入します。認証情報は Provenance に保存されません。
+解決には `getMetaInfo`、検索には `getStatsList` を使います。HTTP通信はRhinestoneの組み込みtransportを使い、利用者はlogical credential `estat` だけを注入します。認証情報は Provenance に保存されません。
 
 ## 解決する例
 
@@ -21,7 +21,6 @@ from rhinestone import Config, configure, sources
 
 app = configure(
     sources=(sources.ESTAT,),
-    dependencies={"http-json": lambda: get_json},
     credentials={"estat": lambda: os.environ["ESTAT_APP_ID"]},
 )
 resource = app.resolve(Config("estat", {"stats_data_id": "table-id"}))
