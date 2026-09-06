@@ -11,7 +11,6 @@ from rhinestone.adapters import (
     DirectAdapter,
     EStatAdapter,
     GsiFundamentalAdapter,
-    GsiTileAdapter,
     OdptAdapter,
     OgcFeaturesAdapter,
     PlateauAdapter,

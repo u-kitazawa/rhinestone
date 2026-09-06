@@ -206,7 +206,7 @@ def test_duplicate_source_id_is_rejected_during_configuration() -> None:
 
 def test_direct_source_id_is_reserved() -> None:
     with pytest.raises(AdapterRegistrationError, match="direct"):
-        configure(sources=(SourceDefinition("direct", "gsi-tile"),))
+        configure(sources=(SourceDefinition("direct", "static"),))
 
 
 def test_unknown_built_in_adapter_type_is_rejected() -> None:
