@@ -25,3 +25,11 @@ jobs:
         env:
           NO_MKDOCS_2_WARNING: "1"
       - run: uv build
+      - name: Install and import the wheel with pip
+        shell: bash
+        run: |
+          wheel_venv="$RUNNER_TEMP/rhinestone-wheel"
+          python -m venv "$wheel_venv"
+          "$wheel_venv/bin/python" -m pip install --upgrade pip
+          "$wheel_venv/bin/python" -m pip install dist/*.whl
+          "$wheel_venv/bin/python" -c "from rhinestone import sources; assert sources.GSI.settings['items']['std']['metadata']['raw']['url'].endswith('/std/{z}/{x}/{y}.png')"
