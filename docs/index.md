@@ -69,11 +69,14 @@ with resource.open(adapter="rasterio") as dataset:
 - dependency: HTTP、GDAL、Rasterio、SDK等のruntime
 - credential: secret
 
+`SourceDefinition`、`Source`、`Resource`などの違いは[用語と概念](concepts.md)でまとめています。
+
 `direct`はexternal SourceではなくCore機能なので、`sources.ALL`と無関係に常時利用できます。
 
 ## 次に読む
 
 - [Getting started](getting-started.md)
+- [用語と概念](concepts.md)
 - [アプリケーションを構成する](configuration.md)
 - [データを検索する](search.md)
 - [Resourceを解決して開く](resolve-and-open.md)
