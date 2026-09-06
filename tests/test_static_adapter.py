@@ -136,3 +136,20 @@ def test_static_source_composes_through_public_api() -> None:
 def test_static_source_requires_items_in_composition() -> None:
     with pytest.raises(ConfigValidationError, match="requires items"):
         configure(sources=(SourceDefinition("catalog", "static"),))
+
+
+def test_static_adapter_validates_capabilities_and_provenance_objects() -> None:
+    invalid_capabilities = dict(item())
+    invalid_capabilities["capabilities"] = 1
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter({"one": invalid_capabilities})
+
+    invalid_capability = dict(item())
+    invalid_capability["capabilities"] = [1]
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter({"one": invalid_capability})
+
+    invalid_provenance = dict(item())
+    invalid_provenance["provenance"] = []
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter({"one": invalid_provenance})
