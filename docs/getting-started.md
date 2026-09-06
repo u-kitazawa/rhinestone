@@ -8,7 +8,7 @@ Rhinestoneは、組み込みSourceを選択し、検索・解決したResource�
 pip install rhinestone
 ```
 
-GDAL、Rasterio、pyogrio等はRhinestoneの固定依存ではありません。必要なruntimeだけを利用者側で用意します。
+HTTP通信はRhinestoneに組み込まれています。GDAL、Rasterio、pyogrio等は固定依存ではなく、必要なruntimeだけを利用者側で用意します。
 
 ## 組み込みSourceを使う
 
@@ -32,7 +32,6 @@ from rhinestone import configure, sources
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "http-json": lambda: get_json,
         "rasterio": lambda: rasterio,
     },
     credentials={
@@ -42,7 +41,7 @@ app = configure(
 )
 ```
 
-factoryは遅延評価されます。Sourceを構成しただけではruntimeやsecretを読み込みません。
+factoryは遅延評価されます。Sourceを構成しただけでは外部runtimeやsecretを読み込みません。
 
 ## Sourceを絞る
 
@@ -56,7 +55,6 @@ app = configure(
         sources.GEOSPATIAL_JP,
         sources.PLATEAU,
     ),
-    dependencies={"http-json": lambda: get_json},
 )
 ```
 
