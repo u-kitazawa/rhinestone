@@ -3,9 +3,52 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from types import MappingProxyType
-from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    FrozenSet,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    TypedDict,
+    Union,
+    cast,
+    overload,
+)
 
 from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
+
+if TYPE_CHECKING:
+    import geopandas  # pyright: ignore[reportMissingImports]
+    import rasterio  # pyright: ignore[reportMissingImports]
+    from osgeo import gdal  # pyright: ignore[reportMissingImports]
+
+
+LibraryName = Literal["gdal", "json-service", "pyogrio", "rasterio"]
+"""Execution runtime names accepted by the public open API."""
+
+DependencyValue = Union[object, Callable[[], Any]]
+"""An injected runtime object or a lazy factory returning one."""
+
+
+class Dependencies(TypedDict, total=False):
+    """IDE-discoverable names for supported external runtime dependencies."""
+
+    gdal: DependencyValue
+    """GDAL Python bindings used for raster, vector, and tile access."""
+
+    rasterio: DependencyValue
+    """Rasterio used for COG and GeoTIFF access."""
+
+    pyogrio: DependencyValue
+    """Pyogrio used for vector data access."""
+
+    rdflib: DependencyValue
+    """RDFLib used for DCAT catalog interpretation."""
 
 
 def _freeze(value: Any) -> Any:
@@ -141,17 +184,33 @@ class Resource:
     access_plan: AccessPlan
     source: Source
     local_path: Optional[str] = None
-    _opener: Optional[Callable[[Optional[str]], Any]] = field(
+    _opener: Optional[Callable[[LibraryName], object]] = field(
         default=None, repr=False, compare=False
     )
 
-    def open(self, adapter: Optional[str] = None) -> Any:
-        """Open this selected Resource through its configured application context."""
+    @overload
+    def open(self, library: Literal["rasterio"]) -> "rasterio.io.DatasetReader":
+        ...
+
+    @overload
+    def open(self, library: Literal["gdal"]) -> "gdal.Dataset":
+        ...
+
+    @overload
+    def open(self, library: Literal["pyogrio"]) -> "geopandas.GeoDataFrame":
+        ...
+
+    @overload
+    def open(self, library: Literal["json-service"]) -> object:
+        ...
+
+    def open(self, library: LibraryName) -> object:
+        """Open this Resource through the explicitly selected runtime library."""
         if self._opener is None:
             raise ExecutionAdapterUnavailableError(
                 "Resource is not bound to an execution context"
             )
-        return self._opener(adapter)
+        return self._opener(library)
 
 
 @dataclass(frozen=True)
@@ -178,9 +237,20 @@ class SearchResult:
     settings: Mapping[str, Any]
     metadata: Metadata
     provenance: Provenance
+    _resolver: Optional[Callable[[], Resource]] = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "settings", _freeze(self.settings))
 
     def to_config(self) -> Config:
         return Config(source_id=self.source_id, settings=self.settings)
+
+    def resolve(self) -> Resource:
+        """Resolve this result in the Rhinestone application that returned it."""
+        if self._resolver is None:
+            raise ConfigValidationError(
+                "SearchResult is not bound to a Rhinestone application"
+            )
+        return self._resolver()
