@@ -21,8 +21,8 @@ def load_catalog_resource(name: str) -> Any:
     ):
         raise ConfigValidationError("Catalog resource name must be a file name")
     try:
-        text = resources.files(_CATALOG_PACKAGE).joinpath(name).read_text(
-            encoding="utf-8"
+        text = (
+            resources.files(_CATALOG_PACKAGE).joinpath(name).read_text(encoding="utf-8")
         )
     except FileNotFoundError:
         raise ConfigValidationError(

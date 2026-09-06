@@ -54,7 +54,9 @@ def test_catalog_resource_rejects_invalid_names(name: Any) -> None:
         load_catalog_resource(name)
 
 
-def test_catalog_resource_errors_are_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_catalog_resource_errors_are_normalized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FakeResource:
         def __init__(self, text: str) -> None:
             self.text = text

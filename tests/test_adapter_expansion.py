@@ -38,10 +38,8 @@ from tests.test_resolution import make_source
 FIXTURES = Path(__file__).parent / "fixtures" / "expansion"
 
 
-
 def fail(*args: Any, **kwargs: Any) -> Any:
     raise ValueError("secret-in-underlying-error")
-
 
 
 def odpt_adapter() -> OdptAdapter:
