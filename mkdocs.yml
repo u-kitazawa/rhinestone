@@ -4,6 +4,7 @@ nav:
   - ホーム: index.md
   - はじめに:
       - インストールと最初の一歩: getting-started.md
+      - 用語と概念: concepts.md
       - アプリケーションを構成する: configuration.md
   - ガイド:
       - データを検索する: search.md
