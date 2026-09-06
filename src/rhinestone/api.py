@@ -24,7 +24,14 @@ from .adapters.source import (
 )
 from .errors import AdapterRegistrationError, ConfigValidationError
 from .execution import ExecutionAdapterSelector
-from .models import Config, Resource, SearchQuery, SearchResult, Source, SourceDefinition
+from .models import (
+    Config,
+    Resource,
+    SearchQuery,
+    SearchResult,
+    Source,
+    SourceDefinition,
+)
 from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .resolution import Resolver
