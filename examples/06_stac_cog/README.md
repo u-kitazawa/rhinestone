@@ -13,14 +13,11 @@ export RHINESTONE_STAC_ENDPOINT="https://your-stac.example"
 export RHINESTONE_STAC_COLLECTION_ID="collection-id"
 export RHINESTONE_STAC_ITEM_ID="item-id"
 export RHINESTONE_STAC_ASSET_KEY="data-asset-key"
-# Optional for protected APIs (choose one).
-export RHINESTONE_STAC_API_TOKEN="your-bearer-token"
-# export RHINESTONE_STAC_API_KEY="your-api-key"
-uv run python docs/examples/06_stac_cog/example.py
+uv run python examples/06_stac_cog/example.py
 ```
 
 The selected asset must advertise a COG media type containing
 `profile=cloud-optimized`; Rhinestone intentionally does not infer COG from a
-`.tif` suffix. The STAC server and asset must be publicly reachable unless your
-injected transport/runtime handles authentication. Tokens use `Authorization:
-Bearer ...`; API keys use `X-API-Key`.
+`.tif` suffix. HTTP metadata retrieval uses Rhinestone's built-in transport, so
+the STAC endpoint used by this public example must be reachable without custom
+transport injection.
