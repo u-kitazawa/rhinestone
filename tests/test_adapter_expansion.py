@@ -391,11 +391,11 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
     resource = app.resolve(config)
     assert not factory_calls
     assert resource.access_plan.kind == "service-query"
-    assert resource.open() == data
+    assert resource.open("json-service") == data
     assert calls["params"] == {"dc:title": "東京", "acl:consumerKey": "rotating-secret"}
     assert calls["allow_redirects"] is False
     assert "rotating-secret" not in repr(resource)
-    assert resource.open() == data
+    assert resource.open("json-service") == data
     assert len(factory_calls) == 2
     other = configure(
         sources=(sources.ODPT,),
