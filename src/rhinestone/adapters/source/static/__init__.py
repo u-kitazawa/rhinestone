@@ -1,6 +1,6 @@
 """Source adapter for repository-managed static service definitions."""
 
-from typing import Any, Dict, List, Mapping, Tuple, cast
+from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
 
 from ....errors import (
     ConfigValidationError,
@@ -213,5 +213,5 @@ class StaticAdapter(ProviderAdapter):
         )
 
 
-def _optional_string(value: Any) -> Any:
+def _optional_string(value: Any) -> Optional[str]:
     return value if isinstance(value, str) else None

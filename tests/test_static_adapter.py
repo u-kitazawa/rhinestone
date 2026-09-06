@@ -59,6 +59,7 @@ def test_static_adapter_search_is_deterministic_and_returns_configs() -> None:
 
     assert len(results) == 1
     assert results[0].to_config() == Config("static", {"id": "a"})
+    assert adapter.search(SearchQuery(text="absent")) == ()
 
 
 def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
@@ -72,6 +73,55 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
         adapter.search(SearchQuery(limit=-1))
 
 
+@pytest.mark.parametrize(
+    "items",
+    (
+        {},
+        [],
+        {"": item()},
+        {"one": []},
+        {"one": {"metadata": []}},
+        {"one": {"candidates": []}},
+        {"one": {"candidates": [{}]}},
+        {"one": {"candidates": [{"uri": "https://example.test", "format": 1}]}},
+        {
+            "one": {
+                "candidates": [
+                    {"uri": "https://example.test", "media_type": 1}
+                ]
+            }
+        },
+        {"one": {"candidates": [{"uri": "https://example.test", "attributes": []}]}},
+        {"one": {"capabilities": []}},
+        {"one": {"capabilities": [1]}},
+        {"one": {"provenance": []}},
+    ),
+)
+def test_static_adapter_rejects_invalid_catalog(items: Any) -> None:
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter(items)
+
+
+def test_static_adapter_rejects_invalid_candidate_shapes() -> None:
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter({"one": {"candidates": [1]}})
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter({"one": {"candidates": [{"uri": ""}]}})
+
+
+def test_static_adapter_rejects_invalid_metadata_and_query_parameters() -> None:
+    metadata_item = dict(item())
+    metadata_item["metadata"] = dict(metadata_item["metadata"])
+    metadata_item["metadata"]["raw"] = []
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter({"one": metadata_item}).load(Config("static", {"id": "one"}))
+
+    query_item = dict(item())
+    query_item["provenance"] = {"query_parameters": []}
+    with pytest.raises(ConfigValidationError):
+        StaticAdapter({"one": query_item}).load(Config("static", {"id": "one"}))
+
+
 def test_static_source_composes_through_public_api() -> None:
     source = SourceDefinition("catalog", "static", {"items": {"one": item()}})
     app = configure(sources=(source,))
@@ -81,3 +131,8 @@ def test_static_source_composes_through_public_api() -> None:
     assert resource.provenance.provider == "catalog"
     assert resource.provenance.adapter == "static"
     assert resource.uri == "https://example.test/one"
+
+
+def test_static_source_requires_items_in_composition() -> None:
+    with pytest.raises(ConfigValidationError, match="requires items"):
+        configure(sources=(SourceDefinition("catalog", "static"),))

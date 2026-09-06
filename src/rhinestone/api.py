@@ -196,11 +196,6 @@ def _build_source_adapter(
         if not isinstance(items, Mapping):
             raise ConfigValidationError("static source requires items")
         return StaticAdapter(cast(Mapping[str, Mapping[str, Any]], items))
-    if adapter_type == "gsi-tile":
-        _reject_options(adapter_type, settings, ())
-        from .adapters.source.gsi_tile import GsiTileAdapter
-
-        return GsiTileAdapter()
     if adapter_type == "gsi-fundamental":
         _reject_options(adapter_type, settings, ())
         return GsiFundamentalAdapter()
