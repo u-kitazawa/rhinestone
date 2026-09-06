@@ -4,7 +4,7 @@ from typing import Any, Dict, Mapping, Optional
 import pytest
 import rdflib
 
-from rhinestone import _http  # pyright: ignore[reportPrivateUsage]
+import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import ConfigValidationError
