@@ -2,8 +2,8 @@
 
 from typing import Dict, List, Tuple
 
-from .catalogs import CatalogSource, load_source_catalog
-from .models import SourceDefinition
+from .catalogs import BUILTIN as CATALOG, CatalogSource, load_source_catalog
+from .models import Provider
 
 _CATALOG: Tuple[CatalogSource, ...] = load_source_catalog()
 _BUILTINS: Dict[str, Provider] = {
