@@ -11,6 +11,7 @@ from rhinestone.models import (
     Provenance,
     Resource,
     ResourceCandidate,
+    SearchDiagnostic,
     SearchResult,
     Source,
     SourceDefinition,
@@ -167,3 +168,8 @@ def test_search_result_requires_a_discovery_source() -> None:
             metadata=Metadata(raw={}),
             provenance=Provenance(provider="direct", raw={}),
         )
+
+
+def test_search_diagnostic_requires_a_source_id() -> None:
+    with pytest.raises(ConfigValidationError, match="search diagnostic source_id"):
+        SearchDiagnostic(source_id="", skipped_conditions=frozenset({"text"}))
