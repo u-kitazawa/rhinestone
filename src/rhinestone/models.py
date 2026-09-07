@@ -264,7 +264,7 @@ class Result:
                 "Result is not bound to a Rhinestone application"
             )
         return self._resolver()
-\n\n# Advanced code may still use the descriptive internal spelling.\nSearchResult = Result\n
+
 
 # Advanced implementation code may use this descriptive alias.
 SearchResult = Result
