@@ -32,7 +32,7 @@ from rhinestone import configure, sources
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "rasterio": lambda: rasterio,
+        "rasterio": rasterio,
     },
     credentials={
         "estat": lambda: estat_app_id,
@@ -61,11 +61,9 @@ app = configure(
 ## 検索からResourceを解決する
 
 ```python
-from rhinestone import SearchQuery
-
-results = app.search(SearchQuery(text="河川", limit=5))
-result = results["geospatial-jp"][0]
-resource = app.resolve(result.to_config())
+results = app.search("河川")
+result = results[0]
+resource = result.resolve()
 ```
 
 検索結果は`source_id`と、そのSource内の対象を識別する`settings`だけをConfigへ引き継ぎます。endpointなどのSource定義はConfigへ複製しません。

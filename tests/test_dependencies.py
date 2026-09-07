@@ -40,3 +40,10 @@ def test_dependency_factory_failure_preserves_the_cause() -> None:
         registry.get("gdal")
 
     assert captured.value.__cause__ is import_error
+
+
+def test_concrete_dependency_is_available_without_factory_evaluation() -> None:
+    runtime = object()
+    registry = DependencyRegistry({"rasterio": runtime})
+
+    assert registry.get("rasterio") is runtime

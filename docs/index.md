@@ -29,15 +29,15 @@ Rhinestone自身が新しいGISエンジンやDataFrameを作るわけではあ�
 ### 何を使うか探したい
 
 ```python
-from rhinestone import SearchQuery, configure, sources
+from rhinestone import configure, sources
 
 app = configure(
     sources=sources.ALL,
 )
 
-results = app.search(SearchQuery(text="河川", limit=5))
-result = results["geospatial-jp"][0]
-resource = app.resolve(result.to_config())
+results = app.search("河川")
+result = results[0]
+resource = result.resolve()
 
 print(resource.uri)
 print(resource.format)
@@ -103,13 +103,13 @@ from rhinestone import configure, sources
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "rasterio": lambda: rasterio,
+        "rasterio": rasterio,
     },
 )
 
 resource = app.resolve(...)
 
-with resource.open(adapter="rasterio") as dataset:
+with resource.open("rasterio") as dataset:
     ...
 ```
 

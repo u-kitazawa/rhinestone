@@ -12,7 +12,7 @@ item_id = os.environ["RHINESTONE_STAC_ITEM_ID"]
 asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
 app = configure(
     sources=(SourceDefinition("earth-search", "stac", {"endpoint": endpoint}),),
-    dependencies={"rasterio": lambda: rasterio},
+    dependencies={"rasterio": rasterio},
 )
 resource = app.resolve(
     Config(
@@ -25,7 +25,7 @@ resource = app.resolve(
     )
 )
 
-with resource.open(adapter="rasterio") as dataset:
+with resource.open("rasterio") as dataset:
     print("resource:", resource.uri)
     print("metadata:", resource.metadata)
     print("raster size:", dataset.width, dataset.height)

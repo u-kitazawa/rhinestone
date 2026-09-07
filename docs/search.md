@@ -1,6 +1,6 @@
 # データを検索する
 
-`app.search()`は、構成済みで検索Capabilityを持つSourceを横断して検索します。戻り値は`source_id`ごとにグループ化された`SearchResult`の辞書です。HTTP通信はRhinestoneの組み込みtransportを使います。
+`app.search()`は、構成済みで検索Capabilityを持つSourceを横断して検索します。文字列を渡す通常経路では`SearchResult`のsequenceを返し、`results[0]`で最初の結果を取得できます。HTTP通信はRhinestoneの組み込みtransportを使います。Sourceごとの高度な参照では`results["source-id"]`、`items()`、`keys()`を利用できます。
 
 ## 組み込みSourceを検索する
 
@@ -14,7 +14,8 @@ app = configure(
     credentials={"estat": lambda: os.environ["ESTAT_APP_ID"]},
 )
 
-results_by_source = app.search(SearchQuery(text="人口", limit=10))
+results = app.search("人口")
+selected = results[0]
 ```
 
 e-Statのapplication IDはcredentialとして渡します。SourceDefinitionや検索結果へsecretを保存しません。
@@ -22,16 +23,16 @@ e-Statのapplication IDはcredentialとして渡します。SourceDefinitionや�
 ## 結果を選ぶ
 
 ```python
-for source_id, results in results_by_source.items():
+for source_id, source_results in results.items():
     print(source_id)
-    for index, result in enumerate(results):
+    for index, result in enumerate(source_results):
         print(index, result.title)
 
-ckan_results = results_by_source.get("geospatial-jp", ())
+ckan_results = results.get("geospatial-jp", ())
 if not ckan_results:
     raise LookupError("該当するデータが見つかりませんでした")
 
-selected = ckan_results[0]
+selected = results[0]
 ```
 
 `SearchResult`は`source_id`と、そのSource内の対象を表す`settings`を保持します。endpointなどSourceDefinition側の値は検索結果へ複製しません。
@@ -40,7 +41,7 @@ selected = ckan_results[0]
 
 ```python
 config = selected.to_config()
-resource = app.resolve(config)
+resource = selected.resolve()
 
 print(config.source_id)
 print(config.settings)

@@ -57,16 +57,16 @@ HTTP metadata取得にも組み込みtransportが使われます。通常のGett
 
 ## runtime dependency
 
-Rhinestoneが実装しない外部runtimeだけをfactoryとして渡します。
+Rhinestoneが実装しない外部runtimeだけを、実体または遅延factoryとして渡します。
 
 ```python
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "rdflib": lambda: rdflib,
-        "gdal": lambda: gdal,
-        "rasterio": lambda: rasterio,
-        "pyogrio": lambda: pyogrio,
+        "rdflib": rdflib,
+        "gdal": gdal,
+        "rasterio": rasterio,
+        "pyogrio": pyogrio,
     },
 )
 ```

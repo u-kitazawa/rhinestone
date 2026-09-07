@@ -12,7 +12,7 @@ PyPIからインストールできます。
 python -m pip install rhinestone
 ```
 
-HTTP通信はRhinestoneに組み込まれています。GISデータ処理やRDF解釈などの外部runtime dependencyだけを利用者側で用意し、callback/factoryとして注入します。
+HTTP通信はRhinestoneに組み込まれています。GISデータ処理やRDF解釈などの外部runtime dependencyだけを利用者側で用意し、実体または遅延factoryとして注入します。
 
 ## 基本的な使い方
 
@@ -24,7 +24,7 @@ from rhinestone import configure, sources
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "rasterio": lambda: rasterio,
+        "rasterio": rasterio,
     },
     credentials={
         "estat": lambda: estat_app_id,
@@ -46,11 +46,9 @@ app = configure(
 検索からResourceまでは同じ流れで接続します。
 
 ```python
-from rhinestone import SearchQuery
-
-results = app.search(SearchQuery(text="河川", limit=5))
-result = results["geospatial-jp"][0]
-resource = app.resolve(result.to_config())
+results = app.search("河川")
+result = results[0]
+resource = result.resolve()
 ```
 
 ## 設計上の境界

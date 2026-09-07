@@ -140,4 +140,18 @@ def test_unbound_resource_cannot_open_without_execution_context() -> None:
     )
 
     with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
-        resource.open()
+        resource.open("gdal")
+
+
+def test_unbound_search_result_cannot_resolve() -> None:
+    result = SearchResult(
+        title="Dataset",
+        description=None,
+        source_id="direct",
+        settings={},
+        metadata=Metadata(raw={}),
+        provenance=Provenance(provider="direct", raw={}),
+    )
+
+    with pytest.raises(ConfigValidationError, match="not bound"):
+        result.resolve()

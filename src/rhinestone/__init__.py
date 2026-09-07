@@ -5,7 +5,9 @@ from .api import Rhinestone, configure
 from .models import (
     AccessPlan,
     Config,
+    Dependencies,
     FileAccessPlan,
+    LibraryName,
     Metadata,
     Provenance,
     RemoteDatasetPlan,
@@ -17,11 +19,14 @@ from .models import (
     Source,
     SourceDefinition,
 )
+from .search import SearchResults
 
 __all__ = [
     "AccessPlan",
     "Config",
+    "Dependencies",
     "FileAccessPlan",
+    "LibraryName",
     "Metadata",
     "Provenance",
     "RemoteDatasetPlan",
@@ -30,6 +35,7 @@ __all__ = [
     "ResourceCandidate",
     "SearchQuery",
     "SearchResult",
+    "SearchResults",
     "ServiceQueryPlan",
     "Source",
     "SourceDefinition",

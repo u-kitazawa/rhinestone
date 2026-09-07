@@ -3,6 +3,7 @@
 from typing import Any, FrozenSet, Iterable, Optional
 
 from .errors import ExecutionAdapterUnavailableError
+from .models import LibraryName
 
 
 class ExecutionAdapterSelector:
@@ -13,7 +14,7 @@ class ExecutionAdapterSelector:
         self,
         resource: Any,
         dependencies: FrozenSet[str],
-        requested: Optional[str] = None,
+        requested: Optional[LibraryName] = None,
     ) -> Any:
         compatible = [
             adapter

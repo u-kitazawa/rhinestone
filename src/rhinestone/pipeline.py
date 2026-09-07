@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from .errors import ProviderMetadataError, RhinestoneError
 from .execution import ExecutionAdapterSelector
-from .models import Config, Resource
+from .models import Config, LibraryName, Resource
 from .registry import AdapterRegistry, DependencyRegistry
 from .resolution import Resolver
 
@@ -39,28 +39,28 @@ class AccessPipeline:
         selector = self._execution_selector
         dependencies = self._dependencies
 
-        def open_resource(requested: Optional[str]) -> Any:
-            return self._open_resource(resource, requested, selector, dependencies)
+        def open_resource(library: LibraryName) -> object:
+            return self._open_resource(resource, library, selector, dependencies)
 
         return replace(
             resource,
             _opener=open_resource,
         )
 
-    def open(self, config: Config, adapter: Optional[str] = None) -> Any:
-        return self.resolve(config).open(adapter=adapter)
+    def open(self, config: Config, library: LibraryName) -> object:
+        return self.resolve(config).open(library)
 
     @staticmethod
     def _open_resource(
         resource: Resource,
-        requested: Optional[str],
+        library: LibraryName,
         selector: ExecutionAdapterSelector,
         dependencies: DependencyRegistry,
     ) -> Any:
         selected = selector.select(
             resource,
             dependencies.available,
-            requested=requested,
+            requested=library,
         )
         runtime = dependencies.get(selected.name)
         return selected.open(resource, runtime)

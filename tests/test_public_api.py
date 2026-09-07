@@ -40,7 +40,7 @@ def test_direct_and_execution_adapters_are_built_in() -> None:
     resource = app.resolve(direct_config())
 
     assert calls == []
-    assert resource.open() == "opened:https://example.test/dataset.tif"
+    assert resource.open("rasterio") == "opened:https://example.test/dataset.tif"
     assert calls == ["load"]
 
 
@@ -62,7 +62,7 @@ def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
 
     resource = app.resolve(direct_config())
 
-    assert resource.open(adapter="rasterio").startswith("rasterio:")
+    assert resource.open("rasterio").startswith("rasterio:")
     assert selected == []
 
 
@@ -173,7 +173,7 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
 
     grouped = app.search(SearchQuery(text="dataset", limit=1))
 
-    assert tuple(grouped) == ("catalog-a", "catalog-b")
+    assert tuple(grouped.keys()) == ("catalog-a", "catalog-b")
     result = grouped["catalog-a"][0]
     assert result.source_id == "catalog-a"
     assert result.settings == {"resource_id": "first-resource"}
@@ -185,6 +185,18 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     assert resolved.provenance.adapter == "ckan"
     assert any(url.startswith("https://first.test") for url in requests)
     assert any(url.startswith("https://second.test") for url in requests)
+    assert len(grouped) == 2
+    assert list(grouped) == [grouped[0], grouped[1]]
+    assert grouped[0].source_id == "catalog-a"
+    assert tuple(grouped[:1]) == (grouped[0],)
+    assert grouped.get("catalog-a") == grouped["catalog-a"]
+    assert grouped.get("missing") == ()
+    assert tuple(grouped.values())[0] == grouped["catalog-a"]
+    assert tuple(grouped.items())[0][0] == "catalog-a"
+
+    simple = app.search("dataset")
+    assert simple[0].title == "first"
+    assert simple[0].resolve().provenance.provider == "catalog-a"
 
 
 def test_public_search_exposes_unsupported_conditions_as_domain_error() -> None:
@@ -216,8 +228,25 @@ def test_configured_contexts_do_not_share_runtime_instances() -> None:
     first = configure(dependencies={"rasterio": lambda: first_runtime})
     second = configure(dependencies={"rasterio": lambda: second_runtime})
 
-    assert first.resolve(direct_config()).open().startswith("first:")
-    assert second.resolve(direct_config()).open().startswith("second:")
+    assert first.resolve(direct_config()).open("rasterio").startswith("first:")
+    assert second.resolve(direct_config()).open("rasterio").startswith("second:")
+
+
+def test_concrete_dependency_object_is_accepted() -> None:
+    runtime = FakeRasterio("direct")
+    app = configure(dependencies={"rasterio": runtime})
+
+    resource = app.resolve(direct_config())
+
+    assert resource.open("rasterio") == "direct:https://example.test/dataset.tif"
+
+
+def test_resource_open_requires_a_library_name() -> None:
+    app = configure(dependencies={"rasterio": FakeRasterio("runtime")})
+    resource = app.resolve(direct_config())
+
+    with pytest.raises(TypeError):
+        resource.open()  # type: ignore[call-arg]
 
 
 def test_legacy_provider_composition_api_is_not_public() -> None:

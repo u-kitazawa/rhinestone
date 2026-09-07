@@ -12,7 +12,7 @@ from rhinestone import configure, sources
 app = configure(
     sources=sources.ALL,
     dependencies={
-        "rasterio": lambda: rasterio,
+        "rasterio": rasterio,
     },
     credentials={
         "estat": lambda: estat_app_id,
@@ -28,7 +28,7 @@ HTTP transportはRhinestoneに組み込まれています。
 | 引数 | 型 | 説明 |
 | --- | --- | --- |
 | `sources` | `Iterable[SourceDefinition]` | 利用するexternal Source。既定は空。`direct`は別途常時利用可能。|
-| `dependencies` | `Mapping[str, Callable[[], Any]] \| None` | GDAL、Rasterio、RDFLib等の外部runtimeを返すfactory。|
+| `dependencies` | `Dependencies \| None` | GDAL、Rasterio、pyogrio、RDFLib等の外部runtime。実体またはfactoryを指定する。|
 | `credentials` | `Mapping[str, Callable[[], str]] \| None` | logical credential名とsecret factory。|
 
 runtimeとcredentialのfactoryは遅延評価されます。Source metadata、DCAT文書、JSON serviceのHTTP通信にdependency登録は不要です。
@@ -67,8 +67,8 @@ SourceDefinition(
 | メソッド | 戻り値 | 説明 |
 | --- | --- | --- |
 | `resolve(config: Config)` | `Resource` | Configを解決する。データは開かない。|
-| `open(config: Config, adapter: str \| None = None)` | `Any` | 解決後にExecution Adapterで開く。|
-| `search(query: SearchQuery)` | `Mapping[str, tuple[SearchResult, ...]]` | 検索可能な構成済みSourceを横断検索する。|
+| `open(config: Config, library: LibraryName)` | `Any` | 解決後にExecution Adapterで開く。|
+| `search(query: SearchQuery \| str)` | `SearchResults` | 検索可能な構成済みSourceを横断検索する。sequenceとしてもSource別groupとしても利用できる。|
 
 ## モデル
 
@@ -84,6 +84,8 @@ SourceDefinition(
 | `SearchQuery` | `supplied_conditions` | 指定済み条件名の読み取り専用集合。|
 | `SearchResult` | `title`, `description`, `source_id`, `settings`, `metadata`, `provenance` | 検索結果。Source endpointは`settings`へ複製しない。|
 | `SearchResult` | `to_config() -> Config` | 通常の解決フローへ戻すConfigを作る。|
+| `SearchResult` | `resolve() -> Resource` | `app.search()`から得た結果を直接解決する。|
+| `SearchResults` | sequence / source group access | `results[0]`、`results["source-id"]`、`items()`で利用する。|
 
 ### 解決結果
 
