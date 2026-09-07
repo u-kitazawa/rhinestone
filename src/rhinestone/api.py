@@ -151,9 +151,7 @@ class Rhinestone:
         return self._pipeline.open(config, library=library)
 
     def search(self, query: Union[SearchQuery, str]) -> SearchResults:
-        normalized_query = (
-            SearchQuery(text=query) if isinstance(query, str) else query
-        )
+        normalized_query = SearchQuery(text=query) if isinstance(query, str) else query
         grouped = self._search.search(normalized_query)
         typed_grouped = cast(
             Mapping[str, Tuple[SearchResult, ...]],
