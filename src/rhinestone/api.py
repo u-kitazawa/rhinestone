@@ -15,7 +15,6 @@ from typing import (
 )
 
 from . import _http
-from .catalogs import Catalog
 from .adapters.execution import (
     GdalAdapter,
     JsonServiceAdapter,
@@ -35,6 +34,7 @@ from .adapters.source import (
     StacAdapter,
     StaticAdapter,
 )
+from .catalogs import Catalog
 from .errors import AdapterRegistrationError, ConfigValidationError
 from .execution import ExecutionAdapterSelector
 from .models import (
@@ -163,7 +163,9 @@ class Rhinestone:
         config = value.to_config() if isinstance(value, Result) else value
         return self._pipeline.resolve(config)
 
-    def open(self, value: Union[Config, Result, Resource], library: LibraryName) -> object:
+    def open(
+        self, value: Union[Config, Result, Resource], library: LibraryName
+    ) -> object:
         """Open a Resource, or resolve a Config/Result and open it."""
         resource = value if isinstance(value, Resource) else self.resolve(value)
         return resource.open(library)
@@ -178,7 +180,9 @@ class Rhinestone:
         limit: Optional[int] = None,
     ) -> SearchResults:
         supplied_parameters = (text, bbox, time, limit)
-        if query is not None and any(parameter is not None for parameter in supplied_parameters):
+        if query is not None and any(
+            parameter is not None for parameter in supplied_parameters
+        ):
             raise TypeError("pass either query or search parameters, not both")
         if query is None:
             normalized_query = SearchQuery(text=text, bbox=bbox, time=time, limit=limit)

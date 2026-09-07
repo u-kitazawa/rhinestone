@@ -59,6 +59,7 @@ class Catalog:
         """Return a new catalog with additional Providers."""
         return Catalog((*self.providers, *providers))
 
+
 @dataclass(frozen=True)
 class CatalogSource:
     """A catalog entry with its public facade name."""

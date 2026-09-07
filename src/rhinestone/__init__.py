@@ -6,12 +6,12 @@ from .catalogs import Catalog
 from .models import (
     AccessPlan,
     Config,
-    Provider,
     Dependencies,
     FileAccessPlan,
     LibraryName,
     Metadata,
     Provenance,
+    Provider,
     RemoteDatasetPlan,
     Resource,
     ResourceCandidate,

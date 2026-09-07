@@ -31,9 +31,7 @@ class SearchResults(Sequence[Result]):
         )
 
     @classmethod
-    def from_grouped(
-        cls, grouped: Mapping[str, Tuple[Result, ...]]
-    ) -> "SearchResults":
+    def from_grouped(cls, grouped: Mapping[str, Tuple[Result, ...]]) -> "SearchResults":
         return cls(grouped)
 
     @overload
