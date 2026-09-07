@@ -6,7 +6,7 @@ from importlib import resources
 from typing import Any, Iterable, List, Mapping, Tuple, cast
 
 from ..errors import ConfigValidationError
-from ..models import Provider, SourceDefinition
+from ..models import Provider
 
 _CATALOG_PACKAGE = "rhinestone.catalogs"
 
@@ -117,7 +117,7 @@ def load_source_catalog(
         entries.append(
             CatalogSource(
                 name=public_name,
-                definition=SourceDefinition(
+                definition=Provider(
                     id=raw_id,
                     adapter_type=adapter_type,
                     settings=settings,
@@ -129,7 +129,7 @@ def load_source_catalog(
 
 def load_source_definitions(
     name: str = "sources.json",
-) -> Tuple[SourceDefinition, ...]:
+) -> Tuple[Provider, ...]:
     """Load built-in Source definitions in catalog order."""
     return tuple(entry.definition for entry in load_source_catalog(name))
 
