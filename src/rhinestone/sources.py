@@ -28,4 +28,4 @@ def __dir__() -> List[str]:
     return sorted(set(globals()) | set(_BY_NAME))
 
 
-__all__ = ["ALL", "CATALOG", *sorted(_BY_NAME)]  # pyright: ignore[reportUnsupportedDunderAll]
+__all__ = ["ALL", *sorted(_BY_NAME)]  # pyright: ignore[reportUnsupportedDunderAll]
