@@ -1,80 +1,51 @@
-# Resource を解決して開く
+# Resourceを解決して開く
 
-Rhinestone の処理は二段階です。まず `resolve()` が provider の情報から `Resource` を
-決定し、次に `open()` が登録済み runtime へ渡します。データを開かずに URI、metadata、
-Provenance だけを使うこともできます。
+Rhinestoneの通常フローは`Result -> Resource -> Data`です。
 
-## 1. Config を解決する
+## ResultをResourceへ解決する
 
 ```python
-from rhinestone import Config
+result = app.search(text="河川")[0]
+resource = app.resolve(result)
+```
 
-resource = app.resolve(
-    Config(
-        source_id="direct",
-        settings={
-            "uri": "https://example.invalid/boundaries.geojson",
-            "format": "geojson",
-            "media_type": "application/geo+json",
-        },
-    )
+`Resource`にはURIだけでなく、format、metadata、provenance、アクセス方法が含まれます。検索結果を解決するためにConfigを組み立てる必要はありません。
+
+## Runtimeで開く
+
+開くRuntimeを明示します。
+
+```python
+import rasterio
+
+app = configure(
+    catalog=BUILTIN,
+    dependencies={"rasterio": rasterio},
 )
-```
-
-解決後は、次の情報を確認できます。
-
-```python
-print(resource.uri)                   # 開く対象の URI
-print(resource.format)                # 例: geojson, cog, shapefile
-print(resource.media_type)            # provider が示した media type
-print(resource.metadata)              # title、license、publisher など
-print(resource.provenance)            # provider、元 URL、API endpoint など
-print(resource.access_plan)           # file / service-query などのアクセス方法
-```
-
-`ConfigValidationError` は Config の値が不足・不正なとき、`AmbiguousResourceError` は
-候補を一意に選べないときに発生します。推測に頼らず、resource ID、format、archive
-entry point などを明示してください。
-
-## 2. Runtime で開く
-
-Rasterio を登録した COG/GeoTIFF Resource は、次のように開きます。
-
-```python
+resource = app.resolve(result)
 with resource.open("rasterio") as dataset:
-    print(dataset.width, dataset.height)
+    ...
 ```
 
-`open()`にはruntime library名を必ず指定します。RhinestoneがResourceに対して自動選択することはありません。複数の
-runtime を登録して再現性を保ちたい場合は、名前を指定してください。
+またはアプリケーションに解決とopenをまとめて依頼できます。
 
 ```python
-dataset = resource.open("gdal")
+dataset = app.open(result, "rasterio")
 ```
 
-対応する runtime が未登録、または format が非対応の場合は
-`ExecutionAdapterUnavailableError` になります。対応組み合わせは
-[対応状況](compatibility.md)で確認してください。
+RhinestoneはGIS I/O、形式変換、空間演算、解析を行いません。選択済みResourceを利用者が所有するRuntimeへ渡します。
 
-## 3. 一度に実行する
+## 高度な直接解決
 
-中間の Resource が不要なら、`app.open(config, adapter=...)` を使えます。
+Provider固有の対象指定を再現可能なConfigとして扱う必要がある場合だけ、`Config`を使います。
 
 ```python
-dataset = app.open(config, library="gdal")
+resource = app.resolve(Config(
+    source_id="direct",
+    settings={
+        "uri": "https://example.invalid/data.geojson",
+        "format": "geojson",
+        "media_type": "application/geo+json",
+    },
+))
 ```
-
-ただし、license、配布元、選ばれた URI を記録したいときは、先に `resolve()` して
-`Resource` を保存・確認する方法を推奨します。
-
-## 典型的な失敗
-
-| 状況 | 確認すること |
-| --- | --- |
-| `UnsupportedSourceError` | `source_id`に対応するproviderが構成されているか |
-| `ConfigValidationError` | 必須設定、format、entry point、credential 名が正しいか |
-| `ProviderMetadataError` | API endpoint、ネットワーク、認証情報を確認する |
-| `ExecutionAdapterUnavailableError` | dependency 名と対応 format を確認する |
-| `DependencyUnavailableError` | `dependencies` に runtime object または factory が登録されているか、factory が import に成功するか |
-
-より具体的な provider の設定は [Source Adapter 一覧](api/source-adapters.md) を参照してください。
