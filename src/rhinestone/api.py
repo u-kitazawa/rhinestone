@@ -75,7 +75,7 @@ class _ConfiguredSourceAdapter:
 
     def search(self, query: SearchQuery) -> Tuple[Result, ...]:
         search_method = getattr(self._adapter, "search")
-        search = cast(Callable[[SearchQuery], Tuple[SearchResult, ...]], search_method)
+        search = cast(Callable[[SearchQuery], Tuple[Result, ...]], search_method)
         return tuple(
             replace(
                 result,
