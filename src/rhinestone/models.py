@@ -1,4 +1,4 @@
-"""Provider-independent domain models."""
+"""Domain models, including the small public vocabulary."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -253,6 +253,7 @@ class SearchResult:
         """Resolve this result in the Rhinestone application that returned it."""
         if self._resolver is None:
             raise ConfigValidationError(
-                "SearchResult is not bound to a Rhinestone application"
+                "Result is not bound to a Rhinestone application"
             )
         return self._resolver()
+\n\n# Advanced code may still use the descriptive internal spelling.\nSearchResult = Result\n
