@@ -3,7 +3,15 @@ from typing import Any, Dict, List, Mapping, Optional
 import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
-from rhinestone import Catalog, Config, Provider, SearchQuery, SourceDefinition, configure, sources
+from rhinestone import (
+    Catalog,
+    Config,
+    Provider,
+    SearchQuery,
+    SourceDefinition,
+    configure,
+    sources,
+)
 from rhinestone.errors import (
     AdapterRegistrationError,
     UnsupportedSearchConditionError,
@@ -290,4 +298,7 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
 
     resource = app.resolve(direct_config())
     assert app.open(resource, "rasterio") == "runtime:https://example.test/dataset.tif"
-    assert app.open(direct_config(), "rasterio") == "runtime:https://example.test/dataset.tif"
+    assert (
+        app.open(direct_config(), "rasterio")
+        == "runtime:https://example.test/dataset.tif"
+    )
