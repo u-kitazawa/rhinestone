@@ -16,10 +16,10 @@ from typing import (
 )
 
 from .errors import UnsupportedSearchConditionError
-from .models import Config, Resource, SearchQuery, SearchResult
+from .models import Config, Resource, Result, SearchQuery
 
 
-class SearchResults(Sequence[SearchResult]):
+class Results(Sequence[SearchResult]):
     """Sequence-like search results with optional source-grouped access."""
 
     def __init__(self, grouped: Mapping[str, Tuple[SearchResult, ...]]) -> None:
