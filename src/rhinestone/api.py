@@ -1,7 +1,17 @@
 """Public composition API."""
 
 from dataclasses import replace
-from typing import Any, Callable, FrozenSet, Iterable, Mapping, Optional, Tuple, Union, cast
+from typing import (
+    Any,
+    Callable,
+    FrozenSet,
+    Iterable,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from . import _http
 from .adapters.execution import (
