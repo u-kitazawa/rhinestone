@@ -93,19 +93,14 @@ class Rhinestone:
         self,
         *,
         sources: Iterable[Provider] = (),
-        providers: Optional[Iterable[Provider]] = None,
         catalog: Optional[Catalog] = None,
         dependencies: Optional[Mapping[str, DependencyValue]] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     ) -> None:
         selected_sources = tuple(sources)
-        if providers is not None:
-            if selected_sources:
-                raise TypeError("pass either providers or sources, not both")
-            selected_sources = tuple(providers)
         if catalog is not None:
-            if selected_sources or providers is not None:
-                raise TypeError("pass either catalog or providers/sources, not both")
+            if selected_sources:
+                raise TypeError("pass either catalog or sources, not both")
             selected_sources = tuple(catalog)
 
         runtime_dependencies = dict(dependencies or {})
@@ -201,7 +196,6 @@ class Rhinestone:
 def configure(
     *,
     sources: Iterable[Provider] = (),
-    providers: Optional[Iterable[Provider]] = None,
     catalog: Optional[Catalog] = None,
     dependencies: Optional[Mapping[str, DependencyValue]] = None,
     credentials: Optional[Mapping[str, Callable[[], str]]] = None,
@@ -209,7 +203,6 @@ def configure(
     """Compose built-in adapters around selected sources and runtime inputs."""
     return Rhinestone(
         sources=sources,
-        providers=providers,
         catalog=catalog,
         dependencies=dependencies,
         credentials=credentials,
