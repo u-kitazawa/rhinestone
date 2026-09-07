@@ -103,7 +103,7 @@ class Rhinestone:
 
         configured_sources = [_ConfiguredSourceAdapter("direct", DirectAdapter())]
         configured_ids = {"direct"}
-        for source_definition in sources:
+        for source_definition in selected_sources:
             source_id = source_definition.id
             if source_id in configured_ids:
                 raise AdapterRegistrationError(
@@ -175,7 +175,7 @@ def configure(
 
 
 def _build_source_adapter(
-    source: SourceDefinition,
+    source: Provider,
     dependencies: DependencyRegistry,
     credentials: CredentialRegistry,
 ) -> ProviderAdapter:
