@@ -97,11 +97,14 @@ class OgcFeaturesAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    source_id=self.adapter_type,
-                    settings={
-                        "collection_id": self._collection_id,
-                        "feature_id": feature_id,
-                    },
+                    discovered_by=self.adapter_type,
+                    target=Config(
+                        self.adapter_type,
+                        {
+                            "collection_id": self._collection_id,
+                            "feature_id": feature_id,
+                        },
+                    ),
                     metadata=Metadata(title=title, raw=feature),
                     provenance=Provenance(
                         provider="ogc-features",

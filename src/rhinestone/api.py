@@ -31,6 +31,7 @@ from .adapters.source import (
     OgcFeaturesAdapter,
     PlateauAdapter,
     ProviderAdapter,
+    SearchCkanJpAdapter,
     StacAdapter,
     StaticAdapter,
 )
@@ -79,8 +80,17 @@ class _ConfiguredSourceAdapter:
         return tuple(
             replace(
                 result,
-                source_id=self.source_id,
-                provenance=replace(result.provenance, provider=self.source_id),
+                discovered_by=self.source_id,
+                target=(
+                    Config(self.source_id, result.target.settings)
+                    if result.target.source_id == self.adapter_type
+                    else result.target
+                ),
+                provenance=(
+                    replace(result.provenance, provider=self.source_id)
+                    if result.target.source_id == self.adapter_type
+                    else result.provenance
+                ),
             )
             for result in search(query)
         )
@@ -155,8 +165,22 @@ class Rhinestone:
 
     def resolve(self, value: Union[Config, Result]) -> Resource:
         """Resolve a Provider selection or a search Result into a Resource."""
-        config = value.to_config() if isinstance(value, Result) else value
-        return self._pipeline.resolve(config)
+        if not isinstance(value, Result):
+            return self._pipeline.resolve(value)
+        resource = self._pipeline.resolve(value.to_config())
+        if value.discovered_by == value.target.source_id:
+            return resource
+        source = replace(
+            resource.source,
+            metadata=value.metadata,
+            provenance=value.provenance,
+        )
+        return replace(
+            resource,
+            metadata=value.metadata,
+            provenance=value.provenance,
+            source=source,
+        )
 
     def open(
         self, value: Union[Config, Result, Resource], library: LibraryName
@@ -188,12 +212,7 @@ class Rhinestone:
             normalized_query = SearchQuery(text=query)
         else:
             normalized_query = query
-        grouped = self._search.search(normalized_query)
-        typed_grouped = cast(
-            Mapping[str, Tuple[Result, ...]],
-            grouped,
-        )
-        return SearchResults.from_grouped(typed_grouped).bind_resolver(self.resolve)
+        return self._search.search(normalized_query).bind_resolver(self.resolve)
 
 
 def configure(
@@ -252,6 +271,9 @@ def _build_source_adapter(
         if not isinstance(items, Mapping):
             raise ConfigValidationError("static source requires items")
         return StaticAdapter(cast(Mapping[str, Mapping[str, Any]], items))
+    if adapter_type == "search-ckan-jp":
+        _reject_options(adapter_type, settings, ("endpoint",))
+        return SearchCkanJpAdapter(get_json=json_transport, **settings)
     if adapter_type == "gsi-fundamental":
         _reject_options(adapter_type, settings, ())
         return GsiFundamentalAdapter()

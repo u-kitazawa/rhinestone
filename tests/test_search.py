@@ -1,8 +1,5 @@
 from typing import List, Tuple
 
-import pytest
-
-from rhinestone.errors import UnsupportedSearchConditionError
 from rhinestone.models import SearchQuery
 from rhinestone.search import SearchCoordinator
 
@@ -41,16 +38,20 @@ def test_search_calls_only_adapters_declaring_search_capability() -> None:
 
     assert searchable.queries == [query]
     assert resolve_only.called is False
-    assert tuple(grouped) == ("searchable",)
+    assert tuple(grouped.keys()) == ("searchable",)
 
 
-def test_unsupported_search_condition_is_not_silently_ignored() -> None:
-    """Provider が扱えない bbox 条件で誤った検索結果を返さないために必要である。"""
-    coordinator = SearchCoordinator((SearchableAdapter(),))
+def test_unsupported_search_condition_is_reported_and_projected() -> None:
+    """非対応条件を診断可能にし、対応条件だけをproviderへ渡すために必要である。"""
+    searchable = SearchableAdapter()
+    coordinator = SearchCoordinator((searchable,))
     query = SearchQuery(text="river", bbox=(139.0, 35.0, 140.0, 36.0))
 
-    with pytest.raises(UnsupportedSearchConditionError, match="bbox"):
-        coordinator.search(query)
+    results = coordinator.search(query)
+
+    assert results.diagnostics[0].source_id == "searchable"
+    assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
+    assert searchable.queries == [SearchQuery(text="river")]
 
 
 def test_results_remain_grouped_by_provider() -> None:
@@ -62,6 +63,6 @@ def test_results_remain_grouped_by_provider() -> None:
 
     grouped = SearchCoordinator((second, first)).search(SearchQuery(text="river"))
 
-    assert tuple(grouped) == ("ckan", "stac")
+    assert tuple(grouped.keys()) == ("ckan", "stac")
     assert len(grouped["ckan"]) == 1
     assert len(grouped["stac"]) == 1

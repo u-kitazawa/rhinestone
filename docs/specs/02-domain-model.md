@@ -77,6 +77,12 @@ provider、dataset/resource identifier、API endpoint、original URL、query par
 
 ## SearchQuery と SearchResult
 
+### v0.5のDiscovery / Resolution semantics
+
+SearchResult は `discovered_by` と解決先の `target: Config` を保持します。`discovered_by` と `target.source_id` は異なってよく、横断catalogの検索結果を別providerの通常の解決フローへ渡せます。
+
+検索はSourceごとに `SearchQuery` をcapabilityへ投影します。未対応条件は診断として返し、指定条件を一つも適用できないSourceでは空の検索を実行せずskipします。
+
 SearchQuery の共通条件は `text`、`bbox`、`time`、`limit` など必要最小限にします。Source Adapter は未対応の検索条件を黙って無視してはなりません（MUST NOT）。
 
 SearchResult は title、description、`source_id`、provider 固有 Config、Metadata、Provenance を保持します。Adapter 種別は Provenance に記録します。データ取得時には Config に変換し、通常の検証・解決フローへ渡します。

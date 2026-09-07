@@ -44,6 +44,10 @@ app = configure(
 
 ## 公開モデル
 
+### v0.5のDiscovery / Resolution semantics
+
+`SearchResult.to_config()` は解決先のtarget Configを返します。発見元Sourceと解決先Sourceは異なってよく、横断catalog側のprovenanceと元provider側のprovenanceを失わないようにします。
+
 `SourceDefinition` は Catalog から読み込まれた静的な構成、`Config` は選択した Source 内の対象、`Source` は Adapter が外部情報を解釈した実行時の結果です。これらを同じ「source情報」として混同しません。
 
 `SearchResult.to_config()` は同じ source id を保持して通常の解決フローへ戻します。`Provenance.provider` には source id、`Provenance.adapter` には Adapter 種別を記録します。

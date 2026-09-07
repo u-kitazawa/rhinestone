@@ -44,7 +44,7 @@ def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None
     assert client.calls == [(search_url, {"q": "river", "rows": 5})]
     assert len(results) == 1
     assert results[0].to_config() == Config("ckan", {"resource_id": "resource-1"})
-    assert "endpoint" not in results[0].settings
+    assert "endpoint" not in results[0].target.settings
     assert results[0].metadata.raw["id"] == "dataset-1"
 
 

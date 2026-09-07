@@ -9,6 +9,7 @@ nav:
   - ガイド:
       - データを検索する: search.md
       - Resourceを解決して開く: resolve-and-open.md
+      - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:
       - 対応状況: compatibility.md
       - APIリファレンス:

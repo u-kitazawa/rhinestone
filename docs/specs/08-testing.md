@@ -8,6 +8,7 @@
 - 共通 Metadata と raw metadata が保持される。
 - Resource 候補から期待する AccessPlan と Resource が決定的に得られる。
 - Search Capability が対応条件を処理し、未対応条件を拒否する。
+- Federated search がSourceごとにqueryを投影し、未適用条件を診断として返す。
 - SearchResult が有効な Config へ変換され、通常フローを通る。
 - Execution Adapter が Resource を期待する OSS URI と option へ翻訳する。
 - Dependency callback は必要な時点でだけ呼ばれる。

@@ -184,6 +184,13 @@
         "terms_url": "https://developer.odpt.org/terms/data_basic_license.html"
       },
       "name": "ODPT"
+    },
+    "search-ckan-jp": {
+      "adapter_type": "search-ckan-jp",
+      "settings": {
+        "endpoint": "https://search.ckan.jp/backend/api"
+      },
+      "name": "SEARCH_CKAN_JP"
     }
   }
 }
