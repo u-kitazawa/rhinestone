@@ -6,10 +6,7 @@ import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
     Catalog,
     Config,
-    Metadata,
     Provider,
-    Provenance,
-    Result,
     SearchQuery,
     SourceDefinition,
     configure,
