@@ -19,10 +19,10 @@ from .errors import UnsupportedSearchConditionError
 from .models import Config, Resource, Result, SearchQuery
 
 
-class Results(Sequence[Result]):
+class SearchResults(Sequence[Result]):
     """Sequence-like search results with optional source-grouped access."""
 
-    def __init__(self, grouped: Mapping[str, Tuple[SearchResult, ...]]) -> None:
+    def __init__(self, grouped: Mapping[str, Tuple[Result, ...]]) -> None:
         self._grouped = OrderedDict(
             (source_id, tuple(results)) for source_id, results in grouped.items()
         )
@@ -32,22 +32,22 @@ class Results(Sequence[Result]):
 
     @classmethod
     def from_grouped(
-        cls, grouped: Mapping[str, Tuple[SearchResult, ...]]
+        cls, grouped: Mapping[str, Tuple[Result, ...]]
     ) -> "SearchResults":
         return cls(grouped)
 
     @overload
-    def __getitem__(self, index: int) -> SearchResult: ...
+    def __getitem__(self, index: int) -> Result: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Tuple[SearchResult, ...]: ...
+    def __getitem__(self, index: slice) -> Tuple[Result, ...]: ...
 
     @overload
-    def __getitem__(self, index: str) -> Tuple[SearchResult, ...]: ...
+    def __getitem__(self, index: str) -> Tuple[Result, ...]: ...
 
     def __getitem__(
         self, index: Union[int, slice, str]
-    ) -> Union[SearchResult, Tuple[SearchResult, ...]]:
+    ) -> Union[Result, Tuple[Result, ...]]:
         if isinstance(index, str):
             return self._grouped[index]
         return self._items[index]
@@ -59,22 +59,22 @@ class Results(Sequence[Result]):
         """Return source IDs for advanced source-grouped access."""
         return tuple(self._grouped)
 
-    def values(self) -> Tuple[Tuple[SearchResult, ...], ...]:
+    def values(self) -> Tuple[Tuple[Result, ...], ...]:
         """Return result groups for advanced source-grouped access."""
         return tuple(self._grouped.values())
 
-    def items(self) -> Tuple[Tuple[str, Tuple[SearchResult, ...]], ...]:
+    def items(self) -> Tuple[Tuple[str, Tuple[Result, ...]], ...]:
         """Return source IDs and result groups for advanced access."""
         return tuple(self._grouped.items())
 
     def get(
-        self, source_id: str, default: Tuple[SearchResult, ...] = ()
-    ) -> Tuple[SearchResult, ...]:
+        self, source_id: str, default: Tuple[Result, ...] = ()
+    ) -> Tuple[Result, ...]:
         """Get one source group without requiring the source to exist."""
         return self._grouped.get(source_id, default)
 
     def bind_resolver(self, resolver: Callable[[Config], Resource]) -> "SearchResults":
-        """Bind direct SearchResult resolution to an application context."""
+        """Bind direct Result resolution to an application context."""
         grouped = OrderedDict(
             (
                 source_id,
