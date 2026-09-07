@@ -48,7 +48,7 @@ app = configure(
 | `dependencies` | 利用者が所有するRuntime |
 | `credentials` | Credential factory |
 
-`sources`は旧来のProvider iterable指定として残されています。新しいコードでは`catalog`または`providers`を使ってください。
+`sources`は旧来のProvider iterable指定として残されています。新しいコードでは`catalog`を使ってください。
 
 ## `Rhinestone.search()`
 
