@@ -46,3 +46,4 @@ with resource.open("rasterio") as dataset:
 - [Resourceを解決して開く](resolve-and-open.md)
 - [APIリファレンス](api.md)
 - [対応状況](compatibility.md)
+- [外部ライブラリ依存方針](dependency-policy.md)
