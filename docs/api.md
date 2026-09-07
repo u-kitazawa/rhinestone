@@ -44,11 +44,11 @@ app = configure(
 | 引数 | 説明 |
 | --- | --- |
 | `catalog` | 利用するProviderのCatalog |
-| `providers` | Providerのiterable。`catalog`の簡易指定 |
+| `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
 | `dependencies` | 利用者が所有するRuntime |
 | `credentials` | Credential factory |
 
-`sources`は旧来のProvider iterable指定として残されています。新しいコードでは`catalog`を使ってください。
+通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
 
 ## `Rhinestone.search()`
 
