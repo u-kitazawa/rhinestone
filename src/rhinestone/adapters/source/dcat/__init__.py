@@ -151,12 +151,14 @@ class DcatAdapter(ProviderAdapter):
             )
             results.append(
                 SearchResult(
-                    title,
-                    description,
-                    self.adapter_type,
-                    dict(settings, dataset=str(dataset)),
-                    item.metadata,
-                    item.provenance,
+                    title=title,
+                    description=description,
+                    discovered_by=self.adapter_type,
+                    target=Config(
+                        self.adapter_type, dict(settings, dataset=str(dataset))
+                    ),
+                    metadata=item.metadata,
+                    provenance=item.provenance,
                 )
             )
         return tuple(results[: query.limit])

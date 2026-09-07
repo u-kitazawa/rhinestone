@@ -50,7 +50,7 @@ def test_ogc_search_uses_items_endpoint_and_standard_query_parameters() -> None:
         "ogc-features",
         {"collection_id": "rivers", "feature_id": "river-1"},
     )
-    assert "endpoint" not in results[0].settings
+    assert "endpoint" not in results[0].target.settings
     assert results[0].metadata.raw["geometry"]["type"] == "LineString"
 
 

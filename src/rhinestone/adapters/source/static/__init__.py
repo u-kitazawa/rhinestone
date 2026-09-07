@@ -65,12 +65,12 @@ class StaticAdapter(ProviderAdapter):
                 continue
             results.append(
                 SearchResult(
-                    title,
-                    description,
-                    self.adapter_type,
-                    {"id": identifier},
-                    source.metadata,
-                    source.provenance,
+                    title=title,
+                    description=description,
+                    discovered_by=self.adapter_type,
+                    target=Config(self.adapter_type, {"id": identifier}),
+                    metadata=source.metadata,
+                    provenance=source.provenance,
                 )
             )
         return tuple(results[: query.limit])

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, cast
 
 import pytest
 
@@ -17,9 +17,10 @@ from rhinestone import (
 )
 from rhinestone.errors import (
     AdapterRegistrationError,
-    UnsupportedSearchConditionError,
     UnsupportedSourceError,
 )
+
+from .provider_support import fixture_json
 
 
 class FakeRasterio:
@@ -85,6 +86,7 @@ def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
         sources.PLATEAU,
         sources.GSI,
         sources.ODPT,
+        sources.SEARCH_CKAN_JP,
     )
     assert all(isinstance(source, SourceDefinition) for source in sources.ALL)
     assert all(source.id != "direct" for source in sources.ALL)
@@ -186,9 +188,9 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
 
     assert tuple(grouped.keys()) == ("catalog-a", "catalog-b")
     result = grouped["catalog-a"][0]
-    assert result.source_id == "catalog-a"
-    assert result.settings == {"resource_id": "first-resource"}
-    assert "endpoint" not in result.settings
+    assert result.discovered_by == "catalog-a"
+    assert result.target == Config("catalog-a", {"resource_id": "first-resource"})
+    assert "endpoint" not in result.target.settings
     config = result.to_config()
     assert config == Config("catalog-a", {"resource_id": "first-resource"})
     resolved = app.resolve(config)
@@ -198,7 +200,7 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     assert any(url.startswith("https://second.test") for url in requests)
     assert len(grouped) == 2
     assert list(grouped) == [grouped[0], grouped[1]]
-    assert grouped[0].source_id == "catalog-a"
+    assert grouped[0].discovered_by == "catalog-a"
     assert tuple(grouped[:1]) == (grouped[0],)
     assert grouped.get("catalog-a") == grouped["catalog-a"]
     assert grouped.get("missing") == ()
@@ -210,12 +212,42 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     assert simple[0].resolve().provenance.provider == "catalog-a"
 
 
-def test_public_search_exposes_unsupported_conditions_as_domain_error() -> None:
+def test_discovery_result_resolves_through_a_different_target_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    endpoint = "https://search.ckan.jp/backend/api"
+    search_url = endpoint + "/package_search"
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Dict[str, Any]:
+        assert url == search_url
+        assert params == {"q": "river", "rows": 1}
+        return cast(Dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    app = configure(sources=(sources.SEARCH_CKAN_JP,))
+
+    result = app.search(text="river", limit=1)[0]
+    resource = app.resolve(result)
+
+    assert result.discovered_by == "search-ckan-jp"
+    assert result.target.source_id == "direct"
+    assert resource.metadata.title == "Example Rivers"
+    assert resource.provenance.provider == "Example CKAN"
+    assert resource.provenance.resource_identifier == "resource-1"
+
+
+def test_public_search_reports_unsupported_conditions_per_source() -> None:
     source = SourceDefinition("catalog", "ckan", {"endpoint": "https://example.test"})
     app = configure(sources=(source,))
 
-    with pytest.raises(UnsupportedSearchConditionError, match="bbox"):
-        app.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
+    results = app.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
+
+    assert results.diagnostics[0].source_id == "catalog"
+    assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
 
 
 def test_duplicate_source_id_is_rejected_during_configuration() -> None:
@@ -299,8 +331,8 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
     result = Result(
         title="direct",
         description=None,
-        source_id="direct",
-        settings=direct_config().settings,
+        discovered_by="direct",
+        target=direct_config(),
         metadata=Metadata(),
         provenance=Provenance(provider="direct"),
     )

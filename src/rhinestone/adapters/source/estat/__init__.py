@@ -144,8 +144,8 @@ class EStatAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(table.get("DESCRIPTION")),
-                    source_id=self.adapter_type,
-                    settings={"stats_data_id": stats_data_id},
+                    discovered_by=self.adapter_type,
+                    target=Config(self.adapter_type, {"stats_data_id": stats_data_id}),
                     metadata=Metadata(
                         title=title,
                         publisher=_localized(table.get("GOV_ORG")),

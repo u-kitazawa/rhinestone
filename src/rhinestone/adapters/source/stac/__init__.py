@@ -94,12 +94,15 @@ class StacAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    source_id=self.adapter_type,
-                    settings={
-                        "collection_id": collection_id,
-                        "item_id": item_id,
-                        "asset_key": asset_key,
-                    },
+                    discovered_by=self.adapter_type,
+                    target=Config(
+                        self.adapter_type,
+                        {
+                            "collection_id": collection_id,
+                            "item_id": item_id,
+                            "asset_key": asset_key,
+                        },
+                    ),
                     metadata=Metadata(title=title, raw=item),
                     provenance=Provenance(
                         provider="stac",

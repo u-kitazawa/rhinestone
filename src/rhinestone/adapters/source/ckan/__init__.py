@@ -121,8 +121,8 @@ class CkanAdapter(ProviderAdapter):
                     SearchResult(
                         title=_optional_string(package.get("title")) or resource_id,
                         description=_optional_string(package.get("notes")),
-                        source_id=self.adapter_type,
-                        settings={"resource_id": resource_id},
+                        discovered_by=self.adapter_type,
+                        target=Config(self.adapter_type, {"resource_id": resource_id}),
                         metadata=Metadata(
                             title=_optional_string(package.get("title")), raw=package
                         ),

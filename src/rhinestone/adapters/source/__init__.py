@@ -9,6 +9,7 @@ from .gsi_fundamental import GsiFundamentalAdapter
 from .odpt import OdptAdapter
 from .ogc import OgcFeaturesAdapter
 from .plateau import PlateauAdapter
+from .search_ckan_jp import SearchCkanJpAdapter
 from .stac import StacAdapter
 from .static import StaticAdapter
 
@@ -26,4 +27,5 @@ __all__ = [
     "ProviderAdapter",
     "StacAdapter",
     "StaticAdapter",
+    "SearchCkanJpAdapter",
 ]

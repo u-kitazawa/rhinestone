@@ -7,6 +7,7 @@ from typing import (
     Any,
     Callable,
     FrozenSet,
+    Iterable,
     List,
     Literal,
     Mapping,
@@ -237,13 +238,39 @@ class SearchQuery:
             if getattr(self, name) is not None
         )
 
+    def project(self, supported_conditions: Iterable[str]) -> "SearchQuery":
+        """Return the portion of this query understood by a source."""
+        supported = frozenset(supported_conditions)
+        return SearchQuery(
+            text=self.text if "text" in supported else None,
+            bbox=self.bbox if "bbox" in supported else None,
+            time=self.time if "time" in supported else None,
+            limit=self.limit if "limit" in supported else None,
+        )
+
+
+@dataclass(frozen=True)
+class SearchDiagnostic:
+    """Explain which query conditions were not applied to one source."""
+
+    source_id: str
+    skipped_conditions: FrozenSet[str]
+    reason: str = "unsupported"
+
+    def __post_init__(self) -> None:
+        if not self.source_id:
+            raise ConfigValidationError("search diagnostic source_id must be non-empty")
+        object.__setattr__(
+            self, "skipped_conditions", frozenset(self.skipped_conditions)
+        )
+
 
 @dataclass(frozen=True)
 class Result:
     title: str
     description: Optional[str]
-    source_id: str
-    settings: Mapping[str, Any]
+    discovered_by: str
+    target: Config
     metadata: Metadata
     provenance: Provenance
     _resolver: Optional[Callable[[], Resource]] = field(
@@ -251,10 +278,12 @@ class Result:
     )
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "settings", _freeze(self.settings))
+        if not self.discovered_by:
+            raise ConfigValidationError("discovered_by must be a non-empty string")
 
     def to_config(self) -> Config:
-        return Config(source_id=self.source_id, settings=self.settings)
+        """Return the target configuration for the normal resolve pipeline."""
+        return self.target
 
     def resolve(self) -> Resource:
         """Resolve this result in the Rhinestone application that returned it."""

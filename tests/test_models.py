@@ -107,8 +107,8 @@ def test_search_result_returns_config_without_losing_knowledge() -> None:
     result = SearchResult(
         title="Population",
         description="Official statistics",
-        source_id="estat",
-        settings={"stats_data_id": "0000000000"},
+        discovered_by="search-ckan-jp",
+        target=Config("estat", {"stats_data_id": "0000000000"}),
         metadata=metadata,
         provenance=provenance,
     )
@@ -147,11 +147,23 @@ def test_unbound_search_result_cannot_resolve() -> None:
     result = SearchResult(
         title="Dataset",
         description=None,
-        source_id="direct",
-        settings={},
+        discovered_by="catalog",
+        target=Config("direct", {}),
         metadata=Metadata(raw={}),
         provenance=Provenance(provider="direct", raw={}),
     )
 
     with pytest.raises(ConfigValidationError, match="not bound"):
         result.resolve()
+
+
+def test_search_result_requires_a_discovery_source() -> None:
+    with pytest.raises(ConfigValidationError, match="discovered_by"):
+        SearchResult(
+            title="Dataset",
+            description=None,
+            discovered_by="",
+            target=Config("direct", {}),
+            metadata=Metadata(raw={}),
+            provenance=Provenance(provider="direct", raw={}),
+        )
