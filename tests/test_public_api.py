@@ -292,3 +292,13 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
         app.open(direct_config(), "rasterio")
         == "runtime:https://example.test/dataset.tif"
     )
+
+    result = Result(
+        title="direct",
+        description=None,
+        source_id="direct",
+        settings=direct_config().settings,
+        metadata=Metadata(),
+        provenance=Provenance(provider="direct"),
+    )
+    assert app.open(result, "rasterio") == "runtime:https://example.test/dataset.tif"
