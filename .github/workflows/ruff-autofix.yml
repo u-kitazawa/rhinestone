@@ -1,0 +1,43 @@
+name: Ruff autofix
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - run: uv sync --dev --locked
+
+      - name: Apply Ruff fixes
+        run: |
+          uv run ruff check --fix .
+          uv run ruff format .
+
+      - name: Commit and push fixes
+        run: |
+          if git diff --quiet; then
+            echo "No Ruff changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u
+          git commit -m "style: apply ruff fixes"
+          git push
