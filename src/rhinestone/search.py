@@ -22,9 +22,7 @@ from .models import Config, Resource, SearchQuery, SearchResult
 class SearchResults(Sequence[SearchResult]):
     """Sequence-like search results with optional source-grouped access."""
 
-    def __init__(
-        self, grouped: Mapping[str, Tuple[SearchResult, ...]]
-    ) -> None:
+    def __init__(self, grouped: Mapping[str, Tuple[SearchResult, ...]]) -> None:
         self._grouped = OrderedDict(
             (source_id, tuple(results)) for source_id, results in grouped.items()
         )
@@ -39,16 +37,13 @@ class SearchResults(Sequence[SearchResult]):
         return cls(grouped)
 
     @overload
-    def __getitem__(self, index: int) -> SearchResult:
-        ...
+    def __getitem__(self, index: int) -> SearchResult: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Tuple[SearchResult, ...]:
-        ...
+    def __getitem__(self, index: slice) -> Tuple[SearchResult, ...]: ...
 
     @overload
-    def __getitem__(self, index: str) -> Tuple[SearchResult, ...]:
-        ...
+    def __getitem__(self, index: str) -> Tuple[SearchResult, ...]: ...
 
     def __getitem__(
         self, index: Union[int, slice, str]
@@ -78,9 +73,7 @@ class SearchResults(Sequence[SearchResult]):
         """Get one source group without requiring the source to exist."""
         return self._grouped.get(source_id, default)
 
-    def bind_resolver(
-        self, resolver: Callable[[Config], Resource]
-    ) -> "SearchResults":
+    def bind_resolver(self, resolver: Callable[[Config], Resource]) -> "SearchResults":
         """Bind direct SearchResult resolution to an application context."""
         grouped = OrderedDict(
             (
@@ -88,9 +81,7 @@ class SearchResults(Sequence[SearchResult]):
                 tuple(
                     replace(
                         result,
-                        _resolver=lambda result=result: resolver(
-                            result.to_config()
-                        ),
+                        _resolver=lambda result=result: resolver(result.to_config()),
                     )
                     for result in results
                 ),
