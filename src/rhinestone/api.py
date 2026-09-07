@@ -162,8 +162,11 @@ class Rhinestone:
         self, value: Union[Config, Result, Resource], library: LibraryName
     ) -> object:
         """Open a Resource, or resolve a Config/Result and open it."""
-        resource = value if isinstance(value, Resource) else self.resolve(value)
-        return resource.open(library)
+        if isinstance(value, Resource):
+            return value.open(library)
+        if isinstance(value, Config):
+            return self._pipeline.open(value, library=library)
+        return self.resolve(value).open(library)
 
     def search(
         self,
