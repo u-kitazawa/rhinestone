@@ -30,7 +30,6 @@ DependencyValue = Union[object, Callable[[], Any]]
 
 Runtime = DependencyValue
 """A runtime object or a lazy factory returning one."""
-"""An injected runtime object or a lazy factory returning one."""
 
 
 class _RasterioDatasetReader(Protocol):
