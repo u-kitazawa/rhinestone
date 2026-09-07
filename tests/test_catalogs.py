@@ -167,6 +167,7 @@ def test_catalog_is_an_immutable_provider_collection() -> None:
 
     assert len(catalog) == 1
     assert catalog[0] is sources.GSI
+    assert catalog_entries[0].provider is sources.GEOSPATIAL_JP
     assert tuple(catalog) == (sources.GSI,)
     assert extended.providers == (sources.GSI, sources.ODPT)
     assert tuple(extended) == (sources.GSI, sources.ODPT)
