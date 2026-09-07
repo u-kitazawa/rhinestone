@@ -5,6 +5,7 @@ import pytest
 import rhinestone.catalogs as catalog_module
 from rhinestone import SourceDefinition, sources
 from rhinestone.catalogs import (
+    Catalog,
     load_catalog_resource,
     load_source_catalog,
     load_source_definitions,
@@ -158,3 +159,15 @@ def test_source_catalog_manifest_shapes_are_rejected(
     )
     with pytest.raises(ConfigValidationError):
         load_source_definitions("fixture.json")
+
+
+def test_catalog_is_an_immutable_provider_collection() -> None:
+    catalog = Catalog((sources.GSI,))
+    extended = catalog.add(sources.ODPT)
+
+    assert len(catalog) == 1
+    assert catalog[0] is sources.GSI
+    assert load_source_catalog()[0].provider == sources.GEOSPATIAL_JP
+    assert tuple(catalog) == (sources.GSI,)
+    assert extended.providers == (sources.GSI, sources.ODPT)
+    assert tuple(extended) == (sources.GSI, sources.ODPT)

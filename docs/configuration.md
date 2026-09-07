@@ -1,85 +1,70 @@
 # アプリケーションを構成する
 
-Rhinestoneは`configure()`で作成した`app`を入口に使います。利用者はAdapterを組み立てず、利用するSourceと外部runtime・credentialを宣言します。HTTP transportはRhinestoneに組み込まれています。
+アプリケーションはCatalog、Runtime、Credentialを組み合わせて作ります。
 
-## 組み込みSource
+## Catalogを指定する
 
 ```python
-from rhinestone import configure, sources
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN
 
-app = configure(sources=sources.ALL)
+app = configure(catalog=BUILTIN)
 ```
 
-`sources.ALL`は特別なsentinelではなく、組み込みexternal Sourceの`SourceDefinition`を並べたtupleです。
-
-個別指定も可能です。
+組み込みCatalogからProviderを限定する場合は、新しいCatalogを作ります。
 
 ```python
-app = configure(
-    sources=(sources.GEOSPATIAL_JP, sources.PLATEAU),
-)
+from rhinestone import Catalog, configure
+from rhinestone.catalogs import BUILTIN
+
+app = configure(catalog=Catalog((
+    BUILTIN.providers[0],
+    BUILTIN.providers[2],
+)))
 ```
 
-SourceDefinitionは「どこを使うか」を表します。例えば`GEOSPATIAL_JP`はCKAN Adapterを利用し、G空間情報センターのendpointを静的設定として保持します。
-
-Configは「そのSourceの何を使うか」を表します。
+## 独自Providerを追加する
 
 ```python
-from rhinestone import Config
+from rhinestone import Catalog, Provider, configure
 
-config = Config(
-    source_id="geospatial-jp",
-    settings={"resource_id": "resource-uuid"},
-)
-```
-
-endpointはConfigへ入れません。
-
-## custom Source
-
-組み込み定義がない提供元を既存Adapterで利用する高度な用途では`SourceDefinition`を明示できます。
-
-```python
-from rhinestone import SourceDefinition, configure
-
-app = configure(
-    sources=(
-        SourceDefinition(
-            id="my-stac",
-            adapter_type="stac",
-            settings={"endpoint": "https://stac.example/api"},
-        ),
+catalog = Catalog((
+    Provider(
+        id="my-stac",
+        adapter_type="stac",
+        settings={"endpoint": "https://stac.example/api"},
     ),
-)
+))
+app = configure(catalog=catalog)
 ```
 
-HTTP metadata取得にも組み込みtransportが使われます。通常のGetting Startedでは組み込み`rhinestone.sources`を優先します。
+`Provider`の`adapter_type`や`settings`は拡張向けの構成情報です。通常は組み込みCatalogのProviderを使います。
 
-## runtime dependency
+## Runtime
 
-Rhinestoneが実装しない外部runtimeだけを、実体または遅延factoryとして渡します。
+外部Runtimeは利用者が所有し、実体または遅延factoryとして渡します。
 
 ```python
 app = configure(
-    sources=sources.ALL,
+    catalog=BUILTIN,
     dependencies={
-        "rdflib": rdflib,
         "gdal": gdal,
         "rasterio": rasterio,
         "pyogrio": pyogrio,
+        "rdflib": rdflib,
     },
 )
 ```
 
-factoryは必要になるまで評価されません。HTTP JSON、HTTP text、JSON serviceの通信runtimeを利用者が登録する必要はありません。
+HTTP JSON、HTTP text、JSON serviceのRuntimeは組み込みです。
 
-## credential
+## Credential
 
-secretはSourceDefinitionやConfigへ保存せず、logical nameに対応するfactoryとして渡します。
+secretはCatalogやProviderに保存せず、Credential factoryとして渡します。
 
 ```python
 app = configure(
-    sources=(sources.ESTAT, sources.ODPT),
+    catalog=BUILTIN,
     credentials={
         "estat": lambda: os.environ["ESTAT_APP_ID"],
         "odpt": lambda: os.environ["ODPT_CONSUMER_KEY"],
@@ -87,17 +72,6 @@ app = configure(
 )
 ```
 
-責務は次のように分離します。
+## 高度なAPI
 
-- `SourceDefinition`: 静的な提供元情報
-- Source Adapter: 接続・解決方法の知識
-- built-in HTTP: metadata・文書・JSON serviceの通信
-- dependency: GDAL、Rasterio、RDFLib等の外部実行能力
-- credential: secret
-- `Config`: 選択したSource内で利用する対象
-
-## Direct
-
-`direct`はexternal SourceではなくCore機能です。`sources.ALL`に含まれず、`configure()`だけでも常時利用できます。
-
-次は[データを検索する](search.md)または[Resourceを解決して開く](resolve-and-open.md)へ進んでください。
+`Config`、Source Adapter、Resolver、AccessPlanは内部パイプラインを直接扱う高度なAPIです。通常の検索・解決では`Result`を`app.resolve()`へ渡してください。

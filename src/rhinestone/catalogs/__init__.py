@@ -3,10 +3,10 @@
 import json
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, List, Mapping, Tuple, cast
+from typing import Any, Iterable, Iterator, List, Mapping, Tuple, cast
 
 from ..errors import ConfigValidationError
-from ..models import SourceDefinition
+from ..models import Provider
 
 _CATALOG_PACKAGE = "rhinestone.catalogs"
 
@@ -38,11 +38,38 @@ def load_catalog_resource(name: object) -> Any:
 
 
 @dataclass(frozen=True)
+class Catalog:
+    """An immutable collection of Providers known to an application."""
+
+    providers: Tuple[Provider, ...]
+
+    def __init__(self, providers: Iterable[Provider] = ()) -> None:
+        object.__setattr__(self, "providers", tuple(providers))
+
+    def __iter__(self) -> Iterator[Provider]:
+        return iter(self.providers)
+
+    def __len__(self) -> int:
+        return len(self.providers)
+
+    def __getitem__(self, index: int) -> Provider:
+        return self.providers[index]
+
+    def add(self, *providers: Provider) -> "Catalog":
+        """Return a new catalog with additional Providers."""
+        return Catalog((*self.providers, *providers))
+
+
+@dataclass(frozen=True)
 class CatalogSource:
     """A catalog entry with its public facade name."""
 
     name: str
-    definition: SourceDefinition
+    definition: Provider
+
+    @property
+    def provider(self) -> Provider:
+        return self.definition
 
 
 def load_source_catalog(
@@ -90,7 +117,7 @@ def load_source_catalog(
         entries.append(
             CatalogSource(
                 name=public_name,
-                definition=SourceDefinition(
+                definition=Provider(
                     id=raw_id,
                     adapter_type=adapter_type,
                     settings=settings,
@@ -102,14 +129,19 @@ def load_source_catalog(
 
 def load_source_definitions(
     name: str = "sources.json",
-) -> Tuple[SourceDefinition, ...]:
+) -> Tuple[Provider, ...]:
     """Load built-in Source definitions in catalog order."""
     return tuple(entry.definition for entry in load_source_catalog(name))
 
 
 __all__ = [
+    "BUILTIN",
+    "Catalog",
     "CatalogSource",
     "load_catalog_resource",
     "load_source_catalog",
     "load_source_definitions",
 ]
+
+
+BUILTIN = Catalog(load_source_definitions())

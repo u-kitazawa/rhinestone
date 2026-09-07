@@ -1,4 +1,4 @@
-"""Provider-independent domain models."""
+"""Domain models, including the small public vocabulary."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -27,6 +27,9 @@ LibraryName = Literal["gdal", "json-service", "pyogrio", "rasterio"]
 
 DependencyValue = Union[object, Callable[[], Any]]
 """An injected runtime object or a lazy factory returning one."""
+
+Runtime = DependencyValue
+"""A runtime object or a lazy factory returning one."""
 
 
 class _RasterioDatasetReader(Protocol):
@@ -71,8 +74,8 @@ def _freeze(value: Any) -> Any:
 
 
 @dataclass(frozen=True)
-class SourceDefinition:
-    """Static definition of one selectable data source."""
+class Provider:
+    """A data provider selected from a catalog."""
 
     id: str
     adapter_type: str
@@ -84,6 +87,10 @@ class SourceDefinition:
         if not self.adapter_type:
             raise ConfigValidationError("adapter_type must be a non-empty string")
         object.__setattr__(self, "settings", _freeze(self.settings))
+
+
+# Advanced implementation code may use this descriptive alias.
+SourceDefinition = Provider
 
 
 @dataclass(frozen=True)
@@ -232,7 +239,7 @@ class SearchQuery:
 
 
 @dataclass(frozen=True)
-class SearchResult:
+class Result:
     title: str
     description: Optional[str]
     source_id: str
@@ -253,6 +260,10 @@ class SearchResult:
         """Resolve this result in the Rhinestone application that returned it."""
         if self._resolver is None:
             raise ConfigValidationError(
-                "SearchResult is not bound to a Rhinestone application"
+                "Result is not bound to a Rhinestone application"
             )
         return self._resolver()
+
+
+# Advanced implementation code may use this descriptive alias.
+SearchResult = Result

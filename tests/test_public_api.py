@@ -3,7 +3,18 @@ from typing import Any, Dict, List, Mapping, Optional
 import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
-from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
+from rhinestone import (
+    Catalog,
+    Config,
+    Metadata,
+    Provenance,
+    Provider,
+    Result,
+    SearchQuery,
+    SourceDefinition,
+    configure,
+    sources,
+)
 from rhinestone.errors import (
     AdapterRegistrationError,
     UnsupportedSearchConditionError,
@@ -252,3 +263,45 @@ def test_resource_open_requires_a_library_name() -> None:
 def test_legacy_provider_composition_api_is_not_public() -> None:
     with pytest.raises(TypeError):
         configure(providers={})  # type: ignore[call-arg]
+
+
+def test_catalog_provider_and_result_are_the_short_public_path() -> None:
+    catalog = Catalog((sources.GSI,))
+    app = configure(catalog=catalog)
+
+    assert isinstance(sources.GSI, Provider)
+    assert tuple(catalog) == (sources.GSI,)
+    result = app.search(text="標準", limit=1)[0]
+    resource = app.resolve(result)
+
+    assert result.title == "標準地図"
+    assert resource.provenance.provider == "gsi"
+
+
+def test_catalog_and_provider_selection_conflicts_are_rejected() -> None:
+    with pytest.raises(TypeError, match="either catalog or sources"):
+        configure(sources=(sources.GSI,), catalog=Catalog((sources.GSI,)))
+
+
+def test_search_parameters_and_open_shortcuts_are_supported() -> None:
+    app = configure(dependencies={"rasterio": FakeRasterio("runtime")})
+
+    with pytest.raises(TypeError, match="either query or search parameters"):
+        app.search("dataset", text="dataset")
+
+    resource = app.resolve(direct_config())
+    assert app.open(resource, "rasterio") == "runtime:https://example.test/dataset.tif"
+    assert (
+        app.open(direct_config(), "rasterio")
+        == "runtime:https://example.test/dataset.tif"
+    )
+
+    result = Result(
+        title="direct",
+        description=None,
+        source_id="direct",
+        settings=direct_config().settings,
+        metadata=Metadata(),
+        provenance=Provenance(provider="direct"),
+    )
+    assert app.open(result, "rasterio") == "runtime:https://example.test/dataset.tif"
