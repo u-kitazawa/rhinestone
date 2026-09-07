@@ -275,18 +275,8 @@ def test_catalog_provider_and_result_are_the_short_public_path() -> None:
     assert resource.provenance.provider == "gsi"
 
 
-def test_providers_is_an_alias_for_catalog_selection() -> None:
-    app = configure(providers=(sources.GSI,))
-
-    assert app.search(text="標準", limit=1)[0].title == "標準地図"
-
-
 def test_catalog_and_provider_selection_conflicts_are_rejected() -> None:
-    with pytest.raises(TypeError, match="either providers or sources"):
-        configure(sources=(sources.GSI,), providers=(sources.GSI,))
-    with pytest.raises(TypeError, match="either catalog or providers"):
-        configure(providers=(sources.GSI,), catalog=Catalog((sources.GSI,)))
-    with pytest.raises(TypeError, match="either catalog or providers"):
+    with pytest.raises(TypeError, match="either catalog or sources"):
         configure(sources=(sources.GSI,), catalog=Catalog((sources.GSI,)))
 
 
