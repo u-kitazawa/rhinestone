@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from types import MappingProxyType
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     FrozenSet,
@@ -12,6 +11,7 @@ from typing import (
     Literal,
     Mapping,
     Optional,
+    Protocol,
     Set,
     Tuple,
     TypedDict,
@@ -22,17 +22,23 @@ from typing import (
 
 from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
 
-if TYPE_CHECKING:
-    import geopandas  # pyright: ignore[reportMissingImports]
-    import rasterio  # pyright: ignore[reportMissingImports]
-    from osgeo import gdal  # pyright: ignore[reportMissingImports]
-
-
 LibraryName = Literal["gdal", "json-service", "pyogrio", "rasterio"]
 """Execution runtime names accepted by the public open API."""
 
 DependencyValue = Union[object, Callable[[], Any]]
 """An injected runtime object or a lazy factory returning one."""
+
+
+class _RasterioDatasetReader(Protocol):
+    def __getattr__(self, name: str) -> Any: ...
+
+
+class _GdalDataset(Protocol):
+    def __getattr__(self, name: str) -> Any: ...
+
+
+class _GeoDataFrame(Protocol):
+    def __getattr__(self, name: str) -> Any: ...
 
 
 class Dependencies(TypedDict, total=False):
@@ -189,13 +195,13 @@ class Resource:
     )
 
     @overload
-    def open(self, library: Literal["rasterio"]) -> "rasterio.io.DatasetReader": ...
+    def open(self, library: Literal["rasterio"]) -> _RasterioDatasetReader: ...
 
     @overload
-    def open(self, library: Literal["gdal"]) -> "gdal.Dataset": ...
+    def open(self, library: Literal["gdal"]) -> _GdalDataset: ...
 
     @overload
-    def open(self, library: Literal["pyogrio"]) -> "geopandas.GeoDataFrame": ...
+    def open(self, library: Literal["pyogrio"]) -> _GeoDataFrame: ...
 
     @overload
     def open(self, library: Literal["json-service"]) -> object: ...
