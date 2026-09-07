@@ -2,8 +2,7 @@
 
 from typing import Dict, List, Tuple
 
-from .catalogs import BUILTIN as CATALOG
-from .catalogs import CatalogSource, load_source_catalog
+from .catalogs import Catalog, CatalogSource, load_source_catalog
 from .models import Provider
 
 _CATALOG: Tuple[CatalogSource, ...] = load_source_catalog()
@@ -12,6 +11,7 @@ _BUILTINS: Dict[str, Provider] = {
 }
 _BY_NAME: Dict[str, Provider] = {entry.name: entry.definition for entry in _CATALOG}
 
+CATALOG = Catalog(tuple(entry.definition for entry in _CATALOG))
 ALL: Tuple[Provider, ...] = CATALOG.providers
 
 
