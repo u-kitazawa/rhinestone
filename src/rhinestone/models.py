@@ -28,6 +28,10 @@ LibraryName = Literal["gdal", "json-service", "pyogrio", "rasterio"]
 DependencyValue = Union[object, Callable[[], Any]]
 """An injected runtime object or a lazy factory returning one."""
 
+Runtime = DependencyValue
+"""A runtime object or a lazy factory returning one."""
+"""An injected runtime object or a lazy factory returning one."""
+
 
 class _RasterioDatasetReader(Protocol):
     def __getattr__(self, name: str) -> Any: ...
@@ -71,8 +75,8 @@ def _freeze(value: Any) -> Any:
 
 
 @dataclass(frozen=True)
-class SourceDefinition:
-    """Static definition of one selectable data source."""
+class Provider:
+    """A data provider selected from a catalog."""
 
     id: str
     adapter_type: str
@@ -84,6 +88,10 @@ class SourceDefinition:
         if not self.adapter_type:
             raise ConfigValidationError("adapter_type must be a non-empty string")
         object.__setattr__(self, "settings", _freeze(self.settings))
+
+
+# Advanced implementation code may use this descriptive alias.
+SourceDefinition = Provider
 
 
 @dataclass(frozen=True)
@@ -232,7 +240,7 @@ class SearchQuery:
 
 
 @dataclass(frozen=True)
-class SearchResult:
+class Result:
     title: str
     description: Optional[str]
     source_id: str
@@ -257,3 +265,6 @@ class SearchResult:
             )
         return self._resolver()
 \n\n# Advanced code may still use the descriptive internal spelling.\nSearchResult = Result\n
+
+# Advanced implementation code may use this descriptive alias.
+SearchResult = Result
