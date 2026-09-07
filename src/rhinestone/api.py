@@ -37,7 +37,7 @@ from .errors import AdapterRegistrationError, ConfigValidationError
 from .execution import ExecutionAdapterSelector
 from .models import (
     Config,
-    Dependencies,
+    DependencyValue,
     LibraryName,
     Resource,
     SearchQuery,
@@ -91,7 +91,7 @@ class Rhinestone:
         self,
         *,
         sources: Iterable[SourceDefinition] = (),
-        dependencies: Optional[Dependencies] = None,
+        dependencies: Optional[Mapping[str, DependencyValue]] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     ) -> None:
         runtime_dependencies = dict(dependencies or {})
@@ -163,7 +163,7 @@ class Rhinestone:
 def configure(
     *,
     sources: Iterable[SourceDefinition] = (),
-    dependencies: Optional[Dependencies] = None,
+    dependencies: Optional[Mapping[str, DependencyValue]] = None,
     credentials: Optional[Mapping[str, Callable[[], str]]] = None,
 ) -> Rhinestone:
     """Compose built-in adapters around selected sources and runtime inputs."""
