@@ -19,7 +19,7 @@ from .errors import UnsupportedSearchConditionError
 from .models import Config, Resource, Result, SearchQuery
 
 
-class Results(Sequence[SearchResult]):
+class Results(Sequence[Result]):
     """Sequence-like search results with optional source-grouped access."""
 
     def __init__(self, grouped: Mapping[str, Tuple[SearchResult, ...]]) -> None:
