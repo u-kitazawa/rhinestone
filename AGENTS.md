@@ -9,6 +9,7 @@
 ## 開発コマンド
 
 - `uv sync --dev` でプロジェクトと開発ツールをインストールする。
+- `bash scripts/check.sh` でPR CIと同じ主要チェックを一括実行する。
 - `uv run pytest` でテストとカバレッジ計測を実行する。
 - `uv run ruff check .` で Lint を実行する。
 - `uv run ruff format --check .` でフォーマットを確認する。
