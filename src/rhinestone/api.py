@@ -1,6 +1,7 @@
 """Public composition API."""
 
 from dataclasses import replace
+from datetime import datetime
 from typing import (
     Any,
     Callable,
@@ -14,6 +15,7 @@ from typing import (
 )
 
 from . import _http
+from .catalogs import Catalog
 from .adapters.execution import (
     GdalAdapter,
     JsonServiceAdapter,
@@ -39,11 +41,11 @@ from .models import (
     Config,
     DependencyValue,
     LibraryName,
+    Provider,
     Resource,
+    Result,
     SearchQuery,
-    SearchResult,
     Source,
-    SourceDefinition,
 )
 from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
@@ -71,7 +73,7 @@ class _ConfiguredSourceAdapter:
             provenance=replace(source.provenance, provider=self.source_id),
         )
 
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> Tuple[Result, ...]:
         search_method = getattr(self._adapter, "search")
         search = cast(Callable[[SearchQuery], Tuple[SearchResult, ...]], search_method)
         return tuple(
@@ -90,10 +92,22 @@ class Rhinestone:
     def __init__(
         self,
         *,
-        sources: Iterable[SourceDefinition] = (),
+        sources: Iterable[Provider] = (),
+        providers: Optional[Iterable[Provider]] = None,
+        catalog: Optional[Catalog] = None,
         dependencies: Optional[Mapping[str, DependencyValue]] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     ) -> None:
+        selected_sources = tuple(sources)
+        if providers is not None:
+            if selected_sources:
+                raise TypeError("pass either providers or sources, not both")
+            selected_sources = tuple(providers)
+        if catalog is not None:
+            if selected_sources or providers is not None:
+                raise TypeError("pass either catalog or providers/sources, not both")
+            selected_sources = tuple(catalog)
+
         runtime_dependencies = dict(dependencies or {})
         runtime_dependencies.setdefault(
             "json-service", lambda: _http.JsonServiceRuntime()
@@ -144,17 +158,37 @@ class Rhinestone:
         )
         self._search = SearchCoordinator(source_adapters)
 
-    def resolve(self, config: Config) -> Resource:
+    def resolve(self, value: Union[Config, Result]) -> Resource:
+        """Resolve a Provider selection or a search Result into a Resource."""
+        config = value.to_config() if isinstance(value, Result) else value
         return self._pipeline.resolve(config)
 
-    def open(self, config: Config, library: LibraryName) -> object:
-        return self._pipeline.open(config, library=library)
+    def open(self, value: Union[Config, Result, Resource], library: LibraryName) -> object:
+        """Open a Resource, or resolve a Config/Result and open it."""
+        resource = value if isinstance(value, Resource) else self.resolve(value)
+        return resource.open(library)
 
-    def search(self, query: Union[SearchQuery, str]) -> SearchResults:
-        normalized_query = SearchQuery(text=query) if isinstance(query, str) else query
+    def search(
+        self,
+        query: Optional[Union[SearchQuery, str]] = None,
+        *,
+        text: Optional[str] = None,
+        bbox: Optional[Tuple[float, float, float, float]] = None,
+        time: Optional[Tuple[Optional[datetime], Optional[datetime]]] = None,
+        limit: Optional[int] = None,
+    ) -> SearchResults:
+        supplied_parameters = (text, bbox, time, limit)
+        if query is not None and any(parameter is not None for parameter in supplied_parameters):
+            raise TypeError("pass either query or search parameters, not both")
+        if query is None:
+            normalized_query = SearchQuery(text=text, bbox=bbox, time=time, limit=limit)
+        elif isinstance(query, str):
+            normalized_query = SearchQuery(text=query)
+        else:
+            normalized_query = query
         grouped = self._search.search(normalized_query)
         typed_grouped = cast(
-            Mapping[str, Tuple[SearchResult, ...]],
+            Mapping[str, Tuple[Result, ...]],
             grouped,
         )
         return SearchResults.from_grouped(typed_grouped).bind_resolver(self.resolve)
@@ -162,13 +196,17 @@ class Rhinestone:
 
 def configure(
     *,
-    sources: Iterable[SourceDefinition] = (),
+    sources: Iterable[Provider] = (),
+    providers: Optional[Iterable[Provider]] = None,
+    catalog: Optional[Catalog] = None,
     dependencies: Optional[Mapping[str, DependencyValue]] = None,
     credentials: Optional[Mapping[str, Callable[[], str]]] = None,
 ) -> Rhinestone:
     """Compose built-in adapters around selected sources and runtime inputs."""
     return Rhinestone(
         sources=sources,
+        providers=providers,
+        catalog=catalog,
         dependencies=dependencies,
         credentials=credentials,
     )
