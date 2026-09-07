@@ -11,6 +11,7 @@ nav:
       - Resourceを解決して開く: resolve-and-open.md
   - リファレンス:
       - 対応状況: compatibility.md
+      - 外部ライブラリ依存方針: dependency-policy.md
       - APIリファレンス:
           - 概要: api.md
           - Source Adapter:
