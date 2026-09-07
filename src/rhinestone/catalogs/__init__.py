@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, Iterable, List, Mapping, Tuple, cast
+from typing import Any, Iterable, Iterator, List, Mapping, Tuple, cast
 
 from ..errors import ConfigValidationError
 from ..models import Provider
@@ -46,7 +46,7 @@ class Catalog:
     def __init__(self, providers: Iterable[Provider] = ()) -> None:
         object.__setattr__(self, "providers", tuple(providers))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Provider]:
         return iter(self.providers)
 
     def __len__(self) -> int:
