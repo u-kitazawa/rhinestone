@@ -82,12 +82,7 @@ RhinestoneはGIS I/O、形式変換、空間演算、データ解析を実装せ
 
 ```console
 uv sync --dev
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run pyright
-uv run mkdocs build --strict
-uv build
+bash scripts/check.sh
 ```
 
 MIT Licenseです。

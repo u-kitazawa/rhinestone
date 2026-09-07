@@ -41,18 +41,13 @@ uv sync --dev --locked
 
 ## ローカル検証
 
-PRを作成する前に、CIと同じ主要チェックを実行してください。
+PRを作成する前に、CIと同じ主要チェックを実行してください。コマンドはCIと共有しているため、個別に実行せず次の入口を使用します。
 
 ```console
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run pyright
-NO_MKDOCS_2_WARNING=1 uv run mkdocs build --strict
-uv build
+bash scripts/check.sh
 ```
 
-`pytest` はカバレッジも計測し、プロジェクト設定で定めた基準を満たさない場合に失敗します。
+`pytest` はカバレッジも計測し、プロジェクト設定で定めた100%基準を満たさない場合に失敗します。テスト件数だけで成功と判断せず、コマンドの終了コードが0であることと、カバレッジ出力の`Missing`が空であることを確認してください。
 
 CIでは、これらに加えてPython 3.10〜3.13での実行と、ビルドしたwheelをクリーンな仮想環境へインストールして読み込む検証を行います。
 
@@ -138,12 +133,7 @@ PR本文には、少なくとも次の内容を含めます。
 
 ## 検証
 
-- [ ] `uv run pytest`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ruff format --check .`
-- [ ] `uv run pyright`
-- [ ] `NO_MKDOCS_2_WARNING=1 uv run mkdocs build --strict`
-- [ ] `uv build`
+- [ ] `bash scripts/check.sh` が終了コード0で完了し、カバレッジ出力に未実行行がない
 
 ## 影響・注意点
 
