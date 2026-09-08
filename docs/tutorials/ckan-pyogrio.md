@@ -45,7 +45,10 @@ def vector_format(result: Any) -> Optional[str]:
     return None
 
 
-app = configure(sources=(sources.GEOSPATIAL_JP,))
+app = configure(
+    sources=(sources.GEOSPATIAL_JP,),
+    dependencies={"pyogrio": pyogrio},
+)
 results = app.search(
     text=os.environ.get("RHINESTONE_CKAN_QUERY", "河川"),
     limit=20,
@@ -79,10 +82,13 @@ CKANのpackage検索はdataset単位の結果をdistributionごとに展開し�
 provenanceにあるresource IDと検索metadata内の `resources` を照合して、providerが広告した
 形式だけを選んでいます。その後の `app.resolve(selected)`で配布URLを取得し、
 `resource.open("pyogrio")`が選択済みURIをpyogrioへ渡します。
+`import pyogrio`だけではRuntimeは登録されないため、利用者が所有する実体を
+`configure(dependencies={"pyogrio": pyogrio})`へ明示的に渡しています。導入方法と
+責任境界は[pyogrio Runtime](../runtimes.md#pyogrio)を参照してください。
 
 ## この例の境界
 
-- 必須: ネットワーク接続、G空間情報センターの公開CKAN API、pyogrio / GeoPandas
+- 必須: ネットワーク接続、G空間情報センターの公開CKAN API、`dependencies`へ登録したpyogrio / GeoPandas
 - credential: この公開CKANの標準経路では不要
 - 変更される値: dataset、resource ID、配布URL、形式、公開状態
 - Rhinestoneの責務: CKAN検索、dataset内のdistribution選択、公式配布URLの解決、pyogrioへの委譲
