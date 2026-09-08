@@ -12,6 +12,7 @@ from rhinestone.models import (
     Resource,
     ResourceCandidate,
     SearchDiagnostic,
+    SearchQuery,
     SearchResult,
     Source,
     SourceDefinition,
@@ -39,6 +40,57 @@ def test_source_definition_and_config_ids_must_be_non_empty() -> None:
         SourceDefinition("catalog", "")
     with pytest.raises(ConfigValidationError, match="source_id"):
         Config("", {})
+
+
+@pytest.mark.parametrize("limit", (-1, True, 1.5, "1"))
+def test_search_query_rejects_invalid_limits(limit: object) -> None:
+    with pytest.raises(ConfigValidationError, match="limit"):
+        SearchQuery(limit=cast(Any, limit))
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    (
+        (),
+        (0, 1, 2),
+        (0, 1, 2, 3, 4),
+        (0, 1, 2, "3"),
+        (False, 1, 2, 3),
+        [0, 1, 2, 3],
+    ),
+)
+def test_search_query_rejects_invalid_bboxes(bbox: object) -> None:
+    with pytest.raises(ConfigValidationError, match="bbox"):
+        SearchQuery(bbox=cast(Any, bbox))
+
+
+@pytest.mark.parametrize(
+    "time",
+    (
+        (),
+        (None,),
+        (None, None, None),
+        ("2024-01-01", None),
+        [None, None],
+    ),
+)
+def test_search_query_rejects_invalid_time_ranges(time: object) -> None:
+    with pytest.raises(ConfigValidationError, match="time"):
+        SearchQuery(time=cast(Any, time))
+
+
+def test_search_query_accepts_valid_boundary_values() -> None:
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+    query = SearchQuery(
+        bbox=(0, 1.5, 2, 3.5),
+        time=(start, None),
+        limit=0,
+    )
+
+    assert query.bbox == (0, 1.5, 2, 3.5)
+    assert query.time == (start, None)
+    assert query.limit == 0
 
 
 def test_source_definition_is_deeply_immutable() -> None:
