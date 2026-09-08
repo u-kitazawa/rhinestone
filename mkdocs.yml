@@ -7,6 +7,11 @@ nav:
       - 用語と概念: concepts.md
       - アプリケーションを構成する: configuration.md
   - ガイド:
+      - 目的別チュートリアル:
+          - 概要: tutorials/index.md
+          - e-Statで人口統計表を探す: tutorials/estat-population.md
+          - STAC画像をRasterioで開く: tutorials/stac-rasterio.md
+          - CKANのベクター配布物をpyogrioで読む: tutorials/ckan-pyogrio.md
       - データを検索する: search.md
       - Resourceを解決して開く: resolve-and-open.md
       - DiscoveryとResolution: discovery-resolution.md
