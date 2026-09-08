@@ -21,6 +21,13 @@ JsonGetter = Callable[[str, Mapping[str, Any]], Any]
 AuthenticatedJsonGetter = Callable[[str, Mapping[str, Any], Mapping[str, str]], Any]
 JsonTransport = Union[JsonGetter, AuthenticatedJsonGetter]
 
+
+class _CredentialHeaders(dict[str, str]):
+    """Mark provider headers so the built-in transport rejects redirects."""
+
+    _rhinestone_no_redirects = True
+
+
 __all__ = ["AuthenticatedJsonGetter", "JsonGetter", "JsonObject", "ProviderAdapter"]
 
 
@@ -155,11 +162,13 @@ class ProviderAdapter(ABC):
     def _request(self, url: str, params: Mapping[str, Any]) -> JsonObject:
         credentialed = self._credential_name is not None or bool(self._headers)
         self._destination_policy.authorize(url, credentialed=credentialed)
-        headers = dict(self._headers)
+        headers: Dict[str, str] = dict(self._headers)
         if self._credential_name is not None:
             headers[self._credential_header] = (
                 self._credential_prefix + self._credentials.get(self._credential_name)
             )
+        if headers:
+            headers = _CredentialHeaders(headers)
         try:
             getter = cast(Any, self._get_json)
             if headers:

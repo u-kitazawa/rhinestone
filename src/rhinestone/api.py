@@ -212,7 +212,7 @@ class Rhinestone:
     ) -> object:
         """Open a Resource, or resolve a Config/Result and open it."""
         if isinstance(value, Resource):
-            return value.open(library)
+            return self._pipeline.open_resource(value, library)
         if isinstance(value, Config):
             return self._pipeline.open(value, library=library)
         return self.resolve(value).open(library)

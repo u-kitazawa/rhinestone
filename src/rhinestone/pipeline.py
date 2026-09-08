@@ -62,6 +62,18 @@ class AccessPipeline:
     def open(self, config: Config, library: LibraryName) -> object:
         return self.resolve(config).open(library)
 
+    def open_resource(self, resource: Resource, library: LibraryName) -> object:
+        """Open an existing Resource using this pipeline's policy and runtimes."""
+        if self._execution_selector is None or self._dependencies is None:
+            raise ProviderMetadataError("Execution pipeline is not configured")
+        return self._open_resource(
+            resource,
+            library,
+            self._execution_selector,
+            self._dependencies,
+            self._destination_policy,
+        )
+
     @staticmethod
     def _open_resource(
         resource: Resource,

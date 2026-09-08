@@ -88,6 +88,9 @@ def test_policy_levels_control_when_authorization_is_applied() -> None:
     with pytest.raises(ConfigValidationError):
         DestinationPolicy(level="invalid")  # type: ignore[arg-type]
 
+    with pytest.raises(DestinationNotAllowedError):
+        strict.authorize("https://[invalid", credentialed=True)
+
 
 def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
     factory_calls: List[bool] = []
@@ -315,7 +318,29 @@ def test_configure_exposes_strict_and_none_network_policies() -> None:
     with pytest.raises(DestinationNotAllowedError):
         strict.open(config, "rasterio")
 
+    for local_uri in ("/data/rivers.tif", "file:///data/rivers.tif"):
+        local_config = Config("direct", {"uri": local_uri, "format": "geotiff"})
+        assert strict.open(local_config, "rasterio") == local_uri
+
     unrestricted = configure(
         network_policy="none", dependencies={"rasterio": Rasterio()}
     )
     assert unrestricted.open(config, "rasterio") == "https://unlisted.example/data.tif"
+
+
+def test_opening_a_resource_rechecks_the_calling_app_policy() -> None:
+    class Rasterio:
+        def open(self, uri: str) -> str:
+            return uri
+
+    config = Config(
+        "direct", {"uri": "https://unlisted.example/data.tif", "format": "geotiff"}
+    )
+    unrestricted = configure(
+        network_policy="none", dependencies={"rasterio": Rasterio()}
+    )
+    resource = unrestricted.resolve(config)
+
+    strict = configure(network_policy="strict", dependencies={"rasterio": Rasterio()})
+    with pytest.raises(DestinationNotAllowedError):
+        strict.open(resource, "rasterio")

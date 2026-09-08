@@ -95,6 +95,12 @@ class DestinationPolicy:
         """Raise when ``url`` is outside this policy's authorized URL space."""
         if self.level == "none" or (self.level == "credentialed" and not credentialed):
             return
+        try:
+            scheme = urlsplit(url).scheme.lower()
+        except ValueError:
+            scheme = "__invalid__"
+        if scheme in {"", "file"}:
+            return
         if not any(rule.matches(url) for rule in self.rules):
             raise DestinationNotAllowedError("Network destination is not authorized")
 
