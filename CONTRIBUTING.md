@@ -2,7 +2,7 @@
 
 Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Source Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
 
-Rhinestoneは、日本の公的・地理空間データへアクセスするためのKnowledge / Specification Layerです。変更を始める前に、[README](README.md) と [設計仕様](docs/spec_v4.md) を確認してください。
+Rhinestoneは、日本の公的・地理空間データへアクセスするためのKnowledge / Specification Layerです。変更を始める前に、[README](README.md)と[ドキュメントの位置付け](docs/documentation-status.md)を確認してください。
 
 ## 基本方針
 
@@ -39,6 +39,8 @@ uv sync --dev --locked
 - `pyproject.toml`: パッケージ、開発ツール、型チェックの設定
 - `.github/workflows/`: CIとドキュメント公開の設定
 
+`docs/`には現行の公開契約に加えて、v0.5への移行先を示す設計草案と履歴資料が含まれます。ナビゲーションに掲載されたガイドとAPIリファレンスを現行の利用者向け契約とし、公開APIの正確な振る舞いは実装とテストで固定します。`docs/spec_v5.md`は段階移行中の設計草案、`docs/spec_v4.md`、`docs/adapter_expansion.md`、`docs/architecture/`、`docs/specs/`は履歴資料です。詳しい更新規則は[ドキュメントの位置付け](docs/documentation-status.md)を参照してください。
+
 ## ローカル検証
 
 PRを作成する前に、CIと同じ主要チェックを実行してください。コマンドはCIと共有しているため、個別に実行せず次の入口を使用します。
@@ -58,7 +60,7 @@ CIでは、これらに加えてPython 3.10〜3.13での実行と、ビルドし
 1. 既存Issueに同じ目的の議論がないか確認する。
 2. 新しい変更の場合はIssueを作成し、目的、背景、対象範囲、想定するAPIや挙動を記載する。
 3. 小さな修正でIssueが不要な場合でも、変更理由がPR本文から分かるようにする。
-4. 仕様変更を伴う場合は、実装前に `docs/spec_v4.md` との整合性を確認する。
+4. 仕様変更を伴う場合は、[ドキュメントの位置付け](docs/documentation-status.md)を確認し、実装、テスト、公開ガイド、APIリファレンスを同じ変更で更新する。
 
 大きな設計変更や公開APIの変更は、実装を始める前にIssueで方向性を確認してください。
 

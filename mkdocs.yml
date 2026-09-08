@@ -12,6 +12,7 @@ nav:
       - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:
       - 対応状況: compatibility.md
+      - ドキュメントの位置付け: documentation-status.md
       - APIリファレンス:
           - 概要: api.md
           - Source Adapter:
@@ -37,6 +38,7 @@ exclude_docs: |
   adapter_expansion.md
   architecture/*
   spec_v4.md
+  spec_v5.md
   specs/*
 
 theme:
