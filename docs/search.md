@@ -10,6 +10,7 @@ results = app.search(text="人口", limit=10)
 
 `text`、`bbox`、`time`、`limit`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
 
+- `text`: `str`または`None`
 - `limit`: `bool`を除く0以上の整数
 - `bbox`: 数値4要素のtuple
 - `time`: `datetime`または`None`を2要素で保持するtuple
