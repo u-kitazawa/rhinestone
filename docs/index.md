@@ -10,19 +10,40 @@ Catalog -> Provider -> search -> Result -> resolve -> Resource -> open -> Data
 
 ## 最初の例
 
-```python
-from rhinestone import configure
-from rhinestone.catalogs import BUILTIN
+Rasterioを用意し、形式が分かっているGeoTIFFを直接Resourceへ解決します。
 
-app = configure(catalog=BUILTIN)
-result = app.search(text="河川")[0]
-resource = app.resolve(result)
-
-with resource.open("rasterio") as dataset:
-    ...
+```console
+python -m pip install rhinestone rasterio
 ```
 
-検索結果を直接解決できるため、通常のフローでConfigを組み立てる必要はありません。
+```python
+import rasterio
+
+from rhinestone import Config, configure
+
+app = configure(dependencies={"rasterio": rasterio})
+resource = app.resolve(
+    Config(
+        source_id="direct",
+        settings={
+            "uri": "https://raw.githubusercontent.com/rasterio/rasterio/57d9fda6c31c5595ea54262f905b43c5f8419e06/tests/data/RGB.byte.tif",
+            "format": "geotiff",
+            "media_type": "image/tiff",
+        },
+    )
+)
+
+with resource.open("rasterio") as dataset:
+    print(dataset.width, "x", dataset.height)
+    print("bands:", dataset.count)
+```
+
+この例は外部Providerの検索順や検索結果に依存しません。URIはRasterioの
+公開テストデータを不変のcommitに固定しています。`direct`は利用者がURIと形式を
+すでに知っている場合の入口です。通常のデータ発見では、[Getting started](getting-started.md)
+のようにCatalog内を検索し、Resultを直接Resourceへ解決します。Rasterioは利用者が
+所有するRuntimeであり、`configure(dependencies=...)`への明示的な注入が必要です。
+詳細は[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
 ## 主要概念
 
