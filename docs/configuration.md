@@ -81,6 +81,28 @@ app = configure(
 )
 ```
 
+認証付き CKAN、STAC、OGC Source は、Provider に secret ではなく Credential の論理名を
+指定します。
+
+```python
+catalog = Catalog((Provider(
+    id="private-stac",
+    adapter_type="stac",
+    settings={
+        "endpoint": "https://stac.example/api",
+        "credential": "stac-token",
+    },
+),))
+app = configure(
+    catalog=catalog,
+    credentials={"stac-token": lambda: os.environ["STAC_TOKEN"]},
+)
+```
+
+`network_policy` は `credentialed`（既定）、`strict`、`none` から選べます。`credentialed`
+は認証付き通信だけを Catalog endpoint に制限し、`strict` は ExecutionAdapter の HTTP
+アクセス全体を制限します。認可されない宛先では Credential factory は評価されません。
+
 ## 高度なAPI
 
 `Config`、Source Adapter、Resolver、AccessPlanは内部パイプラインを直接扱う高度なAPIです。通常の検索・解決では`Result`を`app.resolve()`へ渡してください。

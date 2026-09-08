@@ -25,15 +25,19 @@ from .models import (
     SourceDefinition,
 )
 from .search import SearchResults
+from .security import DestinationPolicy, DestinationRule, NetworkPolicyLevel
 
 __all__ = [
     "AccessPlan",
     "Catalog",
     "Config",
+    "DestinationPolicy",
+    "DestinationRule",
     "Dependencies",
     "FileAccessPlan",
     "LibraryName",
     "Metadata",
+    "NetworkPolicyLevel",
     "Provenance",
     "Provider",
     "RemoteDatasetPlan",
