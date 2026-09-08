@@ -22,6 +22,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     CredentialLoadError,
     CredentialUnavailableError,
+    DependencyUnavailableError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceAccessError,
@@ -275,6 +276,30 @@ def test_dcat_distinguishes_bad_config_fetch_parse_and_missing_dataset() -> None
         dcat_adapter("not valid turtle (").load(dcat_config())
     with pytest.raises(ResourceNotFoundError):
         dcat_adapter().load(dcat_config(dataset="https://absent.example"))
+
+
+def test_dcat_wraps_direct_runtime_factory_failure() -> None:
+    cause = ImportError("rdflib is not installed")
+
+    def unavailable_runtime() -> Any:
+        raise cause
+
+    with pytest.raises(DependencyUnavailableError, match="RDF runtime") as captured:
+        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(dcat_config())
+
+    assert captured.value.__cause__ is cause
+
+
+def test_dcat_preserves_dependency_error_from_runtime_factory() -> None:
+    expected = DependencyUnavailableError("rdflib is not configured")
+
+    def unavailable_runtime() -> Any:
+        raise expected
+
+    with pytest.raises(DependencyUnavailableError) as captured:
+        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(dcat_config())
+
+    assert captured.value is expected
 
 
 @pytest.mark.parametrize("adapter", [dcat_adapter()])
