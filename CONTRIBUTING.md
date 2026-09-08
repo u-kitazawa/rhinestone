@@ -66,11 +66,11 @@ CIでは、これらに加えてPython 3.10〜3.13での実行と、ビルドし
 
 ## ブランチを作成する
 
-`main` を最新状態にしてから、目的が分かるブランチを作成します。
+通常の変更は `develop` を最新状態にしてから、目的が分かるブランチを作成します。`main` は公開済み・リリース可能な状態を表し、通常の作業ブランチの起点にはしません。
 
 ```console
-git switch main
-git pull origin main
+git switch develop
+git pull origin develop
 git switch -c <type>/<short-description>
 ```
 
@@ -119,7 +119,7 @@ refactor: simplify source composition
 git push -u origin <type>/<short-description>
 ```
 
-GitHubで、作業ブランチから `main` へのPull Requestを作成してください。
+GitHubで、通常の作業ブランチから `develop` へのPull Requestを作成してください。`main` へのPull Requestは、`develop`からのrelease promotionまたは `hotfix/*` からの緊急修正に限ります。詳細は[ブランチ運用方針](docs/branch-policy.md)を参照してください。
 
 PR本文には、少なくとも次の内容を含めます。
 
@@ -141,7 +141,7 @@ PR本文には、少なくとも次の内容を含めます。
 
 公開APIの変更、互換性への影響、未対応の事項があれば記載します。
 
-Fixes #<issue-number>
+Refs #<issue-number>
 ```
 
 Issueを自動的にクローズしない場合は、`Fixes #<issue-number>` ではなく、関連Issueへのリンクや `Refs #<issue-number>` などを使用してください。
@@ -174,8 +174,10 @@ git push
 1. IssueまたはPR本文で変更の目的と範囲を確認する。
 2. CIがすべて成功していることを確認する。
 3. レビューコメントへ対応し、必要な追加テストを行う。
-4. 承認後、メンテナーが`main`へマージする。
-5. `main`へのマージ後、ドキュメント公開workflowがMkDocsを実行してGitHub Pagesへ反映する。
+4. 承認後、メンテナーが通常のPRを`develop`へマージする。
+5. リリース時に、メンテナーが`develop`から`main`へのpromotion PRを作成してマージする。squash mergeを許可する。
+6. `main`へhotfixをマージした場合は、同じ変更を`main`から`develop`へ必ず還流させる。
+7. `main`へのマージ後、ドキュメント公開workflowがMkDocsを実行してGitHub Pagesへ反映する。
 
 このリポジトリでは、PRのマージ方法や権限設定はGitHubリポジトリの設定に従います。マージ前に、CIの失敗を無視したり、未確認の変更を残したりしないでください。
 
