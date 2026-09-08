@@ -44,11 +44,11 @@ class DcatAdapter(ProviderAdapter):
         serialization = settings.get("serialization", self._serialization)
         if serialization not in ("json-ld", "turtle", "xml"):
             raise ConfigValidationError("Expected json-ld, turtle or xml serialization")
+        rdf = self._rdf_runtime_factory()
         try:
             document = self._get_document(uri)
-            rdf = self._rdf_runtime_factory()
         except Exception as error:
-            raise ProviderMetadataError("Could not load RDF catalog/runtime") from error
+            raise ProviderMetadataError("Could not load RDF catalog") from error
         try:
             graph = rdf.Graph()
             graph.parse(data=document, format=serialization, publicID=uri)

@@ -43,6 +43,8 @@ app = configure(catalog=catalog)
 ## Runtime
 
 外部Runtimeは利用者が所有し、実体または遅延factoryとして渡します。
+公開APIではどちらも単一の`dependencies`引数へ渡しますが、内部では利用段階に応じて
+Source RuntimeとExecution Runtimeへ分離されます。
 
 ```python
 app = configure(
@@ -57,6 +59,14 @@ app = configure(
 ```
 
 HTTP JSON、HTTP text、JSON serviceのRuntimeは組み込みです。
+
+| 種類 | 用途 | factoryの評価時点 | 例 |
+| --- | --- | --- | --- |
+| Source Runtime | provider / protocol metadataの解釈 | 対象Sourceの`search()`または`resolve()`で初めて必要になった時 | `rdflib` |
+| Execution Runtime | 解決済みResourceを開く | `Resource.open()`で初めて必要になった時 | `gdal`、`rasterio`、`pyogrio` |
+
+`configure()`はどちらのfactoryも評価しません。Source Runtimeは解決済みResourceや
+AccessPlanへ保持されず、Execution RuntimeだけがResourceのopen経路から参照されます。
 
 ## Credential
 

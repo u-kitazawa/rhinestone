@@ -12,6 +12,7 @@ nav:
       - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:
       - 対応状況: compatibility.md
+      - 外部ライブラリ依存方針: dependency-policy.md
       - ドキュメントの位置付け: documentation-status.md
       - APIリファレンス:
           - 概要: api.md

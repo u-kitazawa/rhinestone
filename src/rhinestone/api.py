@@ -53,6 +53,9 @@ from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .resolution import Resolver
 from .search import SearchCoordinator, SearchResults
 
+_SOURCE_RUNTIME_NAMES = frozenset({"rdflib"})
+_EXECUTION_RUNTIME_NAMES = frozenset({"gdal", "json-service", "rasterio", "pyogrio"})
+
 
 class _ConfiguredSourceAdapter:
     """Bind one public source id to one built-in adapter instance."""
@@ -114,10 +117,22 @@ class Rhinestone:
             selected_sources = tuple(catalog)
 
         runtime_dependencies = dict(dependencies or {})
-        runtime_dependencies.setdefault(
+        source_dependencies = DependencyRegistry(
+            {
+                name: value
+                for name, value in runtime_dependencies.items()
+                if name in _SOURCE_RUNTIME_NAMES
+            }
+        )
+        execution_dependencies = {
+            name: value
+            for name, value in runtime_dependencies.items()
+            if name in _EXECUTION_RUNTIME_NAMES
+        }
+        execution_dependencies.setdefault(
             "json-service", lambda: _http.JsonServiceRuntime()
         )
-        dependency_registry = DependencyRegistry(runtime_dependencies)
+        execution_dependency_registry = DependencyRegistry(execution_dependencies)
         credential_registry = CredentialRegistry(credentials or {})
 
         configured_sources = [_ConfiguredSourceAdapter("direct", DirectAdapter())]
@@ -134,7 +149,7 @@ class Rhinestone:
                     source_id,
                     _build_source_adapter(
                         source_definition,
-                        dependency_registry,
+                        source_dependencies,
                         credential_registry,
                     ),
                 )
@@ -159,7 +174,7 @@ class Rhinestone:
             adapter_registry=adapters,
             resolver=Resolver(),
             execution_selector=ExecutionAdapterSelector(adapters.execution_adapters),
-            dependencies=dependency_registry,
+            dependencies=execution_dependency_registry,
         )
         self._search = SearchCoordinator(source_adapters)
 

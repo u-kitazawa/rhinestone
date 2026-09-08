@@ -46,19 +46,19 @@ class _GeoDataFrame(Protocol):
 
 
 class Dependencies(TypedDict, total=False):
-    """IDE-discoverable names for supported external runtime dependencies."""
+    """IDE-discoverable names for supported Source and Execution runtimes."""
 
     gdal: DependencyValue
-    """GDAL Python bindings used for raster, vector, and tile access."""
+    """Execution Runtime used for raster, vector, and tile access."""
 
     rasterio: DependencyValue
-    """Rasterio used for COG and GeoTIFF access."""
+    """Execution Runtime used for COG and GeoTIFF access."""
 
     pyogrio: DependencyValue
-    """Pyogrio used for vector data access."""
+    """Execution Runtime used for vector data access."""
 
     rdflib: DependencyValue
-    """RDFLib used for DCAT catalog interpretation."""
+    """Source Runtime used when searching or resolving a DCAT catalog."""
 
 
 def _freeze(value: Any) -> Any:
