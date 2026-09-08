@@ -40,6 +40,7 @@ with resource.open("rasterio") as dataset:
 ## 次に読む
 
 - [Getting started](getting-started.md)
+- [目的別チュートリアル](tutorials/index.md)
 - [用語と概念](concepts.md)
 - [アプリケーションを構成する](configuration.md)
 - [データを検索する](search.md)

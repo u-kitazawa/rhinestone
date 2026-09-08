@@ -8,6 +8,7 @@ Rhinestoneはv0.5の設計へ段階的に移行しています。設計草案と
 
 - [はじめに](getting-started.md)
 - [ガイド](search.md)
+- [目的別チュートリアル](tutorials/index.md)
 - [APIリファレンス](api.md)
 - [対応状況](compatibility.md)
 - [Runtimeの導入ガイド](runtimes.md)
