@@ -13,7 +13,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
+      - name: Verify release commit is on main
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git fetch origin main --no-tags
+          release_commit="$(git rev-list -n 1 "refs/tags/$RELEASE_TAG")"
+          git merge-base --is-ancestor "$release_commit" origin/main
       - uses: astral-sh/setup-uv@v6
       - run: uv build
       - uses: actions/upload-artifact@v4
