@@ -1,6 +1,6 @@
 # Rhinestone Examples
 
-Examples are ordered from resource resolution to live federated search. Run all
+Examples are ordered from resource resolution to live single-source search. Run all
 commands from the repository root.
 
 | Example | Kind | What it demonstrates |
@@ -10,7 +10,7 @@ commands from the repository root.
 | [04 Inspect Resource](04_inspect_resource/README.md) | Deterministic | Knowledge retained on Resource |
 | [05 GDAL dependency](05_gdal_dependency/README.md) | Runtime | User-owned GDAL and execution selection |
 | [06 STAC COG](06_stac_cog/README.md) | Live/runtime | STAC asset to Rasterio |
-| [07 Search and fetch](07_search_and_fetch/README.md) | Live/demo | Federated search back through Config |
+| [07 Search and fetch](07_search_and_fetch/README.md) | Live/demo | Single-source CKAN search and bound Result resolution |
 
 Base setup:
 
