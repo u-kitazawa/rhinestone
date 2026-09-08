@@ -61,7 +61,7 @@ Provider、Catalog、Result、Resource には保存されません。`credential
 
 ## `Rhinestone.search()`
 
-検索パラメータからResultを返します。
+Catalogに構成されたProvider内のデータ候補を検索し、Resultを返します。Provider自体を発見するAPIではありません。
 
 ```python
 results = app.search(text="河川", limit=10)

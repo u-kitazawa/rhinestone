@@ -16,6 +16,8 @@ from ....registry import CredentialRegistry
 from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
+_FORMAT_ALIASES = {"geopackage": "gpkg"}
+
 
 class CkanAdapter(ProviderAdapter):
     adapter_type = "ckan"
@@ -154,7 +156,7 @@ class CkanAdapter(ProviderAdapter):
         uri = self._required_string(resource, "url")
         return ResourceCandidate(
             uri=uri,
-            format=_optional_string(resource.get("format")),
+            format=_canonical_format(resource.get("format")),
             media_type=_optional_string(resource.get("mimetype")),
             attributes=resource,
         )
@@ -162,3 +164,11 @@ class CkanAdapter(ProviderAdapter):
 
 def _optional_string(value: Any) -> Optional[str]:
     return value if isinstance(value, str) else None
+
+
+def _canonical_format(value: Any) -> Optional[str]:
+    format_name = _optional_string(value)
+    if format_name is None:
+        return None
+    normalized = format_name.strip().lower()
+    return _FORMAT_ALIASES.get(normalized, normalized)
