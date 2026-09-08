@@ -74,6 +74,8 @@ git pull origin develop
 git switch -c <type>/<short-description>
 ```
 
+通常の変更を `develop` や `main` へ直接pushしてはいけません。必ず作業ブランチへcommitしてpushし、Pull Requestを経由して統合してください。`main`へのrelease promotionやhotfixも、[ブランチ運用方針](docs/branch-policy.md)に定めたPull Requestの手順に従います。
+
 既存の履歴では、次のような接頭辞を使用しています。
 
 - `feat/`: 機能追加
@@ -120,6 +122,8 @@ git push -u origin <type>/<short-description>
 ```
 
 GitHubで、通常の作業ブランチから `develop` へのPull Requestを作成してください。`main` へのPull Requestは、`develop`からのrelease promotionまたは `hotfix/*` からの緊急修正に限ります。詳細は[ブランチ運用方針](docs/branch-policy.md)を参照してください。
+
+`develop` や `main` に直接pushして変更を統合してはいけません。Pull Requestの作成後は、CIとレビューが完了してからマージします。
 
 PR本文には、少なくとも次の内容を含めます。
 
