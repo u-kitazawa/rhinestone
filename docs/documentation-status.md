@@ -10,6 +10,7 @@ Rhinestoneはv0.5の設計へ段階的に移行しています。設計草案と
 - [ガイド](search.md)
 - [APIリファレンス](api.md)
 - [対応状況](compatibility.md)
+- [Runtimeの導入ガイド](runtimes.md)
 
 文書と実装が矛盾する場合は、実装とテストを確認し、同じ変更で公開ドキュメントを更新します。
 

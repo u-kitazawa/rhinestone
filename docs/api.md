@@ -101,7 +101,7 @@ data = app.open(result, "rasterio")
 
 ## `Runtime`
 
-GDAL、Rasterio、pyogrio、RDFLibなど、Resourceを開くための利用者所有の外部実行環境です。HTTP JSON、HTTP text、JSON serviceは組み込みRuntimeを使用します。
+GDAL、Rasterio、pyogrio、RDFLibなど、利用者が所有する外部実行環境です。RDFLibはDCATの検索・解決時に、GDAL、Rasterio、pyogrioは`Resource.open()`時に必要になります。HTTP JSON、HTTP text、JSON serviceは組み込みRuntimeを使用します。インストール例と検証済み範囲は[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
 ## 高度なモデル
 

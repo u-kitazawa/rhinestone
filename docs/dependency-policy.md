@@ -14,6 +14,8 @@ Rhinestoneは、配信元・プロトコル固有の解釈を必要な範囲で�
 
 CoreはGDAL、Rasterio、pyogrio、RDFLibなどを直接importしません。HTTP通信も公開APIでtransportを注入させず、Rhinestoneの組み込みtransportを使います。
 
+Runtimeの導入例と、実際にAdapterを実行して確認したバージョンは[Runtimeの導入ガイド](runtimes.md)に記載します。そこにある`tested`は検証済み範囲であり、`pyproject.toml`のdependency constraint、`uv.lock`の再現範囲、または将来の互換性保証を意味しません。
+
 公開APIではSource RuntimeとExecution Runtimeを単一の`dependencies`引数で受け取り、Composition Rootが内部Registryへ分離して注入します。`configure()`はどちらのfactoryも評価しません。
 
 - Source Runtimeはprovider / protocol metadataの解釈に必要で、対象Sourceの`search()`または`resolve()`で初めて必要になった時に評価します。現行例はDCATの`rdflib`です。
