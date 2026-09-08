@@ -13,6 +13,28 @@ Catalog -> Provider -> Result -> Resource
 - `Result`: 検索で見つかった候補
 - `Resource`: 実際に利用できる具体的なデータ
 
+## 対象ユーザー
+
+Rhinestoneは、次のような利用者を対象にしています。
+
+- 日本の行政・公的オープンデータをPythonから横断的に探索したい利用者
+- GIS・リモートセンシングの研究者
+- 公的データを扱うデータエンジニア・データ基盤開発者
+- Rasterio、GDAL、pyogrioなどへ渡す前のProvider固有処理を共通化したい利用者
+
+Rhinestoneは、Providerの発見とResourceへの解決を担当し、実際のGIS処理やデータ解析は既存の専門ライブラリへ委譲します。
+
+## 対象外のユースケース
+
+RhinestoneはGIS処理ライブラリやワークフローエンジンではありません。次の用途には、そのまま利用できないか、追加の検討が必要です。
+
+- GISの空間演算・形式変換・解析そのもの
+- ETLやワークフローの実行基盤
+- 外部RuntimeやProvider固有の制約を完全に隠蔽すること
+- 0.1.x時点で公開APIの長期固定を前提とする本番システム
+
+対応するProvider、Runtime、形式の範囲は[Compatibility](docs/compatibility.md)を、Runtimeの注入方法は[Configuration](docs/configuration.md)を参照してください。RhinestoneはAlpha版のため、公開APIは今後変更される可能性があります。
+
 ## インストール
 
 ```console
