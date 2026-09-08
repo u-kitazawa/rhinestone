@@ -1,5 +1,7 @@
 # テスト戦略
 
+> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
+
 ## Deterministic Tests
 
 通常の CI はネットワークへ依存しない代表 Fixture と golden/contract test を使用します。CKAN、e-Stat、STAC、OGC などの Source Adapter ごとに次を検証します。
