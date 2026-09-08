@@ -45,6 +45,10 @@ class ResourceAccessError(RhinestoneError):
     """A selected resource could not be accessed."""
 
 
+class DestinationNotAllowedError(ResourceAccessError):
+    """A network destination is outside the configured execution policy."""
+
+
 class IntegrityError(RhinestoneError):
     """Resource integrity verification failed."""
 
