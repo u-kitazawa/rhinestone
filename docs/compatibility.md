@@ -8,7 +8,9 @@
 | --- | --- | --- |
 | Python | 3.10 以上 | CI は 3.10〜3.13 を対象にする。 |
 | HTTP | Python standard library | Source metadata、DCAT文書、ODPT JSON serviceのHTTP通信はRhinestoneに組み込む。 |
-| GDAL / Rasterio / pyogrio | 利用者が供給する版 | Rhinestone は version を固定・管理しない。各 adapter が呼ぶ API と対象 format の互換性は利用者側で確認する。 |
+| GDAL / Rasterio / pyogrio | 利用者が供給する版 | Rhinestone は version を固定・管理しない。各 adapter が呼ぶ API と対象 format の互換性は利用者側で確認する。検証済み範囲は[Runtimeの導入ガイド](runtimes.md)に記載する。 |
+
+この表は、Rhinestoneが対応するProvider、format、APIの範囲を示します。Runtime packageのインストール可能性やnative libraryの組み合わせを保証するものではありません。Runtimeごとの installation recipe、lifecycle、tested versionは[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
 ## Source Adapter
 

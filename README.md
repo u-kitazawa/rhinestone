@@ -99,6 +99,7 @@ RhinestoneはGIS I/O、形式変換、空間演算、データ解析を実装せ
 - [Configuration](docs/configuration.md)
 - [API reference](docs/api.md)
 - [Compatibility](docs/compatibility.md)
+- [Runtime guide](docs/runtimes.md)
 
 ## 開発環境
 

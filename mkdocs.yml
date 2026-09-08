@@ -12,6 +12,7 @@ nav:
       - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:
       - 対応状況: compatibility.md
+      - Runtime の導入ガイド: runtimes.md
       - ブランチ運用方針: branch-policy.md
       - 外部ライブラリ依存方針: dependency-policy.md
       - ドキュメントの位置付け: documentation-status.md
