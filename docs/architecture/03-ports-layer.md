@@ -14,7 +14,7 @@ Source Adapter と Execution Adapter の登録状態を管理します。Registr
 初期実装で想定する built-in Adapter は次のとおりです。
 
 ```text
-Source: CkanAdapter, EStatAdapter, StacAdapter, OgcAdapter, DirectAdapter
+Source: CkanAdapter, StacAdapter, OgcAdapter, DirectAdapter
 Execution: GdalAdapter, RasterioAdapter, PyogrioAdapter
 ```
 

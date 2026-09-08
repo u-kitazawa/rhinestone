@@ -21,22 +21,6 @@ config:
     resource_id: abcdef
 ```
 
-e-Stat の例:
-
-```yaml
-catalog:
-  sources:
-    estat:
-      adapter_type: estat
-      settings:
-        endpoint: https://api.e-stat.go.jp/rest/3.0/app/json
-        language: J
-config:
-  source_id: estat
-  settings:
-    stats_data_id: "0000000000"
-```
-
 ## 不変条件
 
 - Config は実行によって暗黙に変更されません（MUST NOT）。

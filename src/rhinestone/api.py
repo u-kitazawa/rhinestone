@@ -25,7 +25,6 @@ from .adapters.source import (
     CkanAdapter,
     DcatAdapter,
     DirectAdapter,
-    EStatAdapter,
     GsiFundamentalAdapter,
     OdptAdapter,
     OgcFeaturesAdapter,
@@ -264,13 +263,6 @@ def _build_source_adapter(
     if adapter_type == "ckan":
         _reject_options(adapter_type, settings, ("endpoint",))
         return CkanAdapter(get_json=json_transport, **settings)
-    if adapter_type == "estat":
-        _reject_options(adapter_type, settings, ("endpoint", "language"))
-        return EStatAdapter(
-            get_json=json_transport,
-            credential_factory=lambda: credentials.get("estat"),
-            **settings,
-        )
     if adapter_type == "stac":
         _reject_options(adapter_type, settings, ("endpoint",))
         return StacAdapter(get_json=json_transport, **settings)

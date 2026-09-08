@@ -18,7 +18,6 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
 
     assert tuple(definition.id for definition in definitions) == (
         "geospatial-jp",
-        "estat",
         "plateau",
         "gsi",
         "odpt",
@@ -28,7 +27,6 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
     assert tuple(entry.definition for entry in catalog_entries) == definitions
     assert tuple(entry.name for entry in catalog_entries) == (
         "GEOSPATIAL_JP",
-        "ESTAT",
         "PLATEAU",
         "GSI",
         "ODPT",
@@ -40,15 +38,13 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
 
 def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
     assert sources.GEOSPATIAL_JP is sources.ALL[0]
-    assert sources.ESTAT is sources.ALL[1]
-    assert sources.PLATEAU is sources.ALL[2]
-    assert sources.GSI is sources.ALL[3]
-    assert sources.ODPT is sources.ALL[4]
-    assert sources.SEARCH_CKAN_JP is sources.ALL[5]
+    assert sources.PLATEAU is sources.ALL[1]
+    assert sources.GSI is sources.ALL[2]
+    assert sources.ODPT is sources.ALL[3]
+    assert sources.SEARCH_CKAN_JP is sources.ALL[4]
     assert set(sources.__all__) == {
         "ALL",
         "GEOSPATIAL_JP",
-        "ESTAT",
         "PLATEAU",
         "GSI",
         "ODPT",
@@ -56,7 +52,6 @@ def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
     }
     assert {
         "GEOSPATIAL_JP",
-        "ESTAT",
         "PLATEAU",
         "GSI",
         "ODPT",
@@ -69,9 +64,6 @@ def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
 def test_catalog_contains_service_configuration_but_not_runtime_values() -> None:
     assert sources.GEOSPATIAL_JP.settings["endpoint"] == (
         "https://www.geospatial.jp/ckan"
-    )
-    assert sources.ESTAT.settings["endpoint"] == (
-        "https://api.e-stat.go.jp/rest/3.0/app/json"
     )
     assert sources.ODPT.settings["endpoint"] == "https://api.odpt.org/api/v4"
     for source in sources.ALL:

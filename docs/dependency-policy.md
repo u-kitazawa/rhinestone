@@ -8,7 +8,7 @@ Rhinestoneは、配信元・プロトコル固有の解釈を必要な範囲で�
 | --- | --- | --- |
 | Core | 軽量な必須依存だけを持つ | `jsonschema` |
 | HTTP transport | 組み込みで提供する | provider metadata、JSON service |
-| Source Adapter | provider / protocolの解釈を担当する。専用ライブラリは意味論の委譲が必要な場合だけ採用する | e-Stat、STAC、DCAT |
+| Source Adapter | provider / protocolの解釈を担当する。専用ライブラリは意味論の委譲が必要な場合だけ採用する | STAC、DCAT |
 | Execution Adapter | 解決済みResourceを専門runtimeの呼び出しへ翻訳する | GDAL、Rasterio、pyogrio |
 | Runtime | 利用者が実体またはfactoryとして供給する | `gdal`、`rasterio`、`pyogrio`、`rdflib` |
 
@@ -25,7 +25,6 @@ Runtimeの導入例と、実際にAdapterを実行して確認したバージョ
 
 | Source | 候補ライブラリ | 判断 | 適用する境界 |
 | --- | --- | --- | --- |
-| e-Stat | `pyestat` | Source Adapterには導入しない。`resolve()`は組み込みHTTPでmetadata、`statsDataId`、queryを解決する。`open()`の専門runtimeが必要になった時点で採用を検証する | 将来のe-Stat Execution Adapter / `pyestat` runtime |
 | DCAT | `rdflib` | RDFの解釈に必要なSource Runtimeとして利用する。依存は利用者から供給し、DCATの`search()`または`resolve()`で遅延評価する | DCAT Source Adapter |
 | STAC | `pystac-client` / `pystac` | 現在の範囲では組み込みHTTP adapterを維持する。conformance、pagination、filter、asset semanticsの実装が必要になった時に採用を再検討する | 将来のSTAC Source Adapter |
 | PLATEAU | `plateaukit` | CityGMLの意味論を委譲できるか、dataset install lifecycleを持ち込まずに使えるかをPoCで確認するまで採用しない | PoC後にSourceまたはExecutionの境界を決定 |
@@ -65,8 +64,6 @@ Runtime identity           = どの外部実行環境を呼び出すか
 ```
 
 現行の組み込みAdapterは1つのAdapterと1つのRuntimeが対応するため、`ExecutionAdapter.name`を選択名とDependency Registryのキーに兼用します。これは現在の契約として維持します。
-
-将来、e-Statのように`estat` Adapterが`pyestat` Runtimeを使うケースを追加する場合は、Adapter選択名とruntime dependency名を別フィールドへ分離します。その変更までは、未使用の`runtime_name`を先行導入せず、既存の`name`契約を増やしません。
 
 ## Adapter chain
 

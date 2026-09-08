@@ -19,7 +19,6 @@
 | `ckan` | CKAN Action API (`/api/3/action`) | 指定 resource の公式 download URL | HTML catalog、URL 推測、resource 検索以外の Action API は非対応。 |
 | `dcat` | DCAT RDF: JSON-LD、Turtle、RDF/XML | `dcat:downloadURL` を持つ Distribution | 他の RDF serialization、`accessURL` だけの Distribution は非対応。 |
 | `direct` | provider 非依存 | 利用者が明示する URI / format | format、media type、実行方法の推測はしない。 |
-| `estat` | e-Stat API 3.0 | 統計表 metadata と検索結果 | 統計データ本体を開く built-in Execution Adapter はない。 |
 | `gsi-fundamental` | 基盤地図情報の取得済み basic vector | ローカル GML、ZIP 内の明示 entry point | DEM、ログイン、ダウンロード自動化、ZIP 以外の archive は非対応。 |
 | `static` | Catalog または利用者が管理する静的定義（組み込み GSI は `sources.json` の `gsi`） | HTTPS / XYZ / EPSG:3857 / 256 px の PNG・JPEG tile など、定義済み Resource | 定義外 item、未定義のアクセス方式、仕様の推測は非対応。 |
 | `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Config 内の secret、他 resource type は非対応。 |

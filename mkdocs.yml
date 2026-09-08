@@ -9,7 +9,6 @@ nav:
   - ガイド:
       - 目的別チュートリアル:
           - 概要: tutorials/index.md
-          - e-Statで人口統計表を探す: tutorials/estat-population.md
           - STAC画像をRasterioで開く: tutorials/stac-rasterio.md
           - CKANのベクター配布物をpyogrioで読む: tutorials/ckan-pyogrio.md
       - データを検索する: search.md
@@ -28,7 +27,6 @@ nav:
               - CKAN: api/adapters/ckan.md
               - DCAT: api/adapters/dcat.md
               - Direct: api/adapters/direct.md
-              - e-Stat: api/adapters/estat.md
               - 基盤地図情報: api/adapters/gsi-fundamental.md
               - ODPT: api/adapters/odpt.md
               - OGC API Features: api/adapters/ogc-features.md

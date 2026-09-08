@@ -83,7 +83,6 @@ def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
     assert isinstance(sources.ALL, tuple)
     assert sources.ALL == (
         sources.GEOSPATIAL_JP,
-        sources.ESTAT,
         sources.PLATEAU,
         sources.GSI,
         sources.ODPT,
@@ -109,7 +108,7 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
     configure(
         sources=sources.ALL,
         dependencies={"rasterio": lambda: dependency_calls.append(True)},
-        credentials={"estat": lambda: credential_calls.append(True) or "secret"},
+        credentials={"odpt": lambda: credential_calls.append(True) or "secret"},
     )
 
     assert dependency_calls == []

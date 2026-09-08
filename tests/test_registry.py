@@ -43,8 +43,8 @@ def test_unknown_adapter_lookup_has_a_domain_specific_failure() -> None:
     """未登録 Source を汎用 KeyError にせず、呼び出し側が安定して判別するために必要である。"""
     registry = AdapterRegistry(source_adapters=(), execution_adapters=())
 
-    with pytest.raises(UnsupportedSourceError, match="estat"):
-        registry.source("estat")
+    with pytest.raises(UnsupportedSourceError, match="missing-source"):
+        registry.source("missing-source")
 
 
 def test_unknown_execution_adapter_has_a_domain_specific_failure() -> None:

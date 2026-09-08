@@ -1,6 +1,8 @@
 # Rhinestone 仕様書 v0.5
 
 > **文書ステータス: 移行先の設計草案。** Rhinestoneはこの設計へ段階的に移行中です。未実装または現在と異なるAPI例を含むため、現行の公開契約には[利用者向けガイドとAPIリファレンス](documentation-status.md)を使用してください。
+>
+> e-Stat 統計表 API（`EStatAdapter`、`estat-api`、`pyestat` 経路）は #56 の決定により現行契約から削除されています。この文書内の e-Stat 記述は履歴上の設計案です。
 
 ## 1. 概要
 
