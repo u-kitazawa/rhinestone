@@ -230,6 +230,34 @@ class SearchQuery:
     time: Optional[Tuple[Optional[datetime], Optional[datetime]]] = None
     limit: Optional[int] = None
 
+    def __post_init__(self) -> None:
+        if self.limit is not None and (type(self.limit) is not int or self.limit < 0):
+            raise ConfigValidationError("limit must be a non-negative integer")
+        raw_bbox = cast(object, self.bbox)
+        if raw_bbox is not None:
+            if not isinstance(raw_bbox, tuple):
+                raise ConfigValidationError("bbox must be a tuple of four numbers")
+            bbox_values = cast(Tuple[Any, ...], raw_bbox)
+            if len(bbox_values) != 4 or any(
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                for value in bbox_values
+            ):
+                raise ConfigValidationError("bbox must be a tuple of four numbers")
+        raw_time = cast(object, self.time)
+        if raw_time is not None:
+            if not isinstance(raw_time, tuple):
+                raise ConfigValidationError(
+                    "time must be a tuple of two datetime or None values"
+                )
+            time_values = cast(Tuple[Any, ...], raw_time)
+            if len(time_values) != 2 or any(
+                value is not None and not isinstance(value, datetime)
+                for value in time_values
+            ):
+                raise ConfigValidationError(
+                    "time must be a tuple of two datetime or None values"
+                )
+
     @property
     def supplied_conditions(self) -> FrozenSet[str]:
         return frozenset(
