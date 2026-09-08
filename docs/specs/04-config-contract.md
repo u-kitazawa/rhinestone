@@ -1,5 +1,7 @@
 # Config 契約
 
+> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
+
 ## 役割
 
 Config は「何のデータを利用したいか」を表す宣言的入力です。Source Adapter が provider 固有の schema と検証を所有し、Core に巨大な provider union schema を置きません。

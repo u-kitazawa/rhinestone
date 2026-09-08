@@ -1,5 +1,7 @@
 # Source Adapter 契約
 
+> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
+
 ## 責務
 
 Source Adapter は外部 provider または Catalog で管理された静的定義と Core の境界です。Config の provider 固有項目、API request、response schema、resource 構造、format 表現を理解し、Core が扱える Source を生成します。
