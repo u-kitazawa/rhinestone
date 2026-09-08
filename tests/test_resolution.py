@@ -76,7 +76,6 @@ def test_unknown_format_fails_instead_of_guessing_from_url_suffix() -> None:
     (
         ("cog", "remote-dataset"),
         ("wms", "service-query"),
-        ("estat-api", "service-query"),
         ("ogc-api-features", "service-query"),
         ("csv", "file"),
     ),
@@ -92,6 +91,17 @@ def test_known_delivery_shapes_create_explicit_access_plans(
     resource = Resolver().resolve(make_source(candidate))
 
     assert resource.access_plan.kind == expected_kind
+
+
+def test_removed_estat_format_is_not_a_builtin_service_format() -> None:
+    """削除したe-Stat統計表API形式を汎用service-queryとして扱わない。"""
+    candidate = ResourceCandidate(
+        "https://example.jp/resource", "estat-api", "application/json"
+    )
+
+    resource = Resolver().resolve(make_source(candidate))
+
+    assert resource.access_plan.kind == "file"
 
 
 def test_archive_knowledge_is_preserved_in_file_plan() -> None:

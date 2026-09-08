@@ -11,7 +11,6 @@ configure -> search -> Resultを選ぶ -> resolve -> Resourceを開く
 
 | 目的 | 解決パターン | 最後に得るもの |
 | --- | --- | --- |
-| [e-Statで人口統計表を探す](estat-population.md) | 検索結果からprovider固有の識別子を解決 | 統計表metadataとservice-query Resource |
 | [STAC画像をRasterioで開く](stac-rasterio.md) | Itemからdata assetを選択 | Rasterioのdataset |
 | [CKANのベクター配布物をpyogrioで読む](ckan-pyogrio.md) | dataset内のdistributionを選択 | GeoDataFrame相当のオブジェクト |
 

@@ -107,7 +107,7 @@ DCAT Source を直接構成する場合も、`dependencies={"rdflib": rdflib}` �
 
 ## 現在の対象外 Runtime
 
-`pystac-client`、`pystac`、`pyestat` は現行の built-in Adapter が要求する Runtime ではありません。STAC は組み込み HTTP Adapter、e-Stat は組み込み HTTP と credential で動作します。これらを Rhinestone の Runtime として追加インストールしても、現行 Adapter の機能は増えません。
+`pystac-client`、`pystac` は現行の built-in Adapter が要求する Runtime ではありません。STAC は組み込み HTTP Adapterで動作します。これらを Rhinestone の Runtime として追加インストールしても、現行 Adapter の機能は増えません。
 
 ## Tested compatibility matrix
 

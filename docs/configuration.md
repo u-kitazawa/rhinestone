@@ -76,7 +76,6 @@ secretはCatalogやProviderに保存せず、Credential factoryとして渡し�
 app = configure(
     catalog=BUILTIN,
     credentials={
-        "estat": lambda: os.environ["ESTAT_APP_ID"],
         "odpt": lambda: os.environ["ODPT_CONSUMER_KEY"],
     },
 )

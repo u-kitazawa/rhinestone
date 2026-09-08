@@ -155,20 +155,20 @@ def test_resource_preserves_source_metadata_and_provenance() -> None:
 
 
 def test_search_result_returns_config_without_losing_knowledge() -> None:
-    metadata = Metadata(title="Population", raw={"table": "raw-value"})
-    provenance = Provenance(provider="estat", raw={"query": "population"})
+    metadata = Metadata(title="Dataset", raw={"table": "raw-value"})
+    provenance = Provenance(provider="catalog", raw={"query": "dataset"})
     result = SearchResult(
-        title="Population",
-        description="Official statistics",
+        title="Dataset",
+        description="Official dataset",
         discovered_by="search-ckan-jp",
-        target=Config("estat", {"stats_data_id": "0000000000"}),
+        target=Config("catalog", {"resource_id": "resource-1"}),
         metadata=metadata,
         provenance=provenance,
     )
 
     config = result.to_config()
 
-    assert config == Config(source_id="estat", settings={"stats_data_id": "0000000000"})
+    assert config == Config(source_id="catalog", settings={"resource_id": "resource-1"})
     assert result.metadata is metadata
     assert result.provenance is provenance
 

@@ -15,7 +15,6 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 | [Static](adapters/static.md) | `static` | リポジトリまたは利用者管理の静的定義 |
 | [CKAN](adapters/ckan.md) | `ckan` | CKAN Action API |
 | [DCAT](adapters/dcat.md) | `dcat` | DCAT RDF catalog |
-| [e-Stat](adapters/estat.md) | `estat` | e-Stat API 3.0 |
 | [GSI Fundamental](adapters/gsi-fundamental.md) | `gsi-fundamental` | 基盤地図情報のローカル GML |
 | [ODPT](adapters/odpt.md) | `odpt` | ODPT v4 |
 | [OGC API Features](adapters/ogc-features.md) | `ogc-features` | OGC API Features 1.0 |

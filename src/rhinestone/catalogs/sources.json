@@ -7,14 +7,6 @@
       },
       "name": "GEOSPATIAL_JP"
     },
-    "estat": {
-      "adapter_type": "estat",
-      "settings": {
-        "endpoint": "https://api.e-stat.go.jp/rest/3.0/app/json",
-        "language": "J"
-      },
-      "name": "ESTAT"
-    },
     "plateau": {
       "adapter_type": "plateau",
       "settings": {
