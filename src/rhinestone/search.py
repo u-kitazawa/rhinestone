@@ -14,7 +14,7 @@ from typing import (
     overload,
 )
 
-from .models import Config, Resource, Result, SearchDiagnostic, SearchQuery
+from .models import Resource, Result, SearchDiagnostic, SearchQuery
 
 
 class SearchResults(Sequence[Result]):
@@ -83,7 +83,7 @@ class SearchResults(Sequence[Result]):
         """Get one source group without requiring the source to exist."""
         return self._grouped.get(source_id, default)
 
-    def bind_resolver(self, resolver: Callable[[Config], Resource]) -> "SearchResults":
+    def bind_resolver(self, resolver: Callable[[Result], Resource]) -> "SearchResults":
         """Bind direct Result resolution to an application context."""
         grouped = OrderedDict(
             (
@@ -91,7 +91,7 @@ class SearchResults(Sequence[Result]):
                 tuple(
                     replace(
                         result,
-                        _resolver=lambda result=result: resolver(result.to_config()),
+                        _resolver=lambda result=result: resolver(result),
                     )
                     for result in results
                 ),

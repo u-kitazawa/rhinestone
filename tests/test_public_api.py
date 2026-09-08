@@ -232,12 +232,16 @@ def test_discovery_result_resolves_through_a_different_target_source(
 
     result = app.search(text="river", limit=1)[0]
     resource = app.resolve(result)
+    bound_resource = result.resolve()
 
     assert result.discovered_by == "search-ckan-jp"
     assert result.target.source_id == "direct"
     assert resource.metadata.title == "Example Rivers"
     assert resource.provenance.provider == "Example CKAN"
     assert resource.provenance.resource_identifier == "resource-1"
+    assert bound_resource == resource
+    assert bound_resource.source.metadata is bound_resource.metadata
+    assert bound_resource.source.provenance is bound_resource.provenance
 
 
 def test_public_search_reports_unsupported_conditions_per_source() -> None:
