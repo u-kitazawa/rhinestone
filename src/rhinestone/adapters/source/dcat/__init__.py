@@ -116,10 +116,6 @@ class DcatAdapter(ProviderAdapter):
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError("Unsupported DCAT search")
-        if query.limit is not None and (
-            type(query.limit) is not int or query.limit < 0
-        ):
-            raise ConfigValidationError("limit must be a non-negative integer")
         settings: Dict[str, Any] = {
             "uri": self._catalog_uri,
             "serialization": self._serialization,

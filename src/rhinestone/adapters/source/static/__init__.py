@@ -46,10 +46,6 @@ class StaticAdapter(ProviderAdapter):
             raise UnsupportedSearchConditionError(
                 "Unsupported static source search condition"
             )
-        if query.limit is not None and (
-            type(query.limit) is not int or query.limit < 0
-        ):
-            raise ConfigValidationError("limit must be a non-negative integer")
 
         results: List[SearchResult] = []
         for identifier in sorted(self._items):

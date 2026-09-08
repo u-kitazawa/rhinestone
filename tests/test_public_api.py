@@ -17,6 +17,7 @@ from rhinestone import (
 )
 from rhinestone.errors import (
     AdapterRegistrationError,
+    ConfigValidationError,
     UnsupportedSourceError,
 )
 
@@ -248,6 +249,57 @@ def test_public_search_reports_unsupported_conditions_per_source() -> None:
 
     assert results.diagnostics[0].source_id == "catalog"
     assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
+
+
+@pytest.mark.parametrize(
+    "search_parameters",
+    (
+        {"limit": -1},
+        {"bbox": (139.0, 35.0, 140.0)},
+        {"time": ("2024-01-01", None)},
+    ),
+)
+def test_invalid_public_search_parameters_fail_before_provider_requests(
+    monkeypatch: pytest.MonkeyPatch, search_parameters: Dict[str, Any]
+) -> None:
+    requests: List[str] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Dict[str, Any]:
+        requests.append(url)
+        return {}
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    app = configure(
+        sources=(
+            SourceDefinition("ckan", "ckan", {"endpoint": "https://ckan.test"}),
+            SourceDefinition("stac", "stac", {"endpoint": "https://stac.test"}),
+            SourceDefinition(
+                "static",
+                "static",
+                {
+                    "items": {
+                        "one": {
+                            "candidates": [
+                                {
+                                    "uri": "https://example.test/one.geojson",
+                                    "format": "geojson",
+                                }
+                            ]
+                        }
+                    }
+                },
+            ),
+        )
+    )
+
+    with pytest.raises(ConfigValidationError):
+        app.search(**cast(Any, search_parameters))
+
+    assert requests == []
 
 
 def test_duplicate_source_id_is_rejected_during_configuration() -> None:
