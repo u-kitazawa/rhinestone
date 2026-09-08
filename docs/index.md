@@ -10,40 +10,35 @@ Catalog -> Provider -> search -> Result -> resolve -> Resource -> open -> Data
 
 ## 最初の例
 
-Rasterioを用意し、形式が分かっているGeoTIFFを直接Resourceへ解決します。
+GDALを用意し、組み込みCatalogの検索結果からResourceを解決して開きます。
 
 ```console
-python -m pip install rhinestone rasterio
+python -m pip install rhinestone GDAL
 ```
 
 ```python
-import rasterio
+from osgeo import gdal
 
-from rhinestone import Config, configure
+from rhinestone import SearchQuery, configure, sources
 
-app = configure(dependencies={"rasterio": rasterio})
-resource = app.resolve(
-    Config(
-        source_id="direct",
-        settings={
-            "uri": "https://raw.githubusercontent.com/rasterio/rasterio/57d9fda6c31c5595ea54262f905b43c5f8419e06/tests/data/RGB.byte.tif",
-            "format": "geotiff",
-            "media_type": "image/tiff",
-        },
-    )
+app = configure(
+    sources=(sources.GSI,),
+    dependencies={"gdal": gdal},
 )
+results = app.search(SearchQuery(text="標準地図", limit=1))
+result = results[0]
+resource = app.resolve(result)
 
-with resource.open("rasterio") as dataset:
-    print(dataset.width, "x", dataset.height)
-    print("bands:", dataset.count)
+dataset = resource.open("gdal")
+print("URI:", resource.uri)
+print("raster size:", dataset.RasterXSize, dataset.RasterYSize)
 ```
 
-この例は外部Providerの検索順や検索結果に依存しません。URIはRasterioの
-公開テストデータを不変のcommitに固定しています。`direct`は利用者がURIと形式を
-すでに知っている場合の入口です。通常のデータ発見では、[Getting started](getting-started.md)
-のようにCatalog内を検索し、Resultを直接Resourceへ解決します。Rasterioは利用者が
-所有するRuntimeであり、`configure(dependencies=...)`への明示的な注入が必要です。
-詳細は[Runtimeの導入ガイド](runtimes.md)を参照してください。
+この例は`BUILTIN`全体のProvider順序や外部検索結果の偶然に依存しません。
+`sources.GSI`は組み込みの静的Sourceで、`標準地図`という明示的な検索条件から
+`std`のResultを選びます。GDALは利用者が所有するExecution Runtimeであり、
+`configure(dependencies=...)`への明示的な注入が必要です。詳細は[Runtimeの導入ガイド](runtimes.md)
+を参照してください。
 
 ## 主要概念
 

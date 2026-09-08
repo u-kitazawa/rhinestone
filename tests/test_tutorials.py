@@ -18,39 +18,33 @@ def tutorial_python(name: str) -> str:
 def test_documentation_index_example_opens_a_compatible_resource(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """冒頭例が外部検索に依存せず、明示したRuntimeで対応Resourceを開けることを保証する。"""
+    """冒頭例が決定的な検索結果を明示Runtimeで開けることを保証する。"""
 
     class Dataset:
-        width = 791
-        height = 718
-        count = 3
-
-        def __enter__(self) -> "Dataset":
-            return self
-
-        def __exit__(
-            self, exc_type: object, exc_value: object, traceback: object
-        ) -> None:
-            return None
+        RasterXSize = 256
+        RasterYSize = 256
 
     opened: list[str] = []
-    runtime = ModuleType("rasterio")
+    gdal = ModuleType("osgeo.gdal")
 
-    def open_dataset(uri: str) -> Dataset:
+    def open_ex(uri: str, **kwargs: object) -> Dataset:
         opened.append(uri)
         return Dataset()
 
-    runtime.open = open_dataset  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "rasterio", runtime)
+    gdal.OpenEx = open_ex  # type: ignore[attr-defined]
+    osgeo = ModuleType("osgeo")
+    osgeo.gdal = gdal  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "osgeo", osgeo)
+    monkeypatch.setitem(sys.modules, "osgeo.gdal", gdal)
 
     source = documentation_python("index.md")
     exec(compile(source, "docs/index.md", "exec"), {})
 
-    assert opened == [
-        "https://raw.githubusercontent.com/rasterio/rasterio/"
-        "57d9fda6c31c5595ea54262f905b43c5f8419e06/tests/data/RGB.byte.tif"
-    ]
-    assert capsys.readouterr().out == "791 x 718\nbands: 3\n"
+    assert len(opened) == 1
+    assert "cyberjapandata.gsi.go.jp" in opened[0]
+    output = capsys.readouterr().out
+    assert output.startswith("URI: https://cyberjapandata.gsi.go.jp/")
+    assert "raster size: 256 256\n" in output
 
 
 def test_ckan_pyogrio_tutorial_registers_runtime() -> None:
