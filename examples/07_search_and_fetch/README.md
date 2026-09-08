@@ -1,6 +1,8 @@
 # 07 — Search and fetch
 
-This live demo performs a G Spatial Information Center CKAN search, keeps results grouped by source, converts one SearchResult to Config, and sends it through the normal resolution pipeline.
+This live single-source demo searches the G Spatial Information Center CKAN
+catalog, keeps results grouped by source, and resolves one bound `Result`
+through the normal resolution pipeline.
 
 ## Setup
 
