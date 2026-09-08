@@ -231,6 +231,8 @@ class SearchQuery:
     limit: Optional[int] = None
 
     def __post_init__(self) -> None:
+        if self.text is not None and not isinstance(self.text, str):
+            raise ConfigValidationError("text must be a string or None")
         if self.limit is not None and (type(self.limit) is not int or self.limit < 0):
             raise ConfigValidationError("limit must be a non-negative integer")
         raw_bbox = cast(object, self.bbox)
