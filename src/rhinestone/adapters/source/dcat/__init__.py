@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from ....errors import (
     ConfigValidationError,
+    DependencyUnavailableError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceNotFoundError,
@@ -44,7 +45,14 @@ class DcatAdapter(ProviderAdapter):
         serialization = settings.get("serialization", self._serialization)
         if serialization not in ("json-ld", "turtle", "xml"):
             raise ConfigValidationError("Expected json-ld, turtle or xml serialization")
-        rdf = self._rdf_runtime_factory()
+        try:
+            rdf = self._rdf_runtime_factory()
+        except DependencyUnavailableError:
+            raise
+        except Exception as error:
+            raise DependencyUnavailableError(
+                "RDF runtime could not be loaded"
+            ) from error
         try:
             document = self._get_document(uri)
         except Exception as error:

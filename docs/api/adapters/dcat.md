@@ -15,6 +15,6 @@
 
 `dcat:downloadURL` を持つ Distribution のみを候補にし、`accessURL` だけの Distribution は解決しません。検索は `text` と `limit` を使えます。
 
-Adapterを直接構築する内部テストや再利用用途では、document取得callbackとRDF runtime factoryをconstructorへ注入できます。
+Adapterを直接構築する内部テストや再利用用途では、document取得callbackとRDF runtime factoryをconstructorへ注入できます。このfactoryの任意例外も`DependencyUnavailableError`へ変換され、既存の`DependencyUnavailableError`はそのまま伝播します。
 
 Distribution URI を指定して pyogrio で開く例は、リポジトリ checkout の `examples/11_dcat_dataset/README.md` にあります。
