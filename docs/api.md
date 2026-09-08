@@ -1,6 +1,6 @@
 # API reference
 
-このページは通常利用する公開APIを先に説明します。Adapter、Resolver、AccessPlan、Registryなどの内部構造は[用語と概念](concepts.md)とarchitecture文書を参照してください。
+このページは通常利用する公開APIを先に説明します。公開メンタルモデルや用語は[用語と概念](concepts.md)、拡張向けの現行Adapter契約は[Source Adapter](api/source-adapters.md)と[Execution Adapter](api/execution-adapters.md)を参照してください。履歴資料の`architecture/`は現行APIの規範ではありません。
 
 ## `Catalog`
 
