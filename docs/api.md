@@ -1,6 +1,6 @@
 # API reference
 
-このページは通常利用する公開APIを先に説明します。Adapter、Resolver、AccessPlan、Registryなどの内部構造は[用語と概念](concepts.md)とarchitecture文書を参照してください。
+このページは通常利用する公開APIを先に説明します。公開メンタルモデルや用語は[用語と概念](concepts.md)、拡張向けの現行Adapter契約は[Source Adapter](api/source-adapters.md)と[Execution Adapter](api/execution-adapters.md)を参照してください。履歴資料の`architecture/`は現行APIの規範ではありません。
 
 ## `Catalog`
 
@@ -38,6 +38,7 @@ app = configure(
     catalog=BUILTIN,
     dependencies={"rasterio": rasterio},
     credentials={"odpt": lambda: odpt_key},
+    network_policy="credentialed",
 )
 ```
 
@@ -47,10 +48,16 @@ app = configure(
 | `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
 | `dependencies` | 利用者が所有するSource / Execution Runtime。公開引数は共通だが内部では利用段階ごとに分離される |
 | `credentials` | Credential factory |
+| `network_policy` | 宛先制限。`none`、`credentialed`（既定）、`strict` |
 
 通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
 Runtime factoryは`configure()`では評価されません。Source Runtimeは検索・解決時、
 Execution Runtimeは`Resource.open()`時に、それぞれ初めて必要になった段階で評価されます。
+
+Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
+などの HTTP Source へ Credential factory を遅延注入できます。secret 自体は
+Provider、Catalog、Result、Resource には保存されません。`credentialed` と `strict`
+では、factory の評価前に Catalog 由来の endpoint へ送信できることを検証します。
 
 ## `Rhinestone.search()`
 
