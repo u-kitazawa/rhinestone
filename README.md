@@ -22,7 +22,7 @@ Rhinestoneは、次のような利用者を対象にしています。
 - 公的データを扱うデータエンジニア・データ基盤開発者
 - Rasterio、GDAL、pyogrioなどへ渡す前のProvider固有処理を共通化したい利用者
 
-Rhinestoneは、Providerの発見とResourceへの解決を担当し、実際のGIS処理やデータ解析は既存の専門ライブラリへ委譲します。
+Rhinestoneは、Catalogに構成されたProvider内のデータを検索してResultとして発見し、Resourceへ解決することを担当します。実際のGIS処理やデータ解析は既存の専門ライブラリへ委譲します。
 
 ## 対象外のユースケース
 
@@ -55,7 +55,7 @@ print(resource.uri)
 print(resource.metadata)
 ```
 
-`BUILTIN`はRhinestoneが提供する組み込みCatalogです。検索結果は`app.resolve(result)`で直接Resourceへ解決できます。
+`BUILTIN`はRhinestoneが提供する組み込みCatalogです。`search()`はCatalogに構成されたProvider内のデータを検索してResultを返し、検索結果は`app.resolve(result)`で直接Resourceへ解決できます。
 
 検索を使わず、既知のProviderを選んで構成することもできます。
 
