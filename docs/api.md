@@ -45,10 +45,12 @@ app = configure(
 | --- | --- |
 | `catalog` | 利用するProviderのCatalog |
 | `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
-| `dependencies` | 利用者が所有するRuntime |
+| `dependencies` | 利用者が所有するSource / Execution Runtime。公開引数は共通だが内部では利用段階ごとに分離される |
 | `credentials` | Credential factory |
 
 通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
+Runtime factoryは`configure()`では評価されません。Source Runtimeは検索・解決時、
+Execution Runtimeは`Resource.open()`時に、それぞれ初めて必要になった段階で評価されます。
 
 ## `Rhinestone.search()`
 

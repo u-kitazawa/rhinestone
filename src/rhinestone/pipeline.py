@@ -40,7 +40,9 @@ class AccessPipeline:
         dependencies = self._dependencies
 
         def open_resource(library: LibraryName) -> object:
-            return self._open_resource(resource, library, selector, dependencies)
+            return AccessPipeline._open_resource(
+                resource, library, selector, dependencies
+            )
 
         return replace(
             resource,
