@@ -10,6 +10,11 @@ nav:
       - データを検索する: search.md
       - Resourceを解決して開く: resolve-and-open.md
       - DiscoveryとResolution: discovery-resolution.md
+  - 目的別チュートリアル:
+      - 概要: tutorials/index.md
+      - e-Statで人口統計表を探す: tutorials/estat-population.md
+      - STACで衛星画像を探してRasterioで開く: tutorials/stac-rasterio.md
+      - PLATEAUのCityGMLを探してGDALで開く: tutorials/plateau-citygml.md
   - リファレンス:
       - 対応状況: compatibility.md
       - Runtime の導入ガイド: runtimes.md
