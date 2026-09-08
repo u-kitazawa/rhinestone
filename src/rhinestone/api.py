@@ -51,6 +51,7 @@ from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .resolution import Resolver
 from .search import SearchCoordinator, SearchResults
+from .security import DestinationPolicy, NetworkPolicyLevel
 
 _SOURCE_RUNTIME_NAMES = frozenset({"rdflib"})
 _EXECUTION_RUNTIME_NAMES = frozenset({"gdal", "json-service", "rasterio", "pyogrio"})
@@ -108,6 +109,7 @@ class Rhinestone:
         catalog: Optional[Catalog] = None,
         dependencies: Optional[Mapping[str, DependencyValue]] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
+        network_policy: NetworkPolicyLevel = "credentialed",
     ) -> None:
         selected_sources = tuple(sources)
         if catalog is not None:
@@ -133,6 +135,9 @@ class Rhinestone:
         )
         execution_dependency_registry = DependencyRegistry(execution_dependencies)
         credential_registry = CredentialRegistry(credentials or {})
+        destination_policy = DestinationPolicy.from_catalog(
+            selected_sources, level=network_policy
+        )
 
         configured_sources = [_ConfiguredSourceAdapter("direct", DirectAdapter())]
         configured_ids = {"direct"}
@@ -150,6 +155,7 @@ class Rhinestone:
                         source_definition,
                         source_dependencies,
                         credential_registry,
+                        destination_policy,
                     ),
                 )
             )
@@ -159,7 +165,11 @@ class Rhinestone:
             GdalAdapter(),
             RasterioAdapter(),
             PyogrioAdapter(),
-            JsonServiceAdapter(OdptAdapter.prepare_request, "odpt"),
+            JsonServiceAdapter(
+                OdptAdapter.prepare_request,
+                "odpt",
+                destination_policy=destination_policy,
+            ),
         )
 
         def bind(adapter: Any) -> Any:
@@ -174,6 +184,7 @@ class Rhinestone:
             resolver=Resolver(),
             execution_selector=ExecutionAdapterSelector(adapters.execution_adapters),
             dependencies=execution_dependency_registry,
+            destination_policy=destination_policy,
         )
         self._search = SearchCoordinator(source_adapters)
 
@@ -235,6 +246,7 @@ def configure(
     catalog: Optional[Catalog] = None,
     dependencies: Optional[Mapping[str, DependencyValue]] = None,
     credentials: Optional[Mapping[str, Callable[[], str]]] = None,
+    network_policy: NetworkPolicyLevel = "credentialed",
 ) -> Rhinestone:
     """Compose built-in adapters around selected sources and runtime inputs."""
     return Rhinestone(
@@ -242,6 +254,7 @@ def configure(
         catalog=catalog,
         dependencies=dependencies,
         credentials=credentials,
+        network_policy=network_policy,
     )
 
 
@@ -249,6 +262,7 @@ def _build_source_adapter(
     source: Provider,
     dependencies: DependencyRegistry,
     credentials: CredentialRegistry,
+    destination_policy: Optional[DestinationPolicy] = None,
 ) -> ProviderAdapter:
     adapter_type = source.adapter_type
     settings = dict(source.settings)
@@ -261,17 +275,59 @@ def _build_source_adapter(
         return _http.get_json(url, params, headers)
 
     if adapter_type == "ckan":
-        _reject_options(adapter_type, settings, ("endpoint",))
-        return CkanAdapter(get_json=json_transport, **settings)
+        _reject_options(
+            adapter_type,
+            settings,
+            ("endpoint", "credential", "credential_header", "credential_scheme"),
+        )
+        return CkanAdapter(
+            get_json=json_transport,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            **settings,
+        )
     if adapter_type == "stac":
-        _reject_options(adapter_type, settings, ("endpoint",))
-        return StacAdapter(get_json=json_transport, **settings)
+        _reject_options(
+            adapter_type,
+            settings,
+            ("endpoint", "credential", "credential_header", "credential_scheme"),
+        )
+        return StacAdapter(
+            get_json=json_transport,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            **settings,
+        )
     if adapter_type == "ogc-features":
-        _reject_options(adapter_type, settings, ("endpoint", "collection_id"))
-        return OgcFeaturesAdapter(get_json=json_transport, **settings)
+        _reject_options(
+            adapter_type,
+            settings,
+            (
+                "endpoint",
+                "collection_id",
+                "credential",
+                "credential_header",
+                "credential_scheme",
+            ),
+        )
+        return OgcFeaturesAdapter(
+            get_json=json_transport,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            **settings,
+        )
     if adapter_type == "plateau":
-        _reject_options(adapter_type, settings, ("endpoint",))
-        return PlateauAdapter(get_json=json_transport, **settings)
+        _reject_options(
+            adapter_type,
+            settings,
+            ("endpoint", "credential", "credential_header", "credential_scheme"),
+        )
+        return PlateauAdapter(
+            get_json=json_transport,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            **settings,
+        )
     if adapter_type == "static":
         _reject_options(adapter_type, settings, ("items",))
         items = settings.get("items")
@@ -280,7 +336,11 @@ def _build_source_adapter(
         return StaticAdapter(cast(Mapping[str, Mapping[str, Any]], items))
     if adapter_type == "search-ckan-jp":
         _reject_options(adapter_type, settings, ("endpoint",))
-        return SearchCkanJpAdapter(get_json=json_transport, **settings)
+        return SearchCkanJpAdapter(
+            get_json=json_transport,
+            destination_policy=destination_policy,
+            **settings,
+        )
     if adapter_type == "gsi-fundamental":
         _reject_options(adapter_type, settings, ())
         return GsiFundamentalAdapter()

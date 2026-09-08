@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Mapping, Optional, cast
 
 from ....errors import ConfigValidationError
 from ....models import Config, ResourceCandidate, Source
+from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
 from .._knowledge import entry_point, source, string
 from ..base import JsonTransport
 from ..ckan import CkanAdapter
@@ -16,10 +18,23 @@ class PlateauAdapter(CkanAdapter):
         self,
         get_json: JsonTransport,
         endpoint: Optional[str] = None,
+        credential: Optional[str] = None,
+        credential_header: Optional[str] = None,
+        credential_scheme: Optional[str] = None,
+        credentials: Optional[CredentialRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
         if not isinstance(endpoint, str) or not endpoint.strip():
             raise ConfigValidationError("PLATEAU endpoint must be configured")
-        super().__init__(get_json, endpoint=endpoint)
+        super().__init__(
+            get_json,
+            endpoint=endpoint,
+            credential=credential,
+            credential_header=credential_header,
+            credential_scheme=credential_scheme,
+            credentials=credentials,
+            destination_policy=destination_policy,
+        )
 
     def load(self, config: Config) -> Source:
         settings = self._config_settings(config)

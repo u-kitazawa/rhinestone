@@ -8,6 +8,7 @@ from ....errors import (
     UnsupportedSourceError,
 )
 from ....models import Config, Metadata, Provenance, SearchQuery, SearchResult, Source
+from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 DEFAULT_ENDPOINT = "https://search.ckan.jp/backend/api"
@@ -30,8 +31,13 @@ class SearchCkanJpAdapter(ProviderAdapter):
         self,
         get_json: JsonTransport,
         endpoint: Optional[str] = DEFAULT_ENDPOINT,
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
-        super().__init__(get_json=get_json, endpoint=endpoint)
+        super().__init__(
+            get_json=get_json,
+            endpoint=endpoint,
+            destination_policy=destination_policy,
+        )
 
     def load(self, config: Config) -> Source:
         raise UnsupportedSourceError(

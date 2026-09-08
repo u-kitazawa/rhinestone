@@ -12,6 +12,8 @@ from ....models import (
     SearchResult,
     Source,
 )
+from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -26,6 +28,11 @@ class CkanAdapter(ProviderAdapter):
         api_token: Optional[str] = None,
         api_key: Optional[str] = None,
         api_key_header: str = "X-CKAN-API-Key",
+        credential: Optional[str] = None,
+        credential_header: Optional[str] = None,
+        credential_scheme: Optional[str] = None,
+        credentials: Optional[CredentialRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -34,6 +41,11 @@ class CkanAdapter(ProviderAdapter):
             api_key=api_key,
             api_key_header=api_key_header,
             token_scheme="",
+            credential=credential,
+            credential_header=credential_header,
+            credential_scheme=credential_scheme,
+            credentials=credentials,
+            destination_policy=destination_policy,
         )
 
     def _action(self, endpoint: str, action: str, params: Mapping[str, Any]) -> Any:
