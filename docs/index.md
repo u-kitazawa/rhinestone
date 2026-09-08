@@ -44,6 +44,7 @@ with resource.open("rasterio") as dataset:
 - [アプリケーションを構成する](configuration.md)
 - [データを検索する](search.md)
 - [Resourceを解決して開く](resolve-and-open.md)
+- [目的別チュートリアル](tutorials/index.md)
 - [APIリファレンス](api.md)
 - [対応状況](compatibility.md)
 - [Runtimeの導入ガイド](runtimes.md)
