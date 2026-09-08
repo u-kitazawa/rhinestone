@@ -54,7 +54,7 @@ Execution Runtimeは`Resource.open()`時に、それぞれ初めて必要にな�
 
 ## `Rhinestone.search()`
 
-検索パラメータからResultを返します。
+Catalogに構成されたProvider内のデータ候補を検索し、Resultを返します。Provider自体を発見するAPIではありません。
 
 ```python
 results = app.search(text="河川", limit=10)
