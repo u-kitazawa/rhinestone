@@ -59,4 +59,6 @@ for diagnostic in results.diagnostics:
 
 指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。
 
-検索結果は`app.resolve(result)`で直接Resourceへ解決できます。`result.to_config()`は内部パイプラインを調査する高度なAPIです。
+検索結果は`app.resolve(result)`で直接Resourceへ解決できます。`app.search()`が返したResultでは
+`result.resolve()`も同じResourceを返し、発見元と解決先が異なる場合もmetadataとprovenanceを
+保持します。`result.to_config()`は内部パイプラインを調査する高度なAPIです。
