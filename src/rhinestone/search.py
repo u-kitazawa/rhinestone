@@ -18,7 +18,13 @@ from .models import Resource, Result, SearchDiagnostic, SearchQuery
 
 
 class SearchResults(Sequence[Result]):
-    """Sequence-like search results with optional source-grouped access."""
+    """Provider-grouped results with deterministic sequence traversal.
+
+    Integer indexing and iteration concatenate groups in their supplied order and
+    preserve each provider's result order. The concatenated sequence is not a
+    relevance ranking across providers; use source-grouped access when provider
+    ranking semantics matter.
+    """
 
     def __init__(
         self,
@@ -66,15 +72,15 @@ class SearchResults(Sequence[Result]):
         return len(self._items)
 
     def keys(self) -> Tuple[str, ...]:
-        """Return source IDs for advanced source-grouped access."""
+        """Return source IDs in sequence traversal order."""
         return tuple(self._grouped)
 
     def values(self) -> Tuple[Tuple[Result, ...], ...]:
-        """Return result groups for advanced source-grouped access."""
+        """Return result groups in sequence traversal order."""
         return tuple(self._grouped.values())
 
     def items(self) -> Tuple[Tuple[str, Tuple[Result, ...]], ...]:
-        """Return source IDs and result groups for advanced access."""
+        """Return source IDs and result groups in sequence traversal order."""
         return tuple(self._grouped.items())
 
     def get(
@@ -102,6 +108,8 @@ class SearchResults(Sequence[Result]):
 
 
 class SearchCoordinator:
+    """Search capable adapters in configuration order without cross-source ranking."""
+
     def __init__(self, adapters: Iterable[Any]) -> None:
         self._adapters = tuple(adapters)
 
@@ -115,7 +123,7 @@ class SearchCoordinator:
         ]
         grouped: OrderedDict[str, Tuple[Any, ...]] = OrderedDict()
         diagnostics: List[SearchDiagnostic] = []
-        for adapter in sorted(searchable, key=lambda item: item.source_id):
+        for adapter in searchable:
             supported = frozenset(adapter.search_conditions)
             unsupported = query.supplied_conditions - supported
             if unsupported:

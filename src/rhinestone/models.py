@@ -26,11 +26,19 @@ from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
 LibraryName = Literal["gdal", "json-service", "pyogrio", "rasterio"]
 """Execution runtime names accepted by the public open API."""
 
-DependencyValue = Union[object, Callable[[], Any]]
-"""An injected runtime object or a lazy factory returning one."""
+
+@dataclass(frozen=True)
+class RuntimeFactory:
+    """An explicit lazy factory for a user-owned Runtime."""
+
+    factory: Callable[[], Any]
+
+
+DependencyValue = Union[object, RuntimeFactory]
+"""An injected Runtime object or an explicit lazy RuntimeFactory."""
 
 Runtime = DependencyValue
-"""A runtime object or a lazy factory returning one."""
+"""A Runtime object or an explicit lazy RuntimeFactory."""
 
 
 class _RasterioDatasetReader(Protocol):

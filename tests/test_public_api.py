@@ -10,6 +10,7 @@ from rhinestone import (
     Provenance,
     Provider,
     Result,
+    RuntimeFactory,
     SearchQuery,
     SourceDefinition,
     configure,
@@ -48,7 +49,11 @@ def direct_config() -> Config:
 def test_direct_and_execution_adapters_are_built_in() -> None:
     calls: List[str] = []
     runtime = FakeRasterio("opened")
-    app = configure(dependencies={"rasterio": lambda: calls.append("load") or runtime})
+    app = configure(
+        dependencies={
+            "rasterio": RuntimeFactory(lambda: calls.append("load") or runtime)
+        }
+    )
 
     resource = app.resolve(direct_config())
 
@@ -68,8 +73,8 @@ def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
     rasterio = FakeRasterio("rasterio")
     app = configure(
         dependencies={
-            "gdal": lambda: FakeGdal(),
-            "rasterio": lambda: rasterio,
+            "gdal": RuntimeFactory(FakeGdal),
+            "rasterio": RuntimeFactory(lambda: rasterio),
         }
     )
 
@@ -107,7 +112,9 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
 
     configure(
         sources=sources.ALL,
-        dependencies={"rasterio": lambda: dependency_calls.append(True)},
+        dependencies={
+            "rasterio": RuntimeFactory(lambda: dependency_calls.append(True))
+        },
         credentials={"odpt": lambda: credential_calls.append(True) or "secret"},
     )
 
@@ -323,8 +330,10 @@ def test_unknown_built_in_adapter_type_is_rejected() -> None:
 def test_configured_contexts_do_not_share_runtime_instances() -> None:
     first_runtime = FakeRasterio("first")
     second_runtime = FakeRasterio("second")
-    first = configure(dependencies={"rasterio": lambda: first_runtime})
-    second = configure(dependencies={"rasterio": lambda: second_runtime})
+    first = configure(dependencies={"rasterio": RuntimeFactory(lambda: first_runtime)})
+    second = configure(
+        dependencies={"rasterio": RuntimeFactory(lambda: second_runtime)}
+    )
 
     assert first.resolve(direct_config()).open("rasterio").startswith("first:")
     assert second.resolve(direct_config()).open("rasterio").startswith("second:")
@@ -337,6 +346,22 @@ def test_concrete_dependency_object_is_accepted() -> None:
     resource = app.resolve(direct_config())
 
     assert resource.open("rasterio") == "direct:https://example.test/dataset.tif"
+
+
+def test_callable_dependency_object_is_accepted_without_invoking_it() -> None:
+    """Callable façadeをlazy factoryと推測せずRuntime実体として扱う。"""
+
+    class CallableRasterio(FakeRasterio):
+        def __call__(self) -> object:
+            raise AssertionError("Runtime object must not be invoked")
+
+    runtime = CallableRasterio("callable")
+    app = configure(dependencies={"rasterio": runtime})
+
+    assert (
+        app.resolve(direct_config()).open("rasterio")
+        == "callable:https://example.test/dataset.tif"
+    )
 
 
 def test_resource_open_requires_a_library_name() -> None:

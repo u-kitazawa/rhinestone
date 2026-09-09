@@ -56,6 +56,7 @@ print(resource.metadata)
 ```
 
 `BUILTIN`はRhinestoneが提供する組み込みCatalogです。`search()`はCatalogに構成されたProvider内のデータを検索してResultを返し、検索結果は`app.resolve(result)`で直接Resourceへ解決できます。
+複数Provider時の整数indexingは構成したProvider順の走査用であり、Providerを横断した関連度rankingではありません。詳細は[Search resultの順序](docs/search.md#結果の順序)を参照してください。
 
 検索を使わず、既知のProviderを選んで構成することもできます。
 

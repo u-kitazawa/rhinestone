@@ -46,12 +46,13 @@ app = configure(
 | --- | --- |
 | `catalog` | 利用するProviderのCatalog |
 | `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
-| `dependencies` | 利用者が所有するSource / Execution Runtime。公開引数は共通だが内部では利用段階ごとに分離される |
+| `dependencies` | 利用者が所有するSource / Execution Runtime実体、または明示的な`RuntimeFactory`。公開引数は共通だが内部では利用段階ごとに分離される |
 | `credentials` | Credential factory |
 | `network_policy` | 宛先制限。`none`、`credentialed`（既定）、`strict` |
 
 通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
-Runtime factoryは`configure()`では評価されません。Source Runtimeは検索・解決時、
+遅延Runtimeは `RuntimeFactory(factory)` として指定します。bare valueはcallableでもRuntime
+実体として扱われます。`RuntimeFactory`は`configure()`では評価されません。Source Runtimeは検索・解決時、
 Execution Runtimeは`Resource.open()`時に、それぞれ初めて必要になった段階で評価されます。
 
 Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
@@ -69,6 +70,11 @@ result = results[0]
 ```
 
 `text`、`bbox`、`time`、`limit`をキーワードで指定できます。`SearchQuery`を渡す形式は高度なAPIです。
+
+`SearchResults`のiterationと整数indexingは、構成したProvider順にgroupを連結し、
+各Provider内の順序を保持します。このsequenceは決定的な走査用であり、Providerを
+横断した関連度rankingではありません。Provider固有のrankingを扱う場合は
+`results.items()`または`results["provider-id"]`でgroupごとに参照します。
 
 ## `Result`
 
