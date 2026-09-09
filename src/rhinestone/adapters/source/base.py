@@ -156,6 +156,8 @@ class ProviderAdapter(ABC):
     @staticmethod
     def _encode_path_segment(value: str) -> str:
         """Encode one decoded logical identifier for use as a URL path segment."""
+        if value in {".", ".."}:
+            return value.replace(".", "%2E")
         return quote(value, safe="")
 
     @staticmethod

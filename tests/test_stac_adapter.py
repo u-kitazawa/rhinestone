@@ -125,6 +125,28 @@ def test_stac_load_encodes_identifiers_as_individual_path_segments() -> None:
     assert source.provenance.resource_identifier == item_id
 
 
+def test_stac_load_escapes_dot_only_identifier_segments() -> None:
+    endpoint = "https://stac.example"
+    item_url = endpoint + "/collections/%2E/items/%2E%2E"
+    client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
+
+    source = StacAdapter(get_json=client).load(
+        Config(
+            "stac",
+            {
+                "endpoint": endpoint,
+                "collection_id": ".",
+                "item_id": "..",
+                "asset_key": "visual",
+            },
+        )
+    )
+
+    assert client.calls == [(item_url, {})]
+    assert source.provenance.dataset_identifier == "."
+    assert source.provenance.resource_identifier == ".."
+
+
 def test_stac_search_result_keeps_logical_identifiers_for_encoded_load() -> None:
     endpoint = "https://stac.example"
     search_url = endpoint + "/search"

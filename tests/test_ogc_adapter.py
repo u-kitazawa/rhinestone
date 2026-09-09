@@ -116,6 +116,33 @@ def test_ogc_load_encodes_identifiers_and_keeps_logical_provenance() -> None:
     assert source.provenance.resource_identifier == feature_id
 
 
+def test_ogc_load_escapes_dot_only_identifier_segments() -> None:
+    endpoint = "https://features.example"
+    collection_url = endpoint + "/collections/%2E%2E"
+    items_url = endpoint + "/collections/%2E%2E/items"
+    collection = dict(fixture_json("ogc/collection.json"))
+    collection["links"] = [
+        {"rel": "items", "type": "application/geo+json", "href": items_url}
+    ]
+    client = RecordingJsonClient({collection_url: collection})
+
+    source = OgcFeaturesAdapter(get_json=client).load(
+        Config(
+            "ogc-features",
+            {
+                "endpoint": endpoint,
+                "collection_id": "..",
+                "feature_id": ".",
+            },
+        )
+    )
+
+    assert client.calls == [(collection_url, {})]
+    assert source.candidates[0].uri == items_url + "/%2E"
+    assert source.provenance.dataset_identifier == ".."
+    assert source.provenance.resource_identifier == "."
+
+
 def test_ogc_search_result_keeps_logical_identifiers_for_encoded_load() -> None:
     endpoint = "https://features.example"
     collection_id = "river/basin"
