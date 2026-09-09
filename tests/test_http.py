@@ -24,10 +24,12 @@ class _Response:
         *,
         status: int = 200,
         charset: Optional[str] = None,
+        final_url: Optional[str] = None,
     ) -> None:
         self._body = body
         self._status = status
         self.headers = _Headers(charset)
+        self._final_url = final_url
 
     def __enter__(self) -> "_Response":
         return self
@@ -45,6 +47,9 @@ class _Response:
 
     def getcode(self) -> int:
         return self._status
+
+    def geturl(self) -> str:
+        return self._final_url or "https://example.test/api"
 
 
 class _Opener:
@@ -98,6 +103,20 @@ def test_get_json_without_query_or_extra_headers(
 
     assert _http.get_json("https://example.test/api", {}) == []
     assert calls["request"].full_url == "https://example.test/api"
+
+
+def test_get_json_preserves_final_response_uri_for_json_objects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def open_url(request: Request, *, timeout: int) -> _Response:
+        return _Response(b'{"ok": true}', final_url="https://redirected.example/final")
+
+    monkeypatch.setattr(_http, "urlopen", open_url)
+
+    response = _http.get_json("https://example.test/api", {})
+
+    assert response == {"ok": True}
+    assert response.response_uri == "https://redirected.example/final"
 
 
 def test_get_json_rejects_redirects_for_marked_credential_headers(

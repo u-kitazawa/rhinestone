@@ -43,6 +43,9 @@ class ProbeAdapter(ProviderAdapter):
     def request(self) -> Mapping[str, Any]:
         return self._request("https://provider.example/data", {})
 
+    def request_uri(self) -> str:
+        return self._request_with_uri("https://provider.example/data", {})[1]
+
     def object(self, value: Any) -> Mapping[str, Any]:
         return self._object(value, "value")
 
@@ -84,6 +87,13 @@ def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> N
         ProbeAdapter(lambda url, params: {}).objects("invalid")
     with pytest.raises(ProviderResponseError, match="object"):
         ProbeAdapter(lambda url, params: {}).objects([{}, "invalid"])
+
+    class InvalidResponseUri(dict[str, Any]):
+        response_uri = None
+
+    assert ProbeAdapter(lambda url, params: InvalidResponseUri()).request_uri() == (
+        "https://provider.example/data"
+    )
 
 
 def test_common_adapter_accepts_single_object_as_one_item_sequence() -> None:
