@@ -17,6 +17,7 @@ nav:
   - リファレンス:
       - 対応状況: compatibility.md
       - Runtime の導入ガイド: runtimes.md
+      - API安定性とリリース運用: release-policy.md
       - ブランチ運用方針: branch-policy.md
       - 外部ライブラリ依存方針: dependency-policy.md
       - ドキュメントの位置付け: documentation-status.md
