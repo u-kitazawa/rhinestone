@@ -1,6 +1,6 @@
 from typing import List, Tuple
 
-from rhinestone import Config, configure
+from rhinestone import Config, RuntimeFactory, configure
 
 
 class FakeGdal:
@@ -17,7 +17,9 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
     runtime = FakeGdal()
     dependency_calls: List[str] = []
     app = configure(
-        dependencies={"gdal": lambda: dependency_calls.append("gdal") or runtime}
+        dependencies={
+            "gdal": RuntimeFactory(lambda: dependency_calls.append("gdal") or runtime)
+        }
     )
     config = Config(
         source_id="direct",
@@ -44,7 +46,7 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
         def read_dataframe(self, uri: str, **options: object) -> str:
             return "pyogrio-data"
 
-    app = configure(dependencies={"pyogrio": lambda: FakePyogrio()})
+    app = configure(dependencies={"pyogrio": RuntimeFactory(FakePyogrio)})
     config = Config(
         source_id="direct",
         settings={"uri": "/data/rivers.shp", "format": "shapefile"},

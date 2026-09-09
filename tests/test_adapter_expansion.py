@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Mapping, Tuple, cast
 
 import pytest
 
-from rhinestone import Config, SearchQuery, configure, sources
+from rhinestone import Config, RuntimeFactory, SearchQuery, configure, sources
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
@@ -406,7 +406,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
 
     app = configure(
         sources=(sources.ODPT,),
-        dependencies={"json-service": lambda: SimpleNamespace(get=get)},
+        dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
         credentials={"odpt": credential},
     )
     config = Config(
@@ -424,7 +424,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
     assert len(factory_calls) == 2
     other = configure(
         sources=(sources.ODPT,),
-        dependencies={"json-service": lambda: SimpleNamespace(get=get)},
+        dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
     )
     with pytest.raises(CredentialUnavailableError):
         other.open(config, library="json-service")

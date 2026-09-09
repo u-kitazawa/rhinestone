@@ -10,6 +10,7 @@ from rhinestone import (
     DestinationPolicy,
     DestinationRule,
     Provider,
+    RuntimeFactory,
     SearchQuery,
     configure,
     sources,
@@ -104,7 +105,9 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
 
     app = configure(
         sources=(sources.ODPT,),
-        dependencies={"json-service": lambda: SimpleNamespace(get=get_json)},
+        dependencies={
+            "json-service": RuntimeFactory(lambda: SimpleNamespace(get=get_json))
+        },
         credentials={
             "odpt": lambda: factory_calls.append(True) or "secret",
         },
@@ -151,7 +154,7 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> N
     app = configure(
         sources=(Provider("private-odpt", "odpt", settings),),
         network_policy="strict",
-        dependencies={"json-service": lambda: SimpleNamespace(get=get)},
+        dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
         credentials={"key": lambda: "secret"},
     )
 

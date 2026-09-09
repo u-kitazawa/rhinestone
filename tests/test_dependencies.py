@@ -1,7 +1,9 @@
 from typing import List
+from unittest.mock import Mock
 
 import pytest
 
+from rhinestone import RuntimeFactory
 from rhinestone.errors import DependencyUnavailableError
 from rhinestone.registry import DependencyRegistry
 
@@ -10,7 +12,9 @@ def test_dependency_callback_is_lazy_and_cached_per_registry() -> None:
     """Optional runtime を import 時に要求せず、利用者所有の実体を遅延取得するために必要である。"""
     calls: List[str] = []
     runtime = object()
-    registry = DependencyRegistry({"gdal": lambda: calls.append("gdal") or runtime})
+    registry = DependencyRegistry(
+        {"gdal": RuntimeFactory(lambda: calls.append("gdal") or runtime)}
+    )
 
     assert calls == []
     assert registry.get("gdal") is runtime
@@ -34,7 +38,7 @@ def test_dependency_factory_failure_preserves_the_cause() -> None:
     def unavailable_gdal() -> object:
         raise import_error
 
-    registry = DependencyRegistry({"gdal": unavailable_gdal})
+    registry = DependencyRegistry({"gdal": RuntimeFactory(unavailable_gdal)})
 
     with pytest.raises(DependencyUnavailableError) as captured:
         registry.get("gdal")
@@ -47,3 +51,13 @@ def test_concrete_dependency_is_available_without_factory_evaluation() -> None:
     registry = DependencyRegistry({"rasterio": runtime})
 
     assert registry.get("rasterio") is runtime
+
+
+def test_callable_runtime_is_not_inferred_to_be_a_factory() -> None:
+    """CallableなRuntime実体をfactoryと推測して呼び出さないために必要である。"""
+    runtime = Mock()
+    registry = DependencyRegistry({"rasterio": runtime})
+
+    assert registry.get("rasterio") is runtime
+    assert registry.get("rasterio") is runtime
+    runtime.assert_not_called()

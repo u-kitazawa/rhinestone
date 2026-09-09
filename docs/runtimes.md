@@ -1,6 +1,6 @@
 # Runtime の導入ガイド
 
-Rhinestone Core は、外部 Runtime をインストール・選択・更新しません。利用者が用途に合う Runtime を用意し、`configure(dependencies=...)` へ実体または factory として渡します。
+Rhinestone Core は、外部 Runtime をインストール・選択・更新しません。利用者が用途に合う Runtime を用意し、`configure(dependencies=...)` へ実体または明示的な `RuntimeFactory` として渡します。
 
 この責務分離により、Runtime の依存関係、native library、ライセンス、更新時期は利用者の環境で管理できます。Rhinestone が保証するのは、対応表に記載した Adapter が、供給された Runtime の公開 API を呼び出すことです。
 
@@ -13,7 +13,25 @@ Runtime が必要になる段階は二つあります。
 | Source Runtime | Source の `search()` または `resolve()` | `rdflib`（DCAT の RDF 解釈） |
 | Execution Runtime | 解決済み Resource の `open()` | `gdal`、`rasterio`、`pyogrio` |
 
-`configure()` と `resolve()` は Execution Runtime を評価しません。factory を渡した場合も、対象の段階まで呼び出されません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
+`configure()` と `resolve()` は Execution Runtime の `RuntimeFactory` を評価しません。対象の段階までfactoryは呼び出されません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
+
+bare valueはcallableでもRuntime実体として扱います。遅延factoryを使う場合だけ明示的に
+`RuntimeFactory` で包むため、callable façadeやMockを誤って呼び出しません。
+
+```python
+import importlib
+
+from rhinestone import RuntimeFactory, configure
+
+app = configure(
+    dependencies={
+        "rasterio": RuntimeFactory(lambda: importlib.import_module("rasterio"))
+    }
+)
+```
+
+factoryは必要になった時に一度だけ評価され、結果はアプリケーション内でcacheされます。
+factoryが失敗した場合は `DependencyUnavailableError` になります。
 
 HTTP metadata の取得と JSON service の通信は Rhinestone に組み込まれているため、HTTP callback や `requests` 互換 Runtime の注入は不要です。
 
@@ -103,7 +121,7 @@ app = configure(
 results = app.search(text="dataset")
 ```
 
-DCAT Source を直接構成する場合も、`dependencies={"rdflib": rdflib}` を同じように渡します。factory を使う場合は `dependencies={"rdflib": lambda: rdflib}` と書けます。DCAT を使わない構成では RDFLib は不要です。
+DCAT Source を直接構成する場合も、`dependencies={"rdflib": rdflib}` を同じように渡します。factory を使う場合は `dependencies={"rdflib": RuntimeFactory(lambda: rdflib)}` と書けます。DCAT を使わない構成では RDFLib は不要です。
 
 ## 現在の対象外 Runtime
 
