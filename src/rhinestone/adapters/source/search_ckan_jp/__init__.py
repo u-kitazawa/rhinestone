@@ -26,6 +26,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
 
     adapter_type = "search-ckan-jp"
     search_conditions = frozenset({"text", "limit"})
+    required_search_conditions = frozenset({"text"})
 
     def __init__(
         self,

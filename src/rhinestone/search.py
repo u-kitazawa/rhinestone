@@ -126,13 +126,21 @@ class SearchCoordinator:
         for adapter in searchable:
             supported = frozenset(adapter.search_conditions)
             unsupported = query.supplied_conditions - supported
-            if unsupported:
+            required = frozenset(getattr(adapter, "required_search_conditions", ()))
+            missing_required = required - query.supplied_conditions
+            if unsupported or missing_required:
                 diagnostics.append(
                     SearchDiagnostic(
                         source_id=adapter.source_id,
                         skipped_conditions=unsupported,
+                        reason=(
+                            "missing_required" if missing_required else "unsupported"
+                        ),
+                        missing_conditions=missing_required,
                     )
                 )
+            if missing_required:
+                continue
             if query.supplied_conditions and not query.supplied_conditions & supported:
                 continue
             grouped[adapter.source_id] = tuple(adapter.search(query.project(supported)))

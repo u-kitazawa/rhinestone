@@ -261,6 +261,28 @@ def test_public_search_reports_unsupported_conditions_per_source() -> None:
     assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
 
 
+def test_public_search_skips_search_ckan_jp_without_required_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Dict[str, Any]:
+        raise AssertionError("search-ckan.jp must be skipped without text")
+
+    monkeypatch.setattr(_http, "get_json", fail_if_called)
+    app = configure(sources=(sources.SEARCH_CKAN_JP,))
+
+    results = app.search(bbox=(139.0, 35.0, 140.0, 36.0), limit=10)
+
+    assert len(results) == 0
+    assert results.diagnostics[0].source_id == "search-ckan-jp"
+    assert results.diagnostics[0].reason == "missing_required"
+    assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
+    assert results.diagnostics[0].missing_conditions == frozenset({"text"})
+
+
 @pytest.mark.parametrize(
     "search_parameters",
     (

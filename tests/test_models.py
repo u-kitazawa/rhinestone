@@ -225,3 +225,14 @@ def test_search_result_requires_a_discovery_source() -> None:
 def test_search_diagnostic_requires_a_source_id() -> None:
     with pytest.raises(ConfigValidationError, match="search diagnostic source_id"):
         SearchDiagnostic(source_id="", skipped_conditions=frozenset({"text"}))
+
+
+def test_search_diagnostic_freezes_missing_conditions() -> None:
+    diagnostic = SearchDiagnostic(
+        source_id="source",
+        skipped_conditions={"bbox"},
+        reason="missing_required",
+        missing_conditions={"text"},
+    )
+
+    assert diagnostic.missing_conditions == frozenset({"text"})
