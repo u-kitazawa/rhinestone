@@ -52,6 +52,9 @@ bash scripts/check.sh
 `pytest` はカバレッジも計測し、プロジェクト設定で定めた100%基準を満たさない場合に失敗します。テスト件数だけで成功と判断せず、コマンドの終了コードが0であることと、カバレッジ出力の`Missing`が空であることを確認してください。
 
 CIでは、これらに加えてPython 3.10〜3.13での実行と、ビルドしたwheelをクリーンな仮想環境へインストールして読み込む検証を行います。
+CIはContributorのブランチを自動修正・commit・pushしません。Ruffで失敗した場合は、
+`uv run ruff check --fix .`と`uv run ruff format .`をローカルで実行して変更を確認・commitし、
+`bash scripts/check.sh`を再実行してください。これにより、PRの最終commitとCIの検証対象を一致させます。
 
 ## Issueから作業を始める
 
