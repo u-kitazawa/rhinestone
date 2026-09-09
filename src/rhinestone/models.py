@@ -290,12 +290,13 @@ class SearchQuery:
 
 @dataclass(frozen=True)
 class SearchDiagnostic:
-    """Explain why query conditions were not applied to one source."""
+    """Explain how one source participated in a search."""
 
     source_id: str
     skipped_conditions: FrozenSet[str]
     reason: str = "unsupported"
     missing_conditions: FrozenSet[str] = frozenset()
+    failure_type: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.source_id:
