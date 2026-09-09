@@ -10,6 +10,6 @@
 
 ## Endpoint と認証
 
-collection が返す公式 `items` link を使用し、HTTP通信はRhinestoneの組み込みtransportで行います。item URL は推測しません。
+collection が返す公式 `items` link を使用し、HTTP通信はRhinestoneの組み込みtransportで行います。`items`の`href`がrelative URI referenceの場合はCollection responseのURIを基準にRFC 3986の規則でabsolute URIへ解決し、その後に明示されたfeature IDを付加します。元の`href`はraw metadataに保持し、解決済みURIをResourceとprovenanceの`original_url`に使用します。
 
 Adapterを直接構築する内部テストや再利用用途ではtransport callbackや認証headerを注入できますが、標準の`configure()`経路でHTTP callbackを登録する必要はありません。

@@ -10,7 +10,9 @@ SourceDefinition の `settings` へ `endpoint`、Config へ `collection_id`、`i
 
 ## Endpoint と認証
 
-Item と Search の公式 STAC API endpoint はRhinestoneの組み込みHTTP transportで呼びます。`api_token` または `api_key` を既存 Adapter の直接利用時に指定できます。検索結果では data role の asset がちょうど一件である必要があり、asset URL や format は推測しません。
+Item と Search の公式 STAC API endpoint はRhinestoneの組み込みHTTP transportで呼びます。`api_token` または `api_key` を既存 Adapter の直接利用時に指定できます。検索結果では data role の asset がちょうど一件である必要があり、asset format は推測しません。
+
+Assetの`href`がrelative URI referenceの場合は、そのAssetを含むItem responseのURIを基準にRFC 3986の規則でabsolute URIへ解決します。元の`href`はraw metadataに保持し、解決済みURIをResourceとprovenanceの`original_url`に使用します。
 
 ## 解決して Rasterio で開く例
 
