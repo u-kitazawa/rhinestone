@@ -160,6 +160,12 @@ class ProviderAdapter(ABC):
         return value
 
     def _request(self, url: str, params: Mapping[str, Any]) -> JsonObject:
+        response, _ = self._request_with_uri(url, params)
+        return response
+
+    def _request_with_uri(
+        self, url: str, params: Mapping[str, Any]
+    ) -> Tuple[JsonObject, str]:
         credentialed = self._credential_name is not None or bool(self._headers)
         self._destination_policy.authorize(url, credentialed=credentialed)
         headers: Dict[str, str] = dict(self._headers)
@@ -181,7 +187,10 @@ class ProviderAdapter(ABC):
             ) from error
         if not isinstance(response, Mapping):
             raise ProviderResponseError("Provider response root must be an object")
-        return cast(JsonObject, response)
+        response_uri = getattr(cast(Any, response), "response_uri", url)
+        if not isinstance(response_uri, str) or not response_uri:
+            response_uri = url
+        return cast(JsonObject, response), response_uri
 
     @staticmethod
     def _object(value: Any, context: str) -> JsonObject:

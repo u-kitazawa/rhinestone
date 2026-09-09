@@ -24,10 +24,12 @@ class _Response:
         *,
         status: int = 200,
         charset: Optional[str] = None,
+        final_url: Optional[str] = None,
     ) -> None:
         self._body = body
         self._status = status
         self.headers = _Headers(charset)
+        self._final_url = final_url
 
     def __enter__(self) -> "_Response":
         return self
@@ -45,6 +47,9 @@ class _Response:
 
     def getcode(self) -> int:
         return self._status
+
+    def geturl(self) -> str:
+        return self._final_url or "https://example.test/api"
 
 
 class _Opener:
@@ -85,7 +90,7 @@ def test_get_json_builds_query_and_headers(monkeypatch: pytest.MonkeyPatch) -> N
     assert calls["timeout"] == 30
 
 
-def test_get_json_without_query_or_extra_headers(
+def test_get_json_preserves_existing_query_and_fragment_without_new_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: Dict[str, Any] = {}
@@ -96,8 +101,47 @@ def test_get_json_without_query_or_extra_headers(
 
     monkeypatch.setattr(_http, "urlopen", open_url)
 
-    assert _http.get_json("https://example.test/api", {}) == []
-    assert calls["request"].full_url == "https://example.test/api"
+    url = "https://example.test/api?tenant=a#section"
+
+    assert _http.get_json(url, {}) == []
+    assert calls["request"].full_url == url
+
+
+def test_get_json_appends_multi_value_query_before_fragment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: Dict[str, Any] = {}
+
+    def open_url(request: Request, *, timeout: int) -> _Response:
+        calls["request"] = request
+        return _Response(b"[]")
+
+    monkeypatch.setattr(_http, "urlopen", open_url)
+
+    assert (
+        _http.get_json(
+            "https://example.test/api?tenant=a&tag=original#section",
+            {"q": "x", "tag": ["b", "c"]},
+        )
+        == []
+    )
+    assert calls["request"].full_url == (
+        "https://example.test/api?tenant=a&tag=original&q=x&tag=b&tag=c#section"
+    )
+
+
+def test_get_json_preserves_final_response_uri_for_json_objects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def open_url(request: Request, *, timeout: int) -> _Response:
+        return _Response(b'{"ok": true}', final_url="https://redirected.example/final")
+
+    monkeypatch.setattr(_http, "urlopen", open_url)
+
+    response = _http.get_json("https://example.test/api", {})
+
+    assert response == {"ok": True}
+    assert response.response_uri == "https://redirected.example/final"
 
 
 def test_get_json_rejects_redirects_for_marked_credential_headers(
@@ -156,7 +200,7 @@ def test_json_service_runtime_wraps_successful_response(
     monkeypatch.setattr(_http, "build_opener", build_test_opener)
 
     response = _http.JsonServiceRuntime().get(
-        "https://example.test/api",
+        "https://example.test/api?tenant=a#section",
         params={"q": "station"},
         headers={"X-Test": "yes"},
         timeout=12,
@@ -168,7 +212,7 @@ def test_json_service_runtime_wraps_successful_response(
     assert response.json() == {"ok": True}
     assert opener.calls["timeout"] == 12
     request = opener.calls["request"]
-    assert request.full_url == "https://example.test/api?q=station"
+    assert request.full_url == "https://example.test/api?tenant=a&q=station#section"
 
 
 def test_json_service_runtime_preserves_http_status(
