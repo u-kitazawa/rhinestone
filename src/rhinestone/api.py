@@ -69,6 +69,10 @@ class _ConfiguredSourceAdapter:
         self.search_conditions = cast(
             FrozenSet[str], getattr(adapter, "search_conditions", empty_conditions)
         )
+        self.required_search_conditions = cast(
+            FrozenSet[str],
+            getattr(adapter, "required_search_conditions", empty_conditions),
+        )
         self._adapter = adapter
 
     def load(self, config: Config) -> Source:

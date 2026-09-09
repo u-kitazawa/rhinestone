@@ -290,17 +290,21 @@ class SearchQuery:
 
 @dataclass(frozen=True)
 class SearchDiagnostic:
-    """Explain which query conditions were not applied to one source."""
+    """Explain why query conditions were not applied to one source."""
 
     source_id: str
     skipped_conditions: FrozenSet[str]
     reason: str = "unsupported"
+    missing_conditions: FrozenSet[str] = frozenset()
 
     def __post_init__(self) -> None:
         if not self.source_id:
             raise ConfigValidationError("search diagnostic source_id must be non-empty")
         object.__setattr__(
             self, "skipped_conditions", frozenset(self.skipped_conditions)
+        )
+        object.__setattr__(
+            self, "missing_conditions", frozenset(self.missing_conditions)
         )
 
 
