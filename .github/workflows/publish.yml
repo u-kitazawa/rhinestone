@@ -47,9 +47,8 @@ jobs:
           package_version="${RELEASE_TAG#v}"
           shopt -s nullglob
           wheels=("dist/rhinestone-${package_version}-"*.whl)
-          sdists=("dist/rhinestone-${package_version}.tar.gz")
 
-          if (( ${#wheels[@]} != 1 || ${#sdists[@]} != 1 )); then
+          if (( ${#wheels[@]} != 1 )) || [[ ! -f "dist/rhinestone-${package_version}.tar.gz" ]]; then
             echo "Built distributions do not match release version $package_version."
             printf '%s\n' dist/*
             exit 1
