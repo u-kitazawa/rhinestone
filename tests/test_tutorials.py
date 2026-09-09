@@ -71,3 +71,76 @@ def test_ckan_pyogrio_tutorial_registers_runtime() -> None:
     assert key.value == "pyogrio"
     assert isinstance(dependencies.values[0], ast.Name)
     assert dependencies.values[0].id == "pyogrio"
+
+
+def test_stac_rasterio_tutorial_selects_an_explicit_asset(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """複数data assetでも明示keyで選択し、検索前提にしないことを保証する。"""
+
+    class Dataset:
+        width = 1024
+        height = 512
+        count = 3
+
+        def __enter__(self) -> "Dataset":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    opened: list[str] = []
+    rasterio = ModuleType("rasterio")
+
+    def open_dataset(uri: str, **kwargs: object) -> Dataset:
+        opened.append(uri)
+        return Dataset()
+
+    rasterio.open = open_dataset  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "rasterio", rasterio)
+    monkeypatch.setenv("RHINESTONE_STAC_ENDPOINT", "https://stac.example/api")
+    monkeypatch.setenv("RHINESTONE_STAC_COLLECTION_ID", "imagery")
+    monkeypatch.setenv("RHINESTONE_STAC_ITEM_ID", "scene-1")
+    monkeypatch.setenv("RHINESTONE_STAC_ASSET_KEY", "visual")
+
+    from rhinestone import api
+
+    requested: list[tuple[str, object]] = []
+
+    def get_json(url: str, params: object, headers: object = None) -> dict[str, object]:
+        requested.append((url, params))
+        return {
+            "id": "scene-1",
+            "collection": "imagery",
+            "properties": {"title": "Scene 1"},
+            "assets": {
+                "analytic": {
+                    "href": "https://assets.example/analytic.tif",
+                    "roles": ["data"],
+                    "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                },
+                "visual": {
+                    "href": "https://assets.example/visual.tif",
+                    "roles": ["data"],
+                    "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                },
+            },
+        }
+
+    monkeypatch.setattr(getattr(api, "_http"), "get_json", get_json)
+
+    source = tutorial_python("stac-rasterio.md")
+    exec(compile(source, "docs/tutorials/stac-rasterio.md", "exec"), {})
+
+    assert requested == [
+        (
+            "https://stac.example/api/collections/imagery/items/scene-1",
+            {},
+        )
+    ]
+    assert opened == ["https://assets.example/visual.tif"]
+    output = capsys.readouterr().out
+    assert "resource: https://assets.example/visual.tif\n" in output
+    assert "format: cog\n" in output
+    assert "width x height: 1024 x 512\n" in output
+    assert "bands: 3\n" in output

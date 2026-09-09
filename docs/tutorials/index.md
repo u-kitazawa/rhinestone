@@ -11,7 +11,7 @@ configure -> search -> Resultを選ぶ -> resolve -> Resourceを開く
 
 | 目的 | 解決パターン | 最後に得るもの |
 | --- | --- | --- |
-| [STAC画像をRasterioで開く](stac-rasterio.md) | Itemからdata assetを選択 | Rasterioのdataset |
+| [STAC画像をRasterioで開く](stac-rasterio.md) | Itemとdata assetを明示して選択 | Rasterioのdataset |
 | [CKANのベクター配布物をpyogrioで読む](ckan-pyogrio.md) | dataset内のdistributionを選択 | GeoDataFrame相当のオブジェクト |
 
 ## 共通の注意

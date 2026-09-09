@@ -24,7 +24,7 @@
 | `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Config 内の secret、他 resource type は非対応。 |
 | `ogc-features` | OGC API Features 1.0 | collection または feature の service query | WFS、他 OGC API、built-in data reader は非対応。 |
 | `plateau` | G 空間情報センター CKAN Action API | 指定 dataset / resource の配布物 | 市区町村・年度からの配布物推測、ZIP 以外の archive は非対応。 |
-| `stac` | STAC API 1.0 | collection item の明示 asset、検索 | asset の URL / format 推測、STAC 以外の catalog は非対応。 |
+| `stac` | STAC API 1.0 | collection item の明示 asset、検索 | 検索はItemごとに `data` roleのassetがちょうど1件必要。解決には対応media typeも必要。asset の URL / format 推測、STAC 以外の catalog は非対応。 |
 
 ## Execution Adapter と format
 
