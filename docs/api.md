@@ -71,6 +71,11 @@ result = results[0]
 
 `text`、`bbox`、`time`、`limit`をキーワードで指定できます。`SearchQuery`を渡す形式は高度なAPIです。
 
+`SearchResults`のiterationと整数indexingは、構成したProvider順にgroupを連結し、
+各Provider内の順序を保持します。このsequenceは決定的な走査用であり、Providerを
+横断した関連度rankingではありません。Provider固有のrankingを扱う場合は
+`results.items()`または`results["provider-id"]`でgroupごとに参照します。
+
 ## `Result`
 
 検索で見つかった候補です。通常は次のようにResourceへ解決します。
