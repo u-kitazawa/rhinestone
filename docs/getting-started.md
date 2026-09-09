@@ -34,6 +34,8 @@ print(resource.provenance)
 ```
 
 検索結果の解決にConfigは必要ありません。
+複数Provider時の`results[0]`は構成順で最初のProviderの先頭結果であり、Providerを
+横断した関連度1位ではありません。順序とgroup別の参照方法は[データを検索する](search.md)を参照してください。
 
 ## Providerを限定する
 
