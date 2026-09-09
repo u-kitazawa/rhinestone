@@ -72,13 +72,15 @@ with resource.open("rasterio") as dataset:
 ## 検索時の制約
 
 現行の `StacAdapter.search()` は、各Itemで `data` roleのassetがちょうど1件の場合だけ
-解決可能な検索結果を返します。0件または複数件の場合は、assetを推測せず
+そのasset keyを含む検索結果を返します。0件または複数件の場合は、assetを推測せず
 `ProviderResponseError` で検索全体を停止します。そのため、複数の `data` assetを含み得る
 一般的なendpointでは、「検索後に結果をfilterしてassetを選ぶ」ことはできません。
 
 そのようなItemを扱う場合は、この例のように利用するItemとasset keyを明示してください。
-単一 `data` assetに制約されたcollectionでのみ検索を使う場合は、検索結果をそのまま
-`app.resolve(result)`へ渡せます。
+単一 `data` assetに制約され、かつそのassetがCOG media typeを広告するcollectionでのみ
+このRasterioフローへ検索結果をそのまま `app.resolve(result)` で渡せます。単一assetでも
+media typeが未指定または非対応の場合、検索結果は返りますが解決時に
+`UnsupportedAccessError` となります。
 
 ## この例の境界
 
