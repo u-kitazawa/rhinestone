@@ -97,3 +97,59 @@ def test_stac_missing_requested_asset_is_a_response_error() -> None:
                 },
             )
         )
+
+
+def test_stac_load_encodes_identifiers_as_individual_path_segments() -> None:
+    endpoint = "https://stac.example"
+    collection_id = "sentinel/2?archive#v1"
+    item_id = "already%2Fencoded"
+    item_url = (
+        endpoint + "/collections/sentinel%2F2%3Farchive%23v1/items/already%252Fencoded"
+    )
+    client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
+
+    source = StacAdapter(get_json=client).load(
+        Config(
+            "stac",
+            {
+                "endpoint": endpoint,
+                "collection_id": collection_id,
+                "item_id": item_id,
+                "asset_key": "visual",
+            },
+        )
+    )
+
+    assert client.calls == [(item_url, {})]
+    assert source.provenance.dataset_identifier == collection_id
+    assert source.provenance.resource_identifier == item_id
+
+
+def test_stac_search_result_keeps_logical_identifiers_for_encoded_load() -> None:
+    endpoint = "https://stac.example"
+    search_url = endpoint + "/search"
+    collection_id = "sentinel/2"
+    item_id = "scene?revision#1%"
+    item_url = endpoint + "/collections/sentinel%2F2/items/scene%3Frevision%231%25"
+    search_response = dict(fixture_json("stac/item_collection.json"))
+    feature = dict(search_response["features"][0])
+    feature.update({"collection": collection_id, "id": item_id})
+    search_response["features"] = [feature]
+    client = RecordingJsonClient(
+        {
+            search_url: search_response,
+            item_url: fixture_json("stac/item.json"),
+        }
+    )
+    adapter = StacAdapter(endpoint=endpoint, get_json=client)
+
+    result = adapter.search(SearchQuery(limit=1))[0]
+    source = adapter.load(result.to_config())
+
+    assert result.target.settings["collection_id"] == collection_id
+    assert result.target.settings["item_id"] == item_id
+    assert result.provenance.dataset_identifier == collection_id
+    assert result.provenance.resource_identifier == item_id
+    assert client.calls == [(search_url, {"limit": 1}), (item_url, {})]
+    assert source.provenance.dataset_identifier == collection_id
+    assert source.provenance.resource_identifier == item_id

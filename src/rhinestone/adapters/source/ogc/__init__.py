@@ -53,13 +53,15 @@ class OgcFeaturesAdapter(ProviderAdapter):
         settings = self._config_settings(config)
         endpoint = self._endpoint_from(settings)
         collection_id = self._required_string(settings, "collection_id")
-        collection_url = f"{endpoint}/collections/{collection_id}"
+        collection_path = self._encode_path_segment(collection_id)
+        collection_url = f"{endpoint}/collections/{collection_path}"
         collection = self._request(collection_url, {})
         items_link = self._items_link(collection)
         feature_id = settings.get("feature_id")
         uri = items_link["href"]
         if isinstance(feature_id, str) and feature_id:
-            uri = f"{uri.rstrip('/')}/{feature_id}"
+            feature_path = self._encode_path_segment(feature_id)
+            uri = f"{uri.rstrip('/')}/{feature_path}"
         candidate = ResourceCandidate(
             uri=uri,
             format="ogc-api-features",
@@ -97,7 +99,8 @@ class OgcFeaturesAdapter(ProviderAdapter):
                 f"Unsupported OGC search conditions: {', '.join(sorted(unsupported))}"
             )
         params = self._query_parameters(query)
-        items_url = f"{endpoint}/collections/{self._collection_id}/items"
+        collection_path = self._encode_path_segment(self._collection_id)
+        items_url = f"{endpoint}/collections/{collection_path}/items"
         response = self._request(items_url, params)
         features = self._objects(response.get("features"), "OGC features")
         found: List[SearchResult] = []
