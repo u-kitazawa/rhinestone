@@ -44,7 +44,17 @@ Resultは次の情報を持ちます。
 
 横断CKAN検索の結果は、`discovered_by="search-ckan-jp"`、`target.source_id="direct"` のようになります。`target`は`result.to_config()`で取得できます。解決先が発見元と異なる場合も、発見元のmetadataとprovenanceはResourceへ引き継がれます。
 
-Providerごとのグループが必要な場合は、`results.items()`、`results.keys()`、`results["provider-id"]`を使えます。
+## 結果の順序
+
+単一Providerでは、iterationと整数indexingはProviderが返した順序をそのまま使います。
+複数Providerでは、`catalog`または`sources`へ構成したProvider順にgroupを連結し、
+各group内ではProviderが返した順序を保ちます。したがって`results[0]`は最初に構成した
+Providerの先頭結果であり、Providerを横断した「最も関連度が高い結果」ではありません。
+
+Rhinestoneは共通scoreやrerankerを持たないため、異なるProviderのrankingを比較しません。
+Source IDの辞書順もrankingには使われず、Source IDをrenameしても構成位置が同じなら
+iteration順は変わりません。Provider固有のrankingを扱う場合は、
+`results.items()`、`results.keys()`、`results["provider-id"]`でgroupごとに参照してください。
 
 ## 検索条件
 
