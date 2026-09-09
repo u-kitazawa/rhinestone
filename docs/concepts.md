@@ -43,7 +43,7 @@ resource = app.resolve(result)
 
 ## Runtime
 
-Runtimeは、Rhinestoneが外部実行に利用する利用者所有の環境です。GDAL、Rasterio、pyogrio、RDFLibなどが該当します。以前の文書で使っていたdependencyやruntime dependencyという表記は、利用者向けにはRuntimeへ統一します。
+Runtimeは、Rhinestoneが外部実行に利用する利用者所有の環境です。GDAL、Rasterio、pyogrio、RDFLibなどが該当します。実体はそのまま、遅延評価する場合は `RuntimeFactory` として構成します。以前の文書で使っていたdependencyやruntime dependencyという表記は、利用者向けにはRuntimeへ統一します。
 
 ## Credential
 

@@ -44,6 +44,7 @@ from .models import (
     Provider,
     Resource,
     Result,
+    RuntimeFactory,
     SearchQuery,
     Source,
 )
@@ -131,7 +132,7 @@ class Rhinestone:
             if name in _EXECUTION_RUNTIME_NAMES
         }
         execution_dependencies.setdefault(
-            "json-service", lambda: _http.JsonServiceRuntime()
+            "json-service", RuntimeFactory(lambda: _http.JsonServiceRuntime())
         )
         execution_dependency_registry = DependencyRegistry(execution_dependencies)
         credential_registry = CredentialRegistry(credentials or {})

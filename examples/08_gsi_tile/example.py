@@ -2,11 +2,11 @@
 
 from osgeo import gdal
 
-from rhinestone import Config, configure, sources
+from rhinestone import Config, RuntimeFactory, configure, sources
 
 app = configure(
     sources=(sources.GSI,),
-    dependencies={"gdal": lambda: gdal},
+    dependencies={"gdal": RuntimeFactory(lambda: gdal)},
 )
 
 resource = app.resolve(Config("gsi", {"id": "std"}))

@@ -7,7 +7,14 @@ import pytest
 import rdflib
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
-from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
+from rhinestone import (
+    Config,
+    RuntimeFactory,
+    SearchQuery,
+    SourceDefinition,
+    configure,
+    sources,
+)
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import (
     ConfigValidationError,
@@ -52,7 +59,9 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
     app = configure(
         sources=(SourceDefinition("catalog", "dcat"),),
         dependencies={
-            "rdflib": lambda: dependency_calls.append("rdflib") or rdflib,
+            "rdflib": RuntimeFactory(
+                lambda: dependency_calls.append("rdflib") or rdflib
+            ),
         },
     )
     assert dependency_calls == []
@@ -92,7 +101,9 @@ def test_dcat_search_loads_source_runtime_on_demand(
             ),
         ),
         dependencies={
-            "rdflib": lambda: dependency_calls.append("rdflib") or rdflib,
+            "rdflib": RuntimeFactory(
+                lambda: dependency_calls.append("rdflib") or rdflib
+            ),
         },
     )
 
@@ -147,7 +158,7 @@ def test_resolved_resource_does_not_retain_source_runtime(
     factory_ref = ref(factory)
     app = configure(
         sources=(SourceDefinition("catalog", "dcat"),),
-        dependencies={"rdflib": factory},
+        dependencies={"rdflib": RuntimeFactory(factory)},
     )
     resource = app.resolve(
         Config(

@@ -10,7 +10,7 @@ from .errors import (
     ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
-from .models import DependencyValue
+from .models import DependencyValue, RuntimeFactory
 
 
 class CredentialRegistry:
@@ -48,7 +48,7 @@ class DependencyRegistry:
                 f"Runtime dependency {name!r} is not configured"
             )
         try:
-            instance = value() if callable(value) else value
+            instance = value.factory() if isinstance(value, RuntimeFactory) else value
         except Exception as error:
             raise DependencyUnavailableError(
                 f"Runtime dependency {name!r} could not be loaded"
