@@ -14,6 +14,7 @@ from ....models import (
 )
 from ....registry import CredentialRegistry
 from ....security import DestinationPolicy
+from .._uri import append_path_segment, resolve_response_href
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -54,12 +55,12 @@ class OgcFeaturesAdapter(ProviderAdapter):
         endpoint = self._endpoint_from(settings)
         collection_id = self._required_string(settings, "collection_id")
         collection_url = f"{endpoint}/collections/{collection_id}"
-        collection = self._request(collection_url, {})
+        collection, response_uri = self._request_with_uri(collection_url, {})
         items_link = self._items_link(collection)
         feature_id = settings.get("feature_id")
-        uri = items_link["href"]
+        uri = resolve_response_href(response_uri, items_link["href"])
         if isinstance(feature_id, str) and feature_id:
-            uri = f"{uri.rstrip('/')}/{feature_id}"
+            uri = append_path_segment(uri, feature_id)
         candidate = ResourceCandidate(
             uri=uri,
             format="ogc-api-features",

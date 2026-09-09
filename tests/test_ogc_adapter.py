@@ -3,7 +3,11 @@ import pytest
 from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
-from tests.provider_support import RecordingJsonClient, fixture_json
+from tests.provider_support import (
+    RecordingJsonClient,
+    ResponseJsonClient,
+    fixture_json,
+)
 
 
 def test_ogc_collection_items_link_becomes_service_resource() -> None:
@@ -81,3 +85,86 @@ def test_ogc_collection_without_items_link_is_rejected() -> None:
                 {"endpoint": endpoint, "collection_id": "rivers"},
             )
         )
+
+
+def test_ogc_resolves_relative_items_href_against_collection_response_uri() -> None:
+    endpoint = "https://features.example"
+    collection_url = endpoint + "/collections/rivers"
+    collection = dict(fixture_json("ogc/collection.json"))
+    collection["links"] = [
+        {
+            "rel": "items",
+            "type": "application/geo+json",
+            "href": "rivers/items?f=json#items",
+        }
+    ]
+    client = RecordingJsonClient({collection_url: collection})
+
+    source = OgcFeaturesAdapter(get_json=client).load(
+        Config(
+            "ogc-features",
+            {
+                "endpoint": endpoint,
+                "collection_id": "rivers",
+                "feature_id": "river-1",
+            },
+        )
+    )
+
+    resolved_uri = (
+        "https://features.example/collections/rivers/items/river-1?f=json#items"
+    )
+    assert source.candidates[0].uri == resolved_uri
+    assert source.provenance.original_url == resolved_uri
+    assert source.raw_metadata["links"][0]["href"] == ("rivers/items?f=json#items")
+
+
+def test_ogc_relative_href_uses_rfc3986_query_and_fragment_rules() -> None:
+    endpoint = "https://features.example"
+    collection_url = endpoint + "/collections/rivers"
+    collection = dict(fixture_json("ogc/collection.json"))
+    collection["links"] = [
+        {"rel": "items", "type": "application/geo+json", "href": "?f=json#items"}
+    ]
+    client = RecordingJsonClient({collection_url: collection})
+
+    source = OgcFeaturesAdapter(get_json=client).load(
+        Config(
+            "ogc-features",
+            {"endpoint": endpoint, "collection_id": "rivers"},
+        )
+    )
+
+    assert source.candidates[0].uri == collection_url + "?f=json#items"
+    assert source.provenance.original_url == source.candidates[0].uri
+
+
+def test_ogc_resolves_relative_href_against_final_redirect_uri() -> None:
+    collection_url = "https://features.example/collections/rivers"
+    collection = dict(fixture_json("ogc/collection.json"))
+    collection["links"] = [
+        {
+            "rel": "items",
+            "type": "application/geo+json",
+            "href": "./items",
+        }
+    ]
+    client = ResponseJsonClient(
+        {collection_url: collection},
+        {collection_url: "https://features-cdn.example/catalog/rivers"},
+    )
+
+    source = OgcFeaturesAdapter(get_json=client).load(
+        Config(
+            "ogc-features",
+            {
+                "endpoint": "https://features.example",
+                "collection_id": "rivers",
+                "feature_id": "river-1",
+            },
+        )
+    )
+
+    assert (
+        source.candidates[0].uri == "https://features-cdn.example/catalog/items/river-1"
+    )

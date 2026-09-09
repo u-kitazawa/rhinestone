@@ -3,7 +3,11 @@ import pytest
 from rhinestone.adapters.source.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
-from tests.provider_support import RecordingJsonClient, fixture_json
+from tests.provider_support import (
+    RecordingJsonClient,
+    ResponseJsonClient,
+    fixture_json,
+)
 
 
 def test_stac_load_selects_only_the_explicit_asset_and_preserves_item() -> None:
@@ -97,3 +101,87 @@ def test_stac_missing_requested_asset_is_a_response_error() -> None:
                 },
             )
         )
+
+
+def test_stac_resolves_relative_asset_href_against_item_response_uri() -> None:
+    endpoint = "https://stac.example"
+    item_url = endpoint + "/collections/sentinel-2/items/scene-1"
+    item = dict(fixture_json("stac/item.json"))
+    assets = dict(item["assets"])
+    visual = dict(assets["visual"])
+    visual["href"] = "./assets/image.tif?download=1#visual"
+    assets["visual"] = visual
+    item["assets"] = assets
+    client = RecordingJsonClient({item_url: item})
+
+    source = StacAdapter(get_json=client).load(
+        Config(
+            "stac",
+            {
+                "endpoint": endpoint,
+                "collection_id": "sentinel-2",
+                "item_id": "scene-1",
+                "asset_key": "visual",
+            },
+        )
+    )
+
+    resolved_uri = (
+        "https://stac.example/collections/sentinel-2/items/"
+        "assets/image.tif?download=1#visual"
+    )
+    assert source.candidates[0].uri == resolved_uri
+    assert source.provenance.original_url == resolved_uri
+    assert source.raw_metadata["assets"]["visual"]["href"] == (
+        "./assets/image.tif?download=1#visual"
+    )
+
+
+def test_stac_relative_href_uses_rfc3986_query_and_fragment_rules() -> None:
+    adapter = StacAdapter(get_json=RecordingJsonClient({}))
+    candidate = adapter._candidate(  # pyright: ignore[reportPrivateUsage]
+        {"href": "./asset.tif", "type": "image/tiff"},
+        "visual",
+        "https://stac.example/items/scene-1?token=x#old",
+    )
+
+    assert candidate.uri == "https://stac.example/items/asset.tif"
+
+
+def test_stac_resolves_relative_href_against_final_redirect_uri() -> None:
+    item_url = "https://stac.example/collections/sentinel-2/items/scene-1"
+    item = dict(fixture_json("stac/item.json"))
+    assets = dict(item["assets"])
+    visual = dict(assets["visual"])
+    visual["href"] = "./assets/image.tif"
+    assets["visual"] = visual
+    item["assets"] = assets
+    client = ResponseJsonClient(
+        {item_url: item},
+        {item_url: "https://stac-cdn.example/items/scene-1"},
+    )
+
+    source = StacAdapter(get_json=client).load(
+        Config(
+            "stac",
+            {
+                "endpoint": "https://stac.example",
+                "collection_id": "sentinel-2",
+                "item_id": "scene-1",
+                "asset_key": "visual",
+            },
+        )
+    )
+
+    assert source.candidates[0].uri == "https://stac-cdn.example/items/assets/image.tif"
+
+
+def test_stac_preserves_absolute_non_http_asset_href() -> None:
+    adapter = StacAdapter(get_json=RecordingJsonClient({}))
+    candidate = adapter._candidate(  # pyright: ignore[reportPrivateUsage]
+        {"href": "s3://bucket/asset.tif", "type": "image/tiff"},
+        "visual",
+        "https://stac.example/items/scene-1",
+    )
+
+    assert candidate.uri == "s3://bucket/asset.tif"

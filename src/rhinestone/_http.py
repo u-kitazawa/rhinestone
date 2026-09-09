@@ -13,6 +13,14 @@ _DEFAULT_HEADERS = {
 }
 
 
+class JsonDocument(dict[str, Any]):
+    """Decoded JSON object together with the URI that supplied it."""
+
+    def __init__(self, value: Mapping[str, Any], response_uri: str) -> None:
+        super().__init__(value)
+        self.response_uri = response_uri
+
+
 def get_json(
     url: str,
     params: Mapping[str, Any],
@@ -27,7 +35,13 @@ def get_json(
     )
     open_request = opener.open if opener is not None else urlopen
     with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
-        return json.load(response)
+        decoded = json.load(response)
+        if isinstance(decoded, Mapping):
+            response_uri = getattr(response, "geturl", lambda: request.full_url)()
+            return JsonDocument(
+                cast(Mapping[str, Any], decoded), response_uri or request.full_url
+            )
+        return decoded
 
 
 def get_text(url: str) -> str:
