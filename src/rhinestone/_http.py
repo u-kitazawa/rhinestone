@@ -3,7 +3,7 @@
 import json
 from typing import Any, Mapping, Optional, cast
 from urllib.error import HTTPError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 _TIMEOUT_SECONDS = 30
@@ -11,6 +11,14 @@ _DEFAULT_HEADERS = {
     "Accept": "application/json",
     "User-Agent": "rhinestone",
 }
+
+
+class JsonDocument(dict[str, Any]):
+    """Decoded JSON object together with the URI that supplied it."""
+
+    def __init__(self, value: Mapping[str, Any], response_uri: str) -> None:
+        super().__init__(value)
+        self.response_uri = response_uri
 
 
 def get_json(
@@ -27,7 +35,13 @@ def get_json(
     )
     open_request = opener.open if opener is not None else urlopen
     with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
-        return json.load(response)
+        decoded = json.load(response)
+        if isinstance(decoded, Mapping):
+            response_uri = getattr(response, "geturl", lambda: request.full_url)()
+            return JsonDocument(
+                cast(Mapping[str, Any], decoded), response_uri or request.full_url
+            )
+        return decoded
 
 
 def get_text(url: str) -> str:
@@ -96,9 +110,22 @@ def _request(
     params: Mapping[str, Any],
     headers: Optional[Mapping[str, str]] = None,
 ) -> Request:
-    query = urlencode(params, doseq=True)
-    request_url = url + ("?" + query if query else "")
+    request_url = _append_query(url, params)
     return Request(
         request_url,
         headers={**_DEFAULT_HEADERS, **dict(headers or {})},
     )
+
+
+def _append_query(url: str, params: Mapping[str, Any]) -> str:
+    """Append parameters without replacing or normalizing an existing query."""
+    additional_query = urlencode(params, doseq=True)
+    if not additional_query:
+        return url
+    components = urlsplit(url)
+    query = (
+        f"{components.query}&{additional_query}"
+        if components.query
+        else additional_query
+    )
+    return urlunsplit(components._replace(query=query))

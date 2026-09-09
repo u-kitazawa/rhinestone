@@ -64,10 +64,15 @@ iteration順は変わりません。Provider固有のrankingを扱う場合は�
 
 ```python
 for diagnostic in results.diagnostics:
-    print(diagnostic.source_id, diagnostic.skipped_conditions)
+    print(
+        diagnostic.source_id,
+        diagnostic.reason,
+        diagnostic.skipped_conditions,
+        diagnostic.missing_conditions,
+    )
 ```
 
-指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。
+指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。Sourceに必須条件がある場合、その条件が指定されていないSourceも検索せずスキップします。`diagnostic.reason`は通常`unsupported`または`missing_required`で、後者では`missing_conditions`に不足条件が入ります。
 
 検索結果は`app.resolve(result)`で直接Resourceへ解決できます。`app.search()`が返したResultでは
 `result.resolve()`も同じResourceを返し、発見元と解決先が異なる場合もmetadataとprovenanceを

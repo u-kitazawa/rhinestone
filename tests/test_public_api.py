@@ -84,6 +84,51 @@ def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
     assert selected == []
 
 
+def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    endpoint = "https://stac.example"
+    item_url = endpoint + "/collections/sentinel-2/items/scene-1"
+    item = dict(fixture_json("stac/item.json"))
+    assets = dict(item["assets"])
+    visual = dict(assets["visual"])
+    visual["href"] = "./assets/image.tif"
+    assets["visual"] = visual
+    item["assets"] = assets
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Dict[str, Any]:
+        assert url == item_url
+        assert params == {}
+        return item
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    runtime = FakeRasterio("opened")
+    app = configure(
+        sources=(SourceDefinition("imagery", "stac", {"endpoint": endpoint}),),
+        dependencies={"rasterio": runtime},
+    )
+    resource = app.resolve(
+        Config(
+            "imagery",
+            {
+                "collection_id": "sentinel-2",
+                "item_id": "scene-1",
+                "asset_key": "visual",
+            },
+        )
+    )
+    resolved_uri = "https://stac.example/collections/sentinel-2/items/assets/image.tif"
+
+    assert resource.uri == resolved_uri
+    assert resource.provenance.original_url == resolved_uri
+    assert resource.open("rasterio") == "opened:" + resolved_uri
+    assert runtime.calls == [resolved_uri]
+
+
 def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
     assert isinstance(sources.ALL, tuple)
     assert sources.ALL == (
@@ -259,6 +304,28 @@ def test_public_search_reports_unsupported_conditions_per_source() -> None:
 
     assert results.diagnostics[0].source_id == "catalog"
     assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
+
+
+def test_public_search_skips_search_ckan_jp_without_required_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Dict[str, Any]:
+        raise AssertionError("search-ckan.jp must be skipped without text")
+
+    monkeypatch.setattr(_http, "get_json", fail_if_called)
+    app = configure(sources=(sources.SEARCH_CKAN_JP,))
+
+    results = app.search(bbox=(139.0, 35.0, 140.0, 36.0), limit=10)
+
+    assert len(results) == 0
+    assert results.diagnostics[0].source_id == "search-ckan-jp"
+    assert results.diagnostics[0].reason == "missing_required"
+    assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
+    assert results.diagnostics[0].missing_conditions == frozenset({"text"})
 
 
 @pytest.mark.parametrize(

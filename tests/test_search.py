@@ -38,6 +38,10 @@ class OrderedSearchableAdapter(SearchableAdapter):
         return self.results
 
 
+class RequiredSearchableAdapter(SearchableAdapter):
+    required_search_conditions = frozenset({"text"})
+
+
 def test_search_calls_only_adapters_declaring_search_capability() -> None:
     """検索不能な Source Adapter を federated search が誤って呼ばないために必要である。"""
     searchable = SearchableAdapter()
@@ -63,6 +67,20 @@ def test_unsupported_search_condition_is_reported_and_projected() -> None:
     assert results.diagnostics[0].source_id == "searchable"
     assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
     assert searchable.queries == [SearchQuery(text="river")]
+
+
+def test_missing_required_search_condition_skips_provider_and_reports_reason() -> None:
+    searchable = RequiredSearchableAdapter()
+    coordinator = SearchCoordinator((searchable,))
+
+    results = coordinator.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0), limit=5))
+
+    assert results.keys() == ()
+    assert results.diagnostics[0].source_id == "searchable"
+    assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
+    assert results.diagnostics[0].reason == "missing_required"
+    assert results.diagnostics[0].missing_conditions == frozenset({"text"})
+    assert searchable.queries == []
 
 
 def test_results_remain_grouped_by_provider() -> None:

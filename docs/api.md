@@ -86,7 +86,7 @@ resource = app.resolve(result)
 
 `title`、`description`、`discovered_by`、`target`、`metadata`、`provenance`を参照できます。`target`は解決先の`Config`で、`to_config()`でも取得できます。
 
-検索結果の一部条件がSourceで適用されなかった場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。
+検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。
 
 ## `Rhinestone.resolve()`
 

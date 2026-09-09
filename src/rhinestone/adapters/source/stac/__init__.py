@@ -14,6 +14,7 @@ from ....models import (
 )
 from ....registry import CredentialRegistry
 from ....security import DestinationPolicy
+from .._uri import resolve_response_href
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -56,9 +57,9 @@ class StacAdapter(ProviderAdapter):
         collection_path = self._encode_path_segment(collection_id)
         item_path = self._encode_path_segment(item_id)
         item_url = f"{endpoint}/collections/{collection_path}/items/{item_path}"
-        item = self._request(item_url, {})
+        item, response_uri = self._request_with_uri(item_url, {})
         asset = self._asset(item, asset_key)
-        candidate = self._candidate(asset, asset_key)
+        candidate = self._candidate(asset, asset_key, response_uri)
         properties = self._object(item.get("properties"), "STAC properties")
         metadata = Metadata(
             title=_optional_string(properties.get("title")) or item_id,
@@ -152,8 +153,11 @@ class StacAdapter(ProviderAdapter):
             raise ProviderResponseError(f"Requested STAC asset {key!r} is missing")
         return self._object(assets[key], f"STAC asset {key!r}")
 
-    def _candidate(self, asset: JsonObject, key: str) -> ResourceCandidate:
-        uri = self._required_string(asset, "href")
+    def _candidate(
+        self, asset: JsonObject, key: str, response_uri: str
+    ) -> ResourceCandidate:
+        href = self._required_string(asset, "href")
+        uri = resolve_response_href(response_uri, href)
         media_type = _optional_string(asset.get("type"))
         format_name = "cog" if media_type and "cloud-optimized" in media_type else None
         return ResourceCandidate(
