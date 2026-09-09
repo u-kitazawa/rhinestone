@@ -63,7 +63,7 @@ def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
             "asset_key": "visual",
         },
     )
-    assert "endpoint" not in results[0].settings
+    assert "endpoint" not in results[0].target.settings
     assert results[0].metadata.raw["stac_version"] == "1.0.0"
 
 

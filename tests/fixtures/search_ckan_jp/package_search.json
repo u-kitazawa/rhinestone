@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "result": {
+    "q": {"q": ["river"]},
+    "count": 1,
+    "results": [
+      {
+        "id": "catalog-id",
+        "xckan_original_id": "original-dataset",
+        "xckan_site_name": "Example CKAN",
+        "xckan_site_url": "https://catalog.example/dataset/original-dataset",
+        "title": "Example Rivers",
+        "notes": "Official river data",
+        "license_title": "CC BY 4.0",
+        "organization": {"title": "Example Municipality"},
+        "resources": [
+          {
+            "id": "resource-1",
+            "url": "https://catalog.example/dataset/original-dataset/resource/resource-1/download/rivers.geojson",
+            "format": "GeoJSON",
+            "mimetype": "application/geo+json",
+            "name": "Rivers"
+          },
+          {
+            "id": "resource-unknown",
+            "url": "https://catalog.example/dataset/original-dataset/resource/resource-unknown/download",
+            "mimetype": "application/octet-stream"
+          }
+        ]
+      }
+    ]
+  }
+}

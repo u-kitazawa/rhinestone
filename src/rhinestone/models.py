@@ -7,6 +7,7 @@ from typing import (
     Any,
     Callable,
     FrozenSet,
+    Iterable,
     List,
     Literal,
     Mapping,
@@ -25,11 +26,19 @@ from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
 LibraryName = Literal["gdal", "json-service", "pyogrio", "rasterio"]
 """Execution runtime names accepted by the public open API."""
 
-DependencyValue = Union[object, Callable[[], Any]]
-"""An injected runtime object or a lazy factory returning one."""
+
+@dataclass(frozen=True)
+class RuntimeFactory:
+    """An explicit lazy factory for a user-owned Runtime."""
+
+    factory: Callable[[], Any]
+
+
+DependencyValue = Union[object, RuntimeFactory]
+"""An injected Runtime object or an explicit lazy RuntimeFactory."""
 
 Runtime = DependencyValue
-"""A runtime object or a lazy factory returning one."""
+"""A Runtime object or an explicit lazy RuntimeFactory."""
 
 
 class _RasterioDatasetReader(Protocol):
@@ -45,19 +54,19 @@ class _GeoDataFrame(Protocol):
 
 
 class Dependencies(TypedDict, total=False):
-    """IDE-discoverable names for supported external runtime dependencies."""
+    """IDE-discoverable names for supported Source and Execution runtimes."""
 
     gdal: DependencyValue
-    """GDAL Python bindings used for raster, vector, and tile access."""
+    """Execution Runtime used for raster, vector, and tile access."""
 
     rasterio: DependencyValue
-    """Rasterio used for COG and GeoTIFF access."""
+    """Execution Runtime used for COG and GeoTIFF access."""
 
     pyogrio: DependencyValue
-    """Pyogrio used for vector data access."""
+    """Execution Runtime used for vector data access."""
 
     rdflib: DependencyValue
-    """RDFLib used for DCAT catalog interpretation."""
+    """Source Runtime used when searching or resolving a DCAT catalog."""
 
 
 def _freeze(value: Any) -> Any:
@@ -229,6 +238,37 @@ class SearchQuery:
     time: Optional[Tuple[Optional[datetime], Optional[datetime]]] = None
     limit: Optional[int] = None
 
+    def __post_init__(self) -> None:
+        raw_text = cast(object, self.text)
+        if raw_text is not None and not isinstance(raw_text, str):
+            raise ConfigValidationError("text must be a string or None")
+        if self.limit is not None and (type(self.limit) is not int or self.limit < 0):
+            raise ConfigValidationError("limit must be a non-negative integer")
+        raw_bbox = cast(object, self.bbox)
+        if raw_bbox is not None:
+            if not isinstance(raw_bbox, tuple):
+                raise ConfigValidationError("bbox must be a tuple of four numbers")
+            bbox_values = cast(Tuple[Any, ...], raw_bbox)
+            if len(bbox_values) != 4 or any(
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                for value in bbox_values
+            ):
+                raise ConfigValidationError("bbox must be a tuple of four numbers")
+        raw_time = cast(object, self.time)
+        if raw_time is not None:
+            if not isinstance(raw_time, tuple):
+                raise ConfigValidationError(
+                    "time must be a tuple of two datetime or None values"
+                )
+            time_values = cast(Tuple[Any, ...], raw_time)
+            if len(time_values) != 2 or any(
+                value is not None and not isinstance(value, datetime)
+                for value in time_values
+            ):
+                raise ConfigValidationError(
+                    "time must be a tuple of two datetime or None values"
+                )
+
     @property
     def supplied_conditions(self) -> FrozenSet[str]:
         return frozenset(
@@ -237,13 +277,39 @@ class SearchQuery:
             if getattr(self, name) is not None
         )
 
+    def project(self, supported_conditions: Iterable[str]) -> "SearchQuery":
+        """Return the portion of this query understood by a source."""
+        supported = frozenset(supported_conditions)
+        return SearchQuery(
+            text=self.text if "text" in supported else None,
+            bbox=self.bbox if "bbox" in supported else None,
+            time=self.time if "time" in supported else None,
+            limit=self.limit if "limit" in supported else None,
+        )
+
+
+@dataclass(frozen=True)
+class SearchDiagnostic:
+    """Explain which query conditions were not applied to one source."""
+
+    source_id: str
+    skipped_conditions: FrozenSet[str]
+    reason: str = "unsupported"
+
+    def __post_init__(self) -> None:
+        if not self.source_id:
+            raise ConfigValidationError("search diagnostic source_id must be non-empty")
+        object.__setattr__(
+            self, "skipped_conditions", frozenset(self.skipped_conditions)
+        )
+
 
 @dataclass(frozen=True)
 class Result:
     title: str
     description: Optional[str]
-    source_id: str
-    settings: Mapping[str, Any]
+    discovered_by: str
+    target: Config
     metadata: Metadata
     provenance: Provenance
     _resolver: Optional[Callable[[], Resource]] = field(
@@ -251,10 +317,12 @@ class Result:
     )
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "settings", _freeze(self.settings))
+        if not self.discovered_by:
+            raise ConfigValidationError("discovered_by must be a non-empty string")
 
     def to_config(self) -> Config:
-        return Config(source_id=self.source_id, settings=self.settings)
+        """Return the target configuration for the normal resolve pipeline."""
+        return self.target
 
     def resolve(self) -> Resource:
         """Resolve this result in the Rhinestone application that returned it."""

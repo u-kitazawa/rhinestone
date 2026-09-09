@@ -1,5 +1,7 @@
 # テスト戦略
 
+> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
+
 ## Deterministic Tests
 
 通常の CI はネットワークへ依存しない代表 Fixture と golden/contract test を使用します。CKAN、e-Stat、STAC、OGC などの Source Adapter ごとに次を検証します。
@@ -8,6 +10,7 @@
 - 共通 Metadata と raw metadata が保持される。
 - Resource 候補から期待する AccessPlan と Resource が決定的に得られる。
 - Search Capability が対応条件を処理し、未対応条件を拒否する。
+- Federated search がSourceごとにqueryを投影し、未適用条件を診断として返す。
 - SearchResult が有効な Config へ変換され、通常フローを通る。
 - Execution Adapter が Resource を期待する OSS URI と option へ翻訳する。
 - Dependency callback は必要な時点でだけ呼ばれる。

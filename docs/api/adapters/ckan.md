@@ -9,6 +9,9 @@
 `Config.settings` は `resource_id` が必須です。組み込み Source の endpoint は `sources.GEOSPATIAL_JP` の Catalog 定義から渡されます。検索では `text` と `limit` を使えます。HTTP通信にはRhinestoneの組み込みtransportを使用します。
 
 配布 URL は API response から取得し、推測しません。
+CKANが広告する `format` はExecution Adapterと共有するcanonical名へ小文字で正規化し、
+`GeoPackage`と`gpkg`はどちらも `Resource.format="gpkg"` として扱います。Providerの
+元表記はResource candidateのattributesとraw metadataに保持します。
 
 ## 解決する例
 

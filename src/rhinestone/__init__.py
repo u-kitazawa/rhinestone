@@ -17,6 +17,8 @@ from .models import (
     ResourceCandidate,
     Result,
     Runtime,
+    RuntimeFactory,
+    SearchDiagnostic,
     SearchQuery,
     SearchResult,
     ServiceQueryPlan,
@@ -24,15 +26,19 @@ from .models import (
     SourceDefinition,
 )
 from .search import SearchResults
+from .security import DestinationPolicy, DestinationRule, NetworkPolicyLevel
 
 __all__ = [
     "AccessPlan",
     "Catalog",
     "Config",
+    "DestinationPolicy",
+    "DestinationRule",
     "Dependencies",
     "FileAccessPlan",
     "LibraryName",
     "Metadata",
+    "NetworkPolicyLevel",
     "Provenance",
     "Provider",
     "RemoteDatasetPlan",
@@ -41,6 +47,8 @@ __all__ = [
     "ResourceCandidate",
     "Result",
     "Runtime",
+    "RuntimeFactory",
+    "SearchDiagnostic",
     "SearchQuery",
     "SearchResult",
     "SearchResults",

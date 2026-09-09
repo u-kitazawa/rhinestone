@@ -13,6 +13,28 @@ Catalog -> Provider -> Result -> Resource
 - `Result`: 検索で見つかった候補
 - `Resource`: 実際に利用できる具体的なデータ
 
+## 対象ユーザー
+
+Rhinestoneは、次のような利用者を対象にしています。
+
+- 日本の行政・公的オープンデータをPythonから横断的に探索したい利用者
+- GIS・リモートセンシングの研究者
+- 公的データを扱うデータエンジニア・データ基盤開発者
+- Rasterio、GDAL、pyogrioなどへ渡す前のProvider固有処理を共通化したい利用者
+
+Rhinestoneは、Catalogに構成されたProvider内のデータを検索してResultとして発見し、Resourceへ解決することを担当します。実際のGIS処理やデータ解析は既存の専門ライブラリへ委譲します。
+
+## 対象外のユースケース
+
+RhinestoneはGIS処理ライブラリやワークフローエンジンではありません。次の用途には、そのまま利用できないか、追加の検討が必要です。
+
+- GISの空間演算・形式変換・解析そのもの
+- ETLやワークフローの実行基盤
+- 外部RuntimeやProvider固有の制約を完全に隠蔽すること
+- 0.1.x時点で公開APIの長期固定を前提とする本番システム
+
+対応するProvider、Runtime、形式の範囲は[Compatibility](docs/compatibility.md)を、Runtimeの注入方法は[Configuration](docs/configuration.md)を参照してください。RhinestoneはAlpha版のため、公開APIは今後変更される可能性があります。
+
 ## インストール
 
 ```console
@@ -33,7 +55,8 @@ print(resource.uri)
 print(resource.metadata)
 ```
 
-`BUILTIN`はRhinestoneが提供する組み込みCatalogです。検索結果は`app.resolve(result)`で直接Resourceへ解決できます。
+`BUILTIN`はRhinestoneが提供する組み込みCatalogです。`search()`はCatalogに構成されたProvider内のデータを検索してResultを返し、検索結果は`app.resolve(result)`で直接Resourceへ解決できます。
+複数Provider時の整数indexingは構成したProvider順の走査用であり、Providerを横断した関連度rankingではありません。詳細は[Search resultの順序](docs/search.md#結果の順序)を参照してください。
 
 検索を使わず、既知のProviderを選んで構成することもできます。
 
@@ -77,17 +100,14 @@ RhinestoneはGIS I/O、形式変換、空間演算、データ解析を実装せ
 - [Configuration](docs/configuration.md)
 - [API reference](docs/api.md)
 - [Compatibility](docs/compatibility.md)
+- [Runtime guide](docs/runtimes.md)
+- [API stability and release policy](docs/release-policy.md)
 
 ## 開発環境
 
 ```console
 uv sync --dev
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run pyright
-uv run mkdocs build --strict
-uv build
+bash scripts/check.sh
 ```
 
 MIT Licenseです。

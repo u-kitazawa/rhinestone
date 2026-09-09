@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Mapping, Tuple, cast
 
 import pytest
 
-from rhinestone import Config, SearchQuery, configure, sources
+from rhinestone import Config, RuntimeFactory, SearchQuery, configure, sources
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
@@ -22,6 +22,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     CredentialLoadError,
     CredentialUnavailableError,
+    DependencyUnavailableError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceAccessError,
@@ -277,6 +278,30 @@ def test_dcat_distinguishes_bad_config_fetch_parse_and_missing_dataset() -> None
         dcat_adapter().load(dcat_config(dataset="https://absent.example"))
 
 
+def test_dcat_wraps_direct_runtime_factory_failure() -> None:
+    cause = ImportError("rdflib is not installed")
+
+    def unavailable_runtime() -> Any:
+        raise cause
+
+    with pytest.raises(DependencyUnavailableError, match="RDF runtime") as captured:
+        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(dcat_config())
+
+    assert captured.value.__cause__ is cause
+
+
+def test_dcat_preserves_dependency_error_from_runtime_factory() -> None:
+    expected = DependencyUnavailableError("rdflib is not configured")
+
+    def unavailable_runtime() -> Any:
+        raise expected
+
+    with pytest.raises(DependencyUnavailableError) as captured:
+        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(dcat_config())
+
+    assert captured.value is expected
+
+
 @pytest.mark.parametrize("adapter", [dcat_adapter()])
 def test_local_search_rejects_unsupported_conditions(adapter: Any) -> None:
     with pytest.raises(UnsupportedSearchConditionError):
@@ -381,7 +406,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
 
     app = configure(
         sources=(sources.ODPT,),
-        dependencies={"json-service": lambda: SimpleNamespace(get=get)},
+        dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
         credentials={"odpt": credential},
     )
     config = Config(
@@ -399,7 +424,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
     assert len(factory_calls) == 2
     other = configure(
         sources=(sources.ODPT,),
-        dependencies={"json-service": lambda: SimpleNamespace(get=get)},
+        dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
     )
     with pytest.raises(CredentialUnavailableError):
         other.open(config, library="json-service")

@@ -8,6 +8,7 @@ from .execution import ExecutionAdapterSelector
 from .models import Config, LibraryName, Resource
 from .registry import AdapterRegistry, DependencyRegistry
 from .resolution import Resolver
+from .security import DestinationPolicy
 
 
 class AccessPipeline:
@@ -17,11 +18,15 @@ class AccessPipeline:
         resolver: Resolver,
         execution_selector: Optional[ExecutionAdapterSelector] = None,
         dependencies: Optional[DependencyRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
         self._adapter_registry = adapter_registry
         self._resolver = resolver
         self._execution_selector = execution_selector
         self._dependencies = dependencies
+        self._destination_policy = (
+            destination_policy or DestinationPolicy.unrestricted()
+        )
 
     def resolve(self, config: Config) -> Resource:
         adapter = self._adapter_registry.source(config.source_id)
@@ -38,9 +43,16 @@ class AccessPipeline:
             return resource
         selector = self._execution_selector
         dependencies = self._dependencies
+        destination_policy = self._destination_policy
 
         def open_resource(library: LibraryName) -> object:
-            return self._open_resource(resource, library, selector, dependencies)
+            return AccessPipeline._open_resource(
+                resource,
+                library,
+                selector,
+                dependencies,
+                destination_policy,
+            )
 
         return replace(
             resource,
@@ -50,12 +62,25 @@ class AccessPipeline:
     def open(self, config: Config, library: LibraryName) -> object:
         return self.resolve(config).open(library)
 
+    def open_resource(self, resource: Resource, library: LibraryName) -> object:
+        """Open an existing Resource using this pipeline's policy and runtimes."""
+        if self._execution_selector is None or self._dependencies is None:
+            raise ProviderMetadataError("Execution pipeline is not configured")
+        return self._open_resource(
+            resource,
+            library,
+            self._execution_selector,
+            self._dependencies,
+            self._destination_policy,
+        )
+
     @staticmethod
     def _open_resource(
         resource: Resource,
         library: LibraryName,
         selector: ExecutionAdapterSelector,
         dependencies: DependencyRegistry,
+        destination_policy: DestinationPolicy,
     ) -> Any:
         selected = selector.select(
             resource,
@@ -63,4 +88,8 @@ class AccessPipeline:
             requested=library,
         )
         runtime = dependencies.get(selected.name)
-        return selected.open(resource, runtime)
+        return selected.open(
+            resource,
+            runtime,
+            destination_policy=destination_policy,
+        )

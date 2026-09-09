@@ -12,6 +12,8 @@ from ....models import (
     SearchResult,
     Source,
 )
+from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -27,6 +29,11 @@ class OgcFeaturesAdapter(ProviderAdapter):
         api_token: Optional[str] = None,
         api_key: Optional[str] = None,
         api_key_header: str = "X-API-Key",
+        credential: Optional[str] = None,
+        credential_header: Optional[str] = None,
+        credential_scheme: Optional[str] = None,
+        credentials: Optional[CredentialRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -34,6 +41,11 @@ class OgcFeaturesAdapter(ProviderAdapter):
             api_token=api_token,
             api_key=api_key,
             api_key_header=api_key_header,
+            credential=credential,
+            credential_header=credential_header,
+            credential_scheme=credential_scheme,
+            credentials=credentials,
+            destination_policy=destination_policy,
         )
         self._collection_id = collection_id
 
@@ -97,11 +109,14 @@ class OgcFeaturesAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    source_id=self.adapter_type,
-                    settings={
-                        "collection_id": self._collection_id,
-                        "feature_id": feature_id,
-                    },
+                    discovered_by=self.adapter_type,
+                    target=Config(
+                        self.adapter_type,
+                        {
+                            "collection_id": self._collection_id,
+                            "feature_id": feature_id,
+                        },
+                    ),
                     metadata=Metadata(title=title, raw=feature),
                     provenance=Provenance(
                         provider="ogc-features",

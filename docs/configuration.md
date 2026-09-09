@@ -42,7 +42,9 @@ app = configure(catalog=catalog)
 
 ## Runtime
 
-外部Runtimeは利用者が所有し、実体または遅延factoryとして渡します。
+外部Runtimeは利用者が所有し、実体または明示的な `RuntimeFactory` として渡します。
+公開APIではどちらも単一の`dependencies`引数へ渡しますが、内部では利用段階に応じて
+Source RuntimeとExecution Runtimeへ分離されます。
 
 ```python
 app = configure(
@@ -58,6 +60,29 @@ app = configure(
 
 HTTP JSON、HTTP text、JSON serviceのRuntimeは組み込みです。
 
+遅延評価が必要な場合は、factoryを `RuntimeFactory` で包みます。bare valueはcallableでも
+Runtime実体として扱われるため、callable façadeやMockがfactoryとして誤実行されません。
+
+```python
+import importlib
+
+from rhinestone import RuntimeFactory, configure
+
+app = configure(
+    dependencies={
+        "rasterio": RuntimeFactory(lambda: importlib.import_module("rasterio")),
+    },
+)
+```
+
+| 種類 | 用途 | factoryの評価時点 | 例 |
+| --- | --- | --- | --- |
+| Source Runtime | provider / protocol metadataの解釈 | 対象Sourceの`search()`または`resolve()`で初めて必要になった時 | `rdflib` |
+| Execution Runtime | 解決済みResourceを開く | `Resource.open()`で初めて必要になった時 | `gdal`、`rasterio`、`pyogrio` |
+
+`configure()`は `RuntimeFactory` を評価しません。Source Runtimeは解決済みResourceや
+AccessPlanへ保持されず、Execution RuntimeだけがResourceのopen経路から参照されます。
+
 ## Credential
 
 secretはCatalogやProviderに保存せず、Credential factoryとして渡します。
@@ -66,11 +91,32 @@ secretはCatalogやProviderに保存せず、Credential factoryとして渡し�
 app = configure(
     catalog=BUILTIN,
     credentials={
-        "estat": lambda: os.environ["ESTAT_APP_ID"],
         "odpt": lambda: os.environ["ODPT_CONSUMER_KEY"],
     },
 )
 ```
+
+認証付き CKAN、STAC、OGC Source は、Provider に secret ではなく Credential の論理名を
+指定します。
+
+```python
+catalog = Catalog((Provider(
+    id="private-stac",
+    adapter_type="stac",
+    settings={
+        "endpoint": "https://stac.example/api",
+        "credential": "stac-token",
+    },
+),))
+app = configure(
+    catalog=catalog,
+    credentials={"stac-token": lambda: os.environ["STAC_TOKEN"]},
+)
+```
+
+`network_policy` は `credentialed`（既定）、`strict`、`none` から選べます。`credentialed`
+は認証付き通信だけを Catalog endpoint に制限し、`strict` は ExecutionAdapter の HTTP
+アクセス全体を制限します。認可されない宛先では Credential factory は評価されません。
 
 ## 高度なAPI
 

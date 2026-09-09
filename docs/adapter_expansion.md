@@ -1,5 +1,7 @@
 # Rhinestone Adapter Expansion Specification v0.1
 
+> **文書ステータス: 履歴資料。** Adapter拡張時の過去の計画と判断を保存する文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](documentation-status.md)を確認してください。
+
 ## 1. 対象
 
 本仕様では、以下の［Source Adapter］を追加する。
