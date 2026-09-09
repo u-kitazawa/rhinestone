@@ -187,7 +187,7 @@ class ProviderAdapter(ABC):
             ) from error
         if not isinstance(response, Mapping):
             raise ProviderResponseError("Provider response root must be an object")
-        response_uri = getattr(response, "response_uri", url)
+        response_uri = getattr(cast(Any, response), "response_uri", url)
         if not isinstance(response_uri, str) or not response_uri:
             response_uri = url
         return cast(JsonObject, response), response_uri

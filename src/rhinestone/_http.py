@@ -38,7 +38,9 @@ def get_json(
         decoded = json.load(response)
         if isinstance(decoded, Mapping):
             response_uri = getattr(response, "geturl", lambda: request.full_url)()
-            return JsonDocument(decoded, response_uri or request.full_url)
+            return JsonDocument(
+                cast(Mapping[str, Any], decoded), response_uri or request.full_url
+            )
         return decoded
 
 
