@@ -189,7 +189,7 @@ class ProviderAdapter(ABC):
                 response = getter(url, params, headers)
             else:
                 response = getter(url, params)
-        except Exception as error:
+        except OSError as error:
             raise ProviderMetadataError(
                 f"Provider metadata request failed for {url!r}"
             ) from error

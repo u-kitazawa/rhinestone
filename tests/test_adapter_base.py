@@ -79,6 +79,12 @@ def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> N
         ProbeAdapter(fail).request()
     assert captured.value.__cause__ is transport_error
 
+    def programming_error(url: str, params: Mapping[str, Any]) -> Any:
+        raise TypeError("transport callback bug")
+
+    with pytest.raises(TypeError, match="transport callback bug"):
+        ProbeAdapter(programming_error).request()
+
     with pytest.raises(ProviderResponseError, match="root"):
         ProbeAdapter(lambda url, params: []).request()
     with pytest.raises(ProviderResponseError, match="object"):
