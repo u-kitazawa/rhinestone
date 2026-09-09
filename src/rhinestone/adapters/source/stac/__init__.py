@@ -12,8 +12,6 @@ from ....models import (
     SearchResult,
     Source,
 )
-from ....registry import CredentialRegistry
-from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -28,11 +26,6 @@ class StacAdapter(ProviderAdapter):
         api_token: Optional[str] = None,
         api_key: Optional[str] = None,
         api_key_header: str = "X-API-Key",
-        credential: Optional[str] = None,
-        credential_header: Optional[str] = None,
-        credential_scheme: Optional[str] = None,
-        credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -40,11 +33,6 @@ class StacAdapter(ProviderAdapter):
             api_token=api_token,
             api_key=api_key,
             api_key_header=api_key_header,
-            credential=credential,
-            credential_header=credential_header,
-            credential_scheme=credential_scheme,
-            credentials=credentials,
-            destination_policy=destination_policy,
         )
 
     def load(self, config: Config) -> Source:
@@ -106,15 +94,12 @@ class StacAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    discovered_by=self.adapter_type,
-                    target=Config(
-                        self.adapter_type,
-                        {
-                            "collection_id": collection_id,
-                            "item_id": item_id,
-                            "asset_key": asset_key,
-                        },
-                    ),
+                    source_id=self.adapter_type,
+                    settings={
+                        "collection_id": collection_id,
+                        "item_id": item_id,
+                        "asset_key": asset_key,
+                    },
                     metadata=Metadata(title=title, raw=item),
                     provenance=Provenance(
                         provider="stac",

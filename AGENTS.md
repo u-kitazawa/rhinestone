@@ -3,20 +3,19 @@
 ## プロジェクト構成
 
 - `src/` レイアウトを使用する。パッケージコードは `src/rhinestone/` 配下に置き、テストを追加する場合は独立した `tests/` ディレクトリに置く。
-- 現行の公開契約、移行先の設計草案、履歴資料は[ドキュメントの位置付け](docs/documentation-status.md)に従って区別する。公開APIは実装、テスト、利用者向けガイド、APIリファレンスを一致させる。
+- 設計仕様をアーキテクチャと不変条件の信頼できる唯一の情報源とする：[docs/spec_v4.md](docs/spec_v4.md)。
 - Core に GDAL、Rasterio、pyogrio 等を実行時依存関係として追加しない。利用者が所有する依存は callback/factory で注入する。
 
 ## 開発コマンド
 
 - `uv sync --dev` でプロジェクトと開発ツールをインストールする。
-- `bash scripts/check.sh` でPR CIと同じ主要チェックを一括実行する。
 - `uv run pytest` でテストとカバレッジ計測を実行する。
 - `uv run ruff check .` で Lint を実行する。
 - `uv run ruff format --check .` でフォーマットを確認する。
 - `uv run pyright` で型チェックを実行する。
 - `uv build` で配布物をビルドする。
 - 機能を追加するときは、対象を絞ったテストも追加する。
-- プロジェクト設定を意図的に変更する場合を除き、`requires-python = ">=3.10"` 宣言との互換性を維持する。
+- プロジェクト設定を意図的に変更する場合を除き、`requires-python = ">=3.7"` 宣言との互換性を維持する。
 
 ## アーキテクチャ規則
 

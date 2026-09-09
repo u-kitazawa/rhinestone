@@ -72,7 +72,7 @@ class Resolver:
         normalized = (candidate.format or "").lower()
         if normalized in {"cog"}:
             return RemoteDatasetPlan(uri=candidate.uri)
-        if normalized in {"wms", "wfs", "api", "ogc-api-features"}:
+        if normalized in {"wms", "wfs", "api", "estat-api", "ogc-api-features"}:
             return ServiceQueryPlan(uri=candidate.uri)
         if normalized:
             archive = candidate.attributes.get("archive")

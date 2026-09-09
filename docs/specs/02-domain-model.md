@@ -1,7 +1,5 @@
 # Core データモデル
 
-> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
-
 Core は次のデータ／モデルを扱います。provider や外部ライブラリ固有の型を共通モデルへ漏らしてはなりません（MUST NOT）。
 
 ## Catalog
@@ -78,12 +76,6 @@ Resource を単なる URI に縮退させてはなりません（MUST NOT）。
 provider、dataset/resource identifier、API endpoint、original URL、query parameter、retrieved time、checksum、Adapter とその version、raw metadata など、取得・解決経路を表します。
 
 ## SearchQuery と SearchResult
-
-### v0.5のDiscovery / Resolution semantics
-
-SearchResult は `discovered_by` と解決先の `target: Config` を保持します。`discovered_by` と `target.source_id` は異なってよく、横断catalogの検索結果を別providerの通常の解決フローへ渡せます。
-
-検索はSourceごとに `SearchQuery` をcapabilityへ投影します。未対応条件は診断として返し、指定条件を一つも適用できないSourceでは空の検索を実行せずskipします。
 
 SearchQuery の共通条件は `text`、`bbox`、`time`、`limit` など必要最小限にします。Source Adapter は未対応の検索条件を黙って無視してはなりません（MUST NOT）。
 

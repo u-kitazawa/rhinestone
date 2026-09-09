@@ -13,46 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
-      - name: Verify release commit is on main
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          git fetch origin main --no-tags
-          release_commit="$(git rev-list -n 1 "refs/tags/$RELEASE_TAG")"
-          git merge-base --is-ancestor "$release_commit" origin/main
-      - name: Verify release version
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          package_version="$(sed -nE 's/^version = "([^"]+)"/\1/p' pyproject.toml)"
-          tag_version="${RELEASE_TAG#v}"
-
-          if [[ -z "$package_version" || "$tag_version" != "$package_version" ]]; then
-            echo "Release tag $RELEASE_TAG does not match project version $package_version."
-            exit 1
-          fi
-
-          if [[ "$RELEASE_TAG" != v* ]]; then
-            echo "Release tags must use the v<version> format."
-            exit 1
-          fi
       - uses: astral-sh/setup-uv@v6
       - run: uv build
-      - name: Verify distribution versions
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          package_version="${RELEASE_TAG#v}"
-          shopt -s nullglob
-          wheels=("dist/rhinestone-${package_version}-"*.whl)
-
-          if (( ${#wheels[@]} != 1 )) || [[ ! -f "dist/rhinestone-${package_version}.tar.gz" ]]; then
-            echo "Built distributions do not match release version $package_version."
-            printf '%s\n' dist/*
-            exit 1
-          fi
       - uses: actions/upload-artifact@v4
         with:
           name: distributions

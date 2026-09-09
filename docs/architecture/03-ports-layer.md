@@ -1,7 +1,5 @@
 # Registry と依存境界仕様
 
-> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
-
 ## ［Adapter Registry］
 
 Source Adapter と Execution Adapter の登録状態を管理します。Registry は Core データから参照する service locator ではなく、composition 境界から調整コンポーネントへ渡します。
@@ -14,7 +12,7 @@ Source Adapter と Execution Adapter の登録状態を管理します。Registr
 初期実装で想定する built-in Adapter は次のとおりです。
 
 ```text
-Source: CkanAdapter, StacAdapter, OgcAdapter, DirectAdapter
+Source: CkanAdapter, EStatAdapter, StacAdapter, OgcAdapter, DirectAdapter
 Execution: GdalAdapter, RasterioAdapter, PyogrioAdapter
 ```
 

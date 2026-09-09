@@ -26,14 +26,12 @@ Providerは、以前の実装で`SourceDefinition`が担っていた「利用す
 
 ## Result
 
-`Result`は検索で見つかった候補です。発見元と、解決先の`Config`、metadata、provenanceを持ちます。
+`Result`は検索で見つかった候補です。Provider固有の対象指定とmetadataを持ちます。
 
 ```python
 result = app.search(text="河川")[0]
 resource = app.resolve(result)
 ```
-
-`result.discovered_by`は検索を実行したSource ID、`result.target`は通常の解決フローへ渡す`Config`です。この2つは異なっていてよく、横断カタログが別のproviderのresourceを発見するケースを表現できます。
 
 `SearchQuery`、`SearchResult`、`to_config()`は高度な内部パイプラインを扱うための名前です。通常の利用では検索パラメータと`Result`だけを使います。
 
@@ -43,7 +41,7 @@ resource = app.resolve(result)
 
 ## Runtime
 
-Runtimeは、Rhinestoneが外部実行に利用する利用者所有の環境です。GDAL、Rasterio、pyogrio、RDFLibなどが該当します。実体はそのまま、遅延評価する場合は `RuntimeFactory` として構成します。以前の文書で使っていたdependencyやruntime dependencyという表記は、利用者向けにはRuntimeへ統一します。
+Runtimeは、Rhinestoneが外部実行に利用する利用者所有の環境です。GDAL、Rasterio、pyogrio、RDFLibなどが該当します。以前の文書で使っていたdependencyやruntime dependencyという表記は、利用者向けにはRuntimeへ統一します。
 
 ## Credential
 

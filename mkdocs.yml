@@ -7,20 +7,11 @@ nav:
       - 用語と概念: concepts.md
       - アプリケーションを構成する: configuration.md
   - ガイド:
-      - 目的別チュートリアル:
-          - 概要: tutorials/index.md
-          - STAC画像をRasterioで開く: tutorials/stac-rasterio.md
-          - CKANのベクター配布物をpyogrioで読む: tutorials/ckan-pyogrio.md
       - データを検索する: search.md
       - Resourceを解決して開く: resolve-and-open.md
-      - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:
       - 対応状況: compatibility.md
-      - Runtime の導入ガイド: runtimes.md
-      - API安定性とリリース運用: release-policy.md
-      - ブランチ運用方針: branch-policy.md
       - 外部ライブラリ依存方針: dependency-policy.md
-      - ドキュメントの位置付け: documentation-status.md
       - APIリファレンス:
           - 概要: api.md
           - Source Adapter:
@@ -28,6 +19,7 @@ nav:
               - CKAN: api/adapters/ckan.md
               - DCAT: api/adapters/dcat.md
               - Direct: api/adapters/direct.md
+              - e-Stat: api/adapters/estat.md
               - 基盤地図情報: api/adapters/gsi-fundamental.md
               - ODPT: api/adapters/odpt.md
               - OGC API Features: api/adapters/ogc-features.md
@@ -45,7 +37,6 @@ exclude_docs: |
   adapter_expansion.md
   architecture/*
   spec_v4.md
-  spec_v5.md
   specs/*
 
 theme:

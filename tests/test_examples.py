@@ -10,6 +10,7 @@ EXAMPLES_ROOT = Path(__file__).parents[1] / "examples"
 EXAMPLE_NAMES: Tuple[str, ...] = (
     "01_direct_resource",
     "02_ckan_shapefile",
+    "03_estat_population",
     "04_inspect_resource",
     "05_gdal_dependency",
     "06_stac_cog",
@@ -64,11 +65,11 @@ def test_deterministic_examples_run_without_network_or_optional_runtime(
 
 
 def test_service_examples_use_formats_known_to_create_service_plans() -> None:
-    """OGC Exampleが誤ってFileAccessPlanへ解決される退行を防ぐために必要である。"""
+    """e-StatとOGC Exampleが誤ってFileAccessPlanへ解決される退行を防ぐために必要である。"""
     from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
     from rhinestone.resolution import Resolver
 
-    for format_name in ("ogc-api-features",):
+    for format_name in ("estat-api", "ogc-api-features"):
         candidate = ResourceCandidate("https://api.example/data", format_name, None)
         source = Source(
             metadata=Metadata(raw={}),
@@ -82,7 +83,7 @@ def test_service_examples_use_formats_known_to_create_service_plans() -> None:
 
 @pytest.mark.parametrize(
     "name",
-    ("02_ckan_shapefile",),
+    ("02_ckan_shapefile", "03_estat_population", "07_search_and_fetch"),
 )
 def test_live_examples_fail_on_missing_environment_before_network(name: str) -> None:
     """HTTPが組み込みでも必須環境変数不足をnetwork requestより先に報告するために必要である。"""

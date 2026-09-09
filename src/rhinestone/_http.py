@@ -20,13 +20,7 @@ def get_json(
 ) -> Any:
     """Fetch and decode JSON over HTTP using the standard library."""
     request = _request(url, params, headers)
-    opener = (
-        build_opener(_NoRedirectHandler())
-        if getattr(headers, "_rhinestone_no_redirects", False)
-        else None
-    )
-    open_request = opener.open if opener is not None else urlopen
-    with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
+    with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
         return json.load(response)
 
 

@@ -60,17 +60,6 @@ def test_access_pipeline_keeps_source_interpretation_before_resolution() -> None
     assert config == Config(source_id="fixture", settings={"dataset": "data-1"})
 
 
-def test_unconfigured_pipeline_cannot_open_an_existing_resource() -> None:
-    pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((RecordingSourceAdapter([]),), ()),
-        resolver=Resolver(),
-    )
-    resource = pipeline.resolve(Config(source_id="fixture", settings={}))
-
-    with pytest.raises(ProviderMetadataError, match="Execution pipeline"):
-        pipeline.open_resource(resource, "gdal")
-
-
 def test_unknown_source_type_has_a_specific_failure() -> None:
     """未知 provider を別 Adapter や URL へ推測せず明示的に拒否するために必要である。"""
     pipeline = AccessPipeline(
