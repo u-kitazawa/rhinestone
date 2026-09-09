@@ -4,6 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from importlib import resources
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
+from urllib.parse import quote
 
 from jsonschema import Draft202012Validator, ValidationError
 
@@ -151,6 +152,13 @@ class ProviderAdapter(ABC):
     @staticmethod
     def _normalize_endpoint(endpoint: str) -> str:
         return endpoint.rstrip("/")
+
+    @staticmethod
+    def _encode_path_segment(value: str) -> str:
+        """Encode one decoded logical identifier for use as a URL path segment."""
+        if value in {".", ".."}:
+            return value.replace(".", "%2E")
+        return quote(value, safe="")
 
     @staticmethod
     def _required_string(settings: Mapping[str, Any], name: str) -> str:

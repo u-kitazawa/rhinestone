@@ -54,7 +54,9 @@ class StacAdapter(ProviderAdapter):
         collection_id = self._required_string(settings, "collection_id")
         item_id = self._required_string(settings, "item_id")
         asset_key = self._required_string(settings, "asset_key")
-        item_url = f"{endpoint}/collections/{collection_id}/items/{item_id}"
+        collection_path = self._encode_path_segment(collection_id)
+        item_path = self._encode_path_segment(item_id)
+        item_url = f"{endpoint}/collections/{collection_path}/items/{item_path}"
         item, response_uri = self._request_with_uri(item_url, {})
         asset = self._asset(item, asset_key)
         candidate = self._candidate(asset, asset_key, response_uri)
