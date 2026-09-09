@@ -85,7 +85,7 @@ def test_get_json_builds_query_and_headers(monkeypatch: pytest.MonkeyPatch) -> N
     assert calls["timeout"] == 30
 
 
-def test_get_json_without_query_or_extra_headers(
+def test_get_json_preserves_existing_query_and_fragment_without_new_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: Dict[str, Any] = {}
@@ -96,8 +96,33 @@ def test_get_json_without_query_or_extra_headers(
 
     monkeypatch.setattr(_http, "urlopen", open_url)
 
-    assert _http.get_json("https://example.test/api", {}) == []
-    assert calls["request"].full_url == "https://example.test/api"
+    url = "https://example.test/api?tenant=a#section"
+
+    assert _http.get_json(url, {}) == []
+    assert calls["request"].full_url == url
+
+
+def test_get_json_appends_multi_value_query_before_fragment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: Dict[str, Any] = {}
+
+    def open_url(request: Request, *, timeout: int) -> _Response:
+        calls["request"] = request
+        return _Response(b"[]")
+
+    monkeypatch.setattr(_http, "urlopen", open_url)
+
+    assert (
+        _http.get_json(
+            "https://example.test/api?tenant=a&tag=original#section",
+            {"q": "x", "tag": ["b", "c"]},
+        )
+        == []
+    )
+    assert calls["request"].full_url == (
+        "https://example.test/api?tenant=a&tag=original&q=x&tag=b&tag=c#section"
+    )
 
 
 def test_get_json_rejects_redirects_for_marked_credential_headers(
@@ -156,7 +181,7 @@ def test_json_service_runtime_wraps_successful_response(
     monkeypatch.setattr(_http, "build_opener", build_test_opener)
 
     response = _http.JsonServiceRuntime().get(
-        "https://example.test/api",
+        "https://example.test/api?tenant=a#section",
         params={"q": "station"},
         headers={"X-Test": "yes"},
         timeout=12,
@@ -168,7 +193,7 @@ def test_json_service_runtime_wraps_successful_response(
     assert response.json() == {"ok": True}
     assert opener.calls["timeout"] == 12
     request = opener.calls["request"]
-    assert request.full_url == "https://example.test/api?q=station"
+    assert request.full_url == "https://example.test/api?tenant=a&q=station#section"
 
 
 def test_json_service_runtime_preserves_http_status(

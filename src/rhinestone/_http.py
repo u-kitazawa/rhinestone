@@ -3,7 +3,7 @@
 import json
 from typing import Any, Mapping, Optional, cast
 from urllib.error import HTTPError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 _TIMEOUT_SECONDS = 30
@@ -96,9 +96,22 @@ def _request(
     params: Mapping[str, Any],
     headers: Optional[Mapping[str, str]] = None,
 ) -> Request:
-    query = urlencode(params, doseq=True)
-    request_url = url + ("?" + query if query else "")
+    request_url = _append_query(url, params)
     return Request(
         request_url,
         headers={**_DEFAULT_HEADERS, **dict(headers or {})},
     )
+
+
+def _append_query(url: str, params: Mapping[str, Any]) -> str:
+    """Append parameters without replacing or normalizing an existing query."""
+    additional_query = urlencode(params, doseq=True)
+    if not additional_query:
+        return url
+    components = urlsplit(url)
+    query = (
+        f"{components.query}&{additional_query}"
+        if components.query
+        else additional_query
+    )
+    return urlunsplit(components._replace(query=query))
