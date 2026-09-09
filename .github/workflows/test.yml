@@ -17,8 +17,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --dev --locked
-      - name: Run repository checks
-        run: bash scripts/check.sh
+      - run: uv run pytest
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      - run: uv run mkdocs build --strict
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+      - run: uv build
       - name: Install and import the wheel with pip
         shell: bash
         run: |

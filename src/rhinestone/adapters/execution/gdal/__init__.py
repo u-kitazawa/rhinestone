@@ -5,7 +5,6 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from ....errors import ResourceAccessError
 from ....models import FileAccessPlan, Resource
-from ....security import DestinationPolicy
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -19,9 +18,6 @@ class GdalAdapter(ExecutionAdapter):
         {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "citygml"}
     )
 
-    def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
-        super().__init__(destination_policy)
-
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
         tile = resource.access_plan.options.get("tile")
         return self.name in dependencies and (
@@ -32,14 +28,7 @@ class GdalAdapter(ExecutionAdapter):
             )
         )
 
-    def open(
-        self,
-        resource: Resource,
-        runtime: Any,
-        *,
-        destination_policy: DestinationPolicy | None = None,
-    ) -> Any:
-        (destination_policy or self._destination_policy).authorize(resource.uri)
+    def open(self, resource: Resource, runtime: Any) -> Any:
         attributes = resource_attributes(resource)
         uri = resource.uri
         tile = resource.access_plan.options.get("tile")

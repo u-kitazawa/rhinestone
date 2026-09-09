@@ -4,7 +4,6 @@ from typing import Any, Dict, FrozenSet
 
 from ....errors import ResourceAccessError
 from ....models import Resource
-from ....security import DestinationPolicy
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -16,22 +15,12 @@ class PyogrioAdapter(ExecutionAdapter):
     priority = 10
     _formats = frozenset({"shapefile", "geojson", "gpkg", "flatgeobuf"})
 
-    def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
-        super().__init__(destination_policy)
-
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
         return (
             resource.format or ""
         ).lower() in self._formats and self.name in dependencies
 
-    def open(
-        self,
-        resource: Resource,
-        runtime: Any,
-        *,
-        destination_policy: DestinationPolicy | None = None,
-    ) -> Any:
-        (destination_policy or self._destination_policy).authorize(resource.uri)
+    def open(self, resource: Resource, runtime: Any) -> Any:
         attributes = resource_attributes(resource)
         options: Dict[str, Any] = {}
         encoding = attributes.get("encoding")

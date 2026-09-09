@@ -1,0 +1,19 @@
+{
+  "GET_META_INFO": {
+    "RESULT": {"STATUS": 0, "ERROR_MSG": "正常に終了しました。", "DATE": "2024-01-02T03:04:05.000+09:00"},
+    "PARAMETER": {"LANG": "J", "STATS_DATA_ID": "0000000001"},
+    "METADATA_INF": {
+      "TABLE_INF": {
+        "@id": "0000000001",
+        "STAT_NAME": {"@code": "00100409", "$": "人口推計"},
+        "GOV_ORG": {"@code": "00200", "$": "総務省"},
+        "STATISTICS_NAME": "人口推計",
+        "TITLE": {"@no": "1", "$": "年齢別人口"},
+        "CYCLE": "年次",
+        "SURVEY_DATE": "2024",
+        "OPEN_DATE": "2024-01-01"
+      },
+      "CLASS_INF": {"CLASS_OBJ": [{"@id": "area", "@name": "地域", "CLASS": [{"@code": "00000", "@name": "全国"}]}]}
+    }
+  }
+}

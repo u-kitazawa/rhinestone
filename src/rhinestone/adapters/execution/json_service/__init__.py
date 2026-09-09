@@ -5,7 +5,6 @@ from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Tuple, cas
 from ....errors import ProviderResponseError, ResourceAccessError
 from ....models import AccessPlan, Resource, ServiceQueryPlan
 from ....registry import CredentialRegistry
-from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
 
 RequestPreparer = Callable[
@@ -22,20 +21,13 @@ class JsonServiceAdapter(ExecutionAdapter):
         prepare_request: RequestPreparer,
         service: str,
         credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
-        super().__init__(destination_policy)
         self._prepare_request = prepare_request
         self._service = service
         self._credentials = credentials or CredentialRegistry({})
 
     def bind_credentials(self, credentials: CredentialRegistry) -> "JsonServiceAdapter":
-        return JsonServiceAdapter(
-            self._prepare_request,
-            self._service,
-            credentials,
-            self._destination_policy,
-        )
+        return JsonServiceAdapter(self._prepare_request, self._service, credentials)
 
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
         return (
@@ -45,16 +37,7 @@ class JsonServiceAdapter(ExecutionAdapter):
             and resource.access_plan.options.get("service") == self._service
         )
 
-    def open(
-        self,
-        resource: Resource,
-        runtime: Any,
-        *,
-        destination_policy: DestinationPolicy | None = None,
-    ) -> Any:
-        (destination_policy or self._destination_policy).authorize(
-            resource.uri, credentialed=True
-        )
+    def open(self, resource: Resource, runtime: Any) -> Any:
         params, headers = self._prepare_request(resource.access_plan, self._credentials)
         try:
             response = runtime.get(

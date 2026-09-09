@@ -4,11 +4,11 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, RuntimeFactory, configure, sources
+from rhinestone import Config, configure, sources
 
 app = configure(
     sources=(sources.PLATEAU,),
-    dependencies={"gdal": RuntimeFactory(lambda: gdal)},
+    dependencies={"gdal": lambda: gdal},
 )
 resource = app.resolve(
     Config(

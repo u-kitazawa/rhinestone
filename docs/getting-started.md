@@ -1,6 +1,6 @@
 # Getting started
 
-Rhinestoneは、Catalogに構成されたProvider内のデータを検索してResultとして発見し、ResultをResourceへ解決するライブラリです。
+Rhinestoneは、Catalogに登録されたProviderを検索し、ResultをResourceへ解決するライブラリです。
 
 ## インストール
 
@@ -21,8 +21,6 @@ app = configure(catalog=BUILTIN)
 
 ## 検索して解決する
 
-`search()`はCatalogに構成されたProviderを検索対象として、その中のデータ候補をResultとして返します。Provider自体を発見するAPIではありません。
-
 ```python
 results = app.search(text="河川", limit=5)
 result = results[0]
@@ -34,8 +32,6 @@ print(resource.provenance)
 ```
 
 検索結果の解決にConfigは必要ありません。
-複数Provider時の`results[0]`は構成順で最初のProviderの先頭結果であり、Providerを
-横断した関連度1位ではありません。順序とgroup別の参照方法は[データを検索する](search.md)を参照してください。
 
 ## Providerを限定する
 

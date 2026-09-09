@@ -5,9 +5,7 @@ Execution Adapter は選択済みの `Resource` を実行runtimeのAPI呼び出�
 [API リファレンス](../api.md) · [Source Adapter](source-adapters.md)
 
 外部Runtimeの供給方法と `resource.open()` の使い方は[Resource を解決して開く](../resolve-and-open.md)
-を参照してください。GDAL等の外部Runtimeは `dependencies` に実体として渡し、遅延評価する
-場合は `RuntimeFactory(factory)` を使います。bare callableはRuntime実体として扱われます。
-JSON serviceのHTTP runtimeはRhinestoneが組み込みで提供します。依存境界とSourceごとの採用方針は[外部ライブラリ依存方針](../dependency-policy.md)を参照してください。
+を参照してください。GDAL等の外部Runtimeは `dependencies` に実体またはfactoryとして渡します。JSON serviceのHTTP runtimeはRhinestoneが組み込みで提供します。依存境界とSourceごとの採用方針は[外部ライブラリ依存方針](../dependency-policy.md)を参照してください。
 
 | Adapter | 選択名 / Runtime名 | Runtime |
 | --- | --- | --- |

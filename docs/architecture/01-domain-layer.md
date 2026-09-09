@@ -1,7 +1,5 @@
 # Core データ層仕様
 
-> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
-
 ## 責務と制約
 
 Core データ層は、Rhinestone が所有する知識を外部ライブラリから独立したモデルとして表現します。GDAL、Rasterio、pyogrio、QGIS 等を import してはなりません（MUST NOT）。
