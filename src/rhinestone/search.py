@@ -11,6 +11,7 @@ from typing import (
     Mapping,
     Tuple,
     Union,
+    cast,
     overload,
 )
 
@@ -126,7 +127,9 @@ class SearchCoordinator:
         for adapter in searchable:
             supported = frozenset(adapter.search_conditions)
             unsupported = query.supplied_conditions - supported
-            required = frozenset(getattr(adapter, "required_search_conditions", ()))
+            required = frozenset(
+                cast(Iterable[str], getattr(adapter, "required_search_conditions", ()))
+            )
             missing_required = required - query.supplied_conditions
             if unsupported or missing_required:
                 diagnostics.append(

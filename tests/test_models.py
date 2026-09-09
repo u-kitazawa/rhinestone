@@ -230,9 +230,9 @@ def test_search_diagnostic_requires_a_source_id() -> None:
 def test_search_diagnostic_freezes_missing_conditions() -> None:
     diagnostic = SearchDiagnostic(
         source_id="source",
-        skipped_conditions={"bbox"},
+        skipped_conditions=frozenset({"bbox"}),
         reason="missing_required",
-        missing_conditions={"text"},
+        missing_conditions=frozenset({"text"}),
     )
 
     assert diagnostic.missing_conditions == frozenset({"text"})
