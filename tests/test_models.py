@@ -236,3 +236,14 @@ def test_search_diagnostic_freezes_missing_conditions() -> None:
     )
 
     assert diagnostic.missing_conditions == frozenset({"text"})
+
+
+def test_search_diagnostic_can_describe_provider_failure() -> None:
+    diagnostic = SearchDiagnostic(
+        source_id="source",
+        skipped_conditions=frozenset(),
+        reason="provider_failure",
+        failure_type="response",
+    )
+
+    assert diagnostic.failure_type == "response"

@@ -1,5 +1,8 @@
 from typing import List, Tuple
 
+import pytest
+
+from rhinestone.errors import ProviderMetadataError, ProviderResponseError
 from rhinestone.models import SearchQuery
 from rhinestone.search import SearchCoordinator
 
@@ -40,6 +43,17 @@ class OrderedSearchableAdapter(SearchableAdapter):
 
 class RequiredSearchableAdapter(SearchableAdapter):
     required_search_conditions = frozenset({"text"})
+
+
+class FailingSearchableAdapter(SearchableAdapter):
+    def __init__(self, source_id: str, error: Exception) -> None:
+        super().__init__()
+        self.source_id = source_id
+        self.error = error
+
+    def search(self, query: SearchQuery) -> Tuple[object, ...]:
+        self.queries.append(query)
+        raise self.error
 
 
 def test_search_calls_only_adapters_declaring_search_capability() -> None:
@@ -122,3 +136,52 @@ def test_single_provider_sequence_preserves_provider_order() -> None:
 
     assert tuple(results) == provider_results
     assert results[0] is provider_results[0]
+
+
+def test_expected_provider_failure_isolated_from_other_sources() -> None:
+    failing = FailingSearchableAdapter("unavailable", ProviderMetadataError("secret"))
+    healthy = OrderedSearchableAdapter("healthy", (object(),))
+
+    results = SearchCoordinator((failing, healthy)).search(SearchQuery(text="river"))
+
+    assert len(results) == 1
+    assert results.keys() == ("healthy",)
+    assert results.diagnostics[0].source_id == "unavailable"
+    assert results.diagnostics[0].reason == "provider_failure"
+    assert results.diagnostics[0].failure_type == "metadata"
+
+
+def test_all_expected_provider_failures_return_empty_results_and_diagnostics() -> None:
+    metadata = FailingSearchableAdapter("metadata", ProviderMetadataError("hidden"))
+    response = FailingSearchableAdapter("response", ProviderResponseError("hidden"))
+
+    results = SearchCoordinator((metadata, response)).search(SearchQuery(text="river"))
+
+    assert len(results) == 0
+    assert [diagnostic.source_id for diagnostic in results.diagnostics] == [
+        "metadata",
+        "response",
+    ]
+    assert [diagnostic.failure_type for diagnostic in results.diagnostics] == [
+        "metadata",
+        "response",
+    ]
+
+
+def test_provider_failure_is_distinct_from_a_successful_empty_provider() -> None:
+    failing = FailingSearchableAdapter("unavailable", ProviderResponseError("hidden"))
+    empty = OrderedSearchableAdapter("empty", ())
+
+    results = SearchCoordinator((failing, empty)).search(SearchQuery(text="river"))
+
+    assert results.keys() == ("empty",)
+    assert results["empty"] == ()
+    assert results.diagnostics[0].reason == "provider_failure"
+    assert results.diagnostics[0].failure_type == "response"
+
+
+def test_unexpected_provider_errors_are_not_swallowed() -> None:
+    failing = FailingSearchableAdapter("broken", TypeError("bug"))
+
+    with pytest.raises(TypeError, match="bug"):
+        SearchCoordinator((failing,)).search(SearchQuery(text="river"))

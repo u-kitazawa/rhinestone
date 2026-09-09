@@ -15,6 +15,7 @@ from typing import (
     overload,
 )
 
+from .errors import ProviderMetadataError, ProviderResponseError
 from .models import Resource, Result, SearchDiagnostic, SearchQuery
 
 
@@ -146,5 +147,26 @@ class SearchCoordinator:
                 continue
             if query.supplied_conditions and not query.supplied_conditions & supported:
                 continue
-            grouped[adapter.source_id] = tuple(adapter.search(query.project(supported)))
+            try:
+                grouped[adapter.source_id] = tuple(
+                    adapter.search(query.project(supported))
+                )
+            except ProviderMetadataError:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=adapter.source_id,
+                        skipped_conditions=frozenset(),
+                        reason="provider_failure",
+                        failure_type="metadata",
+                    )
+                )
+            except ProviderResponseError:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=adapter.source_id,
+                        skipped_conditions=frozenset(),
+                        reason="provider_failure",
+                        failure_type="response",
+                    )
+                )
         return SearchResults.from_grouped(grouped, diagnostics)
