@@ -80,6 +80,41 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
     assert dependency_calls == ["rdflib"]
 
 
+def test_configured_dcat_rejects_tampered_catalog_uri_before_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document_calls: List[str] = []
+
+    def get_document(uri: str) -> str:
+        document_calls.append(uri)
+        return "unused"
+
+    monkeypatch.setattr(_http, "get_text", get_document)
+    app = configure(
+        sources=(
+            SourceDefinition(
+                "catalog",
+                "dcat",
+                {"catalog_uri": "https://trusted.example/catalog"},
+            ),
+        ),
+        dependencies={"rdflib": rdflib},
+    )
+
+    with pytest.raises(ConfigValidationError, match="catalog URI"):
+        app.resolve(
+            Config(
+                "catalog",
+                {
+                    "uri": "https://unlisted.example/catalog",
+                    "dataset": "https://trusted.example/dataset",
+                },
+            )
+        )
+
+    assert document_calls == []
+
+
 def test_dcat_search_loads_source_runtime_on_demand(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
