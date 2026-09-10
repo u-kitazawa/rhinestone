@@ -46,7 +46,7 @@ config:
 
 `gsi-fundamental` は取得済みのローカル基本項目ファイルを `path` で指定します。`metadata` に mesh、feature type、schema version、download specification version、CRS、公式 source URL を記載します。初期版は DEM とログイン・ダウンロード自動化を扱いません。
 
-`dcat` は RDF 文書の `uri`、`dataset` URI、必要なら `distribution` URI を指定します。`serialization` は `json-ld`、`turtle`、`xml` のいずれかです。実行候補は `dcat:downloadURL` を持つ Distribution に限ります。構成済みProviderの `catalog_uri` は信頼済み取得先として扱い、Config の `uri` はその値と一致する場合だけ取得します。
+`dcat` は RDF 文書の `uri`、`dataset` URI、必要なら `distribution` URI を指定します。`serialization` は `json-ld`、`turtle`、`xml` のいずれかです。実行候補は `dcat:downloadURL` を持つ Distribution に限ります。
 
 `odpt` は `dataset`（`station`、`railway`、`train`）、logical `credential`、公式仕様にある `filters` を指定します。endpoint、type、filter の許可値は Catalog が管理し、token や任意 URL を Config に記載してはなりません。
 
