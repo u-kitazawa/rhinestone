@@ -123,6 +123,11 @@ ODPTでは`endpoint + resource_types`だけが対象です。`strict` はExecuti
 認識できない `/vsi.../` locatorはローカルpathと推測せず拒否します。認可されない宛先では
 Credential factoryやExecution Runtimeは評価・呼び出しされません。
 
+Adapterを直接構築する既存コードでは、明示的に作成した`DestinationPolicy(rules=...)`の
+ruleをCredential付き通信にも引き続き利用できます。`from_catalog()`で生成したpolicyは、
+Providerの実行endpointからCredential専用ruleを生成します。Catalogに論理Credential名を
+持たないProviderでも、直接指定した`api_token`／`api_key`はその実行endpointだけへ送信できます。
+
 ## 高度なAPI
 
 `Config`、Source Adapter、Resolver、AccessPlanは内部パイプラインを直接扱う高度なAPIです。通常の検索・解決では`Result`を`app.resolve()`へ渡してください。

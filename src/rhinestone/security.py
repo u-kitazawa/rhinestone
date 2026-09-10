@@ -76,7 +76,7 @@ class CredentialDestinationRule:
         service: Optional[str],
         credential: Optional[str],
     ) -> bool:
-        if provider != self.provider:
+        if provider is not None and provider != self.provider:
             return False
         if service != self.service:
             return False
@@ -91,7 +91,7 @@ class DestinationPolicy:
 
     level: NetworkPolicyLevel = "credentialed"
     rules: Tuple[DestinationRule, ...] = ()
-    credential_rules: Tuple[CredentialDestinationRule, ...] = ()
+    credential_rules: Optional[Tuple[CredentialDestinationRule, ...]] = None
 
     def __post_init__(self) -> None:
         if self.level not in {"none", "credentialed", "strict"}:
@@ -146,7 +146,7 @@ class DestinationPolicy:
             scheme = "__invalid__"
         if scheme in {"", "file"}:
             return
-        if credentialed:
+        if credentialed and self.credential_rules is not None:
             authorized = any(
                 rule.matches(
                     url,
@@ -197,12 +197,17 @@ def _credential_rules(provider: Provider) -> Tuple[CredentialDestinationRule, ..
             if isinstance(resource_type, str) and resource_type
         )
         credential: Optional[str] = None
-    else:
+    elif provider.adapter_type in {"ckan", "ogc-features", "plateau", "stac"}:
         configured_credential = provider.settings.get("credential")
-        if not isinstance(configured_credential, str) or not configured_credential:
+        if configured_credential is None:
+            credential = None
+        elif isinstance(configured_credential, str) and configured_credential:
+            credential = configured_credential
+        else:
             return ()
         urls = (endpoint,)
-        credential = configured_credential
+    else:
+        return ()
     rules: list[CredentialDestinationRule] = []
     for url in urls:
         destination = DestinationRule.from_url(url)

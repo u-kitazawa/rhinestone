@@ -244,6 +244,7 @@ def test_credential_rule_requires_matching_service_and_credential() -> None:
     )
     policy = DestinationPolicy.from_catalog((provider, provider))
 
+    assert policy.credential_rules is not None
     assert len(policy.credential_rules) == 1
     policy.authorize(
         "https://catalog.example/api/action",
@@ -266,6 +267,45 @@ def test_credential_rule_requires_matching_service_and_credential() -> None:
             )
 
 
+def test_explicit_rules_remain_usable_for_direct_adapter_credentials() -> None:
+    endpoint = "https://catalog.example"
+    url = endpoint + "/api/3/action/package_search"
+    rule = DestinationRule.from_url(endpoint)
+    assert rule is not None
+    calls: List[Mapping[str, str]] = []
+
+    def get_json(
+        request_url: str,
+        params: Mapping[str, Any],
+        headers: Mapping[str, str],
+    ) -> Mapping[str, Any]:
+        assert request_url == url
+        calls.append(headers)
+        return fixture_json("ckan/package_search.json")
+
+    CkanAdapter(
+        get_json=get_json,
+        endpoint=endpoint,
+        api_token="secret",
+        destination_policy=DestinationPolicy(rules=(rule,)),
+    ).search(SearchQuery(text="river"))
+
+    assert calls == [{"Authorization": "secret"}]
+
+
+def test_catalog_endpoint_without_logical_credential_supports_direct_secret() -> None:
+    endpoint = "https://catalog.example"
+    policy = DestinationPolicy.from_catalog(
+        (Provider("private", "ckan", {"endpoint": endpoint}),)
+    )
+
+    policy.authorize(
+        endpoint + "/api/3/action/package_search",
+        credentialed=True,
+        service="ckan",
+    )
+
+
 def test_odpt_without_resource_types_has_no_credential_destination() -> None:
     policy = DestinationPolicy.from_catalog(
         (Provider("odpt", "odpt", {"endpoint": "https://api.example"}),)
@@ -281,6 +321,11 @@ def test_invalid_credential_endpoint_does_not_create_rule() -> None:
                 "private",
                 "ckan",
                 {"endpoint": "not-a-url", "credential": "catalog-key"},
+            ),
+            Provider(
+                "invalid-credential",
+                "ckan",
+                {"endpoint": "https://catalog.example", "credential": ""},
             ),
         )
     )
