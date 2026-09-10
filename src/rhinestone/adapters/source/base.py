@@ -56,6 +56,7 @@ class ProviderAdapter(ABC):
         credential_scheme: Optional[str] = None,
         credentials: Optional[CredentialRegistry] = None,
         destination_policy: Optional[DestinationPolicy] = None,
+        provider_id: Optional[str] = None,
     ) -> None:
         self._get_json = get_json
         self._endpoint = self._normalize_endpoint(endpoint) if endpoint else None
@@ -66,6 +67,7 @@ class ProviderAdapter(ABC):
                 "Configure either credential or a direct API secret"
             )
         self._credential_name = credential
+        self._provider_id = provider_id
         self._credentials = credentials or CredentialRegistry({})
         self._destination_policy = (
             destination_policy or DestinationPolicy.unrestricted()
@@ -175,7 +177,13 @@ class ProviderAdapter(ABC):
         self, url: str, params: Mapping[str, Any]
     ) -> Tuple[JsonObject, str]:
         credentialed = self._credential_name is not None or bool(self._headers)
-        self._destination_policy.authorize(url, credentialed=credentialed)
+        self._destination_policy.authorize(
+            url,
+            credentialed=credentialed,
+            provider=self._provider_id,
+            service=self.adapter_type,
+            credential=self._credential_name,
+        )
         headers: Dict[str, str] = dict(self._headers)
         if self._credential_name is not None:
             headers[self._credential_header] = (

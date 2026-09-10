@@ -58,6 +58,33 @@ def make_resource(
     )
 
 
+class BasicExecutionAdapter(ExecutionAdapter):
+    name = "basic"
+    priority = 0
+
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+        return True
+
+    def open(
+        self,
+        resource: Resource,
+        runtime: Any,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> Any:
+        return runtime
+
+
+def test_execution_adapter_default_authorization_uses_resource_uri() -> None:
+    resource = make_resource("https://unlisted.example/data", "custom")
+
+    with pytest.raises(DestinationNotAllowedError):
+        BasicExecutionAdapter().authorize(
+            resource,
+            destination_policy=DestinationPolicy(level="strict"),
+        )
+
+
 class FakeGdal:
     def __init__(self) -> None:
         self.calls: List[Tuple[str, Tuple[str, ...]]] = []

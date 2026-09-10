@@ -78,10 +78,21 @@ def test_catalog_policy_collects_nested_url_values_without_duplicates() -> None:
     policy = DestinationPolicy.from_catalog((provider,))
 
     assert len(policy.rules) == 2
-    policy.authorize("https://catalog.example/api/action", credentialed=True)
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize(
+            "https://catalog.example/api/action",
+            credentialed=True,
+            service="static",
+            credential="secret",
+        )
     policy.authorize("https://tiles.example/1/2/3.png")
     with pytest.raises(DestinationNotAllowedError):
-        policy.authorize("https://evil.example/data", credentialed=True)
+        policy.authorize(
+            "https://evil.example/data",
+            credentialed=True,
+            service="static",
+            credential="secret",
+        )
 
 
 def test_policy_levels_control_when_authorization_is_applied() -> None:
@@ -91,7 +102,12 @@ def test_policy_levels_control_when_authorization_is_applied() -> None:
     )
     policy.authorize("https://evil.example/data")
     with pytest.raises(DestinationNotAllowedError):
-        policy.authorize("https://evil.example/data", credentialed=True)
+        policy.authorize(
+            "https://evil.example/data",
+            credentialed=True,
+            service="static",
+            credential="secret",
+        )
 
     strict = DestinationPolicy.from_catalog((), level="strict")
     with pytest.raises(DestinationNotAllowedError):
@@ -178,6 +194,161 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> N
 
     assert resource.open("json-service") == []
     assert calls == [endpoint + "/odpt:Station"]
+
+
+def test_odpt_credential_rules_exclude_metadata_and_other_providers() -> None:
+    policy = DestinationPolicy.from_catalog(
+        (
+            sources.ODPT,
+            Provider(
+                "other",
+                "ckan",
+                {
+                    "endpoint": "https://other.example/api",
+                    "credential": "other-key",
+                },
+            ),
+        )
+    )
+
+    policy.authorize(
+        "https://api.odpt.org/api/v4/odpt:Station",
+        credentialed=True,
+        provider="odpt",
+        service="odpt",
+        credential="odpt-key",
+    )
+    for url in (
+        "https://developer.odpt.org/documents",
+        "https://developer.odpt.org/terms/data_basic_license.html",
+        "https://other.example/api",
+    ):
+        with pytest.raises(DestinationNotAllowedError):
+            policy.authorize(
+                url,
+                credentialed=True,
+                provider="odpt",
+                service="odpt",
+                credential="odpt-key",
+            )
+
+
+def test_credential_rule_requires_matching_service_and_credential() -> None:
+    provider = Provider(
+        "private",
+        "ckan",
+        {
+            "endpoint": "https://catalog.example/api",
+            "credential": "catalog-key",
+        },
+    )
+    policy = DestinationPolicy.from_catalog((provider, provider))
+
+    assert len(policy.credential_rules) == 1
+    policy.authorize(
+        "https://catalog.example/api/action",
+        credentialed=True,
+        provider="private",
+        service="ckan",
+        credential="catalog-key",
+    )
+    for service, credential in (
+        ("stac", "catalog-key"),
+        ("ckan", "other-key"),
+    ):
+        with pytest.raises(DestinationNotAllowedError):
+            policy.authorize(
+                "https://catalog.example/api/action",
+                credentialed=True,
+                provider="private",
+                service=service,
+                credential=credential,
+            )
+
+
+def test_odpt_without_resource_types_has_no_credential_destination() -> None:
+    policy = DestinationPolicy.from_catalog(
+        (Provider("odpt", "odpt", {"endpoint": "https://api.example"}),)
+    )
+
+    assert policy.credential_rules == ()
+
+
+def test_invalid_credential_endpoint_does_not_create_rule() -> None:
+    policy = DestinationPolicy.from_catalog(
+        (
+            Provider(
+                "private",
+                "ckan",
+                {"endpoint": "not-a-url", "credential": "catalog-key"},
+            ),
+        )
+    )
+
+    assert policy.credential_rules == ()
+
+
+def test_odpt_credential_rule_is_scoped_to_provider_and_resource_path() -> None:
+    endpoint = "https://shared.example/api/v4"
+    settings = dict(sources.ODPT.settings)
+    settings["endpoint"] = endpoint
+    policy = DestinationPolicy.from_catalog(
+        (Provider("private-odpt", "odpt", settings),)
+    )
+
+    for provider, url in (
+        ("odpt", endpoint + "/odpt:Station"),
+        ("private-odpt", endpoint + "/documentation"),
+        ("private-odpt", endpoint + "/odpt:Unknown"),
+    ):
+        with pytest.raises(DestinationNotAllowedError):
+            policy.authorize(
+                url,
+                credentialed=True,
+                provider=provider,
+                service="odpt",
+                credential="key",
+            )
+
+
+def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> None:
+    credential_calls: List[bool] = []
+    runtime_calls: List[bool] = []
+    app = configure(
+        sources=(sources.ODPT, sources.GSI),
+        credentials={
+            "odpt": lambda: credential_calls.append(True) or "secret",
+        },
+    )
+    resource = app.resolve(Config("odpt", {"dataset": "station", "credential": "odpt"}))
+    metadata_url = "https://maps.gsi.go.jp/development/ichiran.html"
+    tampered = replace(
+        resource,
+        uri=metadata_url,
+        access_plan=replace(
+            resource.access_plan,
+            uri=metadata_url,
+            options={**resource.access_plan.options, "endpoint": metadata_url},
+        ),
+    )
+
+    class Runtime:
+        def get(self, *args: Any, **kwargs: Any) -> Any:
+            runtime_calls.append(True)
+            raise AssertionError("runtime must not be called")
+
+    with pytest.raises(DestinationNotAllowedError):
+        JsonServiceAdapter(
+            OdptAdapter.prepare_request,
+            "odpt",
+            CredentialRegistry(
+                {"odpt": lambda: credential_calls.append(True) or "secret"}
+            ),
+            DestinationPolicy.from_catalog((sources.ODPT, sources.GSI)),
+        ).open(tampered, Runtime())
+
+    assert credential_calls == []
+    assert runtime_calls == []
 
 
 @pytest.mark.parametrize(

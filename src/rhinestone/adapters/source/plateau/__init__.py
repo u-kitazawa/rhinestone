@@ -23,6 +23,7 @@ class PlateauAdapter(CkanAdapter):
         credential_scheme: Optional[str] = None,
         credentials: Optional[CredentialRegistry] = None,
         destination_policy: Optional[DestinationPolicy] = None,
+        provider_id: Optional[str] = None,
     ) -> None:
         if not isinstance(endpoint, str) or not endpoint.strip():
             raise ConfigValidationError("PLATEAU endpoint must be configured")
@@ -34,6 +35,7 @@ class PlateauAdapter(CkanAdapter):
             credential_scheme=credential_scheme,
             credentials=credentials,
             destination_policy=destination_policy,
+            provider_id=provider_id,
         )
 
     def load(self, config: Config) -> Source:

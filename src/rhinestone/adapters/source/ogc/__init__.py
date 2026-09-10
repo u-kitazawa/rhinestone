@@ -35,6 +35,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
         credential_scheme: Optional[str] = None,
         credentials: Optional[CredentialRegistry] = None,
         destination_policy: Optional[DestinationPolicy] = None,
+        provider_id: Optional[str] = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -47,6 +48,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
             credential_scheme=credential_scheme,
             credentials=credentials,
             destination_policy=destination_policy,
+            provider_id=provider_id,
         )
         self._collection_id = collection_id
 
