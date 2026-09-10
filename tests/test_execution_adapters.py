@@ -145,6 +145,9 @@ def strict_files_policy() -> DestinationPolicy:
         "/vsicurl/ftp://unlisted.example/data.tif",
         "/vsicurl?use_head=no",
         "/vsicurl?" + "&".join(f"option{index}=x" for index in range(65)),
+        "/vsizip//vsicurl?url=https%3A%2F%2Fallowed.example%2Fdata.zip",
+        "/vsizip//vsicurl/ftp://allowed.example/data.zip",
+        "/vsizip//vsicurl/https://allowed.example/data/file",
         "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip",
         "/vsiunknown/https://allowed.example/data/file.tif",
     ),
@@ -178,6 +181,7 @@ def test_strict_execution_rejects_unsafe_gdal_locator_before_runtime(
         "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}/member.shp",
         "/vsizip/{https://allowed.example/data/archive.zip}/member.shp",
         "/vsizip/https://allowed.example/data/archive.zip/member.shp",
+        "/vsizip//vsicurl/https://allowed.example/data/archive.zipx/file.tar/member.shp",
         "/vsizip/{/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}}/member.shp",
         "/vsicurl?use_head=no&url=https%3A%2F%2Fallowed.example%2Fdata%2Ffile.tif",
         "/data/local-file.tif",
@@ -201,6 +205,31 @@ def test_strict_execution_allows_authorized_or_local_gdal_locator(
     )
 
     assert len(runtime.calls) == 1
+
+
+def test_strict_archive_authorizes_archive_url_not_member_path() -> None:
+    runtime = FakeGdal()
+    policy = DestinationPolicy.from_catalog(
+        (
+            Provider(
+                "files",
+                "direct",
+                {"endpoint": "https://allowed.example/data.zip/member.shp"},
+            ),
+        ),
+        level="strict",
+    )
+
+    with pytest.raises(DestinationNotAllowedError):
+        GdalAdapter(policy).open(
+            make_resource(
+                "/vsizip//vsicurl/https://allowed.example/data.zip/member.shp",
+                "shapefile",
+            ),
+            runtime,
+        )
+
+    assert runtime.calls == []
 
 
 def test_pyogrio_receives_explicit_encoding() -> None:

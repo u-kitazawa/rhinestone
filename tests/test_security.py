@@ -345,6 +345,31 @@ def test_configure_exposes_strict_and_none_network_policies() -> None:
     assert unrestricted.open(config, "rasterio") == "https://unlisted.example/data.tif"
 
 
+def test_strict_pipeline_authorizes_before_runtime_factory() -> None:
+    factory_calls: List[bool] = []
+
+    def unavailable_runtime() -> Any:
+        factory_calls.append(True)
+        raise AssertionError("the runtime must not be evaluated")
+
+    app = configure(
+        network_policy="strict",
+        dependencies={"gdal": RuntimeFactory(unavailable_runtime)},
+    )
+    config = Config(
+        "direct",
+        {
+            "uri": "/vsizip//vsicurl/https://unlisted.example/data.zip/member.shp",
+            "format": "shapefile",
+        },
+    )
+
+    with pytest.raises(DestinationNotAllowedError):
+        app.open(config, "gdal")
+
+    assert factory_calls == []
+
+
 @pytest.mark.parametrize(
     "tile_url",
     (

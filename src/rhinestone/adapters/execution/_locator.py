@@ -1,7 +1,7 @@
 """Authorize network destinations embedded in GDAL runtime locators."""
 
 from typing import Tuple
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 from ...errors import DestinationNotAllowedError
 from ...security import DestinationPolicy, DestinationRule
@@ -30,10 +30,6 @@ def authorize_runtime_locator(
 
 
 def _network_destinations(locator: str) -> Tuple[str, ...]:
-    direct = DestinationRule.from_url(locator)
-    if direct is not None:
-        return (locator,)
-
     for prefix in _NETWORK_PREFIXES:
         if locator.startswith(prefix):
             destination = locator[len(prefix) :]
@@ -57,12 +53,68 @@ def _network_destinations(locator: str) -> Tuple[str, ...]:
     for prefix in _ARCHIVE_PREFIXES:
         if locator.startswith(prefix):
             nested = _nested_archive_locator(locator[len(prefix) :])
-            return () if nested is None else _network_destinations(nested)
+            return () if nested is None else _archive_destinations(nested)
 
     if locator.startswith(_LOCAL_PREFIXES):
         return ()
 
     raise _unsupported_locator()
+
+
+def _archive_destinations(nested: str) -> Tuple[str, ...]:
+    if DestinationRule.from_url(nested) is not None:
+        return (_archive_url(nested),)
+    for prefix in _NETWORK_PREFIXES:
+        if nested.startswith(prefix):
+            return (_archive_url(nested[len(prefix) :]),)
+    if nested.startswith("/vsicurl?"):
+        raise _unsupported_locator()
+    return _network_destinations(nested)
+
+
+def _archive_url(locator: str) -> str:
+    parsed = urlsplit(locator)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        raise _unsupported_locator()
+    archive_end = _archive_path_end(parsed.path)
+    if archive_end is None:
+        raise _unsupported_locator()
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path[:archive_end],
+            parsed.query,
+            parsed.fragment,
+        )
+    )
+
+
+def _archive_path_end(path: str) -> int | None:
+    lower_path = path.lower()
+    extensions = (
+        ".tar.gz",
+        ".tar",
+        ".tgz",
+        ".zip",
+        ".kmz",
+        ".ods",
+        ".xlsx",
+        ".7z",
+        ".rar",
+        ".gz",
+    )
+    candidates = (
+        (lower_path.find(extension), len(extension)) for extension in extensions
+    )
+    for index, length in sorted(
+        (candidate for candidate in candidates if candidate[0] >= 0),
+        key=lambda candidate: candidate[0],
+    ):
+        end = index + length
+        if end == len(path) or path[end] == "/":
+            return end
+    return None
 
 
 def _nested_archive_locator(payload: str) -> str | None:

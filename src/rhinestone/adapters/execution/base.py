@@ -36,3 +36,12 @@ class ExecutionAdapter(ABC):
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
         """Delegate the already selected resource to the supplied runtime."""
+
+    def authorize(
+        self,
+        resource: Resource,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> None:
+        """Authorize a resource before resolving its user-owned runtime."""
+        (destination_policy or self._destination_policy).authorize(resource.uri)
