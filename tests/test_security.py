@@ -540,7 +540,7 @@ def test_source_credential_configuration_is_validated() -> None:
 
 def test_configure_exposes_strict_and_none_network_policies() -> None:
     class Rasterio:
-        def open(self, uri: str) -> str:
+        def open(self, uri: str, driver: str | None = None) -> str:
             return uri
 
     config = Config(
@@ -582,6 +582,27 @@ def test_strict_pipeline_authorizes_before_runtime_factory() -> None:
 
     with pytest.raises(DestinationNotAllowedError):
         app.open(config, "gdal")
+
+    assert factory_calls == []
+
+
+def test_strict_driver_policy_rejects_before_runtime_factory() -> None:
+    factory_calls: List[bool] = []
+
+    def runtime() -> Any:
+        factory_calls.append(True)
+        raise AssertionError("the runtime must not be evaluated")
+
+    app = configure(
+        network_policy="strict",
+        dependencies={"gdal": RuntimeFactory(runtime)},
+    )
+
+    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
+        app.open(
+            Config("direct", {"uri": "/data/rivers.shp", "format": "shapefile"}),
+            "gdal",
+        )
 
     assert factory_calls == []
 
@@ -651,7 +672,7 @@ def test_strict_gdal_rejects_invalid_tile_destination_before_runtime(
     assert runtime.calls == []
 
 
-def test_strict_gdal_allows_catalog_tile_template() -> None:
+def test_strict_gdal_rejects_catalog_tile_without_nested_egress_control() -> None:
     runtime = RecordingGdal()
     app = configure(
         sources=(sources.GSI,),
@@ -661,12 +682,10 @@ def test_strict_gdal_allows_catalog_tile_template() -> None:
 
     resource = app.resolve(Config("gsi", {"id": "std"}))
 
-    assert app.open(resource, "gdal") == "dataset"
-    assert len(runtime.calls) == 1
-    assert (
-        "https://cyberjapandata.gsi.go.jp/xyz/std/${z}/${x}/${y}.png"
-        in runtime.calls[0]
-    )
+    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
+        app.open(resource, "gdal")
+
+    assert runtime.calls == []
 
 
 def test_opening_a_resource_rechecks_the_calling_app_policy() -> None:

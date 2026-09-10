@@ -10,3 +10,8 @@ COG と GeoTIFF に対応します。runtime は `open(uri)` を提供する必�
 `network_policy="strict"`では、GDAL VSI locatorに埋め込まれたHTTP(S) URLもCatalog由来の
 destination policyで認可します。未認可URLと認識できない`/vsi.../`構文は`open()`を
 呼ぶ前に拒否します。
+
+`strict`ではGeoTIFF／COGを`open(uri, driver="GTiff")`で開き、content-basedなVRT等への
+driver fallbackを許可しません。`credentialed`／`none`では従来どおりdriverを省略します。
+
+参考: [Rasterio `open()`](https://rasterio.readthedocs.io/en/stable/api/rasterio.html#rasterio.open)

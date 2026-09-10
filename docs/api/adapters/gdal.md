@@ -21,3 +21,11 @@ Resource URIが `/vsicurl/`、`/vsicurl_streaming/`、または`/vsizip/`等のa
 wrapperを組み合わせたlocatorの場合は、内側のHTTP(S) URLを認可します。通常のlocal
 pathと既知のlocal VSI locatorは維持し、認識できない`/vsi.../`構文はstrict policyで
 fail closedにします。
+
+さらに`strict`では、GeoTIFF／COGだけを`allowed_drivers=("GTiff",)`で開きます。
+拡張子と実際のdriverは一致する保証がなく、VRTやWMS等は内部で別datasetを開けるためです。
+Shapefile、NetCDF、WMS、GML、CityGML、XYZ tileは、secondary accessを同じpolicyで
+再認可できるRuntime契約がない限り`strict`ではRuntime解決前に拒否します。
+`credentialed`／`none`では従来どおりGDALのdriver discoveryを利用します。
+
+参考: [GDAL Security considerations](https://gdal.org/en/stable/user/security.html)

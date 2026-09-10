@@ -19,6 +19,7 @@ class GdalAdapter(ExecutionAdapter):
     _formats = frozenset(
         {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "citygml"}
     )
+    _strict_drivers = {"cog": ("GTiff",), "geotiff": ("GTiff",)}
 
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
@@ -43,13 +44,17 @@ class GdalAdapter(ExecutionAdapter):
         policy = destination_policy or self._destination_policy
         uri = self._runtime_uri(resource, policy)
         authorize_runtime_locator(uri, policy)
+        allowed_drivers = self._allowed_drivers(resource, policy)
         attributes = resource_attributes(resource)
         options: List[str] = []
         encoding = attributes.get("encoding")
         if isinstance(encoding, str):
             options.append("ENCODING=" + encoding.upper())
         try:
-            result = runtime.OpenEx(uri, open_options=tuple(options))
+            runtime_options: dict[str, Any] = {"open_options": tuple(options)}
+            if allowed_drivers is not None:
+                runtime_options["allowed_drivers"] = allowed_drivers
+            result = runtime.OpenEx(uri, **runtime_options)
             if result is None:
                 raise ResourceAccessError("GDAL returned no dataset")
             return result
@@ -66,6 +71,20 @@ class GdalAdapter(ExecutionAdapter):
     ) -> None:
         policy = destination_policy or self._destination_policy
         authorize_runtime_locator(self._runtime_uri(resource, policy), policy)
+        self._allowed_drivers(resource, policy)
+
+    @classmethod
+    def _allowed_drivers(
+        cls, resource: Resource, policy: DestinationPolicy
+    ) -> tuple[str, ...] | None:
+        if policy.level != "strict":
+            return None
+        drivers = cls._strict_drivers.get((resource.format or "").lower())
+        if drivers is None or resource.access_plan.options.get("tile") is not None:
+            raise DestinationNotAllowedError(
+                "GDAL strict policy does not allow this dataset driver"
+            )
+        return drivers
 
     @staticmethod
     def _runtime_uri(resource: Resource, policy: DestinationPolicy) -> str:

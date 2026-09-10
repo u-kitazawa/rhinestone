@@ -88,9 +88,16 @@ def test_execution_adapter_default_authorization_uses_resource_uri() -> None:
 class FakeGdal:
     def __init__(self) -> None:
         self.calls: List[Tuple[str, Tuple[str, ...]]] = []
+        self.allowed_drivers: List[Tuple[str, ...] | None] = []
 
-    def OpenEx(self, uri: str, open_options: Tuple[str, ...] = ()) -> object:
+    def OpenEx(
+        self,
+        uri: str,
+        open_options: Tuple[str, ...] = (),
+        allowed_drivers: Tuple[str, ...] | None = None,
+    ) -> object:
         self.calls.append((uri, open_options))
+        self.allowed_drivers.append(allowed_drivers)
         return {"runtime": "gdal", "uri": uri}
 
 
@@ -118,9 +125,11 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
 class FakeRasterio:
     def __init__(self) -> None:
         self.calls: List[str] = []
+        self.drivers: List[str | None] = []
 
-    def open(self, uri: str) -> object:
+    def open(self, uri: str, driver: str | None = None) -> object:
         self.calls.append(uri)
+        self.drivers.append(driver)
         return {"runtime": "rasterio"}
 
 
@@ -131,6 +140,69 @@ def test_rasterio_opens_cog_uri_directly() -> None:
 
     assert RasterioAdapter().open(resource, runtime) == {"runtime": "rasterio"}
     assert runtime.calls == ["https://files.example/image.tif"]
+    assert runtime.drivers == [None]
+
+
+@pytest.mark.parametrize("format_name", ("cog", "geotiff"))
+def test_strict_raster_adapters_pin_gtiff_driver(format_name: str) -> None:
+    resource = make_resource("https://allowed.example/data/image.tif", format_name)
+    policy = strict_files_policy()
+    gdal = FakeGdal()
+    rasterio = FakeRasterio()
+
+    GdalAdapter(policy).open(resource, gdal)
+    RasterioAdapter(policy).open(resource, rasterio)
+
+    assert gdal.allowed_drivers == [("GTiff",)]
+    assert rasterio.drivers == ["GTiff"]
+
+
+def test_strict_driver_pinning_prevents_hostile_vrt_fallback() -> None:
+    secondary_destinations: List[str] = []
+
+    class HostileGdal:
+        def OpenEx(
+            self,
+            uri: str,
+            open_options: Tuple[str, ...] = (),
+            allowed_drivers: Tuple[str, ...] | None = None,
+        ) -> object:
+            if allowed_drivers != ("GTiff",):
+                secondary_destinations.append("https://unlisted.example/secret.tif")
+            return object()
+
+    GdalAdapter(strict_files_policy()).open(
+        make_resource("https://allowed.example/data/disguised.tif", "geotiff"),
+        HostileGdal(),
+    )
+
+    assert secondary_destinations == []
+
+
+@pytest.mark.parametrize(
+    "format_name", ("shapefile", "netcdf", "wms", "gml", "citygml")
+)
+def test_strict_gdal_rejects_unpinned_driver_before_runtime(
+    format_name: str,
+) -> None:
+    runtime = FakeGdal()
+
+    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
+        GdalAdapter(strict_files_policy()).open(
+            make_resource("/data/file", format_name), runtime
+        )
+
+    assert runtime.calls == []
+
+
+def test_strict_rasterio_rejects_unpinned_driver_before_runtime() -> None:
+    runtime = FakeRasterio()
+    resource = make_resource("/data/rivers.shp", "shapefile")
+
+    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
+        RasterioAdapter(strict_files_policy()).open(resource, runtime)
+
+    assert runtime.calls == []
 
 
 class FakePyogrio:
