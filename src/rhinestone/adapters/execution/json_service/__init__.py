@@ -52,9 +52,7 @@ class JsonServiceAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        (destination_policy or self._destination_policy).authorize(
-            resource.uri, credentialed=True
-        )
+        self._authorize_resource(resource, destination_policy)
         params, headers = self._prepare_request(resource.access_plan, self._credentials)
         try:
             response = runtime.get(
@@ -80,3 +78,26 @@ class JsonServiceAdapter(ExecutionAdapter):
         ):
             raise ProviderResponseError("Service must return an array of objects")
         return cast(Any, data)
+
+    def authorize(
+        self,
+        resource: Resource,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> None:
+        """Authorize credential release before resolving the service runtime."""
+        self._authorize_resource(resource, destination_policy)
+
+    def _authorize_resource(
+        self,
+        resource: Resource,
+        destination_policy: DestinationPolicy | None,
+    ) -> None:
+        credential = resource.access_plan.options.get("credential")
+        (destination_policy or self._destination_policy).authorize(
+            resource.uri,
+            credentialed=True,
+            provider=resource.provenance.provider,
+            service=self._service,
+            credential=credential if isinstance(credential, str) else None,
+        )

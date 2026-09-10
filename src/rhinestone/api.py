@@ -289,6 +289,7 @@ def _build_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
+            provider_id=source.id,
             **settings,
         )
     if adapter_type == "stac":
@@ -301,6 +302,7 @@ def _build_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
+            provider_id=source.id,
             **settings,
         )
     if adapter_type == "ogc-features":
@@ -319,6 +321,7 @@ def _build_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
+            provider_id=source.id,
             **settings,
         )
     if adapter_type == "plateau":
@@ -331,6 +334,7 @@ def _build_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
+            provider_id=source.id,
             **settings,
         )
     if adapter_type == "static":

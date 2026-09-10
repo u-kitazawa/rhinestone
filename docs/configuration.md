@@ -115,11 +115,18 @@ app = configure(
 ```
 
 `network_policy` は `credentialed`（既定）、`strict`、`none` から選べます。`credentialed`
-は認証付き通信だけを Catalog endpoint に制限し、`strict` は ExecutionAdapter の HTTP
+は認証付き通信だけを、CatalogでProviderごとに定義された実行endpointへ制限します。
+説明・仕様・利用条件等のmetadata URLや別ProviderのendpointはCredential送信先になりません。
+ODPTでは`endpoint + resource_types`だけが対象です。`strict` はExecutionAdapterのHTTP
 アクセス全体を制限します。GDAL系Runtimeへ渡す `/vsicurl/`、
 `/vsicurl_streaming/`、archive wrapperとの組み合わせでは内側のHTTP(S) URLを認可し、
 認識できない `/vsi.../` locatorはローカルpathと推測せず拒否します。認可されない宛先では
 Credential factoryやExecution Runtimeは評価・呼び出しされません。
+
+Adapterを直接構築する既存コードでは、明示的に作成した`DestinationPolicy(rules=...)`の
+ruleをCredential付き通信にも引き続き利用できます。`from_catalog()`で生成したpolicyは、
+Providerの実行endpointからCredential専用ruleを生成します。Catalogに論理Credential名を
+持たないProviderでも、直接指定した`api_token`／`api_key`はその実行endpointだけへ送信できます。
 
 ## 高度なAPI
 
