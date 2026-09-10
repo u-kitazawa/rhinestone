@@ -87,6 +87,7 @@ class AccessPipeline:
             dependencies.available,
             requested=library,
         )
+        selected.authorize(resource, destination_policy=destination_policy)
         runtime = dependencies.get(selected.name)
         return selected.open(
             resource,

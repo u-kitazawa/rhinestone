@@ -5,6 +5,7 @@ from typing import Any, Dict, FrozenSet
 from ....errors import ResourceAccessError
 from ....models import Resource
 from ....security import DestinationPolicy
+from .._locator import authorize_runtime_locator
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -31,7 +32,9 @@ class PyogrioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        (destination_policy or self._destination_policy).authorize(resource.uri)
+        authorize_runtime_locator(
+            resource.uri, destination_policy or self._destination_policy
+        )
         attributes = resource_attributes(resource)
         options: Dict[str, Any] = {}
         encoding = attributes.get("encoding")
@@ -43,3 +46,13 @@ class PyogrioAdapter(ExecutionAdapter):
             raise ResourceAccessError(
                 f"pyogrio could not open {resource.uri!r}"
             ) from error
+
+    def authorize(
+        self,
+        resource: Resource,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> None:
+        authorize_runtime_locator(
+            resource.uri, destination_policy or self._destination_policy
+        )

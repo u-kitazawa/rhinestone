@@ -16,3 +16,8 @@ open option として渡します。Resource の再選択、解析、形式・CR
 `access_plan.options["tile"]["url"]` も実際の送信先として、GDAL 用 XML を生成する前に
 Catalog 由来の destination policy で認可します。認可されていない host や path、
 HTTP(S) 以外の tile URL は `OpenEx()` を呼ぶ前に拒否します。
+
+Resource URIが `/vsicurl/`、`/vsicurl_streaming/`、または`/vsizip/`等のarchive
+wrapperを組み合わせたlocatorの場合は、内側のHTTP(S) URLを認可します。通常のlocal
+pathと既知のlocal VSI locatorは維持し、認識できない`/vsi.../`構文はstrict policyで
+fail closedにします。

@@ -6,6 +6,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from ....errors import DestinationNotAllowedError, ResourceAccessError
 from ....models import FileAccessPlan, Resource
 from ....security import DestinationPolicy, DestinationRule
+from .._locator import authorize_runtime_locator
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -40,7 +41,34 @@ class GdalAdapter(ExecutionAdapter):
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
         policy = destination_policy or self._destination_policy
-        policy.authorize(resource.uri)
+        uri = self._runtime_uri(resource, policy)
+        authorize_runtime_locator(uri, policy)
+        attributes = resource_attributes(resource)
+        options: List[str] = []
+        encoding = attributes.get("encoding")
+        if isinstance(encoding, str):
+            options.append("ENCODING=" + encoding.upper())
+        try:
+            result = runtime.OpenEx(uri, open_options=tuple(options))
+            if result is None:
+                raise ResourceAccessError("GDAL returned no dataset")
+            return result
+        except Exception as error:
+            raise ResourceAccessError(
+                f"GDAL could not open {resource.uri!r}"
+            ) from error
+
+    def authorize(
+        self,
+        resource: Resource,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> None:
+        policy = destination_policy or self._destination_policy
+        authorize_runtime_locator(self._runtime_uri(resource, policy), policy)
+
+    @staticmethod
+    def _runtime_uri(resource: Resource, policy: DestinationPolicy) -> str:
         attributes = resource_attributes(resource)
         uri = resource.uri
         tile = resource.access_plan.options.get("tile")
@@ -56,7 +84,7 @@ class GdalAdapter(ExecutionAdapter):
                     "GDAL tile URL must be an authorized HTTP(S) destination"
                 )
             policy.authorize(tile_url)
-            uri = self.tile_xml(tile)
+            uri = GdalAdapter.tile_xml(tile)
         archive = attributes.get("archive")
         if isinstance(resource.access_plan, FileAccessPlan):
             archive = resource.access_plan.archive or archive
@@ -69,19 +97,7 @@ class GdalAdapter(ExecutionAdapter):
             member = resource.access_plan.options.get("entry_point")
             if member:
                 uri += "/" + member
-        options: List[str] = []
-        encoding = attributes.get("encoding")
-        if isinstance(encoding, str):
-            options.append("ENCODING=" + encoding.upper())
-        try:
-            result = runtime.OpenEx(uri, open_options=tuple(options))
-            if result is None:
-                raise ResourceAccessError("GDAL returned no dataset")
-            return result
-        except Exception as error:
-            raise ResourceAccessError(
-                f"GDAL could not open {resource.uri!r}"
-            ) from error
+        return uri
 
     @staticmethod
     def tile_xml(tile: Mapping[str, Any]) -> str:
