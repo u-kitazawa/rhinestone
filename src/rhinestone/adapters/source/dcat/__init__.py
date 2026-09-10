@@ -42,6 +42,10 @@ class DcatAdapter(ProviderAdapter):
 
     def _catalog(self, settings: Mapping[str, Any]) -> Tuple[Any, Any, str, str]:
         uri = string(settings, "uri")
+        if self._catalog_uri is not None and uri != self._catalog_uri:
+            raise ConfigValidationError(
+                "DCAT catalog URI must match the configured catalog_uri"
+            )
         serialization = settings.get("serialization", self._serialization)
         if serialization not in ("json-ld", "turtle", "xml"):
             raise ConfigValidationError("Expected json-ld, turtle or xml serialization")
