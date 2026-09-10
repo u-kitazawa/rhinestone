@@ -11,3 +11,8 @@ runtime は `OpenEx(uri, open_options=...)` を提供する必要があります
 
 ZIP は `/vsizip/`、リモート ZIP は `/vsicurl/` URI に変換し、確定済み encoding を
 open option として渡します。Resource の再選択、解析、形式・CRS 変換は行いません。
+
+`network_policy="strict"` では、通常の Resource は `resource.uri`、XYZ tile は
+`access_plan.options["tile"]["url"]` も実際の送信先として、GDAL 用 XML を生成する前に
+Catalog 由来の destination policy で認可します。認可されていない host や path、
+HTTP(S) 以外の tile URL は `OpenEx()` を呼ぶ前に拒否します。

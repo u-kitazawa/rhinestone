@@ -3,9 +3,9 @@
 from typing import Any, FrozenSet, List, Mapping, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from ....errors import ResourceAccessError
+from ....errors import DestinationNotAllowedError, ResourceAccessError
 from ....models import FileAccessPlan, Resource
-from ....security import DestinationPolicy
+from ....security import DestinationPolicy, DestinationRule
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -39,11 +39,23 @@ class GdalAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        (destination_policy or self._destination_policy).authorize(resource.uri)
+        policy = destination_policy or self._destination_policy
+        policy.authorize(resource.uri)
         attributes = resource_attributes(resource)
         uri = resource.uri
         tile = resource.access_plan.options.get("tile")
         if tile is not None:
+            if not isinstance(tile, Mapping):
+                raise ResourceAccessError("GDAL tile options must be an object")
+            tile = cast(Mapping[str, Any], tile)
+            tile_url = tile.get("url")
+            if not isinstance(tile_url, str):
+                raise ResourceAccessError("GDAL tile URL must be a string")
+            if policy.level == "strict" and DestinationRule.from_url(tile_url) is None:
+                raise DestinationNotAllowedError(
+                    "GDAL tile URL must be an authorized HTTP(S) destination"
+                )
+            policy.authorize(tile_url)
             uri = self.tile_xml(tile)
         archive = attributes.get("archive")
         if isinstance(resource.access_plan, FileAccessPlan):
