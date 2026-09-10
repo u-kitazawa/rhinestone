@@ -2,7 +2,7 @@
 
 from typing import Any, FrozenSet
 
-from ....errors import ResourceAccessError
+from ....errors import DestinationNotAllowedError, ResourceAccessError
 from ....models import Resource
 from ....security import DestinationPolicy
 from .._locator import authorize_runtime_locator
@@ -31,11 +31,15 @@ class RasterioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        authorize_runtime_locator(
-            resource.uri, destination_policy or self._destination_policy
-        )
+        policy = destination_policy or self._destination_policy
+        authorize_runtime_locator(resource.uri, policy)
+        driver = self._driver(resource, policy)
         try:
-            return runtime.open(resource.uri)
+            return (
+                runtime.open(resource.uri, driver=driver)
+                if driver is not None
+                else runtime.open(resource.uri)
+            )
         except Exception as error:
             raise ResourceAccessError(
                 f"Rasterio could not open {resource.uri!r}"
@@ -47,6 +51,16 @@ class RasterioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
-        authorize_runtime_locator(
-            resource.uri, destination_policy or self._destination_policy
-        )
+        policy = destination_policy or self._destination_policy
+        authorize_runtime_locator(resource.uri, policy)
+        self._driver(resource, policy)
+
+    @staticmethod
+    def _driver(resource: Resource, policy: DestinationPolicy) -> str | None:
+        if policy.level != "strict":
+            return None
+        if (resource.format or "").lower() not in RasterioAdapter._formats:
+            raise DestinationNotAllowedError(
+                "Rasterio strict policy does not allow this dataset driver"
+            )
+        return "GTiff"

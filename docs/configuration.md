@@ -123,6 +123,11 @@ ODPTでは`endpoint + resource_types`だけが対象です。`strict` はExecuti
 認識できない `/vsi.../` locatorはローカルpathと推測せず拒否します。認可されない宛先では
 Credential factoryやExecution Runtimeは評価・呼び出しされません。
 
+GDAL／Rasterioでは、`strict`時にGeoTIFF／COGを`GTiff` driverへ固定します。VRT、WMS、
+XYZ tile等の内部でsecondary datasetへアクセスできる経路と、driver mappingを安全に固定して
+いないformatは、Runtime内部の宛先を再認可できないため`strict`ではfail closedになります。
+通常の`credentialed`／`none`では従来のformat対応とdriver discoveryを維持します。
+
 Adapterを直接構築する既存コードでは、明示的に作成した`DestinationPolicy(rules=...)`の
 ruleをCredential付き通信にも引き続き利用できます。`from_catalog()`で生成したpolicyは、
 Providerの実行endpointからCredential専用ruleを生成します。Catalogに論理Credential名を
