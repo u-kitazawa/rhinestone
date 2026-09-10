@@ -19,12 +19,13 @@
 | V05-01 | Resolve First、薄い公開メンタルモデル、`search -> resolve -> open` | `Implemented` | `Rhinestone.search/resolve/open`、`Result.resolve()`、[ホーム](index.md)、[Resourceを解決して開く](resolve-and-open.md)、`tests/test_public_api.py` | 通常利用APIを内部モデルで肥大化させない |
 | V05-02 | discovery-driven と Config-driven の2経路 | `Implemented` | `Rhinestone.resolve(Config | Result)`、[データを検索する](search.md)、[Resourceを解決して開く](resolve-and-open.md)、`tests/test_access_vertical_slice.py` | なし |
 | V05-03 | Catalog / Provider 定義と同一Adapter型の複数構成 | `Implemented` | `Catalog`、`Provider`、`_ConfiguredSourceAdapter`、[アプリケーションを構成する](configuration.md)、`tests/test_catalogs.py`、`tests/test_public_api.py` | 外部自作Adapterの登録はV05-21で別管理 |
-| V05-04 | discovery source と resolution target の分離 | `Implemented` | `Result.discovered_by` と `Result.target`、`Rhinestone.resolve(Result)`、[DiscoveryとResolution](discovery-resolution.md)、`tests/test_public_api.py::test_discovery_result_resolves_through_a_different_target_source` | なし |
+| V05-04 | discovery source と resolution target の分離 | `Implemented` | `Result.discovered_by` と `Result.target`、`Rhinestone.resolve(Result)`、[DiscoveryとResolution](discovery-resolution.md)、`tests/test_public_api.py::test_discovery_result_resolves_through_a_different_target_source` | 両SourceのMetadata / Provenance保持はV05-09bで別管理する |
 | V05-05 | federated search、capability projection、diagnostics | `Implemented` | `SearchCoordinator`、`SearchDiagnostic`、[データを検索する](search.md)、`tests/test_search.py` | Provider横断sequenceは非ranking。共通rerankerは導入しない |
 | V05-06 | source-scoped search の専用公開API | `Deferred` | 結果は `SearchResults["source-id"]` でProvider別に参照可能だが、検索実行を1 Sourceへ限定する公開引数はない | 特定Providerだけの実行が、Catalogを絞る現行手段では不十分な具体例とAPI形状が確定した時に再評価する |
 | V05-07 | Identity / Time / Space の日本横断Knowledge Layer | `Deferred` | 責務境界はIssue #49、実装は#50、#51、#52で管理 | #49の最小契約確定後、同じ知識を少なくとも2 Providerで再利用できることを条件に実装する |
 | V05-08 | Representation knowledge（encoding、archive、配布形式） | `Implemented` | `ResourceCandidate.attributes`、`AccessPlan.options`、GDAL/pyogrio Adapter、[対応状況](compatibility.md)、`tests/test_execution_adapters.py`、`tests/test_resolution.py` | 新しい共通抽象は、同じ知識が2 Provider以上で重複した場合だけ検討する |
-| V05-09 | Metadata / Provenance をURLへ縮退させず保持 | `Implemented` | `Metadata`、`Provenance`、`Source`、`Resource`、[DiscoveryとResolution](discovery-resolution.md)、`tests/test_models.py` | 横断検索後の保持も現行契約として維持する |
+| V05-09a | 単一Source内でMetadata / ProvenanceをURLへ縮退させず保持 | `Implemented` | `Metadata`、`Provenance`、`Source`、`Resource`、[DiscoveryとResolution](discovery-resolution.md)、`tests/test_models.py` | 現行のモデル契約を維持する |
+| V05-09b | discovery sourceとresolution target双方のMetadata / Provenanceを保持 | `Deferred` | 現行の`Rhinestone.resolve(Result)`は横断Source解決時にdiscovery側の記録でtarget側の記録を上書きする。既存のcross-source回帰テストはtargetが追加記録を持たないため、この損失を検出しない | 両記録を表現するモデルと公開API、競合時の優先規則、cross-provider fixtureを確定してから実装する |
 | V05-10 | Source、ResourceCandidate、Resolver、AccessPlan の内部境界 | `Implemented` | `models.py`、`resolution.py`、`pipeline.py`、`tests/test_pipeline.py`、`tests/test_resolution.py` | 通常利用者向けの第一導線には露出しない |
 | V05-11 | Existing OSS First とSource/Execution Runtimeの分離 | `Implemented` | Dependency Registry、`RuntimeFactory`、RDFLib Source Runtime、GDAL/Rasterio/pyogrio Execution Runtime、[Runtimeの導入ガイド](runtimes.md)、[外部ライブラリ依存方針](dependency-policy.md)、`tests/test_dependencies.py` | 新規依存は依存方針の採用基準で個別評価する |
 | V05-12 | portableなnon-secret resolution境界 | `Implemented` | `Result.target`、`Metadata`、`Provenance`、`AccessPlan`を境界とし、Credential、Runtime、`Resource._opener`を除外する方針を[DiscoveryとResolution](discovery-resolution.md)に記録 | 安定したserialization APIを意味しない。V05-13と分離する |
@@ -46,6 +47,7 @@
 - #49 はKnowledge Layer全体の契約、#50はIdentity、#51はTime、#52はSpaceを担当します。このマトリクスは状態判定だけを担当します。
 - #55 はe-Stat統計GISのProvider固有discovery/resolutionを担当し、Knowledge Layerの共通モデルや削除済み統計表APIを再実装しません。
 - #93、#94、#96、#98、#99 はrelease前のnetwork/credential security保証を担当します。V05-15の責務分離モデル自体と、各Runtimeでの強制範囲を区別して追跡します。
+- V05-09bはこのマトリクスで既知の欠落として記録します。実装時は両Sourceの記録をどう公開するかを専用Issueで決定し、既存の単一Source契約と分離して追跡します。
 
 ## #47 の統合判定
 
@@ -53,7 +55,8 @@
 
 1. V05-07: #49の契約確定と、#50/#51の実装。#52は完了または明示的なDeferred判断。
 2. V05-16: #55のe-Stat統計GIS方針と実装を、削除済み統計表APIと分離して完了する。
-3. V05-15: #93/#94/#96/#98/#99でrelease時のsecurity保証範囲を実装・文書化する。
-4. V05-06、V05-13、V05-19、V05-21は再評価条件が成立するまでDeferredとして扱い、暗黙の実装残件に戻さない。
+3. V05-09b: discovery sourceとresolution target双方の記録を表現する契約を確定し、cross-provider fixtureで保持を検証する。
+4. V05-15: #93/#94/#96/#98/#99でrelease時のsecurity保証範囲を実装・文書化する。
+5. V05-06、V05-13、V05-19、V05-21は再評価条件が成立するまでDeferredとして扱い、暗黙の実装残件に戻さない。
 
 状態を変更する場合は、同じ変更で根拠となる実装、テスト、公開ドキュメント、関連Issueを更新します。
