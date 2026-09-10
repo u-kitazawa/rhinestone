@@ -7,3 +7,7 @@
 Shapefile、GeoJSON、GeoPackage、FlatGeobuf に対応します。runtime は
 `read_dataframe(uri, **options)` を提供する必要があります。確定済みの `encoding` は
 option として渡されます。archive URI の組み立ては行いません。
+
+`network_policy="strict"`では、GDAL VSI locatorに埋め込まれたHTTP(S) URLもCatalog由来の
+destination policyで認可します。未認可URLと認識できない`/vsi.../`構文は
+`read_dataframe()`を呼ぶ前に拒否します。

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pytest
 
+from rhinestone import DestinationPolicy, Provider
 from rhinestone.adapters.execution import (
     ExecutionAdapter,
     GdalAdapter,
@@ -10,7 +11,7 @@ from rhinestone.adapters.execution import (
     PyogrioAdapter,
     RasterioAdapter,
 )
-from rhinestone.errors import ResourceAccessError
+from rhinestone.errors import DestinationNotAllowedError, ResourceAccessError
 from rhinestone.models import (
     FileAccessPlan,
     Metadata,
@@ -112,6 +113,94 @@ class FakePyogrio:
     def read_dataframe(self, uri: str, **options: Any) -> object:
         self.calls.append((uri, options))
         return {"runtime": "pyogrio"}
+
+
+_GDAL_RUNTIME_CASES = (
+    (GdalAdapter, FakeGdal, "geotiff"),
+    (RasterioAdapter, FakeRasterio, "geotiff"),
+    (PyogrioAdapter, FakePyogrio, "geojson"),
+)
+
+
+def strict_files_policy() -> DestinationPolicy:
+    return DestinationPolicy.from_catalog(
+        (
+            Provider(
+                "files",
+                "direct",
+                {"endpoint": "https://allowed.example/data"},
+            ),
+        ),
+        level="strict",
+    )
+
+
+@pytest.mark.parametrize(
+    "locator",
+    (
+        "/vsicurl/https://unlisted.example/data.tif",
+        "/vsicurl_streaming/https://unlisted.example/data.geojson",
+        "/vsizip//vsicurl/https://unlisted.example/data.zip/member.shp",
+        "/vsizip/{/vsicurl/https://unlisted.example/data.zip}/member.shp",
+        "/vsicurl/ftp://unlisted.example/data.tif",
+        "/vsicurl?use_head=no",
+        "/vsicurl?" + "&".join(f"option{index}=x" for index in range(65)),
+        "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip",
+        "/vsiunknown/https://allowed.example/data/file.tif",
+    ),
+)
+@pytest.mark.parametrize(
+    ("adapter_type", "runtime_type", "format_name"), _GDAL_RUNTIME_CASES
+)
+def test_strict_execution_rejects_unsafe_gdal_locator_before_runtime(
+    locator: str,
+    adapter_type: Any,
+    runtime_type: Any,
+    format_name: str,
+) -> None:
+    runtime = runtime_type()
+
+    with pytest.raises(DestinationNotAllowedError):
+        adapter_type(strict_files_policy()).open(
+            make_resource(locator, format_name), runtime
+        )
+
+    assert runtime.calls == []
+
+
+@pytest.mark.parametrize(
+    "locator",
+    (
+        "/vsicurl/https://allowed.example/data/file.tif",
+        "/vsicurl_streaming/https://allowed.example/data/file.geojson",
+        "/vsizip//vsicurl/https://allowed.example/data/archive.zip/member.shp",
+        "/vsizip/vsicurl/https://allowed.example/data/archive.zip/member.shp",
+        "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}/member.shp",
+        "/vsizip/{https://allowed.example/data/archive.zip}/member.shp",
+        "/vsizip/https://allowed.example/data/archive.zip/member.shp",
+        "/vsizip/{/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}}/member.shp",
+        "/vsicurl?use_head=no&url=https%3A%2F%2Fallowed.example%2Fdata%2Ffile.tif",
+        "/data/local-file.tif",
+        "/vsizip//data/local.zip/member.shp",
+        "/vsimem/in-memory.tif",
+    ),
+)
+@pytest.mark.parametrize(
+    ("adapter_type", "runtime_type", "format_name"), _GDAL_RUNTIME_CASES
+)
+def test_strict_execution_allows_authorized_or_local_gdal_locator(
+    locator: str,
+    adapter_type: Any,
+    runtime_type: Any,
+    format_name: str,
+) -> None:
+    runtime = runtime_type()
+
+    adapter_type(strict_files_policy()).open(
+        make_resource(locator, format_name), runtime
+    )
+
+    assert len(runtime.calls) == 1
 
 
 def test_pyogrio_receives_explicit_encoding() -> None:

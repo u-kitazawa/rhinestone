@@ -5,6 +5,7 @@ from typing import Any, FrozenSet
 from ....errors import ResourceAccessError
 from ....models import Resource
 from ....security import DestinationPolicy
+from .._locator import authorize_runtime_locator
 from ..base import ExecutionAdapter
 
 
@@ -30,7 +31,9 @@ class RasterioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        (destination_policy or self._destination_policy).authorize(resource.uri)
+        authorize_runtime_locator(
+            resource.uri, destination_policy or self._destination_policy
+        )
         try:
             return runtime.open(resource.uri)
         except Exception as error:

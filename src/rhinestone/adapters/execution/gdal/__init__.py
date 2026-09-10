@@ -6,6 +6,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from ....errors import DestinationNotAllowedError, ResourceAccessError
 from ....models import FileAccessPlan, Resource
 from ....security import DestinationPolicy, DestinationRule
+from .._locator import authorize_runtime_locator
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -40,7 +41,6 @@ class GdalAdapter(ExecutionAdapter):
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
         policy = destination_policy or self._destination_policy
-        policy.authorize(resource.uri)
         attributes = resource_attributes(resource)
         uri = resource.uri
         tile = resource.access_plan.options.get("tile")
@@ -73,6 +73,7 @@ class GdalAdapter(ExecutionAdapter):
         encoding = attributes.get("encoding")
         if isinstance(encoding, str):
             options.append("ENCODING=" + encoding.upper())
+        authorize_runtime_locator(uri, policy)
         try:
             result = runtime.OpenEx(uri, open_options=tuple(options))
             if result is None:
