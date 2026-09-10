@@ -15,12 +15,26 @@ from rhinestone import (
     configure,
     sources,
 )
+from rhinestone.adapters.execution.gdal import GdalAdapter
 from rhinestone.adapters.execution.json_service import JsonServiceAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.adapters.source.odpt import OdptAdapter
-from rhinestone.errors import ConfigValidationError, DestinationNotAllowedError
+from rhinestone.errors import (
+    ConfigValidationError,
+    DestinationNotAllowedError,
+    ResourceAccessError,
+)
 from rhinestone.registry import CredentialRegistry
 from tests.provider_support import fixture_json
+
+
+class RecordingGdal:
+    def __init__(self) -> None:
+        self.calls: List[str] = []
+
+    def OpenEx(self, uri: str, **kwargs: Any) -> str:
+        self.calls.append(uri)
+        return "dataset"
 
 
 def test_destination_rule_uses_url_boundaries() -> None:
@@ -329,6 +343,89 @@ def test_configure_exposes_strict_and_none_network_policies() -> None:
         network_policy="none", dependencies={"rasterio": Rasterio()}
     )
     assert unrestricted.open(config, "rasterio") == "https://unlisted.example/data.tif"
+
+
+@pytest.mark.parametrize(
+    "tile_url",
+    (
+        "https://unlisted.example/{z}/{x}/{y}.png",
+        "https://cyberjapandata.gsi.go.jp/xyz/std/private/{z}/{x}/{y}.png",
+    ),
+)
+def test_strict_gdal_rejects_tampered_tile_destination_before_runtime(
+    tile_url: str,
+) -> None:
+    runtime = RecordingGdal()
+    app = configure(sources=(sources.GSI,))
+    resource = app.resolve(Config("gsi", {"id": "std"}))
+    tile = cast(Mapping[str, Any], resource.access_plan.options["tile"])
+    tampered_plan = replace(
+        resource.access_plan,
+        options={**resource.access_plan.options, "tile": {**tile, "url": tile_url}},
+    )
+    tampered = replace(resource, access_plan=tampered_plan)
+
+    with pytest.raises(DestinationNotAllowedError):
+        GdalAdapter(
+            DestinationPolicy.from_catalog((sources.GSI,), level="strict")
+        ).open(
+            tampered,
+            runtime,
+        )
+
+    assert runtime.calls == []
+
+
+@pytest.mark.parametrize(
+    ("tile", "error"),
+    (
+        ([], ResourceAccessError),
+        ({}, ResourceAccessError),
+        (
+            {
+                "url": "file:///tmp/{z}/{x}/{y}.png",
+                "min_zoom": 0,
+                "max_zoom": 1,
+            },
+            DestinationNotAllowedError,
+        ),
+    ),
+)
+def test_strict_gdal_rejects_invalid_tile_destination_before_runtime(
+    tile: object,
+    error: type[Exception],
+) -> None:
+    runtime = RecordingGdal()
+    resource = configure(sources=(sources.GSI,)).resolve(Config("gsi", {"id": "std"}))
+    invalid_plan = replace(resource.access_plan, options={"tile": tile})
+
+    with pytest.raises(error):
+        GdalAdapter(
+            DestinationPolicy.from_catalog((sources.GSI,), level="strict")
+        ).open(
+            replace(resource, access_plan=invalid_plan),
+            runtime,
+        )
+
+    assert runtime.calls == []
+
+
+def test_strict_gdal_allows_catalog_tile_template() -> None:
+    runtime = RecordingGdal()
+    app = configure(
+        sources=(sources.GSI,),
+        network_policy="strict",
+        dependencies={"gdal": runtime},
+    )
+
+    resource = app.resolve(Config("gsi", {"id": "std"}))
+
+    assert app.open(resource, "gdal") == "dataset"
+    assert len(runtime.calls) == 1
+    assert (
+        "https://cyberjapandata.gsi.go.jp/xyz/std/${z}/${x}/${y}.png"
+        in runtime.calls[0]
+    )
 
 
 def test_opening_a_resource_rechecks_the_calling_app_policy() -> None:
