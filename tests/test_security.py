@@ -15,14 +15,12 @@ from rhinestone import (
     configure,
     sources,
 )
-from rhinestone.adapters.execution.gdal import GdalAdapter
 from rhinestone.adapters.execution.json_service import JsonServiceAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.adapters.source.odpt import OdptAdapter
 from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
-    ResourceAccessError,
 )
 from rhinestone.registry import CredentialRegistry
 from tests.provider_support import fixture_json
@@ -109,18 +107,15 @@ def test_policy_levels_control_when_authorization_is_applied() -> None:
             credential="secret",
         )
 
-    strict = DestinationPolicy.from_catalog((), level="strict")
-    with pytest.raises(DestinationNotAllowedError):
-        strict.authorize("https://evil.example/data")
     DestinationPolicy.unrestricted().authorize(
         "https://evil.example/data", credentialed=True
     )
+    policy.authorize("file:///tmp/data", credentialed=True)
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize("https://[invalid", credentialed=True)
 
     with pytest.raises(ConfigValidationError):
         DestinationPolicy(level="invalid")  # type: ignore[arg-type]
-
-    with pytest.raises(DestinationNotAllowedError):
-        strict.authorize("https://[invalid", credentialed=True)
 
 
 def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
@@ -183,7 +178,6 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> N
     settings["endpoint"] = endpoint
     app = configure(
         sources=(Provider("private-odpt", "odpt", settings),),
-        network_policy="strict",
         dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
         credentials={"key": lambda: "secret"},
     )
@@ -538,7 +532,7 @@ def test_source_credential_configuration_is_validated() -> None:
         )
 
 
-def test_configure_exposes_strict_and_none_network_policies() -> None:
+def test_configure_supports_none_network_policy() -> None:
     class Rasterio:
         def open(self, uri: str, driver: str | None = None) -> str:
             return uri
@@ -547,160 +541,12 @@ def test_configure_exposes_strict_and_none_network_policies() -> None:
         "direct",
         {"uri": "https://unlisted.example/data.tif", "format": "geotiff"},
     )
-    strict = configure(network_policy="strict", dependencies={"rasterio": Rasterio()})
-    with pytest.raises(DestinationNotAllowedError):
-        strict.open(config, "rasterio")
-
-    for local_uri in ("/data/rivers.tif", "file:///data/rivers.tif"):
-        local_config = Config("direct", {"uri": local_uri, "format": "geotiff"})
-        assert strict.open(local_config, "rasterio") == local_uri
-
     unrestricted = configure(
         network_policy="none", dependencies={"rasterio": Rasterio()}
     )
     assert unrestricted.open(config, "rasterio") == "https://unlisted.example/data.tif"
 
 
-def test_strict_pipeline_authorizes_before_runtime_factory() -> None:
-    factory_calls: List[bool] = []
-
-    def unavailable_runtime() -> Any:
-        factory_calls.append(True)
-        raise AssertionError("the runtime must not be evaluated")
-
-    app = configure(
-        network_policy="strict",
-        dependencies={"gdal": RuntimeFactory(unavailable_runtime)},
-    )
-    config = Config(
-        "direct",
-        {
-            "uri": "/vsizip//vsicurl/https://unlisted.example/data.zip/member.shp",
-            "format": "shapefile",
-        },
-    )
-
-    with pytest.raises(DestinationNotAllowedError):
-        app.open(config, "gdal")
-
-    assert factory_calls == []
-
-
-def test_strict_driver_policy_rejects_before_runtime_factory() -> None:
-    factory_calls: List[bool] = []
-
-    def runtime() -> Any:
-        factory_calls.append(True)
-        raise AssertionError("the runtime must not be evaluated")
-
-    app = configure(
-        network_policy="strict",
-        dependencies={"gdal": RuntimeFactory(runtime)},
-    )
-
-    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
-        app.open(
-            Config("direct", {"uri": "/data/rivers.shp", "format": "shapefile"}),
-            "gdal",
-        )
-
-    assert factory_calls == []
-
-
-@pytest.mark.parametrize(
-    "tile_url",
-    (
-        "https://unlisted.example/{z}/{x}/{y}.png",
-        "https://cyberjapandata.gsi.go.jp/xyz/std/private/{z}/{x}/{y}.png",
-    ),
-)
-def test_strict_gdal_rejects_tampered_tile_destination_before_runtime(
-    tile_url: str,
-) -> None:
-    runtime = RecordingGdal()
-    app = configure(sources=(sources.GSI,))
-    resource = app.resolve(Config("gsi", {"id": "std"}))
-    tile = cast(Mapping[str, Any], resource.access_plan.options["tile"])
-    tampered_plan = replace(
-        resource.access_plan,
-        options={**resource.access_plan.options, "tile": {**tile, "url": tile_url}},
-    )
-    tampered = replace(resource, access_plan=tampered_plan)
-
-    with pytest.raises(DestinationNotAllowedError):
-        GdalAdapter(
-            DestinationPolicy.from_catalog((sources.GSI,), level="strict")
-        ).open(
-            tampered,
-            runtime,
-        )
-
-    assert runtime.calls == []
-
-
-@pytest.mark.parametrize(
-    ("tile", "error"),
-    (
-        ([], ResourceAccessError),
-        ({}, ResourceAccessError),
-        (
-            {
-                "url": "file:///tmp/{z}/{x}/{y}.png",
-                "min_zoom": 0,
-                "max_zoom": 1,
-            },
-            DestinationNotAllowedError,
-        ),
-    ),
-)
-def test_strict_gdal_rejects_invalid_tile_destination_before_runtime(
-    tile: object,
-    error: type[Exception],
-) -> None:
-    runtime = RecordingGdal()
-    resource = configure(sources=(sources.GSI,)).resolve(Config("gsi", {"id": "std"}))
-    invalid_plan = replace(resource.access_plan, options={"tile": tile})
-
-    with pytest.raises(error):
-        GdalAdapter(
-            DestinationPolicy.from_catalog((sources.GSI,), level="strict")
-        ).open(
-            replace(resource, access_plan=invalid_plan),
-            runtime,
-        )
-
-    assert runtime.calls == []
-
-
-def test_strict_gdal_rejects_catalog_tile_without_nested_egress_control() -> None:
-    runtime = RecordingGdal()
-    app = configure(
-        sources=(sources.GSI,),
-        network_policy="strict",
-        dependencies={"gdal": runtime},
-    )
-
-    resource = app.resolve(Config("gsi", {"id": "std"}))
-
-    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
-        app.open(resource, "gdal")
-
-    assert runtime.calls == []
-
-
-def test_opening_a_resource_rechecks_the_calling_app_policy() -> None:
-    class Rasterio:
-        def open(self, uri: str) -> str:
-            return uri
-
-    config = Config(
-        "direct", {"uri": "https://unlisted.example/data.tif", "format": "geotiff"}
-    )
-    unrestricted = configure(
-        network_policy="none", dependencies={"rasterio": Rasterio()}
-    )
-    resource = unrestricted.resolve(config)
-
-    strict = configure(network_policy="strict", dependencies={"rasterio": Rasterio()})
-    with pytest.raises(DestinationNotAllowedError):
-        strict.open(resource, "rasterio")
+def test_configure_rejects_invalid_network_policy() -> None:
+    with pytest.raises(ConfigValidationError, match="network policy"):
+        configure(network_policy="invalid")  # type: ignore[arg-type]

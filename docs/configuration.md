@@ -114,24 +114,10 @@ app = configure(
 )
 ```
 
-`network_policy` は `credentialed`（既定）、`strict`、`none` から選べます。`credentialed`
+`network_policy` は `credentialed`（既定）または `none` から選べます。`credentialed`
 は認証付き通信だけを、CatalogでProviderごとに定義された実行endpointへ制限します。
 説明・仕様・利用条件等のmetadata URLや別ProviderのendpointはCredential送信先になりません。
-ODPTでは`endpoint + resource_types`だけが対象です。`strict` はExecutionAdapterが
-authorizationを実行前またはI/O前に強制できるHTTPアクセスだけを許可します。GDAL系Runtimeへ渡す `/vsicurl/`、
-`/vsicurl_streaming/`、archive wrapperとの組み合わせでは内側のHTTP(S) URLを認可し、
-認識できない `/vsi.../` locatorはローカルpathと推測せず拒否します。認可されない宛先では
-Credential factoryやExecution Runtimeは評価・呼び出しされません。
-
-GDAL／Rasterio／pyogrioのuser-owned Runtimeへremote HTTP(S) Resourceを渡す経路は、Runtime内部の
-redirectを再認可できないため`strict`ではfail closedになります。さらにpyogrioの
-`read_dataframe()`は読み込みdriverのallowlistを指定できないため、driver discoveryや
-nested dataset accessを制御できず、`strict`ではlocalを含むすべてのpyogrio実行をfail closedにします。
-GDAL／Rasterioのlocal Resourceは引き続き利用できます。
-GDAL／Rasterioでは、`strict`時にGeoTIFF／COGを`GTiff` driverへ固定します。VRT、WMS、
-XYZ tile等の内部でsecondary datasetへアクセスできる経路と、driver mappingを安全に固定して
-いないformatは、Runtime内部の宛先を再認可できないため`strict`ではfail closedになります。
-通常の`credentialed`／`none`では従来のformat対応とdriver discoveryを維持します。
+ODPTでは`endpoint + resource_types`だけが対象です。`none`では宛先制限を行いません。
 
 Adapterを直接構築する既存コードでは、明示的に作成した`DestinationPolicy(rules=...)`の
 ruleをCredential付き通信にも引き続き利用できます。`from_catalog()`で生成したpolicyは、

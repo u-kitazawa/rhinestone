@@ -48,7 +48,7 @@ app = configure(
 | `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
 | `dependencies` | 利用者が所有するSource / Execution Runtime実体、または明示的な`RuntimeFactory`。公開引数は共通だが内部では利用段階ごとに分離される |
 | `credentials` | Credential factory |
-| `network_policy` | 宛先制限。`none`、`credentialed`（既定）、`strict` |
+| `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
 
 通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
 遅延Runtimeは `RuntimeFactory(factory)` として指定します。bare valueはcallableでもRuntime
@@ -57,8 +57,8 @@ Execution Runtimeは`Resource.open()`時に、それぞれ初めて必要にな�
 
 Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
 などの HTTP Source へ Credential factory を遅延注入できます。secret 自体は
-Provider、Catalog、Result、Resource には保存されません。`credentialed` と `strict`
-では、factory の評価前に Catalog 由来の endpoint へ送信できることを検証します。
+Provider、Catalog、Result、Resource には保存されません。`credentialed` では、factory の
+評価前に Catalog 由来の endpoint へ送信できることを検証します。
 
 ## `Rhinestone.search()`
 

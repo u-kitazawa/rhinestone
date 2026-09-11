@@ -8,7 +8,7 @@ from urllib.parse import unquote, urlsplit
 from .errors import ConfigValidationError, DestinationNotAllowedError
 from .models import Provider
 
-NetworkPolicyLevel = Literal["none", "credentialed", "strict"]
+NetworkPolicyLevel = Literal["none", "credentialed"]
 
 
 @dataclass(frozen=True)
@@ -94,9 +94,9 @@ class DestinationPolicy:
     credential_rules: Optional[Tuple[CredentialDestinationRule, ...]] = None
 
     def __post_init__(self) -> None:
-        if self.level not in {"none", "credentialed", "strict"}:
+        if self.level not in {"none", "credentialed"}:
             raise ConfigValidationError(
-                "network policy must be 'none', 'credentialed', or 'strict'"
+                "network policy must be 'none' or 'credentialed'"
             )
 
     @classmethod
