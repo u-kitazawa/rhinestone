@@ -277,6 +277,8 @@ def _build_source_adapter(
         params: Mapping[str, Any],
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
+        if destination_policy is not None and destination_policy.level == "strict":
+            return _http.get_json(url, params, headers, allow_redirects=False)
         return _http.get_json(url, params, headers)
 
     if adapter_type == "ckan":

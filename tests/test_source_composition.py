@@ -319,3 +319,32 @@ def test_configured_json_transport_supports_adapter_headers(
     adapter.search(SearchQuery(limit=1))  # type: ignore[attr-defined]
     assert seen["headers"] == {"X-Test": "value"}
     assert search_url
+
+
+def test_strict_source_transport_disables_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: List[bool] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+        *,
+        allow_redirects: bool = True,
+    ) -> Any:
+        seen.append(allow_redirects)
+        return fixture_json("ckan/package_search.json")
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    app = configure(
+        sources=(
+            SourceDefinition(
+                "catalog", "ckan", {"endpoint": "https://catalog.example"}
+            ),
+        ),
+        network_policy="strict",
+    )
+
+    assert app.search(limit=1)
+    assert seen == [False]

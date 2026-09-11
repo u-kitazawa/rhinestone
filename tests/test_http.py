@@ -193,6 +193,24 @@ def test_get_json_rejects_redirects_for_marked_credential_headers(
     )
 
 
+def test_get_json_can_disable_redirects_without_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: Dict[str, Any] = {}
+
+    def build_test_opener(handler: object) -> _Opener:
+        calls["handler"] = handler
+        return _Opener(_Response(b"{}"))
+
+    monkeypatch.setattr(_http, "build_opener", build_test_opener)
+
+    assert _http.get_json("https://example.test/api", {}, allow_redirects=False) == {}
+    assert isinstance(  # pyright: ignore[reportPrivateUsage]
+        calls["handler"],
+        _http._NoRedirectHandler,  # pyright: ignore[reportPrivateUsage]
+    )
+
+
 def test_get_text_uses_response_charset_and_utf8_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

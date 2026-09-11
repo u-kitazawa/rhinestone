@@ -38,12 +38,14 @@ def get_json(
     url: str,
     params: Mapping[str, Any],
     headers: Optional[Mapping[str, str]] = None,
+    *,
+    allow_redirects: bool = True,
 ) -> Any:
     """Fetch and decode JSON over HTTP using the standard library."""
     request = _request(url, params, headers)
     opener = (
         build_opener(_NoRedirectHandler())
-        if getattr(headers, "_rhinestone_no_redirects", False)
+        if not allow_redirects or getattr(headers, "_rhinestone_no_redirects", False)
         else None
     )
     open_request = opener.open if opener is not None else urlopen
