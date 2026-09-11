@@ -365,6 +365,7 @@ def _build_source_adapter(
         return DcatAdapter(
             get_document=get_document,
             rdf_runtime_factory=rdf_runtime,
+            destination_policy=destination_policy,
             **settings,
         )
     if adapter_type == "odpt":

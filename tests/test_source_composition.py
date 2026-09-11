@@ -19,6 +19,7 @@ from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivat
 from rhinestone.errors import (
     ConfigValidationError,
     DependencyUnavailableError,
+    DestinationNotAllowedError,
     ProviderMetadataError,
 )
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
@@ -57,12 +58,17 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
     monkeypatch.setattr(_http, "get_text", get_document)
     dependency_calls: List[str] = []
     app = configure(
-        sources=(SourceDefinition("catalog", "dcat"),),
+        sources=(
+            SourceDefinition(
+                "catalog", "dcat", {"catalog_uri": "https://fixture.example/catalog"}
+            ),
+        ),
         dependencies={
             "rdflib": RuntimeFactory(
                 lambda: dependency_calls.append("rdflib") or rdflib
             ),
         },
+        network_policy="strict",
     )
     assert dependency_calls == []
     resource = app.resolve(
@@ -115,6 +121,44 @@ def test_configured_dcat_rejects_tampered_catalog_uri_before_fetch(
     assert document_calls == []
 
 
+@pytest.mark.parametrize(
+    "uri",
+    (
+        "https://unlisted.example/catalog",
+        "file:///tmp/catalog.ttl",
+        "/tmp/catalog.ttl",
+    ),
+)
+def test_strict_dcat_rejects_unregistered_catalog_uri_before_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+    uri: str,
+) -> None:
+    document_calls: List[str] = []
+
+    def get_document(uri: str) -> str:
+        document_calls.append(uri)
+        return "unused"
+
+    monkeypatch.setattr(_http, "get_text", get_document)
+    app = configure(
+        sources=(SourceDefinition("catalog", "dcat"),),
+        network_policy="strict",
+    )
+
+    with pytest.raises(DestinationNotAllowedError):
+        app.resolve(
+            Config(
+                "catalog",
+                {
+                    "uri": uri,
+                    "dataset": "https://unlisted.example/dataset",
+                },
+            )
+        )
+
+    assert document_calls == []
+
+
 def test_dcat_search_loads_source_runtime_on_demand(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -140,6 +184,7 @@ def test_dcat_search_loads_source_runtime_on_demand(
                 lambda: dependency_calls.append("rdflib") or rdflib
             ),
         },
+        network_policy="strict",
     )
 
     assert dependency_calls == []
