@@ -121,8 +121,17 @@ def test_configured_dcat_rejects_tampered_catalog_uri_before_fetch(
     assert document_calls == []
 
 
+@pytest.mark.parametrize(
+    "uri",
+    (
+        "https://unlisted.example/catalog",
+        "file:///tmp/catalog.ttl",
+        "/tmp/catalog.ttl",
+    ),
+)
 def test_strict_dcat_rejects_unregistered_catalog_uri_before_fetch(
     monkeypatch: pytest.MonkeyPatch,
+    uri: str,
 ) -> None:
     document_calls: List[str] = []
 
@@ -141,7 +150,7 @@ def test_strict_dcat_rejects_unregistered_catalog_uri_before_fetch(
             Config(
                 "catalog",
                 {
-                    "uri": "https://unlisted.example/catalog",
+                    "uri": uri,
                     "dataset": "https://unlisted.example/dataset",
                 },
             )
