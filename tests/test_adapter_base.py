@@ -19,10 +19,12 @@ from rhinestone.adapters import (
 from rhinestone.adapters.source._knowledge import string
 from rhinestone.errors import (
     ConfigValidationError,
+    DestinationNotAllowedError,
     ProviderMetadataError,
     ProviderResponseError,
 )
 from rhinestone.models import Config, Source
+from rhinestone.security import DestinationPolicy, DestinationRule
 
 
 class ProbeAdapter(ProviderAdapter):
@@ -112,6 +114,46 @@ def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> N
     assert ProbeAdapter(lambda url, params: InvalidResponseUri()).request_uri() == (
         "https://provider.example/data"
     )
+
+
+def test_strict_policy_reauthorizes_final_source_response_uri() -> None:
+    response_uri = "https://unlisted.example/data"
+    calls: list[str] = []
+
+    class RedirectedResponse(dict[str, Any]):
+        pass
+
+    RedirectedResponse.response_uri = response_uri  # type: ignore[attr-defined]
+
+    def get_json(url: str, params: Mapping[str, Any]) -> Mapping[str, Any]:
+        calls.append(url)
+        return RedirectedResponse()
+
+    rule = DestinationRule.from_url("https://provider.example")
+    assert rule is not None
+
+    with pytest.raises(DestinationNotAllowedError):
+        ProbeAdapter(
+            get_json,
+            destination_policy=DestinationPolicy(level="strict", rules=(rule,)),
+        ).request()
+
+    assert calls == ["https://provider.example/data"]
+
+
+def test_strict_policy_accepts_final_source_response_uri_in_same_rule() -> None:
+    class RedirectedResponse(dict[str, Any]):
+        response_uri = "https://provider.example/redirected"
+
+    rule = DestinationRule.from_url("https://provider.example")
+    assert rule is not None
+
+    response = ProbeAdapter(
+        lambda url, params: RedirectedResponse(),
+        destination_policy=DestinationPolicy(level="strict", rules=(rule,)),
+    ).request()
+
+    assert response == {}
 
 
 def test_common_adapter_accepts_single_object_as_one_item_sequence() -> None:

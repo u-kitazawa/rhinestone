@@ -206,6 +206,14 @@ class ProviderAdapter(ABC):
         response_uri = getattr(cast(Any, response), "response_uri", url)
         if not isinstance(response_uri, str) or not response_uri:
             response_uri = url
+        if self._destination_policy.level == "strict":
+            self._destination_policy.authorize(
+                response_uri,
+                credentialed=credentialed,
+                provider=self._provider_id,
+                service=self.adapter_type,
+                credential=self._credential_name,
+            )
         return cast(JsonObject, response), response_uri
 
     @staticmethod

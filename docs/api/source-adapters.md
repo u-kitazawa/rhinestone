@@ -25,3 +25,6 @@ Source Adapter APIは内部契約です。外部Adapter登録機構はまだ公�
 adapter typeを異なるsource idへ複数割り当てられます。
 
 内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。
+
+`strict`では、組み込みtransportが返す最終`response_uri`（HTTP redirect後を含む）を
+Source Adapterが再認可します。policy外のredirect responseは後続のmetadata処理へ渡されません。

@@ -122,6 +122,8 @@ authorizationを実行前またはI/O前に強制できるHTTPアクセスだけ
 `/vsicurl_streaming/`、archive wrapperとの組み合わせでは内側のHTTP(S) URLを認可し、
 認識できない `/vsi.../` locatorはローカルpathと推測せず拒否します。認可されない宛先では
 Credential factoryやExecution Runtimeは評価・呼び出しされません。
+SourceのHTTP metadata requestでは、transportが報告する最終`response_uri`（redirect後を含む）も
+同じpolicyで再認可します。strictのrule外へredirectしたresponseはSource adapterへ渡しません。
 
 GDAL／Rasterio／pyogrioのuser-owned Runtimeへremote HTTP(S) Resourceを渡す経路は、Runtime内部の
 redirectを再認可できないため`strict`ではfail closedになります。さらにpyogrioの
