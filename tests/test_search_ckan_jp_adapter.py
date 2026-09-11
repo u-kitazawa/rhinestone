@@ -39,8 +39,8 @@ def test_search_ckan_jp_discovers_direct_resource_and_preserves_provenance() -> 
     results = adapter.search(SearchQuery(text="river", limit=5))
 
     assert client.calls == [(search_url, {"q": "river", "rows": 5})]
-    assert len(results) == 1
-    result = results[0]
+    assert len(results) == 2
+    result, second = results
     assert result.discovered_by == "search-ckan-jp"
     assert result.target == Config(
         "direct",
@@ -64,6 +64,30 @@ def test_search_ckan_jp_discovers_direct_resource_and_preserves_provenance() -> 
         "https://catalog.example/dataset/original-dataset"
     )
     assert result.provenance.raw["resource"]["id"] == "resource-1"
+    assert second.provenance.resource_identifier == "resource-2"
+    assert second.target.settings["format"] == "csv"
+
+
+def test_search_ckan_jp_limits_flattened_resources_and_preserves_unlimited_results() -> (
+    None
+):
+    endpoint = "https://search.ckan.jp/backend/api"
+    search_url = endpoint + "/package_search"
+    client = RecordingJsonClient(
+        {search_url: fixture_json("search_ckan_jp/package_search.json")}
+    )
+    adapter = SearchCkanJpAdapter(endpoint=endpoint, get_json=client)
+
+    limited = adapter.search(SearchQuery(text="river", limit=1))
+    unlimited = adapter.search(SearchQuery(text="river"))
+
+    assert [result.provenance.resource_identifier for result in limited] == [
+        "resource-1"
+    ]
+    assert [result.provenance.resource_identifier for result in unlimited] == [
+        "resource-1",
+        "resource-2",
+    ]
 
 
 def test_search_ckan_jp_is_discovery_only() -> None:

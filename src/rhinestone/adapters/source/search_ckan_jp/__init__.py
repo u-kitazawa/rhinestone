@@ -62,7 +62,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         found: List[SearchResult] = []
         for package in packages:
             found.extend(self._package_results(package, endpoint, params))
-        return tuple(found)
+        return tuple(found[: query.limit])
 
     def _package_results(
         self,

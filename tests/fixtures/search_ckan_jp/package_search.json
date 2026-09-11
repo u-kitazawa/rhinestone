@@ -22,6 +22,12 @@
             "name": "Rivers"
           },
           {
+            "id": "resource-2",
+            "url": "https://catalog.example/dataset/original-dataset/resource/resource-2/download/rivers.csv",
+            "format": "CSV",
+            "mimetype": "text/csv"
+          },
+          {
             "id": "resource-unknown",
             "url": "https://catalog.example/dataset/original-dataset/resource/resource-unknown/download",
             "mimetype": "application/octet-stream"
