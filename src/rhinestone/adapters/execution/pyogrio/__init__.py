@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, FrozenSet
 
-from ....errors import ResourceAccessError
+from ....errors import ResourceAccessError, RuntimeCapabilityError
 from ....models import Resource
 from ....security import DestinationPolicy
 from .._locator import authorize_runtime_locator, reject_unobservable_remote
@@ -35,6 +35,10 @@ class PyogrioAdapter(ExecutionAdapter):
         policy = destination_policy or self._destination_policy
         authorize_runtime_locator(resource.uri, policy)
         reject_unobservable_remote(resource.uri, policy)
+        if policy.level == "strict":
+            raise RuntimeCapabilityError(
+                "strict policy cannot enforce pyogrio driver discovery or nested access"
+            )
         attributes = resource_attributes(resource)
         options: Dict[str, Any] = {}
         encoding = attributes.get("encoding")
@@ -56,3 +60,7 @@ class PyogrioAdapter(ExecutionAdapter):
         policy = destination_policy or self._destination_policy
         authorize_runtime_locator(resource.uri, policy)
         reject_unobservable_remote(resource.uri, policy)
+        if policy.level == "strict":
+            raise RuntimeCapabilityError(
+                "strict policy cannot enforce pyogrio driver discovery or nested access"
+            )
