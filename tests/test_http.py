@@ -7,6 +7,7 @@ from urllib.request import Request
 import pytest
 
 from rhinestone import _http  # pyright: ignore[reportPrivateUsage]
+from rhinestone.errors import ProviderResponseError
 
 
 class _Headers:
@@ -143,6 +144,19 @@ def test_get_json_preserves_final_response_uri_for_json_objects(
 
     assert response == {"ok": True}
     assert response.response_uri == "https://redirected.example/final"
+
+
+@pytest.mark.parametrize("body", (b"{", b"<html>error</html>", b""))
+def test_get_json_normalizes_invalid_json(
+    monkeypatch: pytest.MonkeyPatch, body: bytes
+) -> None:
+    def open_url(request: Request, *, timeout: int) -> _Response:
+        return _Response(body)
+
+    monkeypatch.setattr(_http, "urlopen", open_url)
+
+    with pytest.raises(ProviderResponseError, match="not valid JSON"):
+        _http.get_json("https://example.test/api", {})
 
 
 def test_get_json_rejects_redirects_for_marked_credential_headers(

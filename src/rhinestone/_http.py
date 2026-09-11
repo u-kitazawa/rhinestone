@@ -6,6 +6,8 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
+from .errors import ProviderResponseError
+
 _TIMEOUT_SECONDS = 30
 _DEFAULT_HEADERS = {
     "Accept": "application/json",
@@ -35,7 +37,10 @@ def get_json(
     )
     open_request = opener.open if opener is not None else urlopen
     with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
-        decoded = json.load(response)
+        try:
+            decoded = json.load(response)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ProviderResponseError("Provider response is not valid JSON") from None
         if isinstance(decoded, Mapping):
             response_uri = getattr(response, "geturl", lambda: request.full_url)()
             return JsonDocument(

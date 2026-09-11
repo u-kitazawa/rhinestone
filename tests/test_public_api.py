@@ -1,4 +1,6 @@
+import io
 from typing import Any, Dict, List, Mapping, Optional, cast
+from urllib.request import Request
 
 import pytest
 
@@ -304,6 +306,41 @@ def test_public_search_reports_unsupported_conditions_per_source() -> None:
 
     assert results.diagnostics[0].source_id == "catalog"
     assert results.diagnostics[0].skipped_conditions == frozenset({"bbox"})
+
+
+def test_public_search_isolates_builtin_malformed_json_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = iter(
+        (
+            io.BytesIO(b"{"),
+            io.BytesIO(
+                b'{"success": true, "result": {"results": [{"id": "dataset", '
+                b'"title": "River", "resources": [{"id": "resource", '
+                b'"url": "https://files.example/river.geojson", '
+                b'"format": "GeoJSON"}]}]}}'
+            ),
+        )
+    )
+
+    def open_url(request: Request, *, timeout: int) -> io.BytesIO:
+        return next(responses)
+
+    monkeypatch.setattr(_http, "urlopen", open_url)
+    app = configure(
+        sources=(
+            SourceDefinition("broken", "ckan", {"endpoint": "https://broken.test"}),
+            SourceDefinition("healthy", "ckan", {"endpoint": "https://healthy.test"}),
+        )
+    )
+
+    results = app.search(text="river")
+
+    assert len(results) == 1
+    assert results.keys() == ("healthy",)
+    assert results.diagnostics[0].source_id == "broken"
+    assert results.diagnostics[0].reason == "provider_failure"
+    assert results.diagnostics[0].failure_type == "response"
 
 
 def test_public_search_skips_search_ckan_jp_without_required_text(
