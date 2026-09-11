@@ -6,3 +6,5 @@
 
 COG と GeoTIFF に対応します。runtime は `open(uri)` を提供する必要があります。
 選択済み URI をそのまま渡し、archive の展開、Resource の再選択、形式・CRS 変換は行いません。
+
+参考: [Rasterio `open()`](https://rasterio.readthedocs.io/en/stable/api/rasterio.html#rasterio.open)

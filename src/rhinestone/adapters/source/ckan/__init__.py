@@ -12,7 +12,11 @@ from ....models import (
     SearchResult,
     Source,
 )
+from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
+
+_FORMAT_ALIASES = {"geopackage": "gpkg"}
 
 
 class CkanAdapter(ProviderAdapter):
@@ -26,6 +30,12 @@ class CkanAdapter(ProviderAdapter):
         api_token: Optional[str] = None,
         api_key: Optional[str] = None,
         api_key_header: str = "X-CKAN-API-Key",
+        credential: Optional[str] = None,
+        credential_header: Optional[str] = None,
+        credential_scheme: Optional[str] = None,
+        credentials: Optional[CredentialRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
+        provider_id: Optional[str] = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -34,6 +44,12 @@ class CkanAdapter(ProviderAdapter):
             api_key=api_key,
             api_key_header=api_key_header,
             token_scheme="",
+            credential=credential,
+            credential_header=credential_header,
+            credential_scheme=credential_scheme,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            provider_id=provider_id,
         )
 
     def _action(self, endpoint: str, action: str, params: Mapping[str, Any]) -> Any:
@@ -121,8 +137,8 @@ class CkanAdapter(ProviderAdapter):
                     SearchResult(
                         title=_optional_string(package.get("title")) or resource_id,
                         description=_optional_string(package.get("notes")),
-                        source_id=self.adapter_type,
-                        settings={"resource_id": resource_id},
+                        discovered_by=self.adapter_type,
+                        target=Config(self.adapter_type, {"resource_id": resource_id}),
                         metadata=Metadata(
                             title=_optional_string(package.get("title")), raw=package
                         ),
@@ -142,7 +158,7 @@ class CkanAdapter(ProviderAdapter):
         uri = self._required_string(resource, "url")
         return ResourceCandidate(
             uri=uri,
-            format=_optional_string(resource.get("format")),
+            format=canonical_format(resource.get("format")),
             media_type=_optional_string(resource.get("mimetype")),
             attributes=resource,
         )
@@ -150,3 +166,11 @@ class CkanAdapter(ProviderAdapter):
 
 def _optional_string(value: Any) -> Optional[str]:
     return value if isinstance(value, str) else None
+
+
+def canonical_format(value: Any) -> Optional[str]:
+    format_name = _optional_string(value)
+    if format_name is None:
+        return None
+    normalized = format_name.strip().lower()
+    return _FORMAT_ALIASES.get(normalized, normalized)

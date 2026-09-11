@@ -11,3 +11,8 @@ runtime は `OpenEx(uri, open_options=...)` を提供する必要があります
 
 ZIP は `/vsizip/`、リモート ZIP は `/vsicurl/` URI に変換し、確定済み encoding を
 open option として渡します。Resource の再選択、解析、形式・CRS 変換は行いません。
+
+Resource URI、確定済み encoding、XYZ tile の XML を既存の GDAL runtime へ渡します。
+Resource の再選択、解析、形式・CRS 変換、driver 固定は行いません。
+
+参考: [GDAL Security considerations](https://gdal.org/en/stable/user/security.html)

@@ -1,13 +1,26 @@
+import gc
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional
+from weakref import ref
 
 import pytest
 import rdflib
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
-from rhinestone import Config, SearchQuery, SourceDefinition, configure, sources
+from rhinestone import (
+    Config,
+    RuntimeFactory,
+    SearchQuery,
+    SourceDefinition,
+    configure,
+    sources,
+)
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
-from rhinestone.errors import ConfigValidationError
+from rhinestone.errors import (
+    ConfigValidationError,
+    DependencyUnavailableError,
+    ProviderMetadataError,
+)
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
 from tests.provider_support import fixture_json
 
@@ -42,10 +55,20 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
         return document
 
     monkeypatch.setattr(_http, "get_text", get_document)
+    dependency_calls: List[str] = []
     app = configure(
-        sources=(SourceDefinition("catalog", "dcat"),),
-        dependencies={"rdflib": lambda: rdflib},
+        sources=(
+            SourceDefinition(
+                "catalog", "dcat", {"catalog_uri": "https://fixture.example/catalog"}
+            ),
+        ),
+        dependencies={
+            "rdflib": RuntimeFactory(
+                lambda: dependency_calls.append("rdflib") or rdflib
+            ),
+        },
     )
+    assert dependency_calls == []
     resource = app.resolve(
         Config(
             "catalog",
@@ -58,6 +81,165 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
         )
     )
     assert resource.uri == "https://fixture.example/rivers.geojson"
+    assert dependency_calls == ["rdflib"]
+
+
+def test_configured_dcat_rejects_tampered_catalog_uri_before_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document_calls: List[str] = []
+
+    def get_document(uri: str) -> str:
+        document_calls.append(uri)
+        return "unused"
+
+    monkeypatch.setattr(_http, "get_text", get_document)
+    app = configure(
+        sources=(
+            SourceDefinition(
+                "catalog",
+                "dcat",
+                {"catalog_uri": "https://trusted.example/catalog"},
+            ),
+        ),
+        dependencies={"rdflib": rdflib},
+    )
+
+    with pytest.raises(ConfigValidationError, match="catalog URI"):
+        app.resolve(
+            Config(
+                "catalog",
+                {
+                    "uri": "https://unlisted.example/catalog",
+                    "dataset": "https://trusted.example/dataset",
+                },
+            )
+        )
+
+    assert document_calls == []
+
+
+def test_dcat_search_loads_source_runtime_on_demand(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = (
+        Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
+    ).read_text()
+
+    def get_document(uri: str) -> str:
+        return document
+
+    monkeypatch.setattr(_http, "get_text", get_document)
+    dependency_calls: List[str] = []
+    app = configure(
+        sources=(
+            SourceDefinition(
+                "catalog",
+                "dcat",
+                {"catalog_uri": "https://fixture.example/catalog"},
+            ),
+        ),
+        dependencies={
+            "rdflib": RuntimeFactory(
+                lambda: dependency_calls.append("rdflib") or rdflib
+            ),
+        },
+    )
+
+    assert dependency_calls == []
+    assert len(app.search(limit=1)) == 1
+    assert dependency_calls == ["rdflib"]
+
+
+def test_dcat_missing_runtime_is_not_reported_as_provider_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document_calls: List[str] = []
+
+    def get_document(uri: str) -> str:
+        document_calls.append(uri)
+        return "unused"
+
+    monkeypatch.setattr(_http, "get_text", get_document)
+    app = configure(sources=(SourceDefinition("catalog", "dcat"),))
+
+    with pytest.raises(DependencyUnavailableError, match="rdflib"):
+        app.resolve(
+            Config(
+                "catalog",
+                {
+                    "uri": "https://fixture.example/catalog",
+                    "dataset": "https://fixture.example/dataset",
+                },
+            )
+        )
+
+    assert document_calls == []
+
+
+def test_resolved_resource_does_not_retain_source_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = (
+        Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
+    ).read_text()
+
+    def get_document(uri: str) -> str:
+        return document
+
+    monkeypatch.setattr(_http, "get_text", get_document)
+
+    class RdfRuntimeFactory:
+        def __call__(self) -> Any:
+            return rdflib
+
+    factory = RdfRuntimeFactory()
+    factory_ref = ref(factory)
+    app = configure(
+        sources=(SourceDefinition("catalog", "dcat"),),
+        dependencies={"rdflib": RuntimeFactory(factory)},
+    )
+    resource = app.resolve(
+        Config(
+            "catalog",
+            {
+                "uri": "https://fixture.example/catalog",
+                "dataset": "https://fixture.example/dataset",
+                "distribution": "https://fixture.example/geojson",
+            },
+        )
+    )
+
+    del app
+    del factory
+    gc.collect()
+
+    assert resource.uri == "https://fixture.example/rivers.geojson"
+    assert factory_ref() is None
+
+
+def test_dcat_document_failure_remains_provider_metadata_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_document(uri: str) -> str:
+        raise OSError(uri)
+
+    monkeypatch.setattr(_http, "get_text", fail_document)
+    app = configure(
+        sources=(SourceDefinition("catalog", "dcat"),),
+        dependencies={"rdflib": rdflib},
+    )
+
+    with pytest.raises(ProviderMetadataError, match="RDF catalog"):
+        app.resolve(
+            Config(
+                "catalog",
+                {
+                    "uri": "https://fixture.example/catalog",
+                    "dataset": "https://fixture.example/dataset",
+                },
+            )
+        )
 
 
 def test_source_options_reject_unknown_values() -> None:

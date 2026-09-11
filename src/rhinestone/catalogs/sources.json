@@ -7,14 +7,6 @@
       },
       "name": "GEOSPATIAL_JP"
     },
-    "estat": {
-      "adapter_type": "estat",
-      "settings": {
-        "endpoint": "https://api.e-stat.go.jp/rest/3.0/app/json",
-        "language": "J"
-      },
-      "name": "ESTAT"
-    },
     "plateau": {
       "adapter_type": "plateau",
       "settings": {
@@ -184,6 +176,13 @@
         "terms_url": "https://developer.odpt.org/terms/data_basic_license.html"
       },
       "name": "ODPT"
+    },
+    "search-ckan-jp": {
+      "adapter_type": "search-ckan-jp",
+      "settings": {
+        "endpoint": "https://search.ckan.jp/backend/api"
+      },
+      "name": "SEARCH_CKAN_JP"
     }
   }
 }

@@ -15,7 +15,6 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 | [Static](adapters/static.md) | `static` | リポジトリまたは利用者管理の静的定義 |
 | [CKAN](adapters/ckan.md) | `ckan` | CKAN Action API |
 | [DCAT](adapters/dcat.md) | `dcat` | DCAT RDF catalog |
-| [e-Stat](adapters/estat.md) | `estat` | e-Stat API 3.0 |
 | [GSI Fundamental](adapters/gsi-fundamental.md) | `gsi-fundamental` | 基盤地図情報のローカル GML |
 | [ODPT](adapters/odpt.md) | `odpt` | ODPT v4 |
 | [OGC API Features](adapters/ogc-features.md) | `ogc-features` | OGC API Features 1.0 |
@@ -24,3 +23,5 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 
 Source Adapter APIは内部契約です。外部Adapter登録機構はまだ公開しません。同じ
 adapter typeを異なるsource idへ複数割り当てられます。
+
+内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。

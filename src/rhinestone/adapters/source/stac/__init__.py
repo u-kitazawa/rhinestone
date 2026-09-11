@@ -12,6 +12,9 @@ from ....models import (
     SearchResult,
     Source,
 )
+from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
+from .._uri import resolve_response_href
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -26,6 +29,12 @@ class StacAdapter(ProviderAdapter):
         api_token: Optional[str] = None,
         api_key: Optional[str] = None,
         api_key_header: str = "X-API-Key",
+        credential: Optional[str] = None,
+        credential_header: Optional[str] = None,
+        credential_scheme: Optional[str] = None,
+        credentials: Optional[CredentialRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
+        provider_id: Optional[str] = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -33,6 +42,12 @@ class StacAdapter(ProviderAdapter):
             api_token=api_token,
             api_key=api_key,
             api_key_header=api_key_header,
+            credential=credential,
+            credential_header=credential_header,
+            credential_scheme=credential_scheme,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            provider_id=provider_id,
         )
 
     def load(self, config: Config) -> Source:
@@ -41,10 +56,12 @@ class StacAdapter(ProviderAdapter):
         collection_id = self._required_string(settings, "collection_id")
         item_id = self._required_string(settings, "item_id")
         asset_key = self._required_string(settings, "asset_key")
-        item_url = f"{endpoint}/collections/{collection_id}/items/{item_id}"
-        item = self._request(item_url, {})
+        collection_path = self._encode_path_segment(collection_id)
+        item_path = self._encode_path_segment(item_id)
+        item_url = f"{endpoint}/collections/{collection_path}/items/{item_path}"
+        item, response_uri = self._request_with_uri(item_url, {})
         asset = self._asset(item, asset_key)
-        candidate = self._candidate(asset, asset_key)
+        candidate = self._candidate(asset, asset_key, response_uri)
         properties = self._object(item.get("properties"), "STAC properties")
         metadata = Metadata(
             title=_optional_string(properties.get("title")) or item_id,
@@ -94,12 +111,15 @@ class StacAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    source_id=self.adapter_type,
-                    settings={
-                        "collection_id": collection_id,
-                        "item_id": item_id,
-                        "asset_key": asset_key,
-                    },
+                    discovered_by=self.adapter_type,
+                    target=Config(
+                        self.adapter_type,
+                        {
+                            "collection_id": collection_id,
+                            "item_id": item_id,
+                            "asset_key": asset_key,
+                        },
+                    ),
                     metadata=Metadata(title=title, raw=item),
                     provenance=Provenance(
                         provider="stac",
@@ -135,8 +155,11 @@ class StacAdapter(ProviderAdapter):
             raise ProviderResponseError(f"Requested STAC asset {key!r} is missing")
         return self._object(assets[key], f"STAC asset {key!r}")
 
-    def _candidate(self, asset: JsonObject, key: str) -> ResourceCandidate:
-        uri = self._required_string(asset, "href")
+    def _candidate(
+        self, asset: JsonObject, key: str, response_uri: str
+    ) -> ResourceCandidate:
+        href = self._required_string(asset, "href")
+        uri = resolve_response_href(response_uri, href)
         media_type = _optional_string(asset.get("type"))
         format_name = "cog" if media_type and "cloud-optimized" in media_type else None
         return ResourceCandidate(

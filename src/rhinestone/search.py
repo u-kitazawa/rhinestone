@@ -6,33 +6,53 @@ from dataclasses import replace
 from typing import (
     Any,
     Callable,
-    Dict,
-    FrozenSet,
     Iterable,
+    List,
     Mapping,
     Tuple,
     Union,
+    cast,
     overload,
 )
 
-from .errors import UnsupportedSearchConditionError
-from .models import Config, Resource, Result, SearchQuery
+from .errors import ProviderMetadataError, ProviderResponseError
+from .models import Resource, Result, SearchDiagnostic, SearchQuery
 
 
 class SearchResults(Sequence[Result]):
-    """Sequence-like search results with optional source-grouped access."""
+    """Provider-grouped results with deterministic sequence traversal.
 
-    def __init__(self, grouped: Mapping[str, Tuple[Result, ...]]) -> None:
+    Integer indexing and iteration concatenate groups in their supplied order and
+    preserve each provider's result order. The concatenated sequence is not a
+    relevance ranking across providers; use source-grouped access when provider
+    ranking semantics matter.
+    """
+
+    def __init__(
+        self,
+        grouped: Mapping[str, Tuple[Result, ...]],
+        diagnostics: Iterable[SearchDiagnostic] = (),
+    ) -> None:
         self._grouped = OrderedDict(
             (source_id, tuple(results)) for source_id, results in grouped.items()
         )
         self._items = tuple(
             result for results in self._grouped.values() for result in results
         )
+        self._diagnostics = tuple(diagnostics)
 
     @classmethod
-    def from_grouped(cls, grouped: Mapping[str, Tuple[Result, ...]]) -> "SearchResults":
-        return cls(grouped)
+    def from_grouped(
+        cls,
+        grouped: Mapping[str, Tuple[Result, ...]],
+        diagnostics: Iterable[SearchDiagnostic] = (),
+    ) -> "SearchResults":
+        return cls(grouped, diagnostics)
+
+    @property
+    def diagnostics(self) -> Tuple[SearchDiagnostic, ...]:
+        """Return source-scoped diagnostics for the executed search."""
+        return self._diagnostics
 
     @overload
     def __getitem__(self, index: int) -> Result: ...
@@ -54,15 +74,15 @@ class SearchResults(Sequence[Result]):
         return len(self._items)
 
     def keys(self) -> Tuple[str, ...]:
-        """Return source IDs for advanced source-grouped access."""
+        """Return source IDs in sequence traversal order."""
         return tuple(self._grouped)
 
     def values(self) -> Tuple[Tuple[Result, ...], ...]:
-        """Return result groups for advanced source-grouped access."""
+        """Return result groups in sequence traversal order."""
         return tuple(self._grouped.values())
 
     def items(self) -> Tuple[Tuple[str, Tuple[Result, ...]], ...]:
-        """Return source IDs and result groups for advanced access."""
+        """Return source IDs and result groups in sequence traversal order."""
         return tuple(self._grouped.items())
 
     def get(
@@ -71,7 +91,7 @@ class SearchResults(Sequence[Result]):
         """Get one source group without requiring the source to exist."""
         return self._grouped.get(source_id, default)
 
-    def bind_resolver(self, resolver: Callable[[Config], Resource]) -> "SearchResults":
+    def bind_resolver(self, resolver: Callable[[Result], Resource]) -> "SearchResults":
         """Bind direct Result resolution to an application context."""
         grouped = OrderedDict(
             (
@@ -79,21 +99,23 @@ class SearchResults(Sequence[Result]):
                 tuple(
                     replace(
                         result,
-                        _resolver=lambda result=result: resolver(result.to_config()),
+                        _resolver=lambda result=result: resolver(result),
                     )
                     for result in results
                 ),
             )
             for source_id, results in self._grouped.items()
         )
-        return SearchResults(grouped)
+        return SearchResults(grouped, self._diagnostics)
 
 
 class SearchCoordinator:
+    """Search capable adapters in configuration order without cross-source ranking."""
+
     def __init__(self, adapters: Iterable[Any]) -> None:
         self._adapters = tuple(adapters)
 
-    def search(self, query: SearchQuery) -> Mapping[str, Tuple[Any, ...]]:
+    def search(self, query: SearchQuery) -> SearchResults:
         searchable = [
             adapter
             for adapter in self._adapters
@@ -101,22 +123,50 @@ class SearchCoordinator:
             and callable(getattr(adapter, "search", None))
             and hasattr(adapter, "search_conditions")
         ]
-        unsupported_by_adapter: Dict[str, FrozenSet[str]] = {}
-        for adapter in searchable:
-            unsupported = query.supplied_conditions - frozenset(
-                adapter.search_conditions
-            )
-            if unsupported:
-                unsupported_by_adapter[adapter.source_id] = unsupported
-        if unsupported_by_adapter:
-            details = ", ".join(
-                "{}: {}".format(name, ", ".join(sorted(conditions)))
-                for name, conditions in sorted(unsupported_by_adapter.items())
-            )
-            raise UnsupportedSearchConditionError(
-                f"Unsupported search conditions ({details})"
-            )
         grouped: OrderedDict[str, Tuple[Any, ...]] = OrderedDict()
-        for adapter in sorted(searchable, key=lambda item: item.source_id):
-            grouped[adapter.source_id] = tuple(adapter.search(query))
-        return grouped
+        diagnostics: List[SearchDiagnostic] = []
+        for adapter in searchable:
+            supported = frozenset(adapter.search_conditions)
+            unsupported = query.supplied_conditions - supported
+            required = frozenset(
+                cast(Iterable[str], getattr(adapter, "required_search_conditions", ()))
+            )
+            missing_required = required - query.supplied_conditions
+            if unsupported or missing_required:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=adapter.source_id,
+                        skipped_conditions=unsupported,
+                        reason=(
+                            "missing_required" if missing_required else "unsupported"
+                        ),
+                        missing_conditions=missing_required,
+                    )
+                )
+            if missing_required:
+                continue
+            if query.supplied_conditions and not query.supplied_conditions & supported:
+                continue
+            try:
+                grouped[adapter.source_id] = tuple(
+                    adapter.search(query.project(supported))
+                )
+            except ProviderMetadataError:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=adapter.source_id,
+                        skipped_conditions=frozenset(),
+                        reason="provider_failure",
+                        failure_type="metadata",
+                    )
+                )
+            except ProviderResponseError:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=adapter.source_id,
+                        skipped_conditions=frozenset(),
+                        reason="provider_failure",
+                        failure_type="response",
+                    )
+                )
+        return SearchResults.from_grouped(grouped, diagnostics)

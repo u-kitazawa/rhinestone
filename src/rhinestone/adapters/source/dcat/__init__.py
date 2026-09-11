@@ -4,12 +4,14 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from ....errors import (
     ConfigValidationError,
+    DependencyUnavailableError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
 from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
+from ....security import DestinationPolicy
 from .._knowledge import source, string
 from ..base import ProviderAdapter
 
@@ -32,8 +34,12 @@ class DcatAdapter(ProviderAdapter):
         rdf_runtime_factory: Callable[[], Any],
         catalog_uri: Optional[str] = None,
         serialization: str = "turtle",
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
-        super().__init__(get_json=lambda url, params: None)
+        super().__init__(
+            get_json=lambda url, params: None,
+            destination_policy=destination_policy,
+        )
         self._get_document = get_document
         self._rdf_runtime_factory = rdf_runtime_factory
         self._catalog_uri = catalog_uri
@@ -41,14 +47,26 @@ class DcatAdapter(ProviderAdapter):
 
     def _catalog(self, settings: Mapping[str, Any]) -> Tuple[Any, Any, str, str]:
         uri = string(settings, "uri")
+        if self._catalog_uri is not None and uri != self._catalog_uri:
+            raise ConfigValidationError(
+                "DCAT catalog URI must match the configured catalog_uri"
+            )
+        self._destination_policy.authorize(uri)
         serialization = settings.get("serialization", self._serialization)
         if serialization not in ("json-ld", "turtle", "xml"):
             raise ConfigValidationError("Expected json-ld, turtle or xml serialization")
         try:
-            document = self._get_document(uri)
             rdf = self._rdf_runtime_factory()
+        except DependencyUnavailableError:
+            raise
         except Exception as error:
-            raise ProviderMetadataError("Could not load RDF catalog/runtime") from error
+            raise DependencyUnavailableError(
+                "RDF runtime could not be loaded"
+            ) from error
+        try:
+            document = self._get_document(uri)
+        except Exception as error:
+            raise ProviderMetadataError("Could not load RDF catalog") from error
         try:
             graph = rdf.Graph()
             graph.parse(data=document, format=serialization, publicID=uri)
@@ -116,10 +134,6 @@ class DcatAdapter(ProviderAdapter):
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError("Unsupported DCAT search")
-        if query.limit is not None and (
-            type(query.limit) is not int or query.limit < 0
-        ):
-            raise ConfigValidationError("limit must be a non-negative integer")
         settings: Dict[str, Any] = {
             "uri": self._catalog_uri,
             "serialization": self._serialization,
@@ -151,12 +165,14 @@ class DcatAdapter(ProviderAdapter):
             )
             results.append(
                 SearchResult(
-                    title,
-                    description,
-                    self.adapter_type,
-                    dict(settings, dataset=str(dataset)),
-                    item.metadata,
-                    item.provenance,
+                    title=title,
+                    description=description,
+                    discovered_by=self.adapter_type,
+                    target=Config(
+                        self.adapter_type, dict(settings, dataset=str(dataset))
+                    ),
+                    metadata=item.metadata,
+                    provenance=item.provenance,
                 )
             )
         return tuple(results[: query.limit])

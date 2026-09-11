@@ -3,14 +3,35 @@
 import json
 from typing import Any, Mapping, Optional, cast
 from urllib.error import HTTPError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+
+from .errors import ProviderResponseError
 
 _TIMEOUT_SECONDS = 30
 _DEFAULT_HEADERS = {
     "Accept": "application/json",
     "User-Agent": "rhinestone",
 }
+
+
+class _JsonIntegerDecodeError(ValueError):
+    """JSON integer conversion failed inside the decoder."""
+
+
+def _parse_json_int(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError as error:
+        raise _JsonIntegerDecodeError from error
+
+
+class JsonDocument(dict[str, Any]):
+    """Decoded JSON object together with the URI that supplied it."""
+
+    def __init__(self, value: Mapping[str, Any], response_uri: str) -> None:
+        super().__init__(value)
+        self.response_uri = response_uri
 
 
 def get_json(
@@ -20,14 +41,34 @@ def get_json(
 ) -> Any:
     """Fetch and decode JSON over HTTP using the standard library."""
     request = _request(url, params, headers)
-    with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
-        return json.load(response)
+    opener = (
+        build_opener(_NoRedirectHandler())
+        if getattr(headers, "_rhinestone_no_redirects", False)
+        else None
+    )
+    open_request = opener.open if opener is not None else urlopen
+    with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
+        try:
+            decoded = json.load(response, parse_int=_parse_json_int)
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            _JsonIntegerDecodeError,
+        ):
+            raise ProviderResponseError("Provider response is not valid JSON") from None
+        if isinstance(decoded, Mapping):
+            response_uri = getattr(response, "geturl", lambda: request.full_url)()
+            return JsonDocument(
+                cast(Mapping[str, Any], decoded), response_uri or request.full_url
+            )
+        return decoded
 
 
 def get_text(url: str) -> str:
-    """Fetch a text document over HTTP using the standard library."""
+    """Fetch a text document without following HTTP redirects."""
     request = Request(url, headers={"User-Agent": "rhinestone"})
-    with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+    opener = build_opener(_NoRedirectHandler())
+    with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return response.read().decode(charset)
 
@@ -90,9 +131,22 @@ def _request(
     params: Mapping[str, Any],
     headers: Optional[Mapping[str, str]] = None,
 ) -> Request:
-    query = urlencode(params, doseq=True)
-    request_url = url + ("?" + query if query else "")
+    request_url = _append_query(url, params)
     return Request(
         request_url,
         headers={**_DEFAULT_HEADERS, **dict(headers or {})},
     )
+
+
+def _append_query(url: str, params: Mapping[str, Any]) -> str:
+    """Append parameters without replacing or normalizing an existing query."""
+    additional_query = urlencode(params, doseq=True)
+    if not additional_query:
+        return url
+    components = urlsplit(url)
+    query = (
+        f"{components.query}&{additional_query}"
+        if components.query
+        else additional_query
+    )
+    return urlunsplit(components._replace(query=query))

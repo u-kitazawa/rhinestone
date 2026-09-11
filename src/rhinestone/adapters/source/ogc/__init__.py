@@ -12,6 +12,9 @@ from ....models import (
     SearchResult,
     Source,
 )
+from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
+from .._uri import append_path_segment, resolve_response_href
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -27,6 +30,12 @@ class OgcFeaturesAdapter(ProviderAdapter):
         api_token: Optional[str] = None,
         api_key: Optional[str] = None,
         api_key_header: str = "X-API-Key",
+        credential: Optional[str] = None,
+        credential_header: Optional[str] = None,
+        credential_scheme: Optional[str] = None,
+        credentials: Optional[CredentialRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
+        provider_id: Optional[str] = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -34,6 +43,12 @@ class OgcFeaturesAdapter(ProviderAdapter):
             api_token=api_token,
             api_key=api_key,
             api_key_header=api_key_header,
+            credential=credential,
+            credential_header=credential_header,
+            credential_scheme=credential_scheme,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            provider_id=provider_id,
         )
         self._collection_id = collection_id
 
@@ -41,13 +56,14 @@ class OgcFeaturesAdapter(ProviderAdapter):
         settings = self._config_settings(config)
         endpoint = self._endpoint_from(settings)
         collection_id = self._required_string(settings, "collection_id")
-        collection_url = f"{endpoint}/collections/{collection_id}"
-        collection = self._request(collection_url, {})
+        collection_path = self._encode_path_segment(collection_id)
+        collection_url = f"{endpoint}/collections/{collection_path}"
+        collection, response_uri = self._request_with_uri(collection_url, {})
         items_link = self._items_link(collection)
         feature_id = settings.get("feature_id")
-        uri = items_link["href"]
+        uri = resolve_response_href(response_uri, items_link["href"])
         if isinstance(feature_id, str) and feature_id:
-            uri = f"{uri.rstrip('/')}/{feature_id}"
+            uri = append_path_segment(uri, feature_id)
         candidate = ResourceCandidate(
             uri=uri,
             format="ogc-api-features",
@@ -85,7 +101,8 @@ class OgcFeaturesAdapter(ProviderAdapter):
                 f"Unsupported OGC search conditions: {', '.join(sorted(unsupported))}"
             )
         params = self._query_parameters(query)
-        items_url = f"{endpoint}/collections/{self._collection_id}/items"
+        collection_path = self._encode_path_segment(self._collection_id)
+        items_url = f"{endpoint}/collections/{collection_path}/items"
         response = self._request(items_url, params)
         features = self._objects(response.get("features"), "OGC features")
         found: List[SearchResult] = []
@@ -97,11 +114,14 @@ class OgcFeaturesAdapter(ProviderAdapter):
                 SearchResult(
                     title=title,
                     description=_optional_string(properties.get("description")),
-                    source_id=self.adapter_type,
-                    settings={
-                        "collection_id": self._collection_id,
-                        "feature_id": feature_id,
-                    },
+                    discovered_by=self.adapter_type,
+                    target=Config(
+                        self.adapter_type,
+                        {
+                            "collection_id": self._collection_id,
+                            "feature_id": feature_id,
+                        },
+                    ),
                     metadata=Metadata(title=title, raw=feature),
                     provenance=Provenance(
                         provider="ogc-features",

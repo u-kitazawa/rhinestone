@@ -5,6 +5,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from ....errors import ResourceAccessError
 from ....models import FileAccessPlan, Resource
+from ....security import DestinationPolicy
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -18,6 +19,9 @@ class GdalAdapter(ExecutionAdapter):
         {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "citygml"}
     )
 
+    def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
+        super().__init__(destination_policy)
+
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
         tile = resource.access_plan.options.get("tile")
         return self.name in dependencies and (
@@ -28,12 +32,43 @@ class GdalAdapter(ExecutionAdapter):
             )
         )
 
-    def open(self, resource: Resource, runtime: Any) -> Any:
+    def open(
+        self,
+        resource: Resource,
+        runtime: Any,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> Any:
+        uri = self._runtime_uri(resource)
+        attributes = resource_attributes(resource)
+        options: List[str] = []
+        encoding = attributes.get("encoding")
+        if isinstance(encoding, str):
+            options.append("ENCODING=" + encoding.upper())
+        try:
+            runtime_options: dict[str, Any] = {"open_options": tuple(options)}
+            result = runtime.OpenEx(uri, **runtime_options)
+            if result is None:
+                raise ResourceAccessError("GDAL returned no dataset")
+            return result
+        except Exception as error:
+            raise ResourceAccessError(
+                f"GDAL could not open {resource.uri!r}"
+            ) from error
+
+    @staticmethod
+    def _runtime_uri(resource: Resource) -> str:
         attributes = resource_attributes(resource)
         uri = resource.uri
         tile = resource.access_plan.options.get("tile")
         if tile is not None:
-            uri = self.tile_xml(tile)
+            if not isinstance(tile, Mapping):
+                raise ResourceAccessError("GDAL tile options must be an object")
+            tile = cast(Mapping[str, Any], tile)
+            tile_url = tile.get("url")
+            if not isinstance(tile_url, str):
+                raise ResourceAccessError("GDAL tile URL must be a string")
+            uri = GdalAdapter.tile_xml(tile)
         archive = attributes.get("archive")
         if isinstance(resource.access_plan, FileAccessPlan):
             archive = resource.access_plan.archive or archive
@@ -46,19 +81,7 @@ class GdalAdapter(ExecutionAdapter):
             member = resource.access_plan.options.get("entry_point")
             if member:
                 uri += "/" + member
-        options: List[str] = []
-        encoding = attributes.get("encoding")
-        if isinstance(encoding, str):
-            options.append("ENCODING=" + encoding.upper())
-        try:
-            result = runtime.OpenEx(uri, open_options=tuple(options))
-            if result is None:
-                raise ResourceAccessError("GDAL returned no dataset")
-            return result
-        except Exception as error:
-            raise ResourceAccessError(
-                f"GDAL could not open {resource.uri!r}"
-            ) from error
+        return uri
 
     @staticmethod
     def tile_xml(tile: Mapping[str, Any]) -> str:

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pytest
 
+from rhinestone import DestinationPolicy
 from rhinestone.adapters.execution import (
     ExecutionAdapter,
     GdalAdapter,
@@ -57,11 +58,32 @@ def make_resource(
     )
 
 
+class BasicExecutionAdapter(ExecutionAdapter):
+    name = "basic"
+    priority = 0
+
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+        return True
+
+    def open(
+        self,
+        resource: Resource,
+        runtime: Any,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> Any:
+        return runtime
+
+
 class FakeGdal:
     def __init__(self) -> None:
         self.calls: List[Tuple[str, Tuple[str, ...]]] = []
 
-    def OpenEx(self, uri: str, open_options: Tuple[str, ...] = ()) -> object:
+    def OpenEx(
+        self,
+        uri: str,
+        open_options: Tuple[str, ...] = (),
+    ) -> object:
         self.calls.append((uri, open_options))
         return {"runtime": "gdal", "uri": uri}
 
@@ -87,12 +109,26 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
     assert GdalAdapter().supports(resource, frozenset({"gdal"})) is True
 
 
+@pytest.mark.parametrize("tile", ([], {"url": 1}))
+def test_gdal_rejects_invalid_tile_options(tile: object) -> None:
+    resource = make_resource("/data/tile", "custom")
+    resource = replace(
+        resource,
+        access_plan=replace(resource.access_plan, options={"tile": tile}),
+    )
+
+    with pytest.raises(ResourceAccessError):
+        GdalAdapter().open(resource, FakeGdal())
+
+
 class FakeRasterio:
     def __init__(self) -> None:
         self.calls: List[str] = []
+        self.drivers: List[str | None] = []
 
-    def open(self, uri: str) -> object:
+    def open(self, uri: str, driver: str | None = None) -> object:
         self.calls.append(uri)
+        self.drivers.append(driver)
         return {"runtime": "rasterio"}
 
 
@@ -103,6 +139,7 @@ def test_rasterio_opens_cog_uri_directly() -> None:
 
     assert RasterioAdapter().open(resource, runtime) == {"runtime": "rasterio"}
     assert runtime.calls == ["https://files.example/image.tif"]
+    assert runtime.drivers == [None]
 
 
 class FakePyogrio:

@@ -5,6 +5,7 @@ from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Tuple, cas
 from ....errors import ProviderResponseError, ResourceAccessError
 from ....models import AccessPlan, Resource, ServiceQueryPlan
 from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
 
 RequestPreparer = Callable[
@@ -21,13 +22,20 @@ class JsonServiceAdapter(ExecutionAdapter):
         prepare_request: RequestPreparer,
         service: str,
         credentials: Optional[CredentialRegistry] = None,
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
+        super().__init__(destination_policy)
         self._prepare_request = prepare_request
         self._service = service
         self._credentials = credentials or CredentialRegistry({})
 
     def bind_credentials(self, credentials: CredentialRegistry) -> "JsonServiceAdapter":
-        return JsonServiceAdapter(self._prepare_request, self._service, credentials)
+        return JsonServiceAdapter(
+            self._prepare_request,
+            self._service,
+            credentials,
+            self._destination_policy,
+        )
 
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
         return (
@@ -37,7 +45,14 @@ class JsonServiceAdapter(ExecutionAdapter):
             and resource.access_plan.options.get("service") == self._service
         )
 
-    def open(self, resource: Resource, runtime: Any) -> Any:
+    def open(
+        self,
+        resource: Resource,
+        runtime: Any,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> Any:
+        self._authorize_resource(resource, destination_policy)
         params, headers = self._prepare_request(resource.access_plan, self._credentials)
         try:
             response = runtime.get(
@@ -63,3 +78,26 @@ class JsonServiceAdapter(ExecutionAdapter):
         ):
             raise ProviderResponseError("Service must return an array of objects")
         return cast(Any, data)
+
+    def authorize(
+        self,
+        resource: Resource,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> None:
+        """Authorize credential release before resolving the service runtime."""
+        self._authorize_resource(resource, destination_policy)
+
+    def _authorize_resource(
+        self,
+        resource: Resource,
+        destination_policy: DestinationPolicy | None,
+    ) -> None:
+        credential = resource.access_plan.options.get("credential")
+        (destination_policy or self._destination_policy).authorize(
+            resource.uri,
+            credentialed=True,
+            provider=resource.provenance.provider,
+            service=self._service,
+            credential=credential if isinstance(credential, str) else None,
+        )

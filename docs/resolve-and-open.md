@@ -11,6 +11,10 @@ resource = app.resolve(result)
 
 `Resource`にはURIだけでなく、format、metadata、provenance、アクセス方法が含まれます。検索結果を解決するためにConfigを組み立てる必要はありません。
 
+Sourceによってはprovider metadataを解釈するためのSource Runtimeが検索・解決時に
+必要です。たとえばDCATは`rdflib`を`search()`または`resolve()`で遅延評価します。
+解決済みResourceとAccessPlanはSource Runtimeの実体やfactoryを保持しません。
+
 ## Runtimeで開く
 
 開くRuntimeを明示します。
@@ -34,6 +38,8 @@ dataset = app.open(result, "rasterio")
 ```
 
 RhinestoneはGIS I/O、形式変換、空間演算、解析を行いません。選択済みResourceを利用者が所有するRuntimeへ渡します。
+このExecution Runtimeは`configure()`や`resolve()`では評価されず、`Resource.open()`で
+初めて必要になります。
 
 ## 高度な直接解決
 

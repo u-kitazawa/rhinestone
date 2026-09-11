@@ -11,6 +11,8 @@ from rhinestone.models import (
     Provenance,
     Resource,
     ResourceCandidate,
+    SearchDiagnostic,
+    SearchQuery,
     SearchResult,
     Source,
     SourceDefinition,
@@ -38,6 +40,57 @@ def test_source_definition_and_config_ids_must_be_non_empty() -> None:
         SourceDefinition("catalog", "")
     with pytest.raises(ConfigValidationError, match="source_id"):
         Config("", {})
+
+
+@pytest.mark.parametrize("limit", (-1, True, 1.5, "1"))
+def test_search_query_rejects_invalid_limits(limit: object) -> None:
+    with pytest.raises(ConfigValidationError, match="limit"):
+        SearchQuery(limit=cast(Any, limit))
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    (
+        (),
+        (0, 1, 2),
+        (0, 1, 2, 3, 4),
+        (0, 1, 2, "3"),
+        (False, 1, 2, 3),
+        [0, 1, 2, 3],
+    ),
+)
+def test_search_query_rejects_invalid_bboxes(bbox: object) -> None:
+    with pytest.raises(ConfigValidationError, match="bbox"):
+        SearchQuery(bbox=cast(Any, bbox))
+
+
+@pytest.mark.parametrize(
+    "time",
+    (
+        (),
+        (None,),
+        (None, None, None),
+        ("2024-01-01", None),
+        [None, None],
+    ),
+)
+def test_search_query_rejects_invalid_time_ranges(time: object) -> None:
+    with pytest.raises(ConfigValidationError, match="time"):
+        SearchQuery(time=cast(Any, time))
+
+
+def test_search_query_accepts_valid_boundary_values() -> None:
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+    query = SearchQuery(
+        bbox=(0, 1.5, 2, 3.5),
+        time=(start, None),
+        limit=0,
+    )
+
+    assert query.bbox == (0, 1.5, 2, 3.5)
+    assert query.time == (start, None)
+    assert query.limit == 0
 
 
 def test_source_definition_is_deeply_immutable() -> None:
@@ -102,20 +155,20 @@ def test_resource_preserves_source_metadata_and_provenance() -> None:
 
 
 def test_search_result_returns_config_without_losing_knowledge() -> None:
-    metadata = Metadata(title="Population", raw={"table": "raw-value"})
-    provenance = Provenance(provider="estat", raw={"query": "population"})
+    metadata = Metadata(title="Dataset", raw={"table": "raw-value"})
+    provenance = Provenance(provider="catalog", raw={"query": "dataset"})
     result = SearchResult(
-        title="Population",
-        description="Official statistics",
-        source_id="estat",
-        settings={"stats_data_id": "0000000000"},
+        title="Dataset",
+        description="Official dataset",
+        discovered_by="search-ckan-jp",
+        target=Config("catalog", {"resource_id": "resource-1"}),
         metadata=metadata,
         provenance=provenance,
     )
 
     config = result.to_config()
 
-    assert config == Config(source_id="estat", settings={"stats_data_id": "0000000000"})
+    assert config == Config(source_id="catalog", settings={"resource_id": "resource-1"})
     assert result.metadata is metadata
     assert result.provenance is provenance
 
@@ -147,11 +200,50 @@ def test_unbound_search_result_cannot_resolve() -> None:
     result = SearchResult(
         title="Dataset",
         description=None,
-        source_id="direct",
-        settings={},
+        discovered_by="catalog",
+        target=Config("direct", {}),
         metadata=Metadata(raw={}),
         provenance=Provenance(provider="direct", raw={}),
     )
 
     with pytest.raises(ConfigValidationError, match="not bound"):
         result.resolve()
+
+
+def test_search_result_requires_a_discovery_source() -> None:
+    with pytest.raises(ConfigValidationError, match="discovered_by"):
+        SearchResult(
+            title="Dataset",
+            description=None,
+            discovered_by="",
+            target=Config("direct", {}),
+            metadata=Metadata(raw={}),
+            provenance=Provenance(provider="direct", raw={}),
+        )
+
+
+def test_search_diagnostic_requires_a_source_id() -> None:
+    with pytest.raises(ConfigValidationError, match="search diagnostic source_id"):
+        SearchDiagnostic(source_id="", skipped_conditions=frozenset({"text"}))
+
+
+def test_search_diagnostic_freezes_missing_conditions() -> None:
+    diagnostic = SearchDiagnostic(
+        source_id="source",
+        skipped_conditions=frozenset({"bbox"}),
+        reason="missing_required",
+        missing_conditions=frozenset({"text"}),
+    )
+
+    assert diagnostic.missing_conditions == frozenset({"text"})
+
+
+def test_search_diagnostic_can_describe_provider_failure() -> None:
+    diagnostic = SearchDiagnostic(
+        source_id="source",
+        skipped_conditions=frozenset(),
+        reason="provider_failure",
+        failure_type="response",
+    )
+
+    assert diagnostic.failure_type == "response"

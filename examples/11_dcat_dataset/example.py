@@ -5,14 +5,14 @@ import os
 import pyogrio
 import rdflib
 
-from rhinestone import Config, SourceDefinition, configure
+from rhinestone import Config, RuntimeFactory, SourceDefinition, configure
 
 catalog_uri = os.environ["RHINESTONE_DCAT_URI"]
 app = configure(
     sources=(SourceDefinition("catalog", "dcat", {"catalog_uri": catalog_uri}),),
     dependencies={
-        "rdflib": lambda: rdflib,
-        "pyogrio": lambda: pyogrio,
+        "rdflib": RuntimeFactory(lambda: rdflib),
+        "pyogrio": RuntimeFactory(lambda: pyogrio),
     },
 )
 resource = app.resolve(

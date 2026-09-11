@@ -9,7 +9,6 @@ from rhinestone.adapters import (
     CkanAdapter,
     DcatAdapter,
     DirectAdapter,
-    EStatAdapter,
     GsiFundamentalAdapter,
     OdptAdapter,
     OgcFeaturesAdapter,
@@ -44,6 +43,9 @@ class ProbeAdapter(ProviderAdapter):
     def request(self) -> Mapping[str, Any]:
         return self._request("https://provider.example/data", {})
 
+    def request_uri(self) -> str:
+        return self._request_with_uri("https://provider.example/data", {})[1]
+
     def object(self, value: Any) -> Mapping[str, Any]:
         return self._object(value, "value")
 
@@ -77,6 +79,24 @@ def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> N
         ProbeAdapter(fail).request()
     assert captured.value.__cause__ is transport_error
 
+    def programming_error(url: str, params: Mapping[str, Any]) -> Any:
+        raise TypeError("transport callback bug")
+
+    with pytest.raises(TypeError, match="transport callback bug"):
+        ProbeAdapter(programming_error).request()
+
+    def value_error(url: str, params: Mapping[str, Any]) -> Any:
+        raise ValueError("transport callback bug")
+
+    with pytest.raises(ValueError, match="transport callback bug"):
+        ProbeAdapter(value_error).request()
+
+    def response_error(url: str, params: Mapping[str, Any]) -> Any:
+        raise ProviderResponseError("invalid JSON")
+
+    with pytest.raises(ProviderResponseError, match="invalid JSON"):
+        ProbeAdapter(response_error).request()
+
     with pytest.raises(ProviderResponseError, match="root"):
         ProbeAdapter(lambda url, params: []).request()
     with pytest.raises(ProviderResponseError, match="object"):
@@ -85,6 +105,13 @@ def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> N
         ProbeAdapter(lambda url, params: {}).objects("invalid")
     with pytest.raises(ProviderResponseError, match="object"):
         ProbeAdapter(lambda url, params: {}).objects([{}, "invalid"])
+
+    class InvalidResponseUri(dict[str, Any]):
+        response_uri = None
+
+    assert ProbeAdapter(lambda url, params: InvalidResponseUri()).request_uri() == (
+        "https://provider.example/data"
+    )
 
 
 def test_common_adapter_accepts_single_object_as_one_item_sequence() -> None:
@@ -113,7 +140,6 @@ def test_public_base_class_requires_load_implementation() -> None:
         CkanAdapter,
         DcatAdapter,
         DirectAdapter,
-        EStatAdapter,
         GsiFundamentalAdapter,
         OdptAdapter,
         OgcFeaturesAdapter,
@@ -131,7 +157,6 @@ def test_builtin_source_adapters_implement_the_public_base(adapter: Any) -> None
         CkanAdapter,
         DcatAdapter,
         DirectAdapter,
-        EStatAdapter,
         GsiFundamentalAdapter,
         OdptAdapter,
         OgcFeaturesAdapter,

@@ -1,0 +1,36 @@
+name: Branch policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate pull request base
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          if [[ "$BASE_REF" != "main" && "$BASE_REF" != "develop" ]]; then
+            echo "Pull requests must target main or develop."
+            exit 1
+          fi
+
+          if [[ "$BASE_REF" == "main" && "$HEAD_REF" != "develop" && "$HEAD_REF" != hotfix/* ]]; then
+            echo "Only develop promotion or hotfix branches may target main."
+            exit 1
+          fi
+
+          if [[ "$BASE_REF" == "main" && "$HEAD_REF" == "develop" && "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]]; then
+            echo "Develop promotion must come from this repository."
+            exit 1
+          fi
+
+          if [[ "$BASE_REF" == "develop" && "$HEAD_REF" == "main" ]]; then
+            echo "main -> develop is reserved for mandatory hotfix backflow."
+          fi

@@ -1,5 +1,7 @@
 # 利用インターフェース
 
+> **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
+
 ## 基本境界
 
 公開 API は、名前付き Source の構成、Config から Resource を解決する経路、Resource を外部 OSS へ接続する経路、SearchQuery から SearchResult を得る経路を提供します。
@@ -43,6 +45,10 @@ app = configure(
 `direct` Source は常に組み込まれます。利用者が上書きすることはできません。
 
 ## 公開モデル
+
+### v0.5のDiscovery / Resolution semantics
+
+`SearchResult.to_config()` は解決先のtarget Configを返します。発見元Sourceと解決先Sourceは異なってよく、横断catalog側のprovenanceと元provider側のprovenanceを失わないようにします。
 
 `SourceDefinition` は Catalog から読み込まれた静的な構成、`Config` は選択した Source 内の対象、`Source` は Adapter が外部情報を解釈した実行時の結果です。これらを同じ「source情報」として混同しません。
 

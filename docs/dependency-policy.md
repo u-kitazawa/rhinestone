@@ -8,18 +8,24 @@ Rhinestoneは、配信元・プロトコル固有の解釈を必要な範囲で�
 | --- | --- | --- |
 | Core | 軽量な必須依存だけを持つ | `jsonschema` |
 | HTTP transport | 組み込みで提供する | provider metadata、JSON service |
-| Source Adapter | provider / protocolの解釈を担当する。専用ライブラリは意味論の委譲が必要な場合だけ採用する | e-Stat、STAC、DCAT |
+| Source Adapter | provider / protocolの解釈を担当する。専用ライブラリは意味論の委譲が必要な場合だけ採用する | STAC、DCAT |
 | Execution Adapter | 解決済みResourceを専門runtimeの呼び出しへ翻訳する | GDAL、Rasterio、pyogrio |
-| Runtime | 利用者が実体またはfactoryとして供給する | `gdal`、`rasterio`、`pyogrio`、`rdflib` |
+| Runtime | 利用者が実体または明示的な`RuntimeFactory`として供給する | `gdal`、`rasterio`、`pyogrio`、`rdflib` |
 
-CoreはGDAL、Rasterio、pyogrio、RDFLibなどを直接importしません。HTTP通信も公開APIでtransportを注入させず、Rhinestoneの組み込みtransportを使います。外部Runtimeは、`resolve()`だけではロードせず、`open()`で必要になった時点に遅延評価します。
+CoreはGDAL、Rasterio、pyogrio、RDFLibなどを直接importしません。HTTP通信も公開APIでtransportを注入させず、Rhinestoneの組み込みtransportを使います。
+
+Runtimeの導入例と、実際にAdapterを実行して確認したバージョンは[Runtimeの導入ガイド](runtimes.md)に記載します。そこにある`tested`は検証済み範囲であり、`pyproject.toml`のdependency constraint、`uv.lock`の再現範囲、または将来の互換性保証を意味しません。
+
+公開APIではSource RuntimeとExecution Runtimeを単一の`dependencies`引数で受け取り、Composition Rootが内部Registryへ分離して注入します。bare callableはRuntime実体として扱い、遅延評価するfactoryだけを `RuntimeFactory` で明示します。`configure()`はどちらの `RuntimeFactory` も評価しません。
+
+- Source Runtimeはprovider / protocol metadataの解釈に必要で、対象Sourceの`search()`または`resolve()`で初めて必要になった時に評価します。現行例はDCATの`rdflib`です。
+- Execution Runtimeは解決済みResourceをnative objectとして開くために必要で、`Resource.open()`で初めて評価します。現行例は`gdal`、`rasterio`、`pyogrio`です。
 
 ## Sourceごとの判断
 
 | Source | 候補ライブラリ | 判断 | 適用する境界 |
 | --- | --- | --- | --- |
-| e-Stat | `pyestat` | Source Adapterには導入しない。`resolve()`は組み込みHTTPでmetadata、`statsDataId`、queryを解決する。`open()`の専門runtimeが必要になった時点で採用を検証する | 将来のe-Stat Execution Adapter / `pyestat` runtime |
-| DCAT | `rdflib` | RDFの解釈runtimeとして利用する。依存は利用者から供給し、Coreの必須依存にはしない | DCAT Source Adapterのruntime |
+| DCAT | `rdflib` | RDFの解釈に必要なSource Runtimeとして利用する。依存は利用者から供給し、DCATの`search()`または`resolve()`で遅延評価する | DCAT Source Adapter |
 | STAC | `pystac-client` / `pystac` | 現在の範囲では組み込みHTTP adapterを維持する。conformance、pagination、filter、asset semanticsの実装が必要になった時に採用を再検討する | 将来のSTAC Source Adapter |
 | PLATEAU | `plateaukit` | CityGMLの意味論を委譲できるか、dataset install lifecycleを持ち込まずに使えるかをPoCで確認するまで採用しない | PoC後にSourceまたはExecutionの境界を決定 |
 | CKAN / GEOSPATIAL_JP | `ckanapi` | 現状の`package_search`、`package_show`、`resource_show`には導入しない。Action API固有処理が増えた場合に再検討する | 現行CKAN Source Adapter |
@@ -32,20 +38,21 @@ CoreはGDAL、Rasterio、pyogrio、RDFLibなどを直接importしません。HTT
 
 ## Source AdapterとExecution Adapter
 
-Source Adapterは、検索・metadata取得・provider固有identifier・queryなど、Resourceを解決するための知識を担当します。Execution Adapterは、選択済みResourceをGDALやRasterioなどの呼び出しへ翻訳します。Execution AdapterはResourceを選択せず、format変換や解析も行いません。
+Source Adapterは、検索・metadata取得・provider固有identifier・queryなど、Resourceを解決するための知識を担当します。Source Runtimeが必要な場合は、この段階で専用runtimeへprotocol semanticsの解釈を委譲します。Execution Adapterは、選択済みResourceをGDALやRasterioなどの呼び出しへ翻訳します。Execution AdapterはResourceを選択せず、format変換や解析も行いません。
 
 ```text
 Source Adapter
   -> provider / protocol metadata
+  -> optional Source Runtime
   -> Resource + AccessPlan
 
 Execution Adapter
   -> selected Resource
-  -> specialist runtime
+  -> Execution Runtime
   -> native object
 ```
 
-`resolve()`はruntime、opener、credentialの実体を必要としないResourceを返します。`open()`が必要なExecution AdapterとRuntimeを解決し、専門ライブラリのnative objectを返します。Rhinestone独自のDataFrameや統計モデルへ強制変換しません。
+`resolve()`が返すResourceとAccessPlanは、Source Runtimeの実体・factoryやcredentialを保持しません。Resourceのopen経路はExecution Runtimeだけを参照します。`open()`が必要なExecution AdapterとRuntimeを解決し、専門ライブラリのnative objectを返します。Rhinestone独自のDataFrameや統計モデルへ強制変換しません。
 
 ## Adapter identityとRuntime identity
 
@@ -57,8 +64,6 @@ Runtime identity           = どの外部実行環境を呼び出すか
 ```
 
 現行の組み込みAdapterは1つのAdapterと1つのRuntimeが対応するため、`ExecutionAdapter.name`を選択名とDependency Registryのキーに兼用します。これは現在の契約として維持します。
-
-将来、e-Statのように`estat` Adapterが`pyestat` Runtimeを使うケースを追加する場合は、Adapter選択名とruntime dependency名を別フィールドへ分離します。その変更までは、未使用の`runtime_name`を先行導入せず、既存の`name`契約を増やしません。
 
 ## Adapter chain
 
@@ -72,7 +77,7 @@ Execution Adapterのchainは導入しません。1つのExecution Adapterが、�
 
 1. 自前実装ではprovider / protocol固有の意味論を抱えることになるか。
 2. 解決済みResourceをnative objectへ渡す、またはprotocol semanticsを解釈する責務を委譲できるか。
-3. `resolve()`と`open()`の境界を保ち、不要なruntimeをロードせずに済むか。
+3. Source / Executionのどの段階で必要かを明示し、不要なruntimeをロードせずに済むか。
 4. Python version、license、保守状況がプロジェクト方針に適合するか。
 5. Source AdapterとExecution Adapterのどちらに属するか説明できるか。
 6. 既存のgeneric adapterで十分な処理を専用依存へ置き換えていないか。
