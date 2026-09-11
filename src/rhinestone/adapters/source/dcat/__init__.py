@@ -11,6 +11,7 @@ from ....errors import (
     UnsupportedSearchConditionError,
 )
 from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
+from ....security import DestinationPolicy
 from .._knowledge import source, string
 from ..base import ProviderAdapter
 
@@ -33,8 +34,12 @@ class DcatAdapter(ProviderAdapter):
         rdf_runtime_factory: Callable[[], Any],
         catalog_uri: Optional[str] = None,
         serialization: str = "turtle",
+        destination_policy: Optional[DestinationPolicy] = None,
     ) -> None:
-        super().__init__(get_json=lambda url, params: None)
+        super().__init__(
+            get_json=lambda url, params: None,
+            destination_policy=destination_policy,
+        )
         self._get_document = get_document
         self._rdf_runtime_factory = rdf_runtime_factory
         self._catalog_uri = catalog_uri
@@ -46,6 +51,7 @@ class DcatAdapter(ProviderAdapter):
             raise ConfigValidationError(
                 "DCAT catalog URI must match the configured catalog_uri"
             )
+        self._destination_policy.authorize(uri)
         serialization = settings.get("serialization", self._serialization)
         if serialization not in ("json-ld", "turtle", "xml"):
             raise ConfigValidationError("Expected json-ld, turtle or xml serialization")

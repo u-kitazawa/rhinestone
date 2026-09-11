@@ -13,6 +13,9 @@
 解決時の `Config.settings["uri"]` がこの値と一致しない場合は、取得前に拒否されます。
 `catalog_uri` を設定しない構成では取得先を信頼済みProvider値で検証できないため、
 外部入力をそのまま `Config` に渡さないでください。
+`network_policy="strict"` では、policyに登録されたURIだけが取得できます。したがって
+`catalog_uri` を設定したProviderでは一致するURIのみが取得でき、`catalog_uri` のないProviderでは
+Configに指定したURIは自動許可されず拒否されます。`none` / `credentialed` では既存の取得動作を維持します。
 
 ## Catalog と runtime
 
