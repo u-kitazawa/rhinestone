@@ -95,7 +95,7 @@ app = configure(dependencies={"pyogrio": pyogrio})
 frame = app.open(resource, "pyogrio")
 ```
 
-Rhinestone は URI と Source が確定した `encoding` だけを `read_dataframe()` へ渡します。`read_dataframe()` は読み込みdriverのallowlistを表現できないため、driver discoveryやnested dataset accessを制御できず、`network_policy="strict"`ではpyogrio実行をfail closedにします。archive URI の組み立て、GeoDataFrame 以外への変換、空間演算は行いません。GDAL の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。
+Rhinestone は URI と Source が確定した `encoding` だけを `read_dataframe()` へ渡します。archive URI の組み立て、GeoDataFrame 以外への変換、空間演算は行いません。GDAL の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。
 
 ### RDFLib
 

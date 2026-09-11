@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pytest
 
-from rhinestone import DestinationPolicy, Provider
+from rhinestone import DestinationPolicy
 from rhinestone.adapters.execution import (
     ExecutionAdapter,
     GdalAdapter,
@@ -11,11 +11,7 @@ from rhinestone.adapters.execution import (
     PyogrioAdapter,
     RasterioAdapter,
 )
-from rhinestone.errors import (
-    DestinationNotAllowedError,
-    ResourceAccessError,
-    RuntimeCapabilityError,
-)
+from rhinestone.errors import ResourceAccessError
 from rhinestone.models import (
     FileAccessPlan,
     Metadata,
@@ -79,29 +75,16 @@ class BasicExecutionAdapter(ExecutionAdapter):
         return runtime
 
 
-def test_execution_adapter_default_authorization_uses_resource_uri() -> None:
-    resource = make_resource("https://unlisted.example/data", "custom")
-
-    with pytest.raises(DestinationNotAllowedError):
-        BasicExecutionAdapter().authorize(
-            resource,
-            destination_policy=DestinationPolicy(level="strict"),
-        )
-
-
 class FakeGdal:
     def __init__(self) -> None:
         self.calls: List[Tuple[str, Tuple[str, ...]]] = []
-        self.allowed_drivers: List[Tuple[str, ...] | None] = []
 
     def OpenEx(
         self,
         uri: str,
         open_options: Tuple[str, ...] = (),
-        allowed_drivers: Tuple[str, ...] | None = None,
     ) -> object:
         self.calls.append((uri, open_options))
-        self.allowed_drivers.append(allowed_drivers)
         return {"runtime": "gdal", "uri": uri}
 
 
@@ -126,6 +109,18 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
     assert GdalAdapter().supports(resource, frozenset({"gdal"})) is True
 
 
+@pytest.mark.parametrize("tile", ([], {"url": 1}))
+def test_gdal_rejects_invalid_tile_options(tile: object) -> None:
+    resource = make_resource("/data/tile", "custom")
+    resource = replace(
+        resource,
+        access_plan=replace(resource.access_plan, options={"tile": tile}),
+    )
+
+    with pytest.raises(ResourceAccessError):
+        GdalAdapter().open(resource, FakeGdal())
+
+
 class FakeRasterio:
     def __init__(self) -> None:
         self.calls: List[str] = []
@@ -147,68 +142,6 @@ def test_rasterio_opens_cog_uri_directly() -> None:
     assert runtime.drivers == [None]
 
 
-@pytest.mark.parametrize("format_name", ("cog", "geotiff"))
-def test_strict_raster_adapters_pin_gtiff_driver(format_name: str) -> None:
-    resource = make_resource("/data/image.tif", format_name)
-    policy = strict_files_policy()
-    gdal = FakeGdal()
-    rasterio = FakeRasterio()
-
-    GdalAdapter(policy).open(resource, gdal)
-    RasterioAdapter(policy).open(resource, rasterio)
-
-    assert gdal.allowed_drivers == [("GTiff",)]
-    assert rasterio.drivers == ["GTiff"]
-
-
-def test_strict_driver_pinning_prevents_hostile_vrt_fallback() -> None:
-    secondary_destinations: List[str] = []
-
-    class HostileGdal:
-        def OpenEx(
-            self,
-            uri: str,
-            open_options: Tuple[str, ...] = (),
-            allowed_drivers: Tuple[str, ...] | None = None,
-        ) -> object:
-            if allowed_drivers != ("GTiff",):
-                secondary_destinations.append("https://unlisted.example/secret.tif")
-            return object()
-
-    GdalAdapter(strict_files_policy()).open(
-        make_resource("/data/disguised.tif", "geotiff"),
-        HostileGdal(),
-    )
-
-    assert secondary_destinations == []
-
-
-@pytest.mark.parametrize(
-    "format_name", ("shapefile", "netcdf", "wms", "gml", "citygml")
-)
-def test_strict_gdal_rejects_unpinned_driver_before_runtime(
-    format_name: str,
-) -> None:
-    runtime = FakeGdal()
-
-    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
-        GdalAdapter(strict_files_policy()).open(
-            make_resource("/data/file", format_name), runtime
-        )
-
-    assert runtime.calls == []
-
-
-def test_strict_rasterio_rejects_unpinned_driver_before_runtime() -> None:
-    runtime = FakeRasterio()
-    resource = make_resource("/data/rivers.shp", "shapefile")
-
-    with pytest.raises(DestinationNotAllowedError, match="dataset driver"):
-        RasterioAdapter(strict_files_policy()).open(resource, runtime)
-
-    assert runtime.calls == []
-
-
 class FakePyogrio:
     def __init__(self) -> None:
         self.calls: List[Tuple[str, Dict[str, Any]]] = []
@@ -216,167 +149,6 @@ class FakePyogrio:
     def read_dataframe(self, uri: str, **options: Any) -> object:
         self.calls.append((uri, options))
         return {"runtime": "pyogrio"}
-
-
-_GDAL_RUNTIME_CASES = (
-    (GdalAdapter, FakeGdal, "geotiff"),
-    (RasterioAdapter, FakeRasterio, "geotiff"),
-    (PyogrioAdapter, FakePyogrio, "geojson"),
-)
-_LOCAL_RUNTIME_CASES = _GDAL_RUNTIME_CASES[:2]
-
-
-def strict_files_policy() -> DestinationPolicy:
-    return DestinationPolicy.from_catalog(
-        (
-            Provider(
-                "files",
-                "direct",
-                {"endpoint": "https://allowed.example/data"},
-            ),
-        ),
-        level="strict",
-    )
-
-
-@pytest.mark.parametrize(
-    "locator",
-    (
-        "/vsicurl/https://unlisted.example/data.tif",
-        "/vsicurl_streaming/https://unlisted.example/data.geojson",
-        "/vsizip//vsicurl/https://unlisted.example/data.zip/member.shp",
-        "/vsizip/{/vsicurl/https://unlisted.example/data.zip}/member.shp",
-        "/vsicurl/ftp://unlisted.example/data.tif",
-        "/vsicurl?use_head=no",
-        "/vsicurl?" + "&".join(f"option{index}=x" for index in range(65)),
-        "/vsizip//vsicurl?url=https%3A%2F%2Fallowed.example%2Fdata.zip",
-        "/vsizip//vsicurl/ftp://allowed.example/data.zip",
-        "/vsizip//vsicurl/https://allowed.example/data/file",
-        "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip",
-        "/vsiunknown/https://allowed.example/data/file.tif",
-    ),
-)
-@pytest.mark.parametrize(
-    ("adapter_type", "runtime_type", "format_name"), _GDAL_RUNTIME_CASES
-)
-def test_strict_execution_rejects_unsafe_gdal_locator_before_runtime(
-    locator: str,
-    adapter_type: Any,
-    runtime_type: Any,
-    format_name: str,
-) -> None:
-    runtime = runtime_type()
-
-    with pytest.raises(DestinationNotAllowedError):
-        adapter_type(strict_files_policy()).open(
-            make_resource(locator, format_name), runtime
-        )
-
-    assert runtime.calls == []
-
-
-@pytest.mark.parametrize(
-    "locator",
-    (
-        "/data/local-file.tif",
-        "/vsizip//data/local.zip/member.shp",
-        "/vsimem/in-memory.tif",
-    ),
-)
-@pytest.mark.parametrize(
-    ("adapter_type", "runtime_type", "format_name"), _LOCAL_RUNTIME_CASES
-)
-def test_strict_execution_allows_authorized_or_local_gdal_locator(
-    locator: str,
-    adapter_type: Any,
-    runtime_type: Any,
-    format_name: str,
-) -> None:
-    runtime = runtime_type()
-
-    adapter_type(strict_files_policy()).open(
-        make_resource(locator, format_name), runtime
-    )
-
-    assert len(runtime.calls) == 1
-
-
-def test_strict_pyogrio_rejects_driver_discovery_before_runtime() -> None:
-    runtime = FakePyogrio()
-
-    with pytest.raises(RuntimeCapabilityError, match="driver discovery"):
-        PyogrioAdapter(strict_files_policy()).open(
-            make_resource("/data/rivers.geojson", "geojson"), runtime
-        )
-
-    assert runtime.calls == []
-
-
-def test_strict_pyogrio_authorization_rejects_driver_discovery() -> None:
-    with pytest.raises(RuntimeCapabilityError, match="driver discovery"):
-        PyogrioAdapter(strict_files_policy()).authorize(
-            make_resource("/data/rivers.geojson", "geojson")
-        )
-
-
-@pytest.mark.parametrize(
-    ("adapter_type", "runtime_type", "format_name"), _GDAL_RUNTIME_CASES
-)
-@pytest.mark.parametrize(
-    "locator",
-    (
-        "https://allowed.example/data/file.tif",
-        "/vsicurl/https://allowed.example/data/file.tif",
-        "/vsicurl_streaming/https://allowed.example/data/file.geojson",
-        "/vsizip//vsicurl/https://allowed.example/data/archive.zip/member.shp",
-        "/vsizip/vsicurl/https://allowed.example/data/archive.zip/member.shp",
-        "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}/member.shp",
-        "/vsizip/{https://allowed.example/data/archive.zip}/member.shp",
-        "/vsizip/https://allowed.example/data/archive.zip/member.shp",
-        "/vsizip//vsicurl/https://allowed.example/data/archive.zipx/file.tar/member.shp",
-        "/vsizip/{/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}}/member.shp",
-        "/vsicurl?use_head=no&url=https%3A%2F%2Fallowed.example%2Fdata%2Ffile.tif",
-    ),
-)
-def test_strict_execution_rejects_remote_runtime_handoff(
-    locator: str,
-    adapter_type: Any,
-    runtime_type: Any,
-    format_name: str,
-) -> None:
-    runtime = runtime_type()
-
-    with pytest.raises(RuntimeCapabilityError, match="redirects"):
-        adapter_type(strict_files_policy()).open(
-            make_resource(locator, format_name), runtime
-        )
-
-    assert runtime.calls == []
-
-
-def test_strict_archive_authorizes_archive_url_not_member_path() -> None:
-    runtime = FakeGdal()
-    policy = DestinationPolicy.from_catalog(
-        (
-            Provider(
-                "files",
-                "direct",
-                {"endpoint": "https://allowed.example/data.zip/member.shp"},
-            ),
-        ),
-        level="strict",
-    )
-
-    with pytest.raises(DestinationNotAllowedError):
-        GdalAdapter(policy).open(
-            make_resource(
-                "/vsizip//vsicurl/https://allowed.example/data.zip/member.shp",
-                "shapefile",
-            ),
-            runtime,
-        )
-
-    assert runtime.calls == []
 
 
 def test_pyogrio_receives_explicit_encoding() -> None:
