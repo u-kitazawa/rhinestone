@@ -117,12 +117,14 @@ app = configure(
 `network_policy` は `credentialed`（既定）、`strict`、`none` から選べます。`credentialed`
 は認証付き通信だけを、CatalogでProviderごとに定義された実行endpointへ制限します。
 説明・仕様・利用条件等のmetadata URLや別ProviderのendpointはCredential送信先になりません。
-ODPTでは`endpoint + resource_types`だけが対象です。`strict` はExecutionAdapterのHTTP
-アクセス全体を制限します。GDAL系Runtimeへ渡す `/vsicurl/`、
+ODPTでは`endpoint + resource_types`だけが対象です。`strict` はExecutionAdapterが
+authorizationを実行前またはI/O前に強制できるHTTPアクセスだけを許可します。GDAL系Runtimeへ渡す `/vsicurl/`、
 `/vsicurl_streaming/`、archive wrapperとの組み合わせでは内側のHTTP(S) URLを認可し、
 認識できない `/vsi.../` locatorはローカルpathと推測せず拒否します。認可されない宛先では
 Credential factoryやExecution Runtimeは評価・呼び出しされません。
 
+GDAL／Rasterio／pyogrioのuser-owned Runtimeへremote HTTP(S) Resourceを渡す経路は、Runtime内部の
+redirectを再認可できないため`strict`ではfail closedになります。local Resourceは引き続き利用できます。
 GDAL／Rasterioでは、`strict`時にGeoTIFF／COGを`GTiff` driverへ固定します。VRT、WMS、
 XYZ tile等の内部でsecondary datasetへアクセスできる経路と、driver mappingを安全に固定して
 いないformatは、Runtime内部の宛先を再認可できないため`strict`ではfail closedになります。

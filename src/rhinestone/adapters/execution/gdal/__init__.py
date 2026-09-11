@@ -6,7 +6,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from ....errors import DestinationNotAllowedError, ResourceAccessError
 from ....models import FileAccessPlan, Resource
 from ....security import DestinationPolicy, DestinationRule
-from .._locator import authorize_runtime_locator
+from .._locator import authorize_runtime_locator, reject_unobservable_remote
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -45,6 +45,7 @@ class GdalAdapter(ExecutionAdapter):
         uri = self._runtime_uri(resource, policy)
         authorize_runtime_locator(uri, policy)
         allowed_drivers = self._allowed_drivers(resource, policy)
+        reject_unobservable_remote(resource.uri, policy)
         attributes = resource_attributes(resource)
         options: List[str] = []
         encoding = attributes.get("encoding")
@@ -72,6 +73,7 @@ class GdalAdapter(ExecutionAdapter):
         policy = destination_policy or self._destination_policy
         authorize_runtime_locator(self._runtime_uri(resource, policy), policy)
         self._allowed_drivers(resource, policy)
+        reject_unobservable_remote(resource.uri, policy)
 
     @classmethod
     def _allowed_drivers(

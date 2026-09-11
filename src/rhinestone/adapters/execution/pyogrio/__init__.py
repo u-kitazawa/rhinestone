@@ -5,7 +5,7 @@ from typing import Any, Dict, FrozenSet
 from ....errors import ResourceAccessError
 from ....models import Resource
 from ....security import DestinationPolicy
-from .._locator import authorize_runtime_locator
+from .._locator import authorize_runtime_locator, reject_unobservable_remote
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -32,9 +32,9 @@ class PyogrioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        authorize_runtime_locator(
-            resource.uri, destination_policy or self._destination_policy
-        )
+        policy = destination_policy or self._destination_policy
+        authorize_runtime_locator(resource.uri, policy)
+        reject_unobservable_remote(resource.uri, policy)
         attributes = resource_attributes(resource)
         options: Dict[str, Any] = {}
         encoding = attributes.get("encoding")
@@ -53,6 +53,6 @@ class PyogrioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
-        authorize_runtime_locator(
-            resource.uri, destination_policy or self._destination_policy
-        )
+        policy = destination_policy or self._destination_policy
+        authorize_runtime_locator(resource.uri, policy)
+        reject_unobservable_remote(resource.uri, policy)
