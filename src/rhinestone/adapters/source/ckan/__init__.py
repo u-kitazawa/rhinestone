@@ -158,7 +158,7 @@ class CkanAdapter(ProviderAdapter):
         uri = self._required_string(resource, "url")
         return ResourceCandidate(
             uri=uri,
-            format=_canonical_format(resource.get("format")),
+            format=canonical_format(resource.get("format")),
             media_type=_optional_string(resource.get("mimetype")),
             attributes=resource,
         )
@@ -168,7 +168,7 @@ def _optional_string(value: Any) -> Optional[str]:
     return value if isinstance(value, str) else None
 
 
-def _canonical_format(value: Any) -> Optional[str]:
+def canonical_format(value: Any) -> Optional[str]:
     format_name = _optional_string(value)
     if format_name is None:
         return None

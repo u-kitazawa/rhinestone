@@ -10,6 +10,7 @@ from ....errors import (
 from ....models import Config, Metadata, Provenance, SearchQuery, SearchResult, Source
 from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
+from ..ckan import canonical_format
 
 DEFAULT_ENDPOINT = "https://search.ckan.jp/backend/api"
 _MEDIA_TYPE_FORMATS = {
@@ -136,7 +137,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
 def _resource_format(resource: JsonObject) -> Optional[str]:
     format_name = _optional_string(resource.get("format"))
     if format_name is not None and format_name.strip():
-        return format_name.lower()
+        return canonical_format(format_name)
     media_type = _optional_string(resource.get("mimetype"))
     return _MEDIA_TYPE_FORMATS.get(media_type or "")
 

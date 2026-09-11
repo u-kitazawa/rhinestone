@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import pytest
 
+from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
+from rhinestone.adapters.source.direct import DirectAdapter
 from rhinestone.adapters.source.search_ckan_jp import SearchCkanJpAdapter
 from rhinestone.errors import (
     ConfigValidationError,
@@ -9,6 +11,7 @@ from rhinestone.errors import (
     UnsupportedSourceError,
 )
 from rhinestone.models import Config, SearchQuery
+from rhinestone.resolution import Resolver
 
 from .provider_support import fixture_json
 
@@ -152,6 +155,30 @@ def test_search_ckan_jp_handles_minimal_package_metadata() -> None:
         )
         == ()
     )
+
+
+def test_search_ckan_jp_canonicalizes_geopackage_for_direct_resolution() -> None:
+    endpoint = "https://search.ckan.jp/backend/api"
+    result = SearchCkanJpAdapter(get_json=lambda url, params: None)._package_results(  # pyright: ignore[reportPrivateUsage]
+        {
+            "title": "GeoPackage dataset",
+            "resources": {
+                "id": "gpkg-1",
+                "url": "https://data.example/data.gpkg",
+                "format": "GeoPackage",
+                "mimetype": "application/geopackage+sqlite3",
+            },
+        },
+        endpoint,
+        {"q": "gpkg"},
+    )[0]
+
+    assert result.target.settings["format"] == "gpkg"
+    assert result.provenance.raw["resource"]["format"] == "GeoPackage"
+
+    resource = Resolver().resolve(DirectAdapter().load(result.target))
+    assert resource.format == "gpkg"
+    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"}))
 
 
 def test_search_ckan_jp_rejects_unsuccessful_response() -> None:
