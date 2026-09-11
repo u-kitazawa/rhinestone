@@ -12,4 +12,6 @@ option として渡されます。archive URI の組み立ては行いません�
 destination policyで認可します。未認可URLと認識できない`/vsi.../`構文は
 `read_dataframe()`を呼ぶ前に拒否します。
 remote HTTP(S) ResourceはRuntime内部のredirectを再認可できないため、`strict`では
-`read_dataframe()`へ渡しません。local Resourceと`credentialed`／`none`は従来どおりです。
+`read_dataframe()`へ渡しません。また`read_dataframe()`は読み込みdriverのallowlistを
+表現できず、driver discoveryやnested dataset accessを制御できないため、local Resourceも
+`strict`では実行を拒否します。`credentialed`／`none`では従来どおりです。

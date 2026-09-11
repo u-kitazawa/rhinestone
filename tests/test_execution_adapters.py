@@ -223,6 +223,7 @@ _GDAL_RUNTIME_CASES = (
     (RasterioAdapter, FakeRasterio, "geotiff"),
     (PyogrioAdapter, FakePyogrio, "geojson"),
 )
+_LOCAL_RUNTIME_CASES = _GDAL_RUNTIME_CASES[:2]
 
 
 def strict_files_policy() -> DestinationPolicy:
@@ -283,7 +284,7 @@ def test_strict_execution_rejects_unsafe_gdal_locator_before_runtime(
     ),
 )
 @pytest.mark.parametrize(
-    ("adapter_type", "runtime_type", "format_name"), _GDAL_RUNTIME_CASES
+    ("adapter_type", "runtime_type", "format_name"), _LOCAL_RUNTIME_CASES
 )
 def test_strict_execution_allows_authorized_or_local_gdal_locator(
     locator: str,
@@ -298,6 +299,24 @@ def test_strict_execution_allows_authorized_or_local_gdal_locator(
     )
 
     assert len(runtime.calls) == 1
+
+
+def test_strict_pyogrio_rejects_driver_discovery_before_runtime() -> None:
+    runtime = FakePyogrio()
+
+    with pytest.raises(RuntimeCapabilityError, match="driver discovery"):
+        PyogrioAdapter(strict_files_policy()).open(
+            make_resource("/data/rivers.geojson", "geojson"), runtime
+        )
+
+    assert runtime.calls == []
+
+
+def test_strict_pyogrio_authorization_rejects_driver_discovery() -> None:
+    with pytest.raises(RuntimeCapabilityError, match="driver discovery"):
+        PyogrioAdapter(strict_files_policy()).authorize(
+            make_resource("/data/rivers.geojson", "geojson")
+        )
 
 
 @pytest.mark.parametrize(

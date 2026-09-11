@@ -124,7 +124,10 @@ authorizationを実行前またはI/O前に強制できるHTTPアクセスだけ
 Credential factoryやExecution Runtimeは評価・呼び出しされません。
 
 GDAL／Rasterio／pyogrioのuser-owned Runtimeへremote HTTP(S) Resourceを渡す経路は、Runtime内部の
-redirectを再認可できないため`strict`ではfail closedになります。local Resourceは引き続き利用できます。
+redirectを再認可できないため`strict`ではfail closedになります。さらにpyogrioの
+`read_dataframe()`は読み込みdriverのallowlistを指定できないため、driver discoveryや
+nested dataset accessを制御できず、`strict`ではlocalを含むすべてのpyogrio実行をfail closedにします。
+GDAL／Rasterioのlocal Resourceは引き続き利用できます。
 GDAL／Rasterioでは、`strict`時にGeoTIFF／COGを`GTiff` driverへ固定します。VRT、WMS、
 XYZ tile等の内部でsecondary datasetへアクセスできる経路と、driver mappingを安全に固定して
 いないformatは、Runtime内部の宛先を再認可できないため`strict`ではfail closedになります。
