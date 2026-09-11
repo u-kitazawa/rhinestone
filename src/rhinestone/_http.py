@@ -15,6 +15,17 @@ _DEFAULT_HEADERS = {
 }
 
 
+class _JsonIntegerDecodeError(ValueError):
+    """JSON integer conversion failed inside the decoder."""
+
+
+def _parse_json_int(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError as error:
+        raise _JsonIntegerDecodeError from error
+
+
 class JsonDocument(dict[str, Any]):
     """Decoded JSON object together with the URI that supplied it."""
 
@@ -38,8 +49,12 @@ def get_json(
     open_request = opener.open if opener is not None else urlopen
     with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
         try:
-            decoded = json.load(response)
-        except (UnicodeDecodeError, json.JSONDecodeError):
+            decoded = json.load(response, parse_int=_parse_json_int)
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            _JsonIntegerDecodeError,
+        ):
             raise ProviderResponseError("Provider response is not valid JSON") from None
         if isinstance(decoded, Mapping):
             response_uri = getattr(response, "geturl", lambda: request.full_url)()

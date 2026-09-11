@@ -85,6 +85,12 @@ def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> N
     with pytest.raises(TypeError, match="transport callback bug"):
         ProbeAdapter(programming_error).request()
 
+    def value_error(url: str, params: Mapping[str, Any]) -> Any:
+        raise ValueError("transport callback bug")
+
+    with pytest.raises(ValueError, match="transport callback bug"):
+        ProbeAdapter(value_error).request()
+
     def response_error(url: str, params: Mapping[str, Any]) -> Any:
         raise ProviderResponseError("invalid JSON")
 

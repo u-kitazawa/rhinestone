@@ -146,7 +146,15 @@ def test_get_json_preserves_final_response_uri_for_json_objects(
     assert response.response_uri == "https://redirected.example/final"
 
 
-@pytest.mark.parametrize("body", (b"{", b"<html>error</html>", b""))
+@pytest.mark.parametrize(
+    "body",
+    (
+        b"{",
+        b"<html>error</html>",
+        b"",
+        b'{"value": ' + b"1" * 4301 + b"}",
+    ),
+)
 def test_get_json_normalizes_invalid_json(
     monkeypatch: pytest.MonkeyPatch, body: bytes
 ) -> None:
