@@ -5,7 +5,7 @@ from typing import Any, FrozenSet
 from ....errors import DestinationNotAllowedError, ResourceAccessError
 from ....models import Resource
 from ....security import DestinationPolicy
-from .._locator import authorize_runtime_locator
+from .._locator import authorize_runtime_locator, reject_unobservable_remote
 from ..base import ExecutionAdapter
 
 
@@ -33,6 +33,7 @@ class RasterioAdapter(ExecutionAdapter):
     ) -> Any:
         policy = destination_policy or self._destination_policy
         authorize_runtime_locator(resource.uri, policy)
+        reject_unobservable_remote(resource.uri, policy)
         driver = self._driver(resource, policy)
         try:
             return (
@@ -53,6 +54,7 @@ class RasterioAdapter(ExecutionAdapter):
     ) -> None:
         policy = destination_policy or self._destination_policy
         authorize_runtime_locator(resource.uri, policy)
+        reject_unobservable_remote(resource.uri, policy)
         self._driver(resource, policy)
 
     @staticmethod

@@ -11,7 +11,11 @@ from rhinestone.adapters.execution import (
     PyogrioAdapter,
     RasterioAdapter,
 )
-from rhinestone.errors import DestinationNotAllowedError, ResourceAccessError
+from rhinestone.errors import (
+    DestinationNotAllowedError,
+    ResourceAccessError,
+    RuntimeCapabilityError,
+)
 from rhinestone.models import (
     FileAccessPlan,
     Metadata,
@@ -145,7 +149,7 @@ def test_rasterio_opens_cog_uri_directly() -> None:
 
 @pytest.mark.parametrize("format_name", ("cog", "geotiff"))
 def test_strict_raster_adapters_pin_gtiff_driver(format_name: str) -> None:
-    resource = make_resource("https://allowed.example/data/image.tif", format_name)
+    resource = make_resource("/data/image.tif", format_name)
     policy = strict_files_policy()
     gdal = FakeGdal()
     rasterio = FakeRasterio()
@@ -172,7 +176,7 @@ def test_strict_driver_pinning_prevents_hostile_vrt_fallback() -> None:
             return object()
 
     GdalAdapter(strict_files_policy()).open(
-        make_resource("https://allowed.example/data/disguised.tif", "geotiff"),
+        make_resource("/data/disguised.tif", "geotiff"),
         HostileGdal(),
     )
 
@@ -273,16 +277,6 @@ def test_strict_execution_rejects_unsafe_gdal_locator_before_runtime(
 @pytest.mark.parametrize(
     "locator",
     (
-        "/vsicurl/https://allowed.example/data/file.tif",
-        "/vsicurl_streaming/https://allowed.example/data/file.geojson",
-        "/vsizip//vsicurl/https://allowed.example/data/archive.zip/member.shp",
-        "/vsizip/vsicurl/https://allowed.example/data/archive.zip/member.shp",
-        "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}/member.shp",
-        "/vsizip/{https://allowed.example/data/archive.zip}/member.shp",
-        "/vsizip/https://allowed.example/data/archive.zip/member.shp",
-        "/vsizip//vsicurl/https://allowed.example/data/archive.zipx/file.tar/member.shp",
-        "/vsizip/{/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}}/member.shp",
-        "/vsicurl?use_head=no&url=https%3A%2F%2Fallowed.example%2Fdata%2Ffile.tif",
         "/data/local-file.tif",
         "/vsizip//data/local.zip/member.shp",
         "/vsimem/in-memory.tif",
@@ -304,6 +298,41 @@ def test_strict_execution_allows_authorized_or_local_gdal_locator(
     )
 
     assert len(runtime.calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("adapter_type", "runtime_type", "format_name"), _GDAL_RUNTIME_CASES
+)
+@pytest.mark.parametrize(
+    "locator",
+    (
+        "https://allowed.example/data/file.tif",
+        "/vsicurl/https://allowed.example/data/file.tif",
+        "/vsicurl_streaming/https://allowed.example/data/file.geojson",
+        "/vsizip//vsicurl/https://allowed.example/data/archive.zip/member.shp",
+        "/vsizip/vsicurl/https://allowed.example/data/archive.zip/member.shp",
+        "/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}/member.shp",
+        "/vsizip/{https://allowed.example/data/archive.zip}/member.shp",
+        "/vsizip/https://allowed.example/data/archive.zip/member.shp",
+        "/vsizip//vsicurl/https://allowed.example/data/archive.zipx/file.tar/member.shp",
+        "/vsizip/{/vsizip/{/vsicurl/https://allowed.example/data/archive.zip}}/member.shp",
+        "/vsicurl?use_head=no&url=https%3A%2F%2Fallowed.example%2Fdata%2Ffile.tif",
+    ),
+)
+def test_strict_execution_rejects_remote_runtime_handoff(
+    locator: str,
+    adapter_type: Any,
+    runtime_type: Any,
+    format_name: str,
+) -> None:
+    runtime = runtime_type()
+
+    with pytest.raises(RuntimeCapabilityError, match="redirects"):
+        adapter_type(strict_files_policy()).open(
+            make_resource(locator, format_name), runtime
+        )
+
+    assert runtime.calls == []
 
 
 def test_strict_archive_authorizes_archive_url_not_member_path() -> None:

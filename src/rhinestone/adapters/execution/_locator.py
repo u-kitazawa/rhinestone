@@ -3,7 +3,7 @@
 from typing import Tuple
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
-from ...errors import DestinationNotAllowedError
+from ...errors import DestinationNotAllowedError, RuntimeCapabilityError
 from ...security import DestinationPolicy, DestinationRule
 
 _ARCHIVE_PREFIXES = (
@@ -27,6 +27,22 @@ def authorize_runtime_locator(
 
     for destination in _network_destinations(locator):
         destination_policy.authorize(destination)
+
+
+def reject_unobservable_remote(
+    locator: str, destination_policy: DestinationPolicy
+) -> None:
+    """Reject remote Runtime handoffs whose redirect chain cannot be checked."""
+    if destination_policy.level != "strict":
+        return
+    if DestinationRule.from_url(locator) is not None:
+        raise RuntimeCapabilityError(
+            "strict policy cannot enforce redirects inside a user-owned Runtime"
+        )
+    if locator.startswith("/vsi") and _network_destinations(locator):
+        raise RuntimeCapabilityError(
+            "strict policy cannot enforce redirects inside a user-owned Runtime"
+        )
 
 
 def _network_destinations(locator: str) -> Tuple[str, ...]:
@@ -143,4 +159,4 @@ def _unsupported_locator() -> DestinationNotAllowedError:
     )
 
 
-__all__ = ["authorize_runtime_locator"]
+__all__ = ["authorize_runtime_locator", "reject_unobservable_remote"]

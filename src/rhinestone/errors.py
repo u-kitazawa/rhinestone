@@ -49,6 +49,10 @@ class DestinationNotAllowedError(ResourceAccessError):
     """A network destination is outside the configured execution policy."""
 
 
+class RuntimeCapabilityError(ResourceAccessError):
+    """A Runtime cannot enforce the selected execution policy."""
+
+
 class IntegrityError(RhinestoneError):
     """Resource integrity verification failed."""
 

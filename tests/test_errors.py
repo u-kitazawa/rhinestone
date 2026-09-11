@@ -7,6 +7,7 @@ from rhinestone.errors import (
     ProviderMetadataError,
     ProviderResponseError,
     ResourceAccessError,
+    RuntimeCapabilityError,
     UnsupportedAccessError,
     UnsupportedSearchConditionError,
     UnsupportedSourceError,
@@ -29,5 +30,6 @@ def test_expected_failure_causes_have_distinct_error_types() -> None:
         IntegrityError,
     }
 
-    assert len(error_types) == 11
+    error_types.add(RuntimeCapabilityError)
+    assert len(error_types) == 12
     assert all(issubclass(error_type, Exception) for error_type in error_types)
