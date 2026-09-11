@@ -3,10 +3,9 @@
 from typing import Any, FrozenSet, List, Mapping, cast
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from ....errors import DestinationNotAllowedError, ResourceAccessError
+from ....errors import ResourceAccessError
 from ....models import FileAccessPlan, Resource
-from ....security import DestinationPolicy, DestinationRule
-from .._locator import authorize_runtime_locator, reject_unobservable_remote
+from ....security import DestinationPolicy
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 
@@ -19,7 +18,6 @@ class GdalAdapter(ExecutionAdapter):
     _formats = frozenset(
         {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "citygml"}
     )
-    _strict_drivers = {"cog": ("GTiff",), "geotiff": ("GTiff",)}
 
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
@@ -41,11 +39,7 @@ class GdalAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        policy = destination_policy or self._destination_policy
-        uri = self._runtime_uri(resource, policy)
-        authorize_runtime_locator(uri, policy)
-        allowed_drivers = self._allowed_drivers(resource, policy)
-        reject_unobservable_remote(resource.uri, policy)
+        uri = self._runtime_uri(resource)
         attributes = resource_attributes(resource)
         options: List[str] = []
         encoding = attributes.get("encoding")
@@ -53,8 +47,6 @@ class GdalAdapter(ExecutionAdapter):
             options.append("ENCODING=" + encoding.upper())
         try:
             runtime_options: dict[str, Any] = {"open_options": tuple(options)}
-            if allowed_drivers is not None:
-                runtime_options["allowed_drivers"] = allowed_drivers
             result = runtime.OpenEx(uri, **runtime_options)
             if result is None:
                 raise ResourceAccessError("GDAL returned no dataset")
@@ -64,32 +56,8 @@ class GdalAdapter(ExecutionAdapter):
                 f"GDAL could not open {resource.uri!r}"
             ) from error
 
-    def authorize(
-        self,
-        resource: Resource,
-        *,
-        destination_policy: DestinationPolicy | None = None,
-    ) -> None:
-        policy = destination_policy or self._destination_policy
-        authorize_runtime_locator(self._runtime_uri(resource, policy), policy)
-        self._allowed_drivers(resource, policy)
-        reject_unobservable_remote(resource.uri, policy)
-
-    @classmethod
-    def _allowed_drivers(
-        cls, resource: Resource, policy: DestinationPolicy
-    ) -> tuple[str, ...] | None:
-        if policy.level != "strict":
-            return None
-        drivers = cls._strict_drivers.get((resource.format or "").lower())
-        if drivers is None or resource.access_plan.options.get("tile") is not None:
-            raise DestinationNotAllowedError(
-                "GDAL strict policy does not allow this dataset driver"
-            )
-        return drivers
-
     @staticmethod
-    def _runtime_uri(resource: Resource, policy: DestinationPolicy) -> str:
+    def _runtime_uri(resource: Resource) -> str:
         attributes = resource_attributes(resource)
         uri = resource.uri
         tile = resource.access_plan.options.get("tile")
@@ -100,11 +68,6 @@ class GdalAdapter(ExecutionAdapter):
             tile_url = tile.get("url")
             if not isinstance(tile_url, str):
                 raise ResourceAccessError("GDAL tile URL must be a string")
-            if policy.level == "strict" and DestinationRule.from_url(tile_url) is None:
-                raise DestinationNotAllowedError(
-                    "GDAL tile URL must be an authorized HTTP(S) destination"
-                )
-            policy.authorize(tile_url)
             uri = GdalAdapter.tile_xml(tile)
         archive = attributes.get("archive")
         if isinstance(resource.access_plan, FileAccessPlan):

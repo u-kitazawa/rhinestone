@@ -32,7 +32,7 @@
 | --- | --- | --- |
 | `gdal` | `shapefile`、`geotiff`、`cog`、`netcdf`、`wms`、`gml`、`citygml`、GSI XYZ tile | ZIP URI の `/vsizip/` 変換はこれだけが行う。上記以外の format は選択しない。 |
 | `rasterio` | `cog`、`geotiff` | URI と option をそのまま `rasterio.open()` へ渡す。archive 展開や format 変換はしない。 |
-| `pyogrio` | `shapefile`、`geojson`、`gpkg`、`flatgeobuf` | URI と encoding だけを `read_dataframe()` へ渡す。archive URI の組み立てはしない。`strict`ではdriver discovery/nested accessを制御できないため実行しない。 |
+| `pyogrio` | `shapefile`、`geojson`、`gpkg`、`flatgeobuf` | URI と encoding だけを `read_dataframe()` へ渡す。archive URI の組み立てはしない。 |
 | `json-service` | `application/json` の ODPT service query | 組み込みHTTP runtimeとODPT用request preparerを使用する。他providerのJSON APIを汎用的に実行しない。 |
 
 STAC は Cloud-Optimized GeoTIFF media type を `cog` として扱う。その他 asset は format が明示できないため、Resolver が失敗する場合がある。DCAT、CKAN、PLATEAU、Direct の配布物も、format が上表の Execution Adapter に一致した場合だけ `open()` できる。
