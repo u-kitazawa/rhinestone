@@ -16,7 +16,7 @@
 
 ## Catalog と runtime
 
-標準の`configure()`経路ではDCAT文書の取得にRhinestoneの組み込みHTTP transportを使い、RDF解釈runtimeだけを`dependencies={"rdflib": ...}`として利用者が供給します。遅延評価する場合は `RuntimeFactory(factory)` を指定し、DCATの`search()`または`resolve()`で初めて評価されます。未設定またはfactoryの失敗は`DependencyUnavailableError`、文書取得の失敗は`ProviderMetadataError`として区別されます。解決済みResourceやAccessPlanは`rdflib`の実体・factoryを保持しません。
+標準の`configure()`経路ではDCAT文書の取得にRhinestoneの組み込みHTTP transportを使い、RDF解釈runtimeだけを`dependencies={"rdflib": ...}`として利用者が供給します。このSource transportはHTTPリダイレクトを追従せず、3xxを文書取得失敗として扱います。したがってProvider管理の初期`catalog_uri`から別のrequest先へ遷移しません。遅延評価する場合は `RuntimeFactory(factory)` を指定し、DCATの`search()`または`resolve()`で初めて評価されます。未設定またはfactoryの失敗は`DependencyUnavailableError`、文書取得の失敗は`ProviderMetadataError`として区別されます。解決済みResourceやAccessPlanは`rdflib`の実体・factoryを保持しません。
 
 `dcat:downloadURL` を持つ Distribution のみを候補にし、`accessURL` だけの Distribution は解決しません。検索は `text` と `limit` を使えます。
 

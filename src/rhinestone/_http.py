@@ -45,9 +45,10 @@ def get_json(
 
 
 def get_text(url: str) -> str:
-    """Fetch a text document over HTTP using the standard library."""
+    """Fetch a text document without following HTTP redirects."""
     request = Request(url, headers={"User-Agent": "rhinestone"})
-    with urlopen(request, timeout=_TIMEOUT_SECONDS) as response:
+    opener = build_opener(_NoRedirectHandler())
+    with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
         charset = response.headers.get_content_charset() or "utf-8"
         return response.read().decode(charset)
 
