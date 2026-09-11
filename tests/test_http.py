@@ -60,6 +60,7 @@ class _Opener:
     def open(self, request: Request, *, timeout: int) -> Any:
         self.calls["request"] = request
         self.calls["timeout"] = timeout
+        self.calls["count"] = self.calls.get("count", 0) + 1
         if isinstance(self._result, Exception):
             raise self._result
         return self._result
@@ -173,20 +174,49 @@ def test_get_json_rejects_redirects_for_marked_credential_headers(
 def test_get_text_uses_response_charset_and_utf8_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    responses = iter(
+    openers = iter(
         (
-            _Response("東京".encode("shift_jis"), charset="shift_jis"),
-            _Response("大阪".encode()),
+            _Opener(_Response("東京".encode("shift_jis"), charset="shift_jis")),
+            _Opener(_Response("大阪".encode())),
         )
     )
 
-    def open_url(request: Request, *, timeout: int) -> _Response:
-        return next(responses)
+    def build_test_opener(_handler: object) -> _Opener:
+        return next(openers)
 
-    monkeypatch.setattr(_http, "urlopen", open_url)
+    monkeypatch.setattr(_http, "build_opener", build_test_opener)
 
     assert _http.get_text("https://example.test/one") == "東京"
     assert _http.get_text("https://example.test/two") == "大阪"
+
+
+def test_get_text_rejects_redirect_without_following_location(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = Message()
+    redirect = HTTPError(
+        "https://example.test/catalog",
+        302,
+        "redirect",
+        headers,
+        io.BytesIO(),
+    )
+    opener = _Opener(redirect)
+
+    def build_test_opener(handler: object) -> _Opener:
+        assert isinstance(  # pyright: ignore[reportPrivateUsage]
+            handler,
+            _http._NoRedirectHandler,  # pyright: ignore[reportPrivateUsage]
+        )
+        return opener
+
+    monkeypatch.setattr(_http, "build_opener", build_test_opener)
+
+    with pytest.raises(HTTPError):
+        _http.get_text("https://example.test/catalog")
+
+    assert opener.calls["count"] == 1
+    assert opener.calls["request"].full_url == "https://example.test/catalog"
 
 
 def test_json_service_runtime_wraps_successful_response(
