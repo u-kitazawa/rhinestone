@@ -5,6 +5,7 @@ import pytest
 
 from rhinestone import (
     Config,
+    DestinationPolicy,
     ExecutionAdapterDefinition,
     Provider,
     Resource,
@@ -13,6 +14,7 @@ from rhinestone import (
     SourceAdapterDefinition,
     configure,
 )
+from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import AdapterRegistrationError
 from rhinestone.models import Metadata, Provenance, ResourceCandidate
 
@@ -103,6 +105,65 @@ def test_source_definition_can_declare_a_lazy_source_dependency() -> None:
     assert loaded == []
     app.resolve(Config("custom", {"title": "Example"}))
     assert loaded == []
+
+
+def test_source_dependencies_are_scoped_to_each_definition() -> None:
+    seen: dict[str, FrozenSet[str]] = {}
+
+    def factory(provider: Provider, context: Any) -> Any:
+        seen[provider.id] = context.dependencies.available
+        return custom_source(provider, context)
+
+    app = configure(
+        sources=(
+            Provider("first", "first-source"),
+            Provider("second", "second-source"),
+        ),
+        adapters=(
+            SourceAdapterDefinition(
+                "first-source", factory, dependencies=frozenset({"first-runtime"})
+            ),
+            SourceAdapterDefinition(
+                "second-source", factory, dependencies=frozenset({"second-runtime"})
+            ),
+        ),
+        dependencies={"first-runtime": object(), "second-runtime": object()},
+    )
+
+    app.resolve(Config("first", {"title": "First"}))
+    assert seen == {
+        "first": frozenset({"first-runtime"}),
+        "second": frozenset({"second-runtime"}),
+    }
+
+
+def test_custom_provider_credentials_are_authorized_by_default_policy() -> None:
+    provider = Provider(
+        "custom",
+        "custom-source",
+        {"endpoint": "https://custom.example/api", "credential": "custom-key"},
+    )
+    policy = DestinationPolicy.from_catalog((provider,))
+
+    policy.authorize(
+        "https://custom.example/api/items",
+        credentialed=True,
+        provider="custom",
+        service="custom-source",
+        credential="custom-key",
+    )
+
+
+def test_unregistered_source_type_fails_during_context_composition() -> None:
+    with pytest.raises(AdapterRegistrationError, match="unknown-source"):
+        configure(sources=(Provider("unknown", "unknown-source"),))
+
+    with pytest.raises(AdapterRegistrationError, match="unknown-source"):
+        _build_source_adapter(  # pyright: ignore[reportPrivateUsage]
+            Provider("unknown", "unknown-source"),
+            {},
+            object(),  # type: ignore[arg-type]
+        )
 
 
 def test_builtin_and_custom_duplicate_types_are_rejected() -> None:

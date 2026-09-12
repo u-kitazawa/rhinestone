@@ -134,22 +134,10 @@ class Rhinestone:
         )
         source_definitions = _source_definitions(custom_source_definitions)
         execution_definitions = _execution_definitions(custom_execution_definitions)
-        source_runtime_names = frozenset(
-            name
-            for definition in source_definitions.values()
-            for name in definition.dependencies
-        )
         execution_runtime_names = frozenset(
             definition.name for definition in execution_definitions
         )
         runtime_dependencies = dict(dependencies or {})
-        source_dependencies = DependencyRegistry(
-            {
-                name: value
-                for name, value in runtime_dependencies.items()
-                if name in source_runtime_names
-            }
-        )
         execution_dependencies = {
             name: value
             for name, value in runtime_dependencies.items()
@@ -173,13 +161,12 @@ class Rhinestone:
                 _build_source_adapter(
                     direct_provider,
                     source_definitions,
-                    SourceAdapterContext(
-                        get_json=_http.get_json,
-                        get_text=_http.get_text,
-                        credentials=credential_registry,
-                        dependencies=source_dependencies,
-                        destination_policy=destination_policy,
-                        provider_id="direct",
+                    _source_context(
+                        direct_provider,
+                        source_definitions,
+                        runtime_dependencies,
+                        credential_registry,
+                        destination_policy,
                     ),
                 ),
                 "direct",
@@ -198,13 +185,12 @@ class Rhinestone:
                     _build_source_adapter(
                         source_definition,
                         source_definitions,
-                        SourceAdapterContext(
-                            get_json=_http.get_json,
-                            get_text=_http.get_text,
-                            credentials=credential_registry,
-                            dependencies=source_dependencies,
-                            destination_policy=destination_policy,
-                            provider_id=source_id,
+                        _source_context(
+                            source_definition,
+                            source_definitions,
+                            runtime_dependencies,
+                            credential_registry,
+                            destination_policy,
                         ),
                     ),
                     source_definition.adapter_type,
@@ -516,6 +502,36 @@ def _source_definitions(
         custom_types.add(definition.adapter_type)
         definitions[definition.adapter_type] = definition
     return definitions
+
+
+def _source_context(
+    provider: Provider,
+    definitions: Mapping[str, SourceAdapterDefinition],
+    runtime_dependencies: Mapping[str, DependencyValue],
+    credentials: CredentialRegistry,
+    destination_policy: DestinationPolicy,
+) -> SourceAdapterContext:
+    try:
+        definition = definitions[provider.adapter_type]
+    except KeyError:
+        raise AdapterRegistrationError(
+            f"Source adapter {provider.adapter_type!r} is not registered"
+        ) from None
+    dependencies = DependencyRegistry(
+        {
+            name: runtime_dependencies[name]
+            for name in definition.dependencies
+            if name in runtime_dependencies
+        }
+    )
+    return SourceAdapterContext(
+        get_json=_http.get_json,
+        get_text=_http.get_text,
+        credentials=credentials,
+        dependencies=dependencies,
+        destination_policy=destination_policy,
+        provider_id=provider.id,
+    )
 
 
 def _execution_definitions(
