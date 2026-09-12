@@ -131,8 +131,10 @@ __all__ = [
     "ExecutionAdapter",
     "ExecutionAdapterContext",
     "ExecutionAdapterDefinition",
+    "ExecutionAdapterFactory",
     "SearchableSourceAdapter",
     "SourceAdapter",
     "SourceAdapterContext",
     "SourceAdapterDefinition",
+    "SourceAdapterFactory",
 ]

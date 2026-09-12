@@ -20,7 +20,7 @@ results = app.search(text="人口", limit=10)
 `search-ckan-jp` では、`limit` はCKANへのpackage取得数（`rows`）に使われるだけでなく、packageをsupported resourceへ展開した後の結果列にも適用されます。そのため、1つのpackageに複数のresourceがある場合、flattened結果全体が`limit`件に達した時点で後続resourceやpackageの結果が省略されます。`limit=None`ならこの展開後の制限はありません。
 
 ```python
-from rhinestone import SearchQuery
+from rhinestone.models import SearchQuery
 
 results = app.search(SearchQuery(bbox=(139.5, 35.5, 140.0, 36.0), limit=10))
 ```

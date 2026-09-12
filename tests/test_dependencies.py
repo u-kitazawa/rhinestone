@@ -3,8 +3,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from rhinestone import RuntimeFactory
 from rhinestone.errors import DependencyUnavailableError
+from rhinestone.models import RuntimeFactory
 from rhinestone.registry import DependencyRegistry
 
 

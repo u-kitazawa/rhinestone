@@ -6,9 +6,6 @@ import pytest
 
 from rhinestone import (
     Config,
-    RuntimeFactory,
-    SearchQuery,
-    SourceDefinition,
     configure,
     sources,
 )
@@ -18,7 +15,7 @@ from rhinestone.errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import Source
+from rhinestone.models import Provider, RuntimeFactory, SearchQuery, Source
 
 
 def item(identifier: str = "one") -> Mapping[str, Any]:
@@ -146,7 +143,7 @@ def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
 
 
 def test_static_source_composes_through_public_api() -> None:
-    source = SourceDefinition("catalog", "static", {"items": {"one": item()}})
+    source = Provider("catalog", "static", {"items": {"one": item()}})
     app = configure(sources=(source,))
 
     resource = app.resolve(Config("catalog", {"id": "one"}))
@@ -158,7 +155,7 @@ def test_static_source_composes_through_public_api() -> None:
 
 def test_static_source_requires_items_in_composition() -> None:
     with pytest.raises(ConfigValidationError, match="requires items"):
-        configure(sources=(SourceDefinition("catalog", "static"),))
+        configure(sources=(Provider("catalog", "static"),))
 
 
 def test_static_adapter_validates_capabilities_and_provenance_objects() -> None:

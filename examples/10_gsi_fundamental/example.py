@@ -4,10 +4,11 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, RuntimeFactory, SourceDefinition, configure
+from rhinestone import Config, Provider, configure
+from rhinestone.models import RuntimeFactory
 
 app = configure(
-    sources=(SourceDefinition("gsi-fundamental", "gsi-fundamental"),),
+    sources=(Provider("gsi-fundamental", "gsi-fundamental"),),
     dependencies={"gdal": RuntimeFactory(lambda: gdal)},
 )
 resource = app.resolve(

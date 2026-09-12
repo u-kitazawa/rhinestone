@@ -3,7 +3,7 @@ from typing import Any, Mapping, Sequence, cast
 import pytest
 
 import rhinestone.catalogs as catalog_module
-from rhinestone import SourceDefinition, sources
+from rhinestone import Provider, sources
 from rhinestone.catalogs import (
     Catalog,
     load_catalog_resource,
@@ -33,7 +33,7 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "SEARCH_CKAN_JP",
     )
     assert definitions == sources.ALL
-    assert all(isinstance(definition, SourceDefinition) for definition in sources.ALL)
+    assert all(isinstance(definition, Provider) for definition in sources.ALL)
 
 
 def test_builtin_source_names_are_dynamic_catalog_exports() -> None:

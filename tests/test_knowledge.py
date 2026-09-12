@@ -6,21 +6,17 @@ import pytest
 
 from rhinestone import (
     Config,
-    KnowledgeAdapterDefinition,
-    Metadata,
-    MunicipalityIdentity,
-    Provenance,
     Provider,
-    ResourceCandidate,
-    Source,
-    SourceAdapterDefinition,
-    StandardTimeAdapter,
-    TimeSemantic,
     configure,
 )
+from rhinestone.adapters.contracts import SourceAdapterDefinition
 from rhinestone.adapters.knowledge import (
     KnowledgeAdapterContext,
+    KnowledgeAdapterDefinition,
     KnowledgeAdapterRegistry,
+    MunicipalityIdentity,
+    StandardTimeAdapter,
+    TimeSemantic,
 )
 from rhinestone.adapters.source.gsi_fundamental import GsiFundamentalAdapter
 from rhinestone.adapters.source.plateau import PlateauAdapter
@@ -31,6 +27,7 @@ from rhinestone.errors import (
     KnowledgeResolutionError,
     KnowledgeValidationError,
 )
+from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
 from rhinestone.security import DestinationPolicy
 from tests.test_adapter_expansion import fundamental_settings, plateau_client

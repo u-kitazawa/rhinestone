@@ -2,8 +2,9 @@ from typing import Any, cast
 
 import pytest
 
-from rhinestone import SearchQuery, configure
+from rhinestone import configure
 from rhinestone.errors import ConfigValidationError
+from rhinestone.models import SearchQuery
 
 
 def test_search_query_rejects_non_string_text() -> None:

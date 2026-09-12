@@ -14,7 +14,10 @@ Rhinestoneは現在`0.1.x`のAlphaです。この文書は、利用者がアッ�
 - 利用者向けガイドと[APIリファレンス](api.md)に記載された関数、クラス、引数、戻り値、データ項目
 - [対応状況](compatibility.md)および各Adapterリファレンスに記載された利用方法
 
-`src/rhinestone/`に存在することだけでは、公開APIであることを意味しません。`_`で始まるmoduleや名前、`Source`、`Config`、`AccessPlan`、Resolver、Registry、Adapterの内部実装は、公開ドキュメントで明示されない限り内部APIです。内部APIを直接利用したコードの互換性は保証しません。
+`src/rhinestone/`に存在することだけでは、公開APIであることを意味しません。`_`で始まるmoduleや名前、
+Resolver、Registry、Adapterの内部実装は、公開ドキュメントで明示されない限り内部APIです。`Config`などの
+トップレベル中核APIと、各サブモジュールの`__all__`に含まれる拡張APIは、それぞれのsurfaceの契約に従います。
+内部実装を直接利用したコードの互換性は保証しません。
 
 公開APIの追加・変更・削除では、実装、テスト、該当する利用者向けドキュメントを同じ変更で更新します。
 
@@ -25,7 +28,14 @@ Rhinestoneは現在`0.1.x`のAlphaです。この文書は、利用者がアッ�
 - セキュリティ修正や設計上の緊急対応で段階的な廃止ができない場合も、変更の影響と必要な対応をRelease notesに記載します。
 - 内部実装の変更は、公開APIの挙動や利用者の設定・依存関係に影響しない限り、Release notesへの個別記載を必須にしません。
 
-`0.2.0`以降は、公開surfaceの整理と移行案内を進めます。`1.0.0`では、公開APIと互換性の基準を別途見直し、安定版としての契約を定めます。具体的なリリース時期はこの文書では決めません。
+トップレベルsurfaceとサブモジュールの拡張surfaceは別の契約として扱います。トップレベルの
+`__all__`は通常利用・設定導線のための小さな語彙を示し、低レベル型やAdapter契約は
+`rhinestone.models`、`rhinestone.adapters.contracts`、`rhinestone.adapters.knowledge`、
+`rhinestone.security`、`rhinestone.representations`の各`__all__`で公開します。サブモジュール
+経由の拡張APIは低レベルですが、これらの文書化されたsurfaceでは互換性を追跡します。
+
+`0.2.0`以降は、必要に応じて各surfaceの安定性を個別に見直します。`1.0.0`では、公開APIと
+互換性の基準を別途見直し、安定版としての契約を定めます。具体的なリリース時期はこの文書では決めません。
 
 ## 変更履歴の正本
 
@@ -73,3 +83,24 @@ v0.1.0は初回Releaseです。初回Release notesでは、少なくとも次の
 - Catalog由来の宛先制限を含む、認証付きSourceとネットワークポリシーの利用契約
 
 これらはv0.1.0のRelease notesの`Added`または`Changed`に整理します。以降のversionでは、初回Releaseから変わった公開surfaceを同じ形式で追跡します。
+
+## v0.1.1の変更履歴
+
+### Removed / Breaking changes
+
+トップレベルの再エクスポートを通常利用・設定導線へ整理しました。`Source`、
+`ResourceCandidate`、`AccessPlan`系、`Metadata`、`Provenance`、`SearchQuery`、Runtime型、
+Adapter／Knowledge Adapter契約、`DestinationPolicy`、format定義・正規化関数、
+`SourceDefinition` は `rhinestone` から削除されています。
+
+これらを使うコードは、次の移行先へimportを変更してください。
+
+- ドメイン型・Runtime型: `rhinestone.models`
+- Adapter Definition／Context／Factory: `rhinestone.adapters.contracts`
+- Knowledge Adapter: `rhinestone.adapters.knowledge`
+- 宛先ポリシー: `rhinestone.security`
+- format定義・正規化: `rhinestone.representations`
+
+`Provider`が通常利用における提供元定義の正式名です。`SourceDefinition`を使っていた設定例は
+`Provider`へ置き換えてください。0.1.xでもbreaking changeを許容する方針に基づき、0.2まで
+旧トップレベルimportを残す段階的廃止は行いません。

@@ -4,7 +4,8 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, RuntimeFactory, configure, sources
+from rhinestone import Config, configure, sources
+from rhinestone.models import RuntimeFactory
 
 app = configure(
     sources=(sources.PLATEAU,),

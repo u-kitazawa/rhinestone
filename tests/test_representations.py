@@ -2,14 +2,14 @@ from typing import Any
 
 import pytest
 
-from rhinestone import (
+from rhinestone.adapters.source.ckan import canonical_format as ckan_canonical_format
+from rhinestone.representations import (
     FORMAT_ALIASES,
     FORMAT_CATEGORIES,
     MEDIA_TYPE_FORMATS,
     canonical_format,
     format_from_media_type,
 )
-from rhinestone.adapters.source.ckan import canonical_format as ckan_canonical_format
 
 
 @pytest.mark.parametrize(

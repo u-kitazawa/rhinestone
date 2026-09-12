@@ -20,8 +20,8 @@
 契約をもとにした小さく決定的なfixtureを使います。各標準とfixtureが対応する振る舞いだけを定義し、
 環境固有の拡張は対象外とします。
 
-Source Adapterクラスは内部契約です。公開構成APIは名前付きの`SourceDefinition`を組み込みAdapterへ対応付け、
-複数のsource idで同じAdapter型を共有できます。リポジトリ管理のCatalog値は構成前にSourceDefinitionへ読み込みます。
+Source Adapterクラスは内部契約です。公開構成APIは名前付きの`Provider`を組み込みAdapterへ対応付け、
+複数のsource idで同じAdapter型を共有できます。リポジトリ管理のCatalog値は構成前にProviderへ読み込みます。
 テストではAdapterを直接生成し、リクエスト、情報の保持、明示的な選択、失敗時の振る舞いを検証できます。
 
 最初の実行垂直スライスでは、実行Adapterを一時的に`rhinestone.adapters.execution`へ置き、

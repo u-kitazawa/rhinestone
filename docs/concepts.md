@@ -24,7 +24,7 @@ app = configure(catalog=BUILTIN)
 
 `Provider`はデータを提供するサービスや組織です。接続先やサービス固有の設定を持ち、`Catalog`から選びます。
 
-Providerは、以前の実装で`SourceDefinition`が担っていた「利用する提供元の定義」に相当します。`Source`とは異なり、公開APIではProviderを使います。
+Providerは、利用する提供元の定義です。`Source`とは異なり、通常利用の公開APIではProviderを使います。
 
 ### Result（検索結果）
 

@@ -19,7 +19,8 @@ python -m pip install rhinestone GDAL
 ```python
 from osgeo import gdal
 
-from rhinestone import SearchQuery, configure, sources
+from rhinestone import configure, sources
+from rhinestone.models import SearchQuery
 
 app = configure(
     sources=(sources.GSI,),

@@ -90,7 +90,8 @@ results = app.search(text="河川", limit=10)
 result = results[0]
 ```
 
-`text`、`bbox`、`time`、`limit`をキーワードで指定できます。`SearchQuery`を渡す形式は高度なAPIです。
+`text`、`bbox`、`time`、`limit`をキーワードで指定できます。`SearchQuery`を直接渡す場合は
+`rhinestone.models`からimportします。
 
 `SearchResults`のiterationと整数indexingは、構成したProvider順にgroupを連結し、
 各Provider内の順序を保持します。このsequenceは決定的な走査用であり、Providerを
@@ -171,13 +172,30 @@ except ProviderMetadataError:
 検索障害はSource単位で`SearchResults.diagnostics`へ隔離されますが、予期しないプログラム
 エラーは握りつぶされません。
 
+## 拡張・Adapter向けAPI
+
+通常利用のトップレベルAPIは、`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
+`Result`、`SearchResult`、`SearchResults`、`Resource`、`sources`に限定しています。
+Provider固有のSourceを実装したり、実行Adapter・Knowledge Adapterを追加したりする場合は、
+次のサブモジュールを正式な拡張surfaceとして利用してください。
+
+- `rhinestone.models`: `Source`、`ResourceCandidate`、`AccessPlan`系、`Metadata`、`Provenance`、
+  `SearchQuery`、`SearchDiagnostic`、`RuntimeFactory`、`Dependencies`などのドメイン型
+- `rhinestone.adapters.contracts`: Adapter Definition、Context、Factory、Protocol
+- `rhinestone.adapters.knowledge`: Knowledge AdapterのDefinition、Context、Registry、型
+- `rhinestone.security`: `DestinationPolicy`と宛先ルール
+- `rhinestone.representations`: format定義と正規化関数
+
+各サブモジュールの`__all__`が、その拡張surfaceの公開名を示します。Adapterの登録方法は
+[Custom Adapterを作る](custom-adapters.md)を参照してください。
+
 ## 形式名の共通定義
 
 Source Adapter 間で共有する format 名と media type 対応は
 `rhinestone.representations` から利用できます。
 
 ```python
-from rhinestone import canonical_format, format_from_media_type
+from rhinestone.representations import canonical_format, format_from_media_type
 
 assert canonical_format("GeoPackage") == "gpkg"
 assert format_from_media_type("image/tiff") == "geotiff"
@@ -199,6 +217,13 @@ data = app.open(result, "rasterio")
 
 GDAL、Rasterio、pyogrio、RDFLibなど、利用者が所有する外部実行環境です。RDFLibはDCATの検索・解決時に、GDAL、Rasterio、pyogrioは`Resource.open()`時に必要になります。HTTP JSON、HTTP text、JSON serviceは組み込みRuntimeを使用します。インストール例と検証済み範囲は[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
+```python
+from rhinestone.models import RuntimeFactory
+```
+
 ## 高度なモデル
 
-`Config`、`Source`、`ResourceCandidate`、`AccessPlan`、`FileAccessPlan`、`RemoteDatasetPlan`、`ServiceQueryPlan`、`SearchQuery`、`SearchResult`は内部パイプラインまたは拡張向けです。通常の利用では`Catalog`、`Provider`、`Result`、`Resource`だけを使います。
+`Source`、`ResourceCandidate`、`AccessPlan`、`FileAccessPlan`、`RemoteDatasetPlan`、
+`ServiceQueryPlan`、`SearchQuery`、`SearchDiagnostic`、`SearchResult`は、
+`rhinestone.models`経由で利用する拡張・Adapter向けモデルです。`Config`、`Provider`、
+`Result`、`Resource`は通常利用と拡張の両方で使う中核モデルです。

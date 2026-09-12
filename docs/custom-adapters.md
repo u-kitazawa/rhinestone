@@ -23,18 +23,12 @@ Source → Resolver → Resource
 Source Adapter を複数の Provider に再利用できます。
 
 ```python
-from rhinestone import (
-    Catalog,
-    Config,
+from rhinestone import Catalog, Config, Provider, configure
+from rhinestone.adapters.contracts import (
     ExecutionAdapterDefinition,
-    Metadata,
-    Provider,
-    Provenance,
-    ResourceCandidate,
-    Source,
     SourceAdapterDefinition,
-    configure,
 )
+from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
 
 
 class ExampleSource:
@@ -95,7 +89,8 @@ Source Definition の `dependencies` に Runtime 名を宣言すると、その�
 Context に渡されます。
 
 ```python
-from rhinestone import RuntimeFactory, SourceAdapterDefinition
+from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.models import RuntimeFactory
 
 definition = SourceAdapterDefinition(
     "rdf-source",
@@ -123,7 +118,7 @@ Credential secret は `Provider`、`Config`、`Source`、`Resource` に保存し
 `search(query)` は任意の機能です。実装する場合は、Adapter に対応条件を宣言します。
 
 ```python
-from rhinestone import SearchQuery
+from rhinestone.models import SearchQuery
 
 
 class SearchableExampleSource(ExampleSource):

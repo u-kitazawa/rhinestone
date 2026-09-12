@@ -1,7 +1,7 @@
 # Source Adapter（提供元アダプター）
 
 Source Adapter は provider 固有の Config と公式 API、またはリポジトリ管理の静的定義を解釈し、`Source` を作ります。
-利用者はAdapter classを直接import・登録せず、`SourceDefinition.adapter_type`で選びます。
+利用者はAdapter classを直接import・登録せず、`Provider.adapter_type`で選びます。
 
 [API リファレンス](../api.md) · [Execution Adapter](execution-adapters.md)
 

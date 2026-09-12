@@ -1,6 +1,6 @@
 [project]
 name = "rhinestone"
-version = "0.1.0"
+version = "0.1.1"
 description = "Knowledge and specification layer for Japanese public and geospatial data"
 readme = "README.md"
 license = "MIT"

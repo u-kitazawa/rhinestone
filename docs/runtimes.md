@@ -22,7 +22,8 @@ bare valueはcallableでもRuntime実体として扱います。遅延factoryを
 ```python
 import importlib
 
-from rhinestone import RuntimeFactory, configure
+from rhinestone import configure
+from rhinestone.models import RuntimeFactory
 
 app = configure(
     dependencies={

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Mapping, Tuple, cast
 
 import pytest
 
-from rhinestone import Config, RuntimeFactory, SearchQuery, configure, sources
+from rhinestone import Config, configure, sources
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
@@ -30,7 +30,12 @@ from rhinestone.errors import (
     UnsupportedAccessError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import ResourceCandidate, ServiceQueryPlan
+from rhinestone.models import (
+    ResourceCandidate,
+    RuntimeFactory,
+    SearchQuery,
+    ServiceQueryPlan,
+)
 from rhinestone.registry import CredentialRegistry
 from rhinestone.resolution import Resolver
 from tests.provider_support import fixture_json

@@ -2,7 +2,8 @@
 
 import os
 
-from rhinestone import SearchQuery, configure, sources
+from rhinestone import configure, sources
+from rhinestone.models import SearchQuery
 
 app = configure(sources=(sources.GEOSPATIAL_JP,))
 grouped = app.search(

@@ -14,7 +14,8 @@ Source Adapter -> KnowledgeAdapterRegistry -> Identity / Time Adapter
 独自のKnowledge Adapterを使う場合だけ`configure(adapters=...)`へ指定し、同じ種別の標準実装を置き換えます。
 
 ```python
-from rhinestone import KnowledgeAdapterDefinition, configure
+from rhinestone import configure
+from rhinestone.adapters.knowledge import KnowledgeAdapterDefinition
 from rhinestone.adapters.knowledge import StandardTimeAdapter
 
 app = configure(

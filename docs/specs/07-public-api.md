@@ -27,11 +27,11 @@ Catalog の `sources.json` が接続先を持ち、`sources.py` は読み込ん�
 独自の Source を構成する場合は `SourceDefinition` を明示します。
 
 ```python
-from rhinestone import SourceDefinition, configure
+from rhinestone import Provider, configure
 
 app = configure(
     sources=(
-        SourceDefinition(
+        Provider(
             id="my-stac",
             adapter_type="stac",
             settings={"endpoint": "https://stac.example/api"},

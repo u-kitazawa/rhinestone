@@ -4,17 +4,13 @@ from urllib.request import Request
 
 import pytest
 
+import rhinestone
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
     Catalog,
     Config,
-    Metadata,
-    Provenance,
     Provider,
     Result,
-    RuntimeFactory,
-    SearchQuery,
-    SourceDefinition,
     configure,
     sources,
 )
@@ -23,6 +19,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     UnsupportedSourceError,
 )
+from rhinestone.models import Metadata, Provenance, RuntimeFactory, SearchQuery
 
 from .provider_support import fixture_json
 
@@ -35,6 +32,38 @@ class FakeRasterio:
     def open(self, uri: str) -> str:
         self.calls.append(uri)
         return self.label + ":" + uri
+
+
+def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
+    assert rhinestone.__all__ == [
+        "configure",
+        "Rhinestone",
+        "Catalog",
+        "Provider",
+        "Config",
+        "Result",
+        "SearchResult",
+        "SearchResults",
+        "Resource",
+        "sources",
+    ]
+    removed = (
+        "Source",
+        "ResourceCandidate",
+        "AccessPlan",
+        "Metadata",
+        "Provenance",
+        "SearchQuery",
+        "Runtime",
+        "RuntimeFactory",
+        "Dependencies",
+        "AdapterDefinition",
+        "KnowledgeAdapterDefinition",
+        "DestinationPolicy",
+        "canonical_format",
+        "SourceDefinition",
+    )
+    assert all(not hasattr(rhinestone, name) for name in removed)
 
 
 def direct_config() -> Config:
@@ -110,7 +139,7 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
     monkeypatch.setattr(_http, "get_json", get_json)
     runtime = FakeRasterio("opened")
     app = configure(
-        sources=(SourceDefinition("imagery", "stac", {"endpoint": endpoint}),),
+        sources=(Provider("imagery", "stac", {"endpoint": endpoint}),),
         dependencies={"rasterio": runtime},
     )
     resource = app.resolve(
@@ -140,7 +169,7 @@ def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
         sources.ODPT,
         sources.SEARCH_CKAN_JP,
     )
-    assert all(isinstance(source, SourceDefinition) for source in sources.ALL)
+    assert all(isinstance(source, Provider) for source in sources.ALL)
     assert all(source.id != "direct" for source in sources.ALL)
 
 
@@ -234,8 +263,8 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
         }
 
     monkeypatch.setattr(_http, "get_json", get_json)
-    first = SourceDefinition("catalog-a", "ckan", {"endpoint": "https://first.test"})
-    second = SourceDefinition("catalog-b", "ckan", {"endpoint": "https://second.test"})
+    first = Provider("catalog-a", "ckan", {"endpoint": "https://first.test"})
+    second = Provider("catalog-b", "ckan", {"endpoint": "https://second.test"})
     app = configure(sources=(first, second))
 
     grouped = app.search(SearchQuery(text="dataset", limit=1))
@@ -299,7 +328,7 @@ def test_discovery_result_resolves_through_a_different_target_source(
 
 
 def test_public_search_reports_unsupported_conditions_per_source() -> None:
-    source = SourceDefinition("catalog", "ckan", {"endpoint": "https://example.test"})
+    source = Provider("catalog", "ckan", {"endpoint": "https://example.test"})
     app = configure(sources=(source,))
 
     results = app.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
@@ -329,8 +358,8 @@ def test_public_search_isolates_builtin_malformed_json_response(
     monkeypatch.setattr(_http, "urlopen", open_url)
     app = configure(
         sources=(
-            SourceDefinition("broken", "ckan", {"endpoint": "https://broken.test"}),
-            SourceDefinition("healthy", "ckan", {"endpoint": "https://healthy.test"}),
+            Provider("broken", "ckan", {"endpoint": "https://broken.test"}),
+            Provider("healthy", "ckan", {"endpoint": "https://healthy.test"}),
         )
     )
 
@@ -389,9 +418,9 @@ def test_invalid_public_search_parameters_fail_before_provider_requests(
     monkeypatch.setattr(_http, "get_json", get_json)
     app = configure(
         sources=(
-            SourceDefinition("ckan", "ckan", {"endpoint": "https://ckan.test"}),
-            SourceDefinition("stac", "stac", {"endpoint": "https://stac.test"}),
-            SourceDefinition(
+            Provider("ckan", "ckan", {"endpoint": "https://ckan.test"}),
+            Provider("stac", "stac", {"endpoint": "https://stac.test"}),
+            Provider(
                 "static",
                 "static",
                 {
@@ -423,12 +452,12 @@ def test_duplicate_source_id_is_rejected_during_configuration() -> None:
 
 def test_direct_source_id_is_reserved() -> None:
     with pytest.raises(AdapterRegistrationError, match="direct"):
-        configure(sources=(SourceDefinition("direct", "static"),))
+        configure(sources=(Provider("direct", "static"),))
 
 
 def test_unknown_built_in_adapter_type_is_rejected() -> None:
     with pytest.raises(AdapterRegistrationError, match="unknown"):
-        configure(sources=(SourceDefinition("custom", "unknown"),))
+        configure(sources=(Provider("custom", "unknown"),))
 
 
 def test_configured_contexts_do_not_share_runtime_instances() -> None:

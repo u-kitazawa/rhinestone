@@ -7,11 +7,7 @@ import pytest
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
     Config,
-    DestinationPolicy,
-    DestinationRule,
     Provider,
-    RuntimeFactory,
-    SearchQuery,
     configure,
     sources,
 )
@@ -22,7 +18,9 @@ from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
 )
+from rhinestone.models import RuntimeFactory, SearchQuery
 from rhinestone.registry import CredentialRegistry
+from rhinestone.security import DestinationPolicy, DestinationRule
 from tests.provider_support import fixture_json
 
 

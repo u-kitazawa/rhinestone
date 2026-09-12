@@ -6,7 +6,7 @@
 
 ## 設定と検索
 
-SourceDefinition の `settings` へ `endpoint`、Config へ `collection_id`、`item_id`、`asset_key` を指定します。検索には `bbox`、`time`、`limit` を使えます。
+Provider の `settings` へ `endpoint`、Config へ `collection_id`、`item_id`、`asset_key` を指定します。検索には `bbox`、`time`、`limit` を使えます。
 
 `collection_id` と `item_id` は未エンコードの論理IDとして指定します。RhinestoneはHTTP requestを組み立てる際に各IDを1つのpath segmentとしてpercent-encodeします。既にエンコードされたように見える値も推測で復号しないため、例えば論理IDの`%2F`はrequest pathでは`%252F`になります。`.`と`..`だけのIDもpath traversalとして正規化されないようエンコードします。Metadataとprovenanceには元の論理IDを保持します。
 
@@ -21,11 +21,11 @@ Assetの`href`がrelative URI referenceの場合は、そのAssetを含むItem r
 ```python
 import rasterio
 
-from rhinestone import Config, SourceDefinition, configure
+from rhinestone import Config, Provider, configure
 
 app = configure(
     sources=(
-        SourceDefinition(
+        Provider(
             id="imagery",
             adapter_type="stac",
             settings={"endpoint": "https://stac.example/api"},

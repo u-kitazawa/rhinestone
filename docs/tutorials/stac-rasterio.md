@@ -30,7 +30,7 @@ import os
 
 import rasterio
 
-from rhinestone import Config, SourceDefinition, configure
+from rhinestone import Config, Provider, configure
 
 
 endpoint = os.environ["RHINESTONE_STAC_ENDPOINT"]
@@ -39,7 +39,7 @@ item_id = os.environ["RHINESTONE_STAC_ITEM_ID"]
 asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
 app = configure(
     sources=(
-        SourceDefinition(
+        Provider(
             id="imagery",
             adapter_type="stac",
             settings={"endpoint": endpoint},

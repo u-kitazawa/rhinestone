@@ -9,13 +9,13 @@ from rhinestone.models import (
     FileAccessPlan,
     Metadata,
     Provenance,
+    Provider,
     Resource,
     ResourceCandidate,
     SearchDiagnostic,
     SearchQuery,
     SearchResult,
     Source,
-    SourceDefinition,
 )
 
 
@@ -35,9 +35,9 @@ def test_config_is_immutable_and_copies_nested_settings() -> None:
 
 def test_source_definition_and_config_ids_must_be_non_empty() -> None:
     with pytest.raises(ConfigValidationError, match="source id"):
-        SourceDefinition("", "ckan")
+        Provider("", "ckan")
     with pytest.raises(ConfigValidationError, match="adapter_type"):
-        SourceDefinition("catalog", "")
+        Provider("catalog", "")
     with pytest.raises(ConfigValidationError, match="source_id"):
         Config("", {})
 
@@ -113,7 +113,7 @@ def test_search_query_accepts_valid_boundary_values() -> None:
 
 def test_source_definition_is_deeply_immutable() -> None:
     settings: Dict[str, Any] = {"endpoint": "https://example.jp", "nested": {"x": 1}}
-    source = SourceDefinition("catalog", "ckan", settings)
+    source = Provider("catalog", "ckan", settings)
     cast(Dict[str, int], settings["nested"])["x"] = 2
 
     assert source.settings["nested"]["x"] == 1

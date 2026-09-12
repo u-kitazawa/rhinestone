@@ -5,18 +5,24 @@ import pytest
 
 from rhinestone import (
     Config,
-    DestinationPolicy,
-    ExecutionAdapterDefinition,
     Provider,
-    Resource,
-    RuntimeFactory,
-    Source,
-    SourceAdapterDefinition,
     configure,
+)
+from rhinestone.adapters.contracts import (
+    ExecutionAdapterDefinition,
+    SourceAdapterDefinition,
 )
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.errors import AdapterRegistrationError
-from rhinestone.models import Metadata, Provenance, ResourceCandidate
+from rhinestone.models import (
+    Metadata,
+    Provenance,
+    Resource,
+    ResourceCandidate,
+    RuntimeFactory,
+    Source,
+)
+from rhinestone.security import DestinationPolicy
 
 
 def custom_source(provider: Provider, context: Any) -> Any:

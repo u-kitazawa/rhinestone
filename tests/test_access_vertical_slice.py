@@ -1,6 +1,7 @@
 from typing import List, Tuple
 
-from rhinestone import Config, RuntimeFactory, configure
+from rhinestone import Config, configure
+from rhinestone.models import RuntimeFactory
 
 
 class FakeGdal:

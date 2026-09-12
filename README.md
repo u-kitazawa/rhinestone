@@ -84,9 +84,13 @@ app = configure(
 
 HTTP通信はRhinestoneに組み込まれています。
 
-## 内部アーキテクチャ
+## APIの段階
 
-`Source`、`Config`、`AccessPlan`、`Resolver`、Adapter、Registryは、提供元ごとの差を処理する内部概念です。通常は`Catalog`、検索結果、`Resource`だけを意識すれば十分です。
+通常の利用では、トップレベルの`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
+`Result`、`SearchResults`、`Resource`、`sources`を使います。`Source`、`AccessPlan`、
+`Metadata`、`Provenance`、Runtime、Adapter、Registryなどを扱う拡張コードは、用途別の
+サブモジュールからimportします。詳しくは[APIリファレンス](docs/api.md)の
+[拡張・Adapter向けAPI](docs/api.md#拡張-adapter向けapi)を参照してください。
 
 RhinestoneはGIS I/O、形式変換、空間演算、データ解析を実装せず、解決済みResourceを既存の専門Runtimeへ渡します。
 

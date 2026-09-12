@@ -48,8 +48,10 @@ app = configure(catalog=catalog)
 Source と Execution は、組み込みと同じパイプラインへ明示的に登録できます。
 
 ```python
-from rhinestone import (
-    Catalog, ExecutionAdapterDefinition, Provider, SourceAdapterDefinition, configure,
+from rhinestone import Catalog, Provider, configure
+from rhinestone.adapters.contracts import (
+    ExecutionAdapterDefinition,
+    SourceAdapterDefinition,
 )
 
 catalog = Catalog((Provider("example", "example-source"),))
@@ -88,8 +90,8 @@ Source factoryには、組み込みHTTP transport、Credential、依存Runtime�
 `adapters`へ`KnowledgeAdapterDefinition`を渡します。独自定義は同じ種別の標準実装を置き換えます。
 
 ```python
-from rhinestone import KnowledgeAdapterDefinition, configure
-from rhinestone.adapters.knowledge import StandardTimeAdapter
+from rhinestone import configure
+from rhinestone.adapters.knowledge import KnowledgeAdapterDefinition, StandardTimeAdapter
 
 app = configure(
     adapters=(
@@ -130,7 +132,8 @@ Runtime実体として扱われるため、callable façadeやMockがfactoryと�
 ```python
 import importlib
 
-from rhinestone import RuntimeFactory, configure
+from rhinestone import configure
+from rhinestone.models import RuntimeFactory
 
 app = configure(
     dependencies={

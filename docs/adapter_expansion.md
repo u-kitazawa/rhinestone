@@ -74,7 +74,7 @@ AdapterはProvider固有の知識を持つが、CoreへProvider固有構造を�
 GSIタイル専用のAdapterは追加しない。既存の汎用 `StaticAdapter` を使用し、
 GSI固有の固定知識はCatalog itemとして管理する。
 
-`SourceDefinition` は次のように構成する。
+`Provider` は次のように構成する。
 
 ```yaml
 source:

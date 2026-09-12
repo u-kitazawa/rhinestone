@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pytest
 
-from rhinestone import DestinationPolicy
 from rhinestone.adapters.execution import (
     ExecutionAdapter,
     GdalAdapter,
@@ -21,6 +20,7 @@ from rhinestone.models import (
     ResourceCandidate,
     Source,
 )
+from rhinestone.security import DestinationPolicy
 
 
 def make_resource(

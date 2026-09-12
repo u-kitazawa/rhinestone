@@ -4,14 +4,14 @@ import os
 
 import rasterio
 
-from rhinestone import Config, SourceDefinition, configure
+from rhinestone import Config, Provider, configure
 
 endpoint = os.environ["RHINESTONE_STAC_ENDPOINT"]
 collection_id = os.environ["RHINESTONE_STAC_COLLECTION_ID"]
 item_id = os.environ["RHINESTONE_STAC_ITEM_ID"]
 asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
 app = configure(
-    sources=(SourceDefinition("earth-search", "stac", {"endpoint": endpoint}),),
+    sources=(Provider("earth-search", "stac", {"endpoint": endpoint}),),
     dependencies={"rasterio": rasterio},
 )
 resource = app.resolve(
