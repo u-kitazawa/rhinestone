@@ -9,6 +9,7 @@
     "format": {"type": "string", "minLength": 1},
     "municipality": {"type": "string", "minLength": 1},
     "time": {"type": "string", "minLength": 1},
+    "time_kind": {"enum": ["calendar_year", "fiscal_year", "survey_year", "as_of_date"]},
     "archive": {"const": "zip"},
     "entry_point": {"type": "string", "minLength": 1}
   },

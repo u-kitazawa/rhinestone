@@ -6,7 +6,7 @@
 
 ## 設定と endpoint
 
-`dataset_id` または `resource_id` のいずれかが必須です。`archive="zip"`、`entry_point` は任意です。組み込みSourceではendpointはCatalogから渡され、CKAN Action APIへのHTTP通信はRhinestoneの組み込みtransportを使用します。検索条件は `text` と `limit` です。
+`dataset_id` または `resource_id` のいずれかが必須です。`archive="zip"`、`entry_point` は任意です。`time` を指定する場合は、必要に応じて `time_kind` に `calendar_year`、`fiscal_year`、`survey_year`、`as_of_date` のいずれかを指定して意味を明示できます。組み込みSourceではendpointはCatalogから渡され、CKAN Action APIへのHTTP通信はRhinestoneの組み込みtransportを使用します。検索条件は `text` と `limit` です。
 
 Adapterを直接構築する内部テストや再利用用途では、transport callbackをconstructorへ注入できます。標準の`configure()`経路で利用者がHTTP callbackを登録する必要はありません。
 

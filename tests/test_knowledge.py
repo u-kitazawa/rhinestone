@@ -26,6 +26,7 @@ from rhinestone.adapters.source.gsi_fundamental import GsiFundamentalAdapter
 from rhinestone.adapters.source.plateau import PlateauAdapter
 from rhinestone.errors import (
     AdapterRegistrationError,
+    ConfigValidationError,
     KnowledgeAdapterUnavailableError,
     KnowledgeResolutionError,
     KnowledgeValidationError,
@@ -408,6 +409,47 @@ def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
     gsi_knowledge = gsi_source.candidates[0].attributes["knowledge"]
     assert gsi_knowledge["identity"]["name"] == "横浜市"
     assert gsi_knowledge["time"]["year"] == 2020
+
+
+def test_source_adapters_preserve_explicit_time_kind() -> None:
+    registry = knowledge_registry()
+    plateau_source = PlateauAdapter(
+        plateau_client,
+        endpoint="https://fixture.example",
+        knowledge=registry,
+    ).load(
+        Config(
+            "plateau",
+            {
+                "dataset_id": "fixture",
+                "time": "2020年",
+                "time_kind": "survey_year",
+            },
+        )
+    )
+    assert (
+        plateau_source.candidates[0].attributes["knowledge"]["time"]["kind"]
+        == "survey_year"
+    )
+
+    settings = fundamental_settings()
+    settings.update({"time": "2020", "time_kind": "survey_year"})
+    gsi_source = GsiFundamentalAdapter(knowledge=registry).load(
+        Config("gsi-fundamental", settings)
+    )
+    assert (
+        gsi_source.candidates[0].attributes["knowledge"]["time"]["kind"]
+        == "survey_year"
+    )
+
+
+def test_source_knowledge_rejects_unknown_time_kind() -> None:
+    from rhinestone.adapters.source._knowledge import resolve_knowledge
+
+    with pytest.raises(ConfigValidationError, match="time_kind"):
+        resolve_knowledge(
+            {"time": "2020", "time_kind": "unknown"}, knowledge_registry()
+        )
 
 
 def test_knowledge_factory_is_not_loaded_until_source_uses_it() -> None:

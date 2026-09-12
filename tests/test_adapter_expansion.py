@@ -73,6 +73,22 @@ def test_plateau_requires_catalog_endpoint() -> None:
         PlateauAdapter(plateau_client)
 
 
+def test_plateau_keeps_provider_id_positionally_compatible() -> None:
+    adapter = PlateauAdapter(
+        plateau_client,
+        "https://fixture.example",
+        None,
+        None,
+        None,
+        None,
+        None,
+        "legacy-provider",
+        knowledge=None,
+    )
+
+    assert adapter is not None
+
+
 def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> None:
     adapter = PlateauAdapter(plateau_client, endpoint="https://fixture.example")
     settings = {

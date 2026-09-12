@@ -1,11 +1,11 @@
 """Internal helpers for declarative provider knowledge (not an extension API)."""
 
 from pathlib import PurePosixPath
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple, cast
 
 from ...errors import ConfigValidationError
 from ...models import Metadata, Provenance, ResourceCandidate, Source
-from ..knowledge import KnowledgeAdapterRegistry
+from ..knowledge import KnowledgeAdapterRegistry, TimeKind
 
 
 def string(settings: Mapping[str, Any], name: str) -> str:
@@ -70,5 +70,15 @@ def resolve_knowledge(
         resolved["identity"] = registry.resolve_municipality(value).as_mapping()
     if "time" in settings:
         value = string(settings, "time")
-        resolved["time"] = registry.resolve_time(value).as_mapping()
+        time_kind = settings.get("time_kind")
+        if time_kind is not None and time_kind not in {
+            "calendar_year",
+            "fiscal_year",
+            "survey_year",
+            "as_of_date",
+        }:
+            raise ConfigValidationError("time_kind must be a supported time kind")
+        resolved["time"] = registry.resolve_time(
+            value, kind=cast(Optional[TimeKind], time_kind)
+        ).as_mapping()
     return resolved
