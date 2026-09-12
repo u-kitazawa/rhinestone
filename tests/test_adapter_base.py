@@ -1,5 +1,7 @@
+import ast
 import json
 from importlib import resources
+from pathlib import Path
 from typing import Any, Mapping, cast
 
 import pytest
@@ -23,6 +25,23 @@ from rhinestone.errors import (
     ProviderResponseError,
 )
 from rhinestone.models import Config, Source
+
+ADAPTER_PACKAGES = (
+    "source/ckan",
+    "source/dcat",
+    "source/direct",
+    "source/gsi_fundamental",
+    "source/odpt",
+    "source/ogc",
+    "source/plateau",
+    "source/search_ckan_jp",
+    "source/stac",
+    "source/static",
+    "execution/gdal",
+    "execution/json_service",
+    "execution/pyogrio",
+    "execution/rasterio",
+)
 
 
 class ProbeAdapter(ProviderAdapter):
@@ -165,7 +184,8 @@ def test_builtin_source_adapters_implement_the_public_base(adapter: Any) -> None
     ),
 )
 def test_builtin_adapter_schema_is_valid_json_schema(adapter: Any) -> None:
-    text = resources.files(adapter.__module__).joinpath("schema.json").read_text()
+    package_name = adapter.__module__.rpartition(".")[0]
+    text = resources.files(package_name).joinpath("schema.json").read_text()
 
     Draft202012Validator.check_schema(json.loads(text))
 
@@ -173,3 +193,16 @@ def test_builtin_adapter_schema_is_valid_json_schema(adapter: Any) -> None:
 def test_internal_string_validation_remains_available_to_custom_adapters() -> None:
     with pytest.raises(ConfigValidationError, match="name"):
         string({}, "name")
+
+
+@pytest.mark.parametrize("package", ADAPTER_PACKAGES)
+def test_adapter_package_initializers_only_reexport_public_symbols(
+    package: str,
+) -> None:
+    root = Path(__file__).parents[1] / "src" / "rhinestone" / "adapters"
+    tree = ast.parse((root / package / "__init__.py").read_text())
+
+    assert not any(
+        isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        for node in tree.body
+    )

@@ -123,12 +123,10 @@ class ProviderAdapter(ABC):
 
     def config_schema(self) -> Optional[Mapping[str, Any]]:
         """Return this built-in adapter's JSON Schema, if it provides one."""
+        module_name = type(self).__module__
         try:
-            text = (
-                resources.files(type(self).__module__)
-                .joinpath("schema.json")
-                .read_text()
-            )
+            package_name = module_name.rpartition(".")[0] or module_name
+            text = resources.files(package_name).joinpath("schema.json").read_text()
         except (FileNotFoundError, ModuleNotFoundError, TypeError):
             return None
         return cast(Mapping[str, Any], json.loads(text))

@@ -109,6 +109,14 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
     assert GdalAdapter().supports(resource, frozenset({"gdal"})) is True
 
 
+def test_gdal_exposes_tile_xml_translation() -> None:
+    xml = GdalAdapter.tile_xml(
+        {"url": "https://tiles.example/{z}/{x}/{y}.png", "min_zoom": 2, "max_zoom": 5}
+    )
+
+    assert "https://tiles.example/${z}/${x}/${y}.png" in xml
+
+
 @pytest.mark.parametrize("tile", ([], {"url": 1}))
 def test_gdal_rejects_invalid_tile_options(tile: object) -> None:
     resource = make_resource("/data/tile", "custom")
