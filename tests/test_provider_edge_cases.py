@@ -125,6 +125,34 @@ def test_stac_asset_without_media_type_remains_explicitly_unknown() -> None:
     assert source.candidates[0].media_type is None
 
 
+def test_stac_plain_tiff_media_type_maps_to_geotiff() -> None:
+    endpoint = "https://stac.example"
+    item_url = endpoint + "/collections/c/items/i"
+    client = RecordingJsonClient(
+        {
+            item_url: {
+                "id": "i",
+                "properties": {},
+                "assets": {"data": {"href": "https://f.tif", "type": "image/tiff"}},
+            }
+        }
+    )
+
+    source = StacAdapter(get_json=client).load(
+        Config(
+            "stac",
+            {
+                "endpoint": endpoint,
+                "collection_id": "c",
+                "item_id": "i",
+                "asset_key": "data",
+            },
+        )
+    )
+
+    assert source.candidates[0].format == "geotiff"
+
+
 def test_ogc_serializes_interval_and_preserves_explicit_feature_id() -> None:
     """OGC datetime queryと明示feature idをservice accessへ保持するために必要である。"""
     endpoint = "https://features.example"

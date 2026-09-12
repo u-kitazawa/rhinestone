@@ -83,6 +83,32 @@ def test_ckan_canonicalizes_formats_without_losing_provider_metadata(
         assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"}))
 
 
+def test_ckan_uses_media_type_when_format_is_missing() -> None:
+    endpoint = "https://catalog.example"
+    resource_url = endpoint + "/api/3/action/resource_show"
+    package_url = endpoint + "/api/3/action/package_show"
+    client = RecordingJsonClient(
+        {
+            resource_url: {
+                "success": True,
+                "result": {
+                    "id": "resource-1",
+                    "package_id": "dataset-1",
+                    "mimetype": "application/geo+json",
+                    "url": "https://files.example/vector",
+                },
+            },
+            package_url: {"success": True, "result": {"id": "dataset-1"}},
+        }
+    )
+
+    source = CkanAdapter(get_json=client).load(
+        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+    )
+
+    assert source.candidates[0].format == "geojson"
+
+
 def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None:
     endpoint = "https://catalog.example"
     search_url = endpoint + "/api/3/action/package_search"

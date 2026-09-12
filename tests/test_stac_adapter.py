@@ -31,6 +31,7 @@ def test_stac_load_selects_only_the_explicit_asset_and_preserves_item() -> None:
     assert source.candidates[0].uri == "https://assets.example/scene-1.tif"
     assert source.candidates[0].media_type is not None
     assert source.candidates[0].media_type.startswith("image/tiff")
+    assert source.candidates[0].format == "cog"
     assert source.candidates[0].attributes["asset_key"] == "visual"
     assert source.metadata.title == "Tokyo scene"
     assert source.provenance.dataset_identifier == "sentinel-2"

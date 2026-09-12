@@ -37,6 +37,10 @@
 
 STAC は Cloud-Optimized GeoTIFF media type を `cog` として扱う。その他 asset は format が明示できないため、Resolver が失敗する場合がある。DCAT、CKAN、PLATEAU、Direct の配布物も、format が上表の Execution Adapter に一致した場合だけ `open()` できる。
 
+共通の representation 定義は `rhinestone.representations` にあり、format の alias と既知の
+media type 対応を Source Adapter 間で共有する。format が明示されている場合は media type
+より優先し、URL suffix からの推測は行わない。
+
 ## 共通の非対応
 
 - GDAL、Rasterio、pyogrio、PyArrow 等を使った format 変換や GIS 処理

@@ -2,16 +2,8 @@
 
 from typing import Any, Mapping, Optional, cast
 
+from ....representations import canonical_format, format_from_media_type
 from ..base import JsonObject
-from ..ckan.format import canonical_format
-
-_MEDIA_TYPE_FORMATS = {
-    "application/geo+json": "geojson",
-    "application/geopackage+sqlite3": "gpkg",
-    "application/json": "json",
-    "application/zip": "zip",
-    "text/csv": "csv",
-}
 
 
 def optional_string(value: Any) -> Optional[str]:
@@ -23,7 +15,7 @@ def resource_format(resource: JsonObject) -> Optional[str]:
     if format_name is not None and format_name.strip():
         return canonical_format(format_name)
     media_type = optional_string(resource.get("mimetype"))
-    return _MEDIA_TYPE_FORMATS.get(media_type or "")
+    return format_from_media_type(media_type)
 
 
 def organization_title(value: Any) -> Optional[str]:

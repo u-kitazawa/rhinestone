@@ -32,6 +32,13 @@ from .models import (
     Source,
     SourceDefinition,
 )
+from .representations import (
+    FORMAT_ALIASES,
+    FORMAT_CATEGORIES,
+    MEDIA_TYPE_FORMATS,
+    canonical_format,
+    format_from_media_type,
+)
 from .search import SearchResults
 from .security import DestinationPolicy, DestinationRule, NetworkPolicyLevel
 
@@ -46,8 +53,11 @@ __all__ = [
     "ExecutionAdapterDefinition",
     "Dependencies",
     "FileAccessPlan",
+    "FORMAT_ALIASES",
+    "FORMAT_CATEGORIES",
     "LibraryName",
     "Metadata",
+    "MEDIA_TYPE_FORMATS",
     "NetworkPolicyLevel",
     "Provenance",
     "Provider",
@@ -68,5 +78,7 @@ __all__ = [
     "SourceAdapterDefinition",
     "SourceDefinition",
     "configure",
+    "canonical_format",
+    "format_from_media_type",
     "sources",
 ]

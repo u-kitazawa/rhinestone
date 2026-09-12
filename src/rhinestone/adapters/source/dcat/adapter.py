@@ -11,6 +11,7 @@ from ....errors import (
     UnsupportedSearchConditionError,
 )
 from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
+from ....representations import canonical_format, format_from_media_type
 from ....security import DestinationPolicy
 from .._knowledge import source, string
 from ..base import ProviderAdapter
@@ -18,10 +19,6 @@ from ..base import ProviderAdapter
 _DCAT = "http://www.w3.org/ns/dcat#"
 _DCT = "http://purl.org/dc/terms/"
 _RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-_FORMATS = {
-    "application/geo+json": "geojson",
-    "application/geopackage+sqlite3": "gpkg",
-}
 
 
 class DcatAdapter(ProviderAdapter):
@@ -93,10 +90,9 @@ class DcatAdapter(ProviderAdapter):
             set(graph.objects(dataset, rdf.URIRef(_DCAT + "distribution"))), key=str
         ):
             media_type = self._value(rdf, graph, distribution, _DCAT + "mediaType")
-            format_name = self._value(rdf, graph, distribution, _DCT + "format")
-            format_name = _FORMATS.get(media_type or "", format_name)
-            if format_name is not None:
-                format_name = format_name.lower()
+            format_name = canonical_format(
+                self._value(rdf, graph, distribution, _DCT + "format")
+            ) or format_from_media_type(media_type)
             for url in sorted(
                 set(graph.objects(distribution, rdf.URIRef(_DCAT + "downloadURL"))),
                 key=str,

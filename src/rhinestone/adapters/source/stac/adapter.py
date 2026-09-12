@@ -13,6 +13,7 @@ from ....models import (
     Source,
 )
 from ....registry import CredentialRegistry
+from ....representations import format_from_media_type
 from ....security import DestinationPolicy
 from .._uri import resolve_response_href
 from ..base import JsonObject, JsonTransport, ProviderAdapter
@@ -161,7 +162,11 @@ class StacAdapter(ProviderAdapter):
         href = self._required_string(asset, "href")
         uri = resolve_response_href(response_uri, href)
         media_type = _optional_string(asset.get("type"))
-        format_name = "cog" if media_type and "cloud-optimized" in media_type else None
+        format_name = (
+            "cog"
+            if media_type and "cloud-optimized" in media_type
+            else format_from_media_type(media_type)
+        )
         return ResourceCandidate(
             uri=uri,
             format=format_name,

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Mapping, Optional, cast
 from ....errors import ConfigValidationError
 from ....models import Config, ResourceCandidate, Source
 from ....registry import CredentialRegistry
+from ....representations import canonical_format
 from ....security import DestinationPolicy
 from .._knowledge import entry_point, source, string
 from ..base import JsonTransport
@@ -60,11 +61,13 @@ class PlateauAdapter(CkanAdapter):
         candidates: List[ResourceCandidate] = []
         for item in resources:
             identifier = string(item, "id")
-            format_name = string(item, "format").lower()
-            format_name = {"geopackage": "gpkg"}.get(format_name, format_name)
+            format_name = canonical_format(string(item, "format"))
+            assert format_name is not None
             matches = resource_id is None or identifier == resource_id
             if "format" in settings:
-                matches = matches and format_name == string(settings, "format").lower()
+                matches = matches and format_name == canonical_format(
+                    string(settings, "format")
+                )
             attributes: Dict[str, Any] = dict(item)
             attributes.update(
                 {

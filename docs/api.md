@@ -105,6 +105,22 @@ resource = app.resolve(result)
 data = resource.open("rasterio")
 ```
 
+## Representation vocabulary
+
+Source Adapter 間で共有する format 名と media type 対応は
+`rhinestone.representations` から利用できます。
+
+```python
+from rhinestone import canonical_format, format_from_media_type
+
+assert canonical_format("GeoPackage") == "gpkg"
+assert format_from_media_type("image/tiff") == "geotiff"
+```
+
+format の alias と既知の media type だけを正規化し、URL の拡張子から format は推測しません。
+`FORMAT_ALIASES`、`MEDIA_TYPE_FORMATS`、`FORMAT_CATEGORIES` は共有定義です。
+Execution Adapter がどの format を実行できるかは、各 Adapter の capability として管理されます。
+
 ## `Rhinestone.open()`
 
 Resourceを渡すか、Result/Configを渡して解決とopenを一度に行えます。
