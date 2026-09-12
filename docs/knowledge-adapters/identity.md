@@ -1,5 +1,7 @@
 # Identity Knowledge Adapter（地域同一性）
 
+> 文書ステータス: Knowledge Adapterの仕様候補。実装済み公開APIの契約ではない。
+
 ## 1. 目的
 
 Identity Adapterは、Providerごとに異なる自治体名・地域コード・行政区分を、Rhinestoneが

@@ -36,10 +36,12 @@ Rhinestoneの中心概念は `Catalog -> Provider -> Result -> Resource` であ�
 ## 推奨する実装順
 
 ```text
-Identity -> Spatial -> Temporal -> Schema -> Provenance -> Rights
+Provenance foundation -> Identity -> Spatial -> Temporal -> Schema -> Rights
 ```
 
-IdentityとSpatialは、PLATEAU、基盤地図情報、STAC、OGC API Features、統計・CKAN系の
+意味領域としての優先度はIdentityとSpatialが最も高いが、実装基盤としてはProvenanceの
+最小契約を先に追加する。以後の各Adapterが、どのスナップショットと根拠で解決したかを
+失わないようにするためである。IdentityとSpatialは、PLATEAU、基盤地図情報、STAC、OGC API Features、統計・CKAN系の
 候補を横断して誤解を減らす。Temporalは検索条件とMetadataの双方に現れるため、次に
 正規化する価値が高い。SchemaはExecution Adapterとの接続点を明確にし、Provenanceと
 Rightsは、研究利用や再配布を含む実運用で「使えた」の根拠を残す。
@@ -71,6 +73,7 @@ Rightsは、研究利用や再配布を含む実運用で「使えた」の根�
 
 ## 個別文書
 
+- [レビューと実装判断](review.md)
 - [Identity / 地域同一性](identity.md)
 - [Spatial / 空間参照](spatial.md)
 - [Temporal / 時間意味](temporal.md)

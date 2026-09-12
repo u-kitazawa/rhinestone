@@ -1,5 +1,7 @@
 # Provenance Knowledge Adapter（来歴・再現性）
 
+> 文書ステータス: Knowledge Adapterの仕様候補。実装済み公開APIの契約ではない。
+
 ## 1. 目的
 
 Provenance Adapterは、Rhinestoneが「どのProviderの、どのメタデータを、いつ、どの設定で

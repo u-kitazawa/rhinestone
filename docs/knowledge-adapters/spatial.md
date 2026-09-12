@@ -1,5 +1,7 @@
 # Spatial Knowledge Adapter（空間参照と範囲意味）
 
+> 文書ステータス: Knowledge Adapterの仕様候補。実装済み公開APIの契約ではない。
+
 ## 1. 目的
 
 Spatial Adapterは、異なるProviderが使う座標参照系（CRS）、軸順、bbox、タイル、地域

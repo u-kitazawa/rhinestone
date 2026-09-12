@@ -1,5 +1,7 @@
 # Schema Knowledge Adapter（形式・スキーマ・互換性）
 
+> 文書ステータス: Knowledge Adapterの仕様候補。実装済み公開APIの契約ではない。
+
 ## 1. 目的
 
 Schema Adapterは、Resourceの「何であるか」を複数の粒度で記録し、形式判定やExecution

@@ -1,5 +1,7 @@
 # Rights Knowledge Adapter（ライセンス・利用条件）
 
+> 文書ステータス: Knowledge Adapterの仕様候補。実装済み公開APIの契約ではない。
+
 ## 1. 目的
 
 Rights Adapterは、Resourceに関係するライセンス、出典表示、利用目的、再配布、アクセス制限、

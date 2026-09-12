@@ -1,5 +1,7 @@
 # Temporal Knowledge Adapter（時間意味）
 
+> 文書ステータス: Knowledge Adapterの仕様候補。実装済み公開APIの契約ではない。
+
 ## 1. 目的
 
 Temporal Adapterは、同じ「2020」という文字列が、暦年、年度、調査年、データの有効時点の
