@@ -246,7 +246,10 @@ class SearchQuery:
         if raw_text is not None and not isinstance(raw_text, str):
             raise ConfigValidationError("text must be a string or None")
         if self.limit is not None and (type(self.limit) is not int or self.limit < 0):
-            raise ConfigValidationError("limit must be a non-negative integer")
+            raise ConfigValidationError(
+                "limit must be a non-negative integer (SearchQuery.limit); "
+                f"got {type(self.limit).__name__}"
+            )
         raw_bbox = cast(object, self.bbox)
         if raw_bbox is not None:
             if not isinstance(raw_bbox, tuple):
