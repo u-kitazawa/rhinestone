@@ -7,6 +7,8 @@ provider discovery separate from general GIS resource access and never scrapes
 HTML or guesses a download URL.
 """
 
+import json
+from importlib import resources
 from typing import Any, Iterable, List, Mapping, Optional, Tuple, cast
 
 from ....errors import (
@@ -49,6 +51,18 @@ class EstatGisAdapter(ProviderAdapter):
 
     adapter_type = "estat-gis"
     search_conditions = frozenset({"text", "limit"})
+
+    def config_schema(self) -> Optional[Mapping[str, Any]]:
+        """Load the schema beside this package's adapter implementation.
+
+        The implementation remains re-exported from ``__init__`` for the
+        built-in public import path, so the base class cannot infer the
+        package from ``type(self).__module__`` on its own.
+        """
+        text = (
+            resources.files(cast(str, __package__)).joinpath("schema.json").read_text()
+        )
+        return cast(Mapping[str, Any], json.loads(text))
 
     def __init__(
         self,

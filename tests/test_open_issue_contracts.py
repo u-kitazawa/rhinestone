@@ -178,6 +178,10 @@ def test_space_values_fail_closed_without_reprojection() -> None:
     assert require_lossless_crs84(BoundingBox(1, 2, 3, 4)) == (1, 2, 3, 4)
     with pytest.raises(KnowledgeValidationError):
         MeshCode("JIS-X-0410", 3, "5339")
+    with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", True, "5339")  # type: ignore[arg-type]
+    with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", 1.0, "5339")  # type: ignore[arg-type]
     assert MeshCode("JIS-X-0410", 3, "53394567").code == "53394567"
     assert tuple(BoundingBox(139, 35, 140, 36)) == (139, 35, 140, 36)
 
@@ -299,7 +303,9 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
         )
     with pytest.raises(ConfigValidationError, match="time_kind"):
         app.resolve(Config("estat", {"time_kind": "survey_year"}))
-    with pytest.raises(ConfigValidationError, match="Unknown"):
+    with pytest.raises(ConfigValidationError, match="survey_year"):
+        app.resolve(Config("estat", {"survey_year": "2020"}))
+    with pytest.raises(ConfigValidationError, match="unexpected"):
         app.resolve(Config("estat", {"unexpected": "value"}))
     with pytest.raises(ResourceNotFoundError, match="No e-Stat"):
         app.resolve(Config("estat", {"distribution_id": "missing"}))
@@ -331,6 +337,16 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
     assert app_results[0].target.source_id == "estat"
     with pytest.raises(UnsupportedSearchConditionError):
         adapter.search(SearchQuery(bbox=(1, 2, 3, 4)))
+
+    adapter.config_schema = lambda: None  # type: ignore[method-assign]
+    with pytest.raises(ConfigValidationError, match="Unknown"):
+        adapter.load(Config("estat-gis", {"unexpected": "value"}))
+    with pytest.raises(ConfigValidationError, match="survey_year"):
+        EstatGisAdapter._matches(
+            distributions[0],
+            {"time": "2020"},
+            {"time": {"year": 2020, "kind": "calendar_year"}},
+        )
 
 
 def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
@@ -407,3 +423,15 @@ def test_custom_adapter_context_uses_public_ports_only() -> None:
     )
     app.resolve(Config("external", {}))
     assert seen == [(True, True)]
+
+
+def test_municipality_projection_ignores_provider_specific_identity_fields() -> None:
+    snapshot = StaticMunicipalityAdapter(municipality_records(), snapshot_version="v1")
+    projected = MunicipalityIdentity(
+        code="13101",
+        name="千代田区",
+        prefecture_code="13",
+        prefecture_name="東京都",
+        provider_identifiers={"other": "external-13101"},
+    )
+    assert snapshot.project(projected, "plateau") == "13101-tokyo"

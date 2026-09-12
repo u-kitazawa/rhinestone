@@ -116,7 +116,7 @@ class MeshCode:
     def __post_init__(self) -> None:
         if not isinstance(cast(object, self.system), str) or not self.system.strip():
             raise KnowledgeValidationError("mesh system must be non-empty")
-        if self.level not in _MESH_LENGTHS:
+        if type(self.level) is not int or self.level not in _MESH_LENGTHS:
             raise KnowledgeValidationError("mesh level must be an integer from 1 to 6")
         if (
             not isinstance(cast(object, self.code), str)

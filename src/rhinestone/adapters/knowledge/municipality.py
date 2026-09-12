@@ -171,8 +171,9 @@ class StaticMunicipalityAdapter:
             cast(object, identity), MunicipalityIdentity
         ) or not isinstance(cast(object, provider), str):
             raise KnowledgeResolutionError("municipality projection input is invalid")
+        identity_key = _canonical_identity_key(identity)
         for record in self._records:
-            if record.identity == identity:
+            if _canonical_identity_key(record.identity) == identity_key:
                 try:
                     return record.provider_identifiers[provider]
                 except KeyError:
@@ -184,6 +185,19 @@ class StaticMunicipalityAdapter:
     def evidence(self) -> Mapping[str, str]:
         """Return non-secret snapshot evidence for retained metadata."""
         return {"snapshot_version": self.snapshot_version}
+
+
+def _canonical_identity_key(
+    identity: MunicipalityIdentity,
+) -> tuple[str, str, str, str, str]:
+    """Return identity fields shared across provider projections."""
+    return (
+        identity.code,
+        identity.name,
+        identity.prefecture_code,
+        identity.prefecture_name,
+        identity.level,
+    )
 
 
 __all__ = [

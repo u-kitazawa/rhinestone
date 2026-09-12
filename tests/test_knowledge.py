@@ -23,6 +23,7 @@ from rhinestone.adapters.source.plateau import PlateauAdapter
 from rhinestone.errors import (
     AdapterRegistrationError,
     ConfigValidationError,
+    DependencyUnavailableError,
     KnowledgeAdapterUnavailableError,
     KnowledgeResolutionError,
     KnowledgeValidationError,
@@ -292,6 +293,46 @@ def test_knowledge_registry_requires_factory_context() -> None:
     )
     with pytest.raises(KnowledgeResolutionError, match="factory context"):
         registry.resolve_time("2024")
+
+
+def test_knowledge_registry_accepts_a_dependency_port_without_scoped() -> None:
+    class PublicDependencies:
+        @property
+        def available(self) -> frozenset[str]:
+            return frozenset({"runtime"})
+
+        def get(self, name: str) -> object:
+            assert name == "runtime"
+            return "loaded"
+
+    seen: list[object] = []
+
+    def factory(context: KnowledgeAdapterContext) -> StandardTimeAdapter:
+        assert context.dependencies.available == frozenset({"runtime"})
+        seen.append(context.dependencies.get("runtime"))
+        with pytest.raises(DependencyUnavailableError, match="not declared"):
+            context.dependencies.get("undeclared")
+        return StandardTimeAdapter()
+
+    registry = KnowledgeAdapterRegistry(
+        (
+            KnowledgeAdapterDefinition(
+                "standard",
+                factory,
+                "time",
+                frozenset({"runtime"}),
+            ),
+        ),
+        KnowledgeAdapterContext(
+            get_json=lambda *args: {},
+            get_text=lambda uri: "",
+            credentials=CredentialRegistry({}),
+            dependencies=PublicDependencies(),  # type: ignore[arg-type]
+            destination_policy=DestinationPolicy.unrestricted(),
+        ),
+    )
+    assert registry.resolve_time("2024").year == 2024
+    assert seen == ["loaded"]
 
 
 @pytest.mark.parametrize(
