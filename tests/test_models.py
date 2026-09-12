@@ -64,6 +64,15 @@ def test_search_query_rejects_invalid_bboxes(bbox: object) -> None:
         SearchQuery(bbox=cast(Any, bbox))
 
 
+def test_search_query_bbox_error_does_not_call_element_repr() -> None:
+    class Unrepresentable:
+        def __repr__(self) -> str:
+            raise AssertionError("repr must not be called")
+
+    with pytest.raises(ConfigValidationError, match="invalid length or element type"):
+        SearchQuery(bbox=cast(Any, (0, 1, 2, Unrepresentable())))
+
+
 @pytest.mark.parametrize(
     "time",
     (
@@ -77,6 +86,15 @@ def test_search_query_rejects_invalid_bboxes(bbox: object) -> None:
 def test_search_query_rejects_invalid_time_ranges(time: object) -> None:
     with pytest.raises(ConfigValidationError, match="time"):
         SearchQuery(time=cast(Any, time))
+
+
+def test_search_query_time_error_does_not_call_element_repr() -> None:
+    class Unrepresentable:
+        def __repr__(self) -> str:
+            raise AssertionError("repr must not be called")
+
+    with pytest.raises(ConfigValidationError, match="invalid length or element type"):
+        SearchQuery(time=cast(Any, (Unrepresentable(), None)))
 
 
 def test_search_query_accepts_valid_boundary_values() -> None:

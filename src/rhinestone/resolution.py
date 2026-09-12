@@ -21,27 +21,43 @@ ResolutionRule = Callable[[ResourceCandidate], Optional[Tuple[int, str]]]
 
 
 class Resolver:
+    """Choose exactly one candidate and construct its explicit AccessPlan."""
+
     def __init__(self, rules: Iterable[ResolutionRule] = ()) -> None:
         self._rules = tuple(rules)
 
     def resolve(self, source: Source) -> Resource:
+        """Resolve a normalized Source into one Resource.
+
+        Candidates marked ``matches_config=False`` remain in the Source but are
+        excluded from selection. Exactly one remaining candidate is required;
+        representation and access kind must be explicit enough to build a plan.
+        """
         candidates: List[ResourceCandidate] = []
         for item in source.candidates:
             matches = item.attributes.get("matches_config", True)
             if not isinstance(matches, bool):
-                raise UnsupportedAccessError("matches_config must be a boolean")
+                raise UnsupportedAccessError(
+                    "Resource candidate attribute 'matches_config' must be a "
+                    f"boolean; got {type(matches).__name__}"
+                )
             if matches:
                 candidates.append(item)
         if not candidates:
-            raise ResourceNotFoundError("No resource matches the requested selection")
+            raise ResourceNotFoundError(
+                "No resource matches the requested selection; verify the "
+                "provider-specific identifiers and Config settings"
+            )
         if len(candidates) != 1:
             raise AmbiguousResourceError(
-                f"Expected exactly one resource candidate; got {len(candidates)}"
+                "Expected exactly one resource candidate after selection; "
+                f"got {len(candidates)}; add an explicit resource selector"
             )
         candidate = candidates[0]
         if candidate.format is None and candidate.media_type is None:
             raise UnsupportedAccessError(
-                "Resource format and media type are unknown; URI suffix is not guessed"
+                "Resource format and media type are unknown; URI suffix is not "
+                "guessed, so provide an explicit representation"
             )
         plan = self._select_plan(candidate)
         return Resource(
@@ -58,7 +74,10 @@ class Resolver:
         explicit = candidate.attributes.get("access_kind")
         if explicit is not None:
             if not isinstance(explicit, str):
-                raise UnsupportedAccessError("access_kind must be a string")
+                raise UnsupportedAccessError(
+                    "access_kind must be a string naming file, remote-dataset, "
+                    f"or service-query; got {type(explicit).__name__}"
+                )
             return self._make_plan(explicit, candidate)
         matches: List[Tuple[int, str]] = []
         for rule in self._rules:
@@ -80,14 +99,18 @@ class Resolver:
                 archive = "zip"
             return FileAccessPlan(uri=candidate.uri, archive=archive)
         raise UnsupportedAccessError(
-            f"No access plan supports media type {candidate.media_type!r}"
+            f"No access plan supports media type {candidate.media_type!r}; "
+            "provide a known format or explicit access_kind"
         )
 
     @staticmethod
     def _make_plan(kind: str, candidate: ResourceCandidate) -> AccessPlan:
         options = candidate.attributes.get("access_options", {})
         if not isinstance(options, Mapping):
-            raise UnsupportedAccessError("access_options must be an object")
+            raise UnsupportedAccessError(
+                "access_options must be an object containing adapter options; "
+                f"got {type(options).__name__}"
+            )
         options = cast(Mapping[str, Any], options)
         if kind == "file":
             return FileAccessPlan(
@@ -99,4 +122,7 @@ class Resolver:
             return RemoteDatasetPlan(uri=candidate.uri, options=options)
         if kind == "service-query":
             return ServiceQueryPlan(uri=candidate.uri, options=options)
-        raise UnsupportedAccessError(f"Unknown access plan kind {kind!r}")
+        raise UnsupportedAccessError(
+            f"Unknown access plan kind {kind!r}; expected file, remote-dataset, "
+            "or service-query"
+        )

@@ -117,7 +117,17 @@ class _ConfiguredSourceAdapter:
 
 
 class Rhinestone:
-    """An isolated context composed from sources and user-owned runtime inputs."""
+    """An isolated application context for discovery, resolution, and access.
+
+    Each instance owns its configured Providers, injected runtimes, credential
+    factories, network policy, and adapter registry. It is safe to create
+    separate instances with different credentials or runtime objects in the
+    same process.
+
+    Use :func:`configure` for the usual construction path. The public workflow
+    is ``search -> resolve -> open``; known Provider selections can start with
+    ``resolve(Config(...))`` instead.
+    """
 
     def __init__(
         self,
@@ -197,7 +207,8 @@ class Rhinestone:
             source_id = source_definition.id
             if source_id in configured_ids:
                 raise AdapterRegistrationError(
-                    f"Source {source_id!r} is registered more than once"
+                    f"Source {source_id!r} is registered more than once; each "
+                    "Provider.id must be unique"
                 )
             configured_ids.add(source_id)
             configured_sources.append(
@@ -237,7 +248,8 @@ class Rhinestone:
             if execution.name != definition.name:
                 raise AdapterRegistrationError(
                     f"Execution adapter factory returned {execution.name!r}; "
-                    f"expected {definition.name!r}"
+                    f"expected {definition.name!r}; return an adapter whose name "
+                    "matches its ExecutionAdapterDefinition"
                 )
             configured_executions.append(execution)
         adapter_registry = AdapterRegistry(
@@ -255,7 +267,21 @@ class Rhinestone:
         self._search = SearchCoordinator(source_adapters)
 
     def resolve(self, value: Union[Config, Result]) -> Resource:
-        """Resolve a Provider selection or a search Result into a Resource."""
+        """Resolve a Config or search Result into one concrete Resource.
+
+        ``Result`` metadata and provenance are preserved when discovery and
+        resolution use different source adapters. Resolution fails explicitly
+        when no candidate, multiple candidates, or no supported access plan is
+        available.
+
+        Raises:
+            UnsupportedSourceError: If a Config names an unconfigured source.
+            ProviderMetadataError: If provider metadata cannot be loaded.
+            ResourceNotFoundError: If no candidate matches the selection.
+            AmbiguousResourceError: If multiple candidates match.
+            UnsupportedAccessError: If the candidate has no supported access
+                plan.
+        """
         if not isinstance(value, Result):
             return self._pipeline.resolve(value)
         resource = self._pipeline.resolve(value.to_config())
@@ -276,7 +302,20 @@ class Rhinestone:
     def open(
         self, value: Union[Config, Result, Resource], library: LibraryName
     ) -> object:
-        """Open a Resource, or resolve a Config/Result and open it."""
+        """Resolve and open a value through an explicitly named runtime.
+
+        Args:
+            value: An already resolved ``Resource``, a search ``Result``, or a
+                direct ``Config``.
+            library: Execution adapter name such as ``"rasterio"`` or
+                ``"pyogrio"``.
+
+        Raises:
+            ExecutionAdapterUnavailableError: If the named adapter or injected
+                runtime is unavailable or incompatible.
+            ResourceAccessError: If the runtime cannot access the resource.
+            DestinationNotAllowedError: If network policy rejects the URI.
+        """
         if isinstance(value, Resource):
             return self._pipeline.open_resource(value, library)
         if isinstance(value, Config):
@@ -292,6 +331,27 @@ class Rhinestone:
         time: Optional[Tuple[Optional[datetime], Optional[datetime]]] = None,
         limit: Optional[int] = None,
     ) -> SearchResults:
+        """Search all configured searchable sources in configuration order.
+
+        Args:
+            query: A ``SearchQuery`` or shorthand text query.
+            text: Free-text search condition.
+            bbox: ``(west, south, east, north)`` geographic bounding box.
+            time: ``(start, end)`` datetime interval; either endpoint may be
+                ``None``.
+            limit: Non-negative result limit passed to capable sources.
+
+        Returns:
+            ``SearchResults`` grouped by source and traversable in deterministic
+            configuration order. Unsupported conditions and isolated provider
+            failures are available in ``result.diagnostics``.
+
+        Raises:
+            ConfigValidationError: If a query value has an invalid shape or
+                type.
+            TypeError: If both ``query`` and shorthand search parameters are
+                supplied.
+        """
         supplied_parameters = (text, bbox, time, limit)
         if query is not None and any(
             parameter is not None for parameter in supplied_parameters
@@ -315,7 +375,30 @@ def configure(
     network_policy: NetworkPolicyLevel = "credentialed",
     adapters: Iterable[AdapterDefinition] = (),
 ) -> Rhinestone:
-    """Compose adapters around selected sources, runtimes, and shared knowledge."""
+    """Create an isolated Rhinestone application.
+
+    Args:
+        sources: Provider definitions to enable when ``catalog`` is omitted.
+        catalog: Immutable Provider collection; mutually exclusive with
+            ``sources``.
+        dependencies: User-owned runtime objects or ``RuntimeFactory`` values,
+            keyed by runtime name. Factories are evaluated lazily.
+        credentials: Lazy factories keyed by logical credential name. Secrets
+            are not retained in public models.
+        network_policy: ``"credentialed"`` (default) authorizes requests from
+            catalog destinations; ``"none"`` disables destination restrictions.
+        adapters: Additional Source, Execution, or Knowledge Adapter
+            definitions.
+
+    Returns:
+        A configured application whose ``search``, ``resolve``, and ``open``
+        methods share the same registries and security policy.
+
+    Raises:
+        ConfigValidationError: If a source or policy setting is invalid.
+        AdapterRegistrationError: If definitions conflict or a factory returns
+            an inconsistent adapter.
+    """
     return Rhinestone(
         sources=sources,
         catalog=catalog,
@@ -407,7 +490,10 @@ def _build_builtin_source_adapter(
         _reject_options(adapter_type, settings, ("items",))
         items = settings.get("items")
         if not isinstance(items, Mapping):
-            raise ConfigValidationError("static source requires items")
+            raise ConfigValidationError(
+                "static source requires items: provide a non-empty mapping of "
+                "static resource definitions"
+            )
         return StaticAdapter(cast(Mapping[str, Mapping[str, Any]], items))
     if adapter_type == "search-ckan-jp":
         _reject_options(adapter_type, settings, ("endpoint",))
@@ -458,7 +544,8 @@ def _reject_options(
     unknown = sorted(set(settings) - set(allowed))
     if unknown:
         raise ConfigValidationError(
-            f"Unknown {adapter_type} source options: {', '.join(unknown)}"
+            f"Unknown {adapter_type} source options: {', '.join(unknown)}; "
+            "remove them or use the adapter's documented settings"
         )
 
 
@@ -481,7 +568,10 @@ def _split_definitions(
         elif isinstance(candidate, KnowledgeAdapterDefinition):
             knowledge.append(candidate)
         else:
-            raise AdapterRegistrationError("Unknown adapter definition")
+            raise AdapterRegistrationError(
+                "Unknown adapter definition; expected a SourceAdapterDefinition, "
+                "ExecutionAdapterDefinition, or KnowledgeAdapterDefinition"
+            )
     return tuple(sources), tuple(executions), tuple(knowledge)
 
 
@@ -526,11 +616,13 @@ def _source_definitions(
     for definition in custom:
         if definition.adapter_type in custom_types:
             raise AdapterRegistrationError(
-                f"Source adapter {definition.adapter_type!r} is registered more than once"
+                f"Source adapter {definition.adapter_type!r} is registered more "
+                "than once; adapter_type must be unique"
             )
         if definition.adapter_type in definitions:
             raise AdapterRegistrationError(
-                f"Source adapter {definition.adapter_type!r} is registered more than once"
+                f"Source adapter {definition.adapter_type!r} is registered more "
+                "than once; built-in adapter types cannot be replaced"
             )
         custom_types.add(definition.adapter_type)
         definitions[definition.adapter_type] = definition
@@ -549,7 +641,8 @@ def _source_context(
         definition = definitions[provider.adapter_type]
     except KeyError:
         raise AdapterRegistrationError(
-            f"Source adapter {provider.adapter_type!r} is not registered"
+            f"Source adapter {provider.adapter_type!r} is not registered; add a "
+            "matching SourceAdapterDefinition"
         ) from None
     return SourceAdapterContext(
         get_json=_http.get_json,
@@ -590,7 +683,8 @@ def _execution_definitions(
     for definition in custom:
         if definition.name in names:
             raise AdapterRegistrationError(
-                f"Execution adapter {definition.name!r} is registered more than once"
+                f"Execution adapter {definition.name!r} is registered more than "
+                "once; adapter names must be unique"
             )
         names.add(definition.name)
         definitions.append(definition)
@@ -606,7 +700,8 @@ def _knowledge_definitions(
     for definition in custom_definitions:
         if definition.kind in custom_by_kind:
             raise AdapterRegistrationError(
-                f"Knowledge adapter kind {definition.kind!r} is registered more than once"
+                f"Knowledge adapter kind {definition.kind!r} is registered more "
+                "than once; provide one definition per kind"
             )
         custom_by_kind[definition.kind] = definition
 
@@ -650,6 +745,7 @@ def _build_source_adapter(
         definition = definitions[source.adapter_type]
     except KeyError:
         raise AdapterRegistrationError(
-            f"Source adapter {source.adapter_type!r} is not registered"
+            f"Source adapter {source.adapter_type!r} is not registered; add a "
+            "matching SourceAdapterDefinition"
         ) from None
     return definition.factory(source, cast(SourceAdapterContext, context))

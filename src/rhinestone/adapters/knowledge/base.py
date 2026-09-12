@@ -13,15 +13,17 @@ KnowledgeKind = Literal["identity", "time"]
 class IdentityKnowledgeAdapter(Protocol):
     """Resolve an explicit municipality name or code to canonical identity."""
 
-    def resolve_municipality(self, value: str) -> MunicipalityIdentity: ...
+    def resolve_municipality(self, value: str) -> MunicipalityIdentity:
+        """Resolve a provider expression into a canonical municipality identity."""
+        ...
 
 
 class TimeKnowledgeAdapter(Protocol):
     """Resolve an explicit Japanese public-data time expression."""
 
-    def resolve_time(
-        self, value: str, *, kind: TimeKind | None = None
-    ) -> TimeSemantic: ...
+    def resolve_time(self, value: str, *, kind: TimeKind | None = None) -> TimeSemantic:
+        """Resolve a provider time expression into canonical time semantics."""
+        ...
 
 
 KnowledgeAdapter = Union[IdentityKnowledgeAdapter, TimeKnowledgeAdapter]

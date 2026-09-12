@@ -20,6 +20,8 @@ from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
 class StacAdapter(ProviderAdapter):
+    """Interpret STAC API Items, Assets, and standard search responses."""
+
     adapter_type = "stac"
     search_conditions = frozenset({"bbox", "time", "limit"})
 
@@ -52,6 +54,7 @@ class StacAdapter(ProviderAdapter):
         )
 
     def load(self, config: Config) -> Source:
+        """Load one STAC Item and its explicitly named Asset."""
         settings = self._config_settings(config)
         endpoint = self._endpoint_from(settings)
         collection_id = self._required_string(settings, "collection_id")
@@ -90,6 +93,7 @@ class StacAdapter(ProviderAdapter):
     def search(
         self, query: SearchQuery, collections: Sequence[str] = ()
     ) -> Tuple[SearchResult, ...]:
+        """Search STAC Items using bbox, datetime, limit, and collections."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
         if unsupported:

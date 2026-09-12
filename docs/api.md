@@ -27,6 +27,24 @@ provider = Provider(
 ```
 
 `adapter_type`と`settings`はProviderを構成する拡張向け情報です。secretやRuntimeは保持しません。
+`Provider`は不変なので、設定を変更する場合は新しいProviderまたはCatalogを作成します。
+
+## `Config`（解決設定）
+
+`Config`は、構成済みProviderを選び、そのAdapterへ渡す解決条件です。
+`source_id`はCatalog内のProvider IDと一致している必要があります。Provider固有の例として、
+CKANなら`resource_id`、STACなら`collection_id`・`item_id`・`asset_key`を指定します。
+
+```python
+from rhinestone import Config
+
+config = Config("my-stac", {
+    "collection_id": "sentinel-2",
+    "item_id": "scene-1",
+    "asset_key": "visual",
+})
+resource = app.resolve(config)
+```
 
 ## `configure()`（アプリケーションを作る）
 
@@ -91,6 +109,10 @@ resource = app.resolve(result)
 
 検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。Providerの通信・metadata・response障害は`reason="provider_failure"`、`failure_type`（`metadata`または`response`）として診断され、他のSourceの結果は継続して返されます。予期しないプログラムエラーはこの診断へ変換されません。
 
+`Result.metadata`と`Result.provenance`は検索時の情報です。`app.resolve(result)`は解決後も
+これらをResourceへ引き継ぎます。アプリケーションから独立して作成したResultでは
+`result.resolve()`を使えないため、`app.resolve(result)`を使用してください。
+
 ## `Rhinestone.resolve()`（Resourceを確定する）
 
 `Result`または高度な`Config`をResourceへ解決します。
@@ -106,6 +128,48 @@ resource = app.resolve(result)
 ```python
 data = resource.open("rasterio")
 ```
+
+ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作成した後の値です。
+`access_plan.kind`は`file`、`remote-dataset`、`service-query`のいずれかです。
+`Resource.open()`はデータ解析を行わず、指定した利用者所有Runtimeへ処理を委譲します。
+
+## エラー処理
+
+期待される失敗は`rhinestone.errors`の型で分類されます。通常は次のように、原因に応じて
+利用者へ案内したり再試行したりします。
+
+```python
+from rhinestone.errors import (
+    AmbiguousResourceError,
+    ProviderMetadataError,
+    ResourceNotFoundError,
+)
+
+try:
+    resource = app.resolve(config)
+except ResourceNotFoundError:
+    print("selection did not match a resource; check provider identifiers")
+except AmbiguousResourceError:
+    print("more than one resource matched; add an explicit selector")
+except ProviderMetadataError:
+    print("provider metadata was unavailable; retry or inspect the endpoint")
+```
+
+主な分類は次のとおりです。
+
+- `ConfigValidationError`: Config、検索条件、Catalog、Adapter定義の入力不正
+- `UnsupportedSourceError`: 未構成のSource ID
+- `ProviderMetadataError` / `ProviderResponseError`: 通信・Provider応答の失敗
+- `ResourceNotFoundError` / `AmbiguousResourceError`: Resource選択の失敗
+- `UnsupportedAccessError`: formatまたはAccessPlanが未対応・不明
+- `ExecutionAdapterUnavailableError` / `DependencyUnavailableError`: Runtime不足または非互換
+- `ResourceAccessError` / `DestinationNotAllowedError`: 実データアクセスまたは宛先制限の失敗
+- `CredentialUnavailableError` / `CredentialLoadError`: 論理Credentialの設定・factory失敗
+
+例外メッセージには、原因を調べるためのフィールド名、Source ID、Adapter名、候補数などが
+含まれます。Credentialのsecret、raw payload、過長なレスポンスは含まれません。Providerの
+検索障害はSource単位で`SearchResults.diagnostics`へ隔離されますが、予期しないプログラム
+エラーは握りつぶされません。
 
 ## 形式名の共通定義
 

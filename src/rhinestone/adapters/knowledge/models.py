@@ -13,7 +13,11 @@ MunicipalityLevel = Literal["prefecture", "municipality"]
 
 @dataclass(frozen=True)
 class MunicipalityIdentity:
-    """A canonical municipality identity, independent of provider identifiers."""
+    """A canonical municipality identity independent of provider identifiers.
+
+    ``provider_identifiers`` preserves source-specific IDs while ``code`` and
+    the names provide a shared value for downstream consumers.
+    """
 
     code: str
     name: str
@@ -60,7 +64,7 @@ class MunicipalityIdentity:
         )
 
     def as_mapping(self) -> Mapping[str, object]:
-        """Return a JSON-compatible representation for retained metadata."""
+        """Return a JSON-compatible mapping suitable for retained metadata."""
         return {
             "code": self.code,
             "name": self.name,
@@ -73,7 +77,11 @@ class MunicipalityIdentity:
 
 @dataclass(frozen=True)
 class TimeSemantic:
-    """A time value whose public-data meaning is explicit."""
+    """A time value whose public-data meaning is explicit.
+
+    Year-based kinds use ``year``; ``as_of_date`` uses ``as_of``. Japanese era
+    information is retained in ``era`` and ``era_year`` when supplied.
+    """
 
     kind: TimeKind
     year: Optional[int] = None
@@ -119,7 +127,7 @@ class TimeSemantic:
             )
 
     def as_mapping(self) -> Mapping[str, object]:
-        """Return a JSON-compatible representation for retained metadata."""
+        """Return a JSON-compatible mapping suitable for retained metadata."""
         result: dict[str, object] = {"kind": self.kind, "raw": self.raw}
         if self.year is not None:
             result["year"] = self.year

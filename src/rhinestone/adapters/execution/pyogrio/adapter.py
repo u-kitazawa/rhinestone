@@ -20,6 +20,7 @@ class PyogrioAdapter(ExecutionAdapter):
         super().__init__(destination_policy)
 
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+        """Return whether pyogrio and the Resource's vector format are compatible."""
         return (
             resource.format or ""
         ).lower() in self._formats and self.name in dependencies
@@ -31,6 +32,7 @@ class PyogrioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
+        """Read the selected vector Resource with ``runtime.read_dataframe``."""
         attributes = resource_attributes(resource)
         options: Dict[str, Any] = {}
         encoding = attributes.get("encoding")

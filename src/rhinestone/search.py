@@ -47,6 +47,7 @@ class SearchResults(Sequence[Result]):
         grouped: Mapping[str, Tuple[Result, ...]],
         diagnostics: Iterable[SearchDiagnostic] = (),
     ) -> "SearchResults":
+        """Build immutable results from source-grouped Result tuples."""
         return cls(grouped, diagnostics)
 
     @property
@@ -66,11 +67,13 @@ class SearchResults(Sequence[Result]):
     def __getitem__(
         self, index: Union[int, slice, str]
     ) -> Union[Result, Tuple[Result, ...]]:
+        """Return a result, sequence slice, or source-specific result group."""
         if isinstance(index, str):
             return self._grouped[index]
         return self._items[index]
 
     def __len__(self) -> int:
+        """Return the total number of results across all source groups."""
         return len(self._items)
 
     def keys(self) -> Tuple[str, ...]:
@@ -116,6 +119,13 @@ class SearchCoordinator:
         self._adapters = tuple(adapters)
 
     def search(self, query: SearchQuery) -> SearchResults:
+        """Search capable adapters and isolate expected provider failures.
+
+        Each source receives only the conditions it declares. Unsupported or
+        missing required conditions become diagnostics; metadata and response
+        failures affect only the failing source. Unexpected programming errors
+        continue to propagate.
+        """
         searchable = [
             adapter
             for adapter in self._adapters

@@ -19,6 +19,8 @@ from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
 class OgcFeaturesAdapter(ProviderAdapter):
+    """Interpret OGC API Features collections and item services."""
+
     adapter_type = "ogc-features"
     search_conditions = frozenset({"bbox", "time", "limit"})
 
@@ -53,6 +55,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
         self._collection_id = collection_id
 
     def load(self, config: Config) -> Source:
+        """Load one OGC collection and its explicit items endpoint."""
         settings = self._config_settings(config)
         endpoint = self._endpoint_from(settings)
         collection_id = self._required_string(settings, "collection_id")
@@ -92,6 +95,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
         )
 
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+        """Search one configured OGC collection using standard parameters."""
         endpoint = self._endpoint_from({}, self._endpoint)
         if not self._collection_id:
             raise ConfigValidationError("collection_id is required for OGC search")

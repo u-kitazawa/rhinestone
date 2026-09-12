@@ -23,6 +23,7 @@ class GdalAdapter(ExecutionAdapter):
         super().__init__(destination_policy)
 
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+        """Return whether GDAL and the Resource's format are compatible."""
         tile = resource.access_plan.options.get("tile")
         return self.name in dependencies and (
             (resource.format or "").lower() in self._formats
@@ -39,6 +40,7 @@ class GdalAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
+        """Open the selected Resource with ``runtime.OpenEx``."""
         uri = self._runtime_uri(resource)
         attributes = resource_attributes(resource)
         options: List[str] = []
@@ -49,7 +51,10 @@ class GdalAdapter(ExecutionAdapter):
             runtime_options: dict[str, Any] = {"open_options": tuple(options)}
             result = runtime.OpenEx(uri, **runtime_options)
             if result is None:
-                raise ResourceAccessError("GDAL returned no dataset")
+                raise ResourceAccessError(
+                    "GDAL returned no dataset; verify the selected Resource and "
+                    "GDAL-supported format"
+                )
             return result
         except Exception as error:
             raise ResourceAccessError(
@@ -63,11 +68,16 @@ class GdalAdapter(ExecutionAdapter):
         tile = resource.access_plan.options.get("tile")
         if tile is not None:
             if not isinstance(tile, Mapping):
-                raise ResourceAccessError("GDAL tile options must be an object")
+                raise ResourceAccessError(
+                    "GDAL tile options must be an object; provide explicit tile "
+                    "configuration in AccessPlan.options"
+                )
             tile = cast(Mapping[str, Any], tile)
             tile_url = tile.get("url")
             if not isinstance(tile_url, str):
-                raise ResourceAccessError("GDAL tile URL must be a string")
+                raise ResourceAccessError(
+                    "GDAL tile URL must be a string; provide a valid tile endpoint"
+                )
             uri = build_tile_xml(tile)
         archive = attributes.get("archive")
         if isinstance(resource.access_plan, FileAccessPlan):
@@ -85,4 +95,5 @@ class GdalAdapter(ExecutionAdapter):
 
     @staticmethod
     def tile_xml(tile: Mapping[str, Any]) -> str:
+        """Build GDAL WMS/XYZ tile XML from explicit tile options."""
         return build_tile_xml(tile)

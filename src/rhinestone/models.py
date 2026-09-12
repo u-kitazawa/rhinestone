@@ -29,7 +29,12 @@ LibraryName = str
 
 @dataclass(frozen=True)
 class RuntimeFactory:
-    """An explicit lazy factory for a user-owned Runtime."""
+    """Describe a runtime factory evaluated only when its runtime is needed.
+
+    The zero-argument callable is not evaluated during application
+    configuration. Its result is cached within the configured dependency
+    scope.
+    """
 
     factory: Callable[[], Any]
 
@@ -84,7 +89,13 @@ def _freeze(value: Any) -> Any:
 
 @dataclass(frozen=True)
 class Provider:
-    """A data provider selected from a catalog."""
+    """Describe one configured data provider.
+
+    ``id`` is the application-local identifier used by ``Config`` and search
+    diagnostics. ``adapter_type`` selects the Source Adapter that interprets
+    ``settings``. Runtime objects and secrets belong in ``configure`` inputs,
+    not in this immutable value.
+    """
 
     id: str
     adapter_type: str
@@ -92,9 +103,15 @@ class Provider:
 
     def __post_init__(self) -> None:
         if not self.id:
-            raise ConfigValidationError("source id must be a non-empty string")
+            raise ConfigValidationError(
+                "source id must be a non-empty string; set Provider.id to the "
+                "configured source identifier"
+            )
         if not self.adapter_type:
-            raise ConfigValidationError("adapter_type must be a non-empty string")
+            raise ConfigValidationError(
+                "adapter_type must be a non-empty string; choose a "
+                "registered source adapter type"
+            )
         object.__setattr__(self, "settings", _freeze(self.settings))
 
 
@@ -104,17 +121,32 @@ SourceDefinition = Provider
 
 @dataclass(frozen=True)
 class Config:
+    """Select one configured source and provide its resolution settings.
+
+    ``source_id`` must refer to a Provider configured in the application;
+    ``settings`` are interpreted by that source's adapter and frozen on input.
+    """
+
     source_id: str
     settings: Mapping[str, Any]
 
     def __post_init__(self) -> None:
         if not self.source_id:
-            raise ConfigValidationError("source_id must be a non-empty string")
+            raise ConfigValidationError(
+                "source_id must be a non-empty string; identify the "
+                "configured source to resolve"
+            )
         object.__setattr__(self, "settings", _freeze(self.settings))
 
 
 @dataclass(frozen=True)
 class Metadata:
+    """Normalized human-readable metadata retained from a source response.
+
+    Common fields support display and inspection while provider-specific values
+    remain available in the immutable ``raw`` mapping.
+    """
+
     title: Optional[str] = None
     description: Optional[str] = None
     publisher: Optional[str] = None
@@ -128,6 +160,12 @@ class Metadata:
 
 @dataclass(frozen=True)
 class Provenance:
+    """Trace the provider, identifiers, endpoint, and retrieval of a value.
+
+    Provenance is retained through search, resolution, and execution. The
+    ``raw`` mapping must not contain credentials or other secrets.
+    """
+
     provider: str
     dataset_identifier: Optional[str] = None
     resource_identifier: Optional[str] = None
@@ -147,6 +185,13 @@ class Provenance:
 
 @dataclass(frozen=True)
 class ResourceCandidate:
+    """One provider-advertised delivery option considered by the Resolver.
+
+    ``attributes`` carries explicit resolver hints such as ``matches_config``,
+    ``access_kind``, ``access_options``, and ``archive``. Candidates are not
+    opened directly; resolve the enclosing ``Source`` first.
+    """
+
     uri: str
     format: Optional[str]
     media_type: Optional[str]
@@ -158,6 +203,12 @@ class ResourceCandidate:
 
 @dataclass(frozen=True)
 class Source:
+    """Normalized provider output consumed by resource resolution.
+
+    The source retains metadata, all delivery candidates, capabilities,
+    provenance, and raw provider metadata for later pipeline stages.
+    """
+
     metadata: Metadata
     candidates: Tuple[ResourceCandidate, ...]
     capabilities: FrozenSet[str]
@@ -172,6 +223,12 @@ class Source:
 
 @dataclass(frozen=True)
 class AccessPlan:
+    """Explicit instructions describing how a selected resource is delivered.
+
+    ``kind`` identifies the delivery shape and ``options`` carries safe,
+    adapter-specific execution values.
+    """
+
     kind: str
     uri: str
     options: Mapping[str, Any] = field(default_factory=dict)
@@ -182,22 +239,35 @@ class AccessPlan:
 
 @dataclass(frozen=True)
 class FileAccessPlan(AccessPlan):
+    """Access plan for a downloadable file, optionally contained in an archive."""
+
     archive: Optional[str] = None
     kind: str = field(default="file", init=False)
 
 
 @dataclass(frozen=True)
 class RemoteDatasetPlan(AccessPlan):
+    """Access plan for a remotely readable dataset such as a COG."""
+
     kind: str = field(default="remote-dataset", init=False)
 
 
 @dataclass(frozen=True)
 class ServiceQueryPlan(AccessPlan):
+    """Access plan for a queryable service endpoint."""
+
     kind: str = field(default="service-query", init=False)
 
 
 @dataclass(frozen=True)
 class Resource:
+    """A uniquely selected, metadata-preserving data resource.
+
+    A Resource contains the URI, normalized representation, provenance, and
+    explicit access plan selected by the Resolver. Use :meth:`open` with a
+    named execution runtime, or pass it to ``Rhinestone.open``.
+    """
+
     uri: str
     format: Optional[str]
     media_type: Optional[str]
@@ -226,16 +296,34 @@ class Resource:
     def open(self, library: str) -> object: ...
 
     def open(self, library: LibraryName) -> object:
-        """Open this Resource through the explicitly selected runtime library."""
+        """Open this resource through the explicitly selected runtime.
+
+        Args:
+            library: Registered execution adapter name, such as ``"gdal"``,
+                ``"rasterio"``, ``"pyogrio"``, or ``"json-service"``.
+
+        Raises:
+            ExecutionAdapterUnavailableError: If the resource is detached, the
+                adapter is unavailable, or no compatible runtime was injected.
+            ResourceAccessError: If the selected runtime cannot open the data.
+        """
         if self._opener is None:
             raise ExecutionAdapterUnavailableError(
-                "Resource is not bound to an execution context"
+                "Resource is not bound to an execution context; use "
+                "app.resolve(config_or_result) before calling Resource.open"
             )
         return self._opener(library)
 
 
 @dataclass(frozen=True)
 class SearchQuery:
+    """Immutable search criteria projected to each source's capabilities.
+
+    ``bbox`` is ``(west, south, east, north)``. ``time`` is a ``(start, end)``
+    pair where either endpoint may be ``None``. Unsupported supplied criteria
+    are reported through ``SearchResults.diagnostics``.
+    """
+
     text: Optional[str] = None
     bbox: Optional[Tuple[float, float, float, float]] = None
     time: Optional[Tuple[Optional[datetime], Optional[datetime]]] = None
@@ -244,7 +332,10 @@ class SearchQuery:
     def __post_init__(self) -> None:
         raw_text = cast(object, self.text)
         if raw_text is not None and not isinstance(raw_text, str):
-            raise ConfigValidationError("text must be a string or None")
+            raise ConfigValidationError(
+                "text must be a string or None (SearchQuery.text); "
+                f"got {type(raw_text).__name__}"
+            )
         if self.limit is not None and (type(self.limit) is not int or self.limit < 0):
             raise ConfigValidationError(
                 "limit must be a non-negative integer (SearchQuery.limit); "
@@ -253,18 +344,26 @@ class SearchQuery:
         raw_bbox = cast(object, self.bbox)
         if raw_bbox is not None:
             if not isinstance(raw_bbox, tuple):
-                raise ConfigValidationError("bbox must be a tuple of four numbers")
+                raise ConfigValidationError(
+                    "bbox must be a tuple of four numbers (SearchQuery.bbox); "
+                    f"got {type(raw_bbox).__name__}"
+                )
             bbox_values = cast(Tuple[Any, ...], raw_bbox)
             if len(bbox_values) != 4 or any(
                 isinstance(value, bool) or not isinstance(value, (int, float))
                 for value in bbox_values
             ):
-                raise ConfigValidationError("bbox must be a tuple of four numbers")
+                raise ConfigValidationError(
+                    "bbox must be a tuple of four numbers (SearchQuery.bbox); "
+                    "got a tuple with an invalid length or element type"
+                )
         raw_time = cast(object, self.time)
         if raw_time is not None:
             if not isinstance(raw_time, tuple):
                 raise ConfigValidationError(
-                    "time must be a tuple of two datetime or None values"
+                    "time must be a tuple of two datetime or None values "
+                    "(SearchQuery.time); "
+                    f"values; got {type(raw_time).__name__}"
                 )
             time_values = cast(Tuple[Any, ...], raw_time)
             if len(time_values) != 2 or any(
@@ -272,11 +371,15 @@ class SearchQuery:
                 for value in time_values
             ):
                 raise ConfigValidationError(
-                    "time must be a tuple of two datetime or None values"
+                    "time must be a tuple of two datetime or None values "
+                    "(SearchQuery.time); "
+                    "got a tuple with an invalid length or element type"
                 )
 
     @property
     def supplied_conditions(self) -> FrozenSet[str]:
+        """Return the names of criteria explicitly supplied by the caller."""
+
         return frozenset(
             name
             for name in ("text", "bbox", "time", "limit")
@@ -284,7 +387,7 @@ class SearchQuery:
         )
 
     def project(self, supported_conditions: Iterable[str]) -> "SearchQuery":
-        """Return the portion of this query understood by a source."""
+        """Return a query containing only source-supported criteria."""
         supported = frozenset(supported_conditions)
         return SearchQuery(
             text=self.text if "text" in supported else None,
@@ -296,7 +399,13 @@ class SearchQuery:
 
 @dataclass(frozen=True)
 class SearchDiagnostic:
-    """Explain how one source participated in a search."""
+    """Explain how one source participated in a federated search.
+
+    ``reason`` is normally ``unsupported``, ``missing_required``, or
+    ``provider_failure``. For provider failures, ``failure_type`` distinguishes
+    metadata retrieval from response interpretation without exposing raw
+    exceptions in search results.
+    """
 
     source_id: str
     skipped_conditions: FrozenSet[str]
@@ -306,7 +415,10 @@ class SearchDiagnostic:
 
     def __post_init__(self) -> None:
         if not self.source_id:
-            raise ConfigValidationError("search diagnostic source_id must be non-empty")
+            raise ConfigValidationError(
+                "search diagnostic source_id must be non-empty; identify the "
+                "source that produced the diagnostic"
+            )
         object.__setattr__(
             self, "skipped_conditions", frozenset(self.skipped_conditions)
         )
@@ -317,6 +429,12 @@ class SearchDiagnostic:
 
 @dataclass(frozen=True)
 class Result:
+    """A searchable dataset result that can be resolved into a Resource.
+
+    The result preserves display metadata and provenance from discovery. Its
+    ``target`` is the configuration used by the normal resolution pipeline.
+    """
+
     title: str
     description: Optional[str]
     discovered_by: str
@@ -329,17 +447,26 @@ class Result:
 
     def __post_init__(self) -> None:
         if not self.discovered_by:
-            raise ConfigValidationError("discovered_by must be a non-empty string")
+            raise ConfigValidationError(
+                "Result.discovered_by must be a non-empty string; identify the "
+                "source that discovered this result"
+            )
 
     def to_config(self) -> Config:
-        """Return the target configuration for the normal resolve pipeline."""
+        """Return the immutable target configuration for resolution."""
         return self.target
 
     def resolve(self) -> Resource:
-        """Resolve this result in the Rhinestone application that returned it."""
+        """Resolve this result in the application that returned it.
+
+        Raises:
+            ConfigValidationError: If this detached result is not bound to an
+                application context.
+        """
         if self._resolver is None:
             raise ConfigValidationError(
-                "Result is not bound to a Rhinestone application"
+                "Result is not bound to a Rhinestone application; use "
+                "app.resolve(result) with the application that produced it"
             )
         return self._resolver()
 

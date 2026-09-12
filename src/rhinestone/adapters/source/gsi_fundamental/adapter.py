@@ -11,6 +11,8 @@ from ..base import ProviderAdapter
 
 
 class GsiFundamentalAdapter(ProviderAdapter):
+    """Resolve local GSI Fundamental geospatial data declarations."""
+
     adapter_type = "gsi-fundamental"
 
     def __init__(self, knowledge: KnowledgeAdapterRegistry | None = None) -> None:
@@ -18,6 +20,7 @@ class GsiFundamentalAdapter(ProviderAdapter):
         self._knowledge = knowledge or KnowledgeAdapterRegistry()
 
     def load(self, config: Config) -> Source:
+        """Build a Source for the configured local GML data file."""
         settings = self._config_settings(config)
         path = Path(string(settings, "path")).absolute()
         if not path.is_file():

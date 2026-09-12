@@ -11,6 +11,8 @@ from .validation import filter_mapping, required_string, string_mapping
 
 
 class OdptAdapter(ProviderAdapter):
+    """Create explicit ODPT JSON service access plans."""
+
     adapter_type = "odpt"
 
     def __init__(
@@ -38,6 +40,7 @@ class OdptAdapter(ProviderAdapter):
         self._terms_url = required_string(terms_url, "terms_url")
 
     def load(self, config: Config) -> Source:
+        """Build a queryable Source from an ODPT dataset declaration."""
         settings = self._config_settings(config)
         dataset = string(settings, "dataset")
         credential = string(settings, "credential")
@@ -85,6 +88,7 @@ class OdptAdapter(ProviderAdapter):
         plan: AccessPlan,
         credentials: CredentialRegistry,
     ) -> Tuple[Mapping[str, Any], Mapping[str, str]]:
+        """Convert an ODPT service plan into request parameters and headers."""
         expected_uri = plan.options.get("endpoint")
         if (
             plan.kind != "service-query"

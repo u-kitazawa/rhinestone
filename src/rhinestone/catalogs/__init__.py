@@ -20,7 +20,9 @@ def load_catalog_resource(name: object) -> Any:
         or "\\" in name
         or name in {".", ".."}
     ):
-        raise ConfigValidationError("Catalog resource name must be a file name")
+        raise ConfigValidationError(
+            "Catalog resource name must be a file name without path separators"
+        )
     try:
         text = (
             resources.files(_CATALOG_PACKAGE).joinpath(name).read_text(encoding="utf-8")
@@ -39,7 +41,11 @@ def load_catalog_resource(name: object) -> Any:
 
 @dataclass(frozen=True)
 class Catalog:
-    """An immutable collection of Providers known to an application."""
+    """An immutable, ordered collection of Providers enabled by an application.
+
+    Iteration and indexing preserve configuration order. Use :meth:`add` to
+    obtain a new Catalog; an existing Catalog is never modified.
+    """
 
     providers: Tuple[Provider, ...]
 
@@ -47,12 +53,15 @@ class Catalog:
         object.__setattr__(self, "providers", tuple(providers))
 
     def __iter__(self) -> Iterator[Provider]:
+        """Iterate over Providers in catalog order."""
         return iter(self.providers)
 
     def __len__(self) -> int:
+        """Return the number of Providers in the catalog."""
         return len(self.providers)
 
     def __getitem__(self, index: int) -> Provider:
+        """Return the Provider at an integer index."""
         return self.providers[index]
 
     def add(self, *providers: Provider) -> "Catalog":
@@ -62,13 +71,14 @@ class Catalog:
 
 @dataclass(frozen=True)
 class CatalogSource:
-    """A catalog entry with its public facade name."""
+    """A built-in catalog entry pairing a display name with its Provider."""
 
     name: str
     definition: Provider
 
     @property
     def provider(self) -> Provider:
+        """Return the Provider definition represented by this catalog entry."""
         return self.definition
 
 
@@ -78,11 +88,15 @@ def load_source_catalog(
     """Load and validate built-in Source catalog entries in catalog order."""
     document = load_catalog_resource(name)
     if not isinstance(document, Mapping):
-        raise ConfigValidationError("Source catalog must be an object")
+        raise ConfigValidationError(
+            "Source catalog must be an object containing a 'sources' mapping"
+        )
     document_mapping = cast(Mapping[str, Any], document)
     raw_sources = document_mapping.get("sources")
     if not isinstance(raw_sources, Mapping) or not raw_sources:
-        raise ConfigValidationError("Source catalog must define sources")
+        raise ConfigValidationError(
+            "Source catalog must define a non-empty 'sources' mapping"
+        )
 
     source_entries = cast(Mapping[Any, Any], raw_sources)
     entries: List[CatalogSource] = []

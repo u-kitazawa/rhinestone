@@ -14,6 +14,8 @@ RequestPreparer = Callable[
 
 
 class JsonServiceAdapter(ExecutionAdapter):
+    """Execute an explicit JSON service AccessPlan through an HTTP runtime."""
+
     name = "json-service"
     priority = 10
 
@@ -30,6 +32,7 @@ class JsonServiceAdapter(ExecutionAdapter):
         self._credentials = credentials or CredentialRegistry({})
 
     def bind_credentials(self, credentials: CredentialRegistry) -> "JsonServiceAdapter":
+        """Return a copy bound to the application's credential registry."""
         return JsonServiceAdapter(
             self._prepare_request,
             self._service,
@@ -38,6 +41,7 @@ class JsonServiceAdapter(ExecutionAdapter):
         )
 
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+        """Return whether this service and JSON response shape are compatible."""
         return (
             self.name in dependencies
             and isinstance(resource.access_plan, ServiceQueryPlan)
@@ -52,6 +56,7 @@ class JsonServiceAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
+        """Execute the service request without following redirects."""
         self._authorize_resource(resource, destination_policy)
         params, headers = self._prepare_request(resource.access_plan, self._credentials)
         try:
@@ -63,20 +68,31 @@ class JsonServiceAdapter(ExecutionAdapter):
                 allow_redirects=False,
             )
             if 300 <= response.status_code < 400:
-                raise ResourceAccessError("Service redirects are not supported")
+                raise ResourceAccessError(
+                    "Service redirects are not supported; configure the final "
+                    "service endpoint explicitly"
+                )
             response.raise_for_status()
         except Exception:
             # requests exceptions may include a URL containing the secret query.
-            raise ResourceAccessError("JSON service request failed") from None
+            raise ResourceAccessError(
+                "JSON service request failed; inspect the service endpoint, "
+                "credential configuration, and runtime response"
+            ) from None
         try:
             data = response.json()
         except Exception:
-            raise ProviderResponseError("Service returned invalid JSON") from None
+            raise ProviderResponseError(
+                "Service returned invalid JSON; expected a JSON document"
+            ) from None
         if resource.access_plan.options.get("response_type") == "array" and (
             not isinstance(data, list)
             or any(not isinstance(item, Mapping) for item in cast(List[Any], data))
         ):
-            raise ProviderResponseError("Service must return an array of objects")
+            raise ProviderResponseError(
+                "Service must return an array of objects; response_type='array' "
+                "was declared in the AccessPlan"
+            )
         return cast(Any, data)
 
     def authorize(

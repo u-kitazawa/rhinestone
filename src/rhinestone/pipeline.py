@@ -12,6 +12,8 @@ from .security import DestinationPolicy
 
 
 class AccessPipeline:
+    """Run Config through Source, resolution, and execution boundaries."""
+
     def __init__(
         self,
         adapter_registry: AdapterRegistry,
@@ -29,6 +31,7 @@ class AccessPipeline:
         )
 
     def resolve(self, config: Config) -> Resource:
+        """Load provider metadata and resolve ``config`` into a Resource."""
         adapter = self._adapter_registry.source(config.source_id)
         try:
             source = adapter.load(config)
@@ -36,7 +39,8 @@ class AccessPipeline:
             raise
         except Exception as error:
             raise ProviderMetadataError(
-                f"Provider metadata for {config.source_id!r} could not be loaded"
+                f"Provider metadata for source {config.source_id!r} could not be "
+                "loaded; inspect the endpoint and provider availability"
             ) from error
         resource = self._resolver.resolve(source)
         if self._execution_selector is None or self._dependencies is None:
@@ -60,12 +64,16 @@ class AccessPipeline:
         )
 
     def open(self, config: Config, library: LibraryName) -> object:
+        """Resolve ``config`` and open its Resource through ``library``."""
         return self.resolve(config).open(library)
 
     def open_resource(self, resource: Resource, library: LibraryName) -> object:
         """Open an existing Resource using this pipeline's policy and runtimes."""
         if self._execution_selector is None or self._dependencies is None:
-            raise ProviderMetadataError("Execution pipeline is not configured")
+            raise ProviderMetadataError(
+                "Execution pipeline is not configured; construct the public "
+                "application with configure() before opening a Resource"
+            )
         return self._open_resource(
             resource,
             library,

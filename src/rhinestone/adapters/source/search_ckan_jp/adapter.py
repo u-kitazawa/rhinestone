@@ -35,11 +35,13 @@ class SearchCkanJpAdapter(ProviderAdapter):
         )
 
     def load(self, config: Config) -> Source:
+        """Reject direct loading because this adapter is discovery-only."""
         raise UnsupportedSourceError(
             "search-ckan-jp is a discovery-only source and cannot resolve resources"
         )
 
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+        """Search the official search.ckan.jp endpoint using text criteria."""
         if query.text is None:
             raise ConfigValidationError(
                 "search-ckan-jp requires a text condition for discovery"

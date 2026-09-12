@@ -20,6 +20,8 @@ from .format import optional_string
 
 
 class CkanAdapter(ProviderAdapter):
+    """Interpret CKAN Action API package and resource responses."""
+
     adapter_type = "ckan"
     search_conditions = frozenset({"text", "limit"})
 
@@ -68,6 +70,7 @@ class CkanAdapter(ProviderAdapter):
         return response["result"]
 
     def load(self, config: Config) -> Source:
+        """Load one CKAN resource and its parent package metadata."""
         settings = self._config_settings(config)
         endpoint = self._endpoint_from(settings)
         resource_id = self._required_string(settings, "resource_id")
@@ -113,6 +116,7 @@ class CkanAdapter(ProviderAdapter):
         )
 
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+        """Search CKAN packages and return their resource-level results."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
         if unsupported:

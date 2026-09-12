@@ -19,6 +19,7 @@ class RasterioAdapter(ExecutionAdapter):
         super().__init__(destination_policy)
 
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+        """Return whether Rasterio and the Resource's raster format are compatible."""
         return (
             resource.format or ""
         ).lower() in self._formats and self.name in dependencies
@@ -30,6 +31,7 @@ class RasterioAdapter(ExecutionAdapter):
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
+        """Open the selected raster Resource with ``runtime.open``."""
         try:
             return runtime.open(resource.uri)
         except Exception as error:

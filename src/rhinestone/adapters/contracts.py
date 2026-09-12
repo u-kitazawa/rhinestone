@@ -10,18 +10,30 @@ from .knowledge import KnowledgeAdapterDefinition, KnowledgeAdapterRegistry
 
 
 class SourceAdapter(Protocol):
-    def load(self, config: Config) -> Source: ...
+    """Minimal contract for an adapter that turns Config into Source."""
+
+    def load(self, config: Config) -> Source:
+        """Load and normalize provider metadata for ``config``."""
+        ...
 
 
 class SearchableSourceAdapter(SourceAdapter, Protocol):
-    def search(self, query: Any) -> Tuple[Result, ...]: ...
+    """Optional Source Adapter contract for provider-backed search."""
+
+    def search(self, query: Any) -> Tuple[Result, ...]:
+        """Return results for the already projected source query."""
+        ...
 
 
 class ExecutionAdapter(Protocol):
+    """Translate an explicit AccessPlan into a user-owned runtime call."""
+
     name: str
     priority: int
 
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool: ...
+    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+        """Return whether this adapter can open ``resource`` with dependencies."""
+        ...
 
     def open(
         self,
@@ -29,12 +41,19 @@ class ExecutionAdapter(Protocol):
         runtime: Any,
         *,
         destination_policy: DestinationPolicy | None = None,
-    ) -> Any: ...
+    ) -> Any:
+        """Open ``resource`` through the supplied runtime object."""
+        ...
 
 
 @dataclass(frozen=True)
 class SourceAdapterContext:
-    """Framework services available to a Source Adapter factory."""
+    """Framework services injected into a Source Adapter factory.
+
+    The context supplies transport, scoped dependencies, credential lookup,
+    network authorization, provider identity, and shared knowledge adapters.
+    Adapter factories should retain only the services they need.
+    """
 
     get_json: Callable[..., Any]
     get_text: Callable[[str], str]
@@ -47,7 +66,12 @@ class SourceAdapterContext:
 
 @dataclass(frozen=True)
 class ExecutionAdapterContext:
-    """Framework services available to an Execution Adapter factory."""
+    """Framework services injected into an Execution Adapter factory.
+
+    Execution adapters receive credential lookup, scoped runtime dependencies,
+    and the destination policy. They select no Resource; selection belongs to
+    the Resolver and execution selector.
+    """
 
     credentials: CredentialRegistry
     dependencies: DependencyRegistry
@@ -60,7 +84,12 @@ ExecutionAdapterFactory = Callable[[ExecutionAdapterContext], ExecutionAdapter]
 
 @dataclass(frozen=True)
 class SourceAdapterDefinition:
-    """Register one reusable provider-specific Source Adapter factory."""
+    """Register one reusable provider-specific Source Adapter factory.
+
+    ``adapter_type`` must be unique within the application. ``dependencies``
+    limits which injected runtime names are visible to the factory and its
+    adapter.
+    """
 
     adapter_type: str
     factory: SourceAdapterFactory
@@ -76,7 +105,11 @@ class SourceAdapterDefinition:
 
 @dataclass(frozen=True)
 class ExecutionAdapterDefinition:
-    """Register one user-owned Execution Adapter factory."""
+    """Register one user-owned Execution Adapter factory.
+
+    The factory must return an adapter whose ``name`` exactly matches this
+    definition's ``name``; names already provided by built-ins cannot be reused.
+    """
 
     name: str
     factory: ExecutionAdapterFactory

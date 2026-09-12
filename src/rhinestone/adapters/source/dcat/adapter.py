@@ -22,6 +22,8 @@ _RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 
 
 class DcatAdapter(ProviderAdapter):
+    """Interpret a DCAT RDF catalog and resolve one Dataset distribution."""
+
     adapter_type = "dcat"
     search_conditions = frozenset({"text", "limit"})
 
@@ -79,6 +81,7 @@ class DcatAdapter(ProviderAdapter):
         return values[0] if values else None
 
     def load(self, config: Config) -> Source:
+        """Load the configured Dataset URI and expose its distribution."""
         settings = self._config_settings(config)
         rdf, graph, document, uri = self._catalog(settings)
         dataset_uri = string(settings, "dataset")
@@ -128,6 +131,7 @@ class DcatAdapter(ProviderAdapter):
         )
 
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+        """Search Dataset subjects by text while preserving their distributions."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError("Unsupported DCAT search")
         settings: Dict[str, Any] = {

@@ -14,6 +14,8 @@ from ..ckan import CkanAdapter
 
 
 class PlateauAdapter(CkanAdapter):
+    """Interpret PLATEAU datasets exposed through a CKAN-compatible API."""
+
     adapter_type = "plateau"
 
     def __init__(
@@ -43,6 +45,7 @@ class PlateauAdapter(CkanAdapter):
         self._knowledge = knowledge or KnowledgeAdapterRegistry()
 
     def load(self, config: Config) -> Source:
+        """Load one PLATEAU resource and preserve its CityGML metadata."""
         settings = self._config_settings(config)
         endpoint = self._endpoint_from(settings)
         resource_id: Optional[str] = None

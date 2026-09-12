@@ -28,9 +28,13 @@ class StandardTimeAdapter:
     def resolve_time(
         self, value: str, *, kind: Optional[TimeKind] = None
     ) -> TimeSemantic:
+        """Resolve explicit calendar, fiscal, era, or ISO date expressions."""
         raw_value = cast(object, value)
         if not isinstance(raw_value, str) or not raw_value.strip():
-            raise KnowledgeResolutionError("time value must be a non-empty string")
+            raise KnowledgeResolutionError(
+                "time value must be a non-empty string; provide an explicit year, "
+                "era year, or ISO date"
+            )
         raw = value.strip()
         era_date_match = _ERA_DATE_PATTERN.fullmatch(raw)
         if era_date_match is not None:
@@ -74,7 +78,8 @@ class StandardTimeAdapter:
         year_match = _YEAR_PATTERN.fullmatch(raw)
         if year_match is None:
             raise KnowledgeResolutionError(
-                "time value must be an explicit year, era year, or ISO date"
+                "time value must be an explicit year, era year, or ISO date; "
+                "ambiguous natural-language dates are not inferred"
             )
         year = int(year_match.group(1))
         suffix = year_match.group(2)

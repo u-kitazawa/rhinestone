@@ -15,6 +15,7 @@ class DirectAdapter(ProviderAdapter):
         super().__init__(get_json=lambda url, params: None)
 
     def load(self, config: Config) -> Source:
+        """Build a Source from a complete, explicitly described resource."""
         settings = self._config_settings(config)
         uri = self._required_string(settings, "uri")
         format_name = self._required_string(settings, "format")

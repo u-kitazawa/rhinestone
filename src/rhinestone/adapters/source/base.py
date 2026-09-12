@@ -108,7 +108,9 @@ class ProviderAdapter(ABC):
     def _config_settings(self, config: Config) -> Mapping[str, Any]:
         if config.source_id != self.adapter_type:
             raise ConfigValidationError(
-                f"Expected adapter type {self.adapter_type!r}; got {config.source_id!r}"
+                f"Expected adapter type {self.adapter_type!r}; got "
+                f"{config.source_id!r}; construct Config with the adapter's "
+                "source type"
             )
         schema = self.config_schema()
         if schema is not None:
@@ -118,7 +120,10 @@ class ProviderAdapter(ABC):
             except ValidationError as error:
                 location = ".".join(str(item) for item in error.absolute_path)
                 detail = f"{location}: " if location else ""
-                raise ConfigValidationError(detail + error.message) from None
+                raise ConfigValidationError(
+                    f"Invalid {self.adapter_type} configuration: {detail}"
+                    f"{error.message}"
+                ) from None
         return config.settings
 
     def config_schema(self) -> Optional[Mapping[str, Any]]:
@@ -138,7 +143,10 @@ class ProviderAdapter(ABC):
             configured = settings.get("endpoint")
             if configured is not None:
                 if not isinstance(configured, str) or not configured.strip():
-                    raise ConfigValidationError("endpoint must be a non-empty string")
+                    raise ConfigValidationError(
+                        "endpoint must be a non-empty string; provide the "
+                        "provider API endpoint"
+                    )
                 if self._normalize_endpoint(configured) != self._endpoint:
                     raise ConfigValidationError(
                         "endpoint is managed by the SourceDefinition"
@@ -146,7 +154,9 @@ class ProviderAdapter(ABC):
             return self._endpoint
         value = settings.get("endpoint", self._endpoint or default)
         if not isinstance(value, str) or not value.strip():
-            raise ConfigValidationError("endpoint must be a non-empty string")
+            raise ConfigValidationError(
+                "endpoint must be a non-empty string; provide the provider API endpoint"
+            )
         return self._normalize_endpoint(value)
 
     @staticmethod
@@ -164,7 +174,10 @@ class ProviderAdapter(ABC):
     def _required_string(settings: Mapping[str, Any], name: str) -> str:
         value = settings.get(name)
         if not isinstance(value, str) or not value:
-            raise ConfigValidationError(f"{name} must be a non-empty string")
+            raise ConfigValidationError(
+                f"{name} must be a non-empty string; provide this required "
+                "configuration value"
+            )
         return value
 
     def _request(self, url: str, params: Mapping[str, Any]) -> JsonObject:
@@ -200,7 +213,10 @@ class ProviderAdapter(ABC):
                 f"Provider metadata request failed for {url!r}"
             ) from error
         if not isinstance(response, Mapping):
-            raise ProviderResponseError("Provider response root must be an object")
+            raise ProviderResponseError(
+                "Provider response root must be an object; the decoded response "
+                "did not match the provider contract"
+            )
         response_uri = getattr(cast(Any, response), "response_uri", url)
         if not isinstance(response_uri, str) or not response_uri:
             response_uri = url
@@ -209,7 +225,9 @@ class ProviderAdapter(ABC):
     @staticmethod
     def _object(value: Any, context: str) -> JsonObject:
         if not isinstance(value, Mapping):
-            raise ProviderResponseError(f"{context} must be an object")
+            raise ProviderResponseError(
+                f"{context} must be an object; provider response shape is invalid"
+            )
         return cast(JsonObject, value)
 
     @staticmethod
@@ -217,7 +235,10 @@ class ProviderAdapter(ABC):
         if isinstance(value, Mapping):
             return (cast(JsonObject, value),)
         if not isinstance(value, list):
-            raise ProviderResponseError(f"{context} must be an object or array")
+            raise ProviderResponseError(
+                f"{context} must be an object or array; provider response shape "
+                "is invalid"
+            )
         values = cast(List[Any], value)
         return tuple(ProviderAdapter._object(item, context) for item in values)
 

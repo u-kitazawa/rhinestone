@@ -55,7 +55,9 @@ def get_json(
             json.JSONDecodeError,
             _JsonIntegerDecodeError,
         ):
-            raise ProviderResponseError("Provider response is not valid JSON") from None
+            raise ProviderResponseError(
+                "Provider response is not valid JSON; expected a JSON document"
+            ) from None
         if isinstance(decoded, Mapping):
             response_uri = getattr(response, "geturl", lambda: request.full_url)()
             return JsonDocument(

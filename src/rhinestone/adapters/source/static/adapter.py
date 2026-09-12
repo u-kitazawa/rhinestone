@@ -31,6 +31,7 @@ class StaticAdapter(ProviderAdapter):
         self._items = self._validate_items(items)
 
     def load(self, config: Config) -> Source:
+        """Resolve one repository-managed item by its explicit identifier."""
         settings = self._config_settings(config)
         identifier = string(settings, "id")
         try:
@@ -42,6 +43,7 @@ class StaticAdapter(ProviderAdapter):
         return self._source(identifier, item)
 
     def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+        """Search static item identifiers and metadata by text and limit."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError(
                 "Unsupported static source search condition"

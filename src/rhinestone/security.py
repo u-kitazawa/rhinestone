@@ -13,7 +13,7 @@ NetworkPolicyLevel = Literal["none", "credentialed"]
 
 @dataclass(frozen=True)
 class DestinationRule:
-    """A URL origin and path boundary that may receive a request."""
+    """Describe an HTTP origin and path boundary allowed for requests."""
 
     scheme: str
     host: str
@@ -22,6 +22,7 @@ class DestinationRule:
 
     @classmethod
     def from_url(cls, url: str) -> Optional["DestinationRule"]:
+        """Parse an HTTP(S) URL into a boundary rule, or return ``None``."""
         try:
             parsed = urlsplit(url)
             port = parsed.port
@@ -43,6 +44,7 @@ class DestinationRule:
         )
 
     def matches(self, url: str) -> bool:
+        """Return whether ``url`` stays within this rule's origin and path."""
         candidate = self.from_url(url)
         if candidate is None:
             return False
@@ -61,7 +63,7 @@ class DestinationRule:
 
 @dataclass(frozen=True)
 class CredentialDestinationRule:
-    """A provider-scoped destination that may receive one credential."""
+    """Describe a provider-scoped destination allowed to receive a credential."""
 
     provider: str
     service: str
@@ -76,6 +78,7 @@ class CredentialDestinationRule:
         service: Optional[str],
         credential: Optional[str],
     ) -> bool:
+        """Return whether URL and logical credential context match this rule."""
         if provider is not None and provider != self.provider:
             return False
         if service != self.service:
@@ -87,7 +90,11 @@ class CredentialDestinationRule:
 
 @dataclass(frozen=True)
 class DestinationPolicy:
-    """Authorize network destinations at the execution boundary."""
+    """Authorize network destinations at Source and execution boundaries.
+
+    The default ``credentialed`` level permits ordinary public requests while
+    requiring catalog-derived authorization before credential release.
+    """
 
     level: NetworkPolicyLevel = "credentialed"
     rules: Tuple[DestinationRule, ...] = ()
@@ -103,7 +110,7 @@ class DestinationPolicy:
     def from_catalog(
         cls, catalog: Iterable[Provider], level: NetworkPolicyLevel = "credentialed"
     ) -> "DestinationPolicy":
-        """Derive rules from the URL-bearing values in a trusted catalog."""
+        """Derive immutable authorization rules from trusted catalog URLs."""
         rules: list[DestinationRule] = []
         seen: set[DestinationRule] = set()
         credential_rules: list[CredentialDestinationRule] = []
@@ -126,6 +133,7 @@ class DestinationPolicy:
 
     @classmethod
     def unrestricted(cls) -> "DestinationPolicy":
+        """Return a policy that permits all destinations."""
         return cls(level="none")
 
     def authorize(
@@ -137,7 +145,12 @@ class DestinationPolicy:
         service: Optional[str] = None,
         credential: Optional[str] = None,
     ) -> None:
-        """Raise when ``url`` is outside this policy's authorized URL space."""
+        """Raise when ``url`` is outside this policy's authorized URL space.
+
+        ``credential`` is a logical credential name, never the secret itself.
+        Invalid or ambiguous network destinations are rejected when policy
+        authorization is required.
+        """
         if self.level == "none" or (self.level == "credentialed" and not credentialed):
             return
         try:
@@ -159,7 +172,12 @@ class DestinationPolicy:
         else:
             authorized = any(rule.matches(url) for rule in self.rules)
         if not authorized:
-            raise DestinationNotAllowedError("Network destination is not authorized")
+            context = "credentialed " if credentialed else ""
+            raise DestinationNotAllowedError(
+                f"Network destination {context}is not authorized by the "
+                f"configured policy for provider {provider!r} and service "
+                f"{service!r}"
+            )
 
 
 def _normalize_path(path: str) -> str:
