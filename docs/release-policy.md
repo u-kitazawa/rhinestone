@@ -1,4 +1,4 @@
-# API安定性とリリース運用
+# APIの安定性とリリース運用
 
 Rhinestoneは現在`0.1.x`のAlphaです。この文書は、利用者がアップグレードの影響を判断できるように、公開APIの範囲、変更の知らせ方、リリースの正本を定めます。
 
@@ -31,13 +31,13 @@ Rhinestoneは現在`0.1.x`のAlphaです。この文書は、利用者がアッ�
 
 GitHub Releaseを、各versionの利用者向け変更履歴の正本とします。独立した`CHANGELOG.md`は作成せず、Release notesと別の履歴を二重に管理しません。
 
-各GitHub Releaseでは、次の見出しを使用します。該当する変更がない見出しは省略できます。
+各GitHub Releaseでは、次の見出し（英語の固定ラベル）を使用します。該当する変更がない見出しは省略できます。
 
-- `Added`
-- `Changed`
-- `Fixed`
-- `Deprecated`
-- `Removed / Breaking changes`
+- `Added`（追加）
+- `Changed`（変更）
+- `Fixed`（修正）
+- `Deprecated`（非推奨）
+- `Removed / Breaking changes`（削除／互換性を壊す変更）
 
 Release notesには、少なくとも次を記載します。
 

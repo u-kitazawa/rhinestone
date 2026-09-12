@@ -34,7 +34,7 @@ resource = rs.fetch(config)
 
 ---
 
-### 2.2 Normalize Access, Not Data
+### 2.2 データではなくアクセス方法をそろえる
 
 RhinestoneはすべてのデータをGeoDataFrame等へ統一しない。
 
@@ -67,7 +67,7 @@ provenance
 
 ---
 
-### 2.4 User-Owned Runtime Dependencies
+### 2.4 利用者が用意する外部ライブラリ
 
 GDAL、Rasterio、pyogrio等はRhinestoneの固定依存としない。
 
@@ -94,7 +94,7 @@ examples/
 
 ---
 
-# 4. 01_direct_resource.py
+# 4. 01_direct_resource.pyの例
 
 ## 4.1 目的
 
@@ -156,7 +156,7 @@ print(resource.provenance)
 
 ---
 
-# 5. 02_ckan_shapefile.py
+# 5. 02_ckan_shapefile.pyの例
 
 ## 5.1 目的
 
@@ -215,7 +215,7 @@ Exampleから、
 
 ---
 
-# 6. 03_estat_population.py
+# 6. 03_estat_population.pyの例
 
 ## 6.1 目的
 
@@ -272,7 +272,7 @@ Exampleで示すべきなのは、
 
 ---
 
-# 7. 04_inspect_resource.py
+# 7. 04_inspect_resource.pyの例
 
 ## 7.1 目的
 
@@ -330,7 +330,7 @@ Rhinestone
 
 ---
 
-# 8. 05_gdal_dependency.py
+# 8. 05_gdal_dependency.pyの例
 
 ## 8.1 目的
 
@@ -404,12 +404,12 @@ Exampleから、
 
 次のメッセージが伝わること。
 
-> Rhinestone does not own your GDAL.  
-> Rhinestone knows how to use your GDAL.
+> RhinestoneはGDALを所有しません。
+> Rhinestoneは、利用者のGDALを使う方法を知っています。
 
 ---
 
-# 9. 06_stac_cog.py
+# 9. 06_stac_cog.pyの例
 
 ## 9.1 目的
 
@@ -458,7 +458,7 @@ CKAN ShapefileとSTAC COGという全く異なる配信方法をRhinestoneが扱
 
 ---
 
-# 10. 07_search_and_fetch.py
+# 10. 07_search_and_fetch.pyの例
 
 ## 10.1 目的
 
@@ -514,7 +514,7 @@ README、デモ、発表等のアピール用途を中心とする。
 
 Exampleは用途別に以下の3種類として扱う。
 
-## 11.1 Deterministic Example
+## 11.1 決定的な例
 
 固定された入力やfixtureで再現性を確保する。
 
@@ -530,7 +530,7 @@ CIまたはtestから再利用可能であることが望ましい。
 
 ---
 
-## 11.2 Live Integration Example
+## 11.2 実サービス連携の例
 
 実際の公開Providerへアクセスする。
 
@@ -546,7 +546,7 @@ CIまたはtestから再利用可能であることが望ましい。
 
 ---
 
-## 11.3 Demo Example
+## 11.3 デモの例
 
 見栄え・体験を優先する。
 
@@ -665,11 +665,11 @@ GDAL / Rasterio / pyogrio / etc.
 
 ---
 
-# 14. Before / After
+# 14. 導入前と導入後
 
 Rhinestoneの価値を説明するため、READMEでは必要に応じてBefore / Afterを示す。
 
-## Without Rhinestone
+## Rhinestoneを使わない場合
 
 ```text
 API仕様を調べる
@@ -683,7 +683,7 @@ GDAL向けURIを作る
 open optionを設定する
 ```
 
-## With Rhinestone
+## Rhinestoneを使う場合
 
 ```python
 resource = rs.fetch(config)
@@ -734,7 +734,7 @@ Example
 
 これはRhinestoneの、
 
-> Fail Rather Than Guess
+> 推測せず、明示的に失敗する
 
 の原則に従う。
 

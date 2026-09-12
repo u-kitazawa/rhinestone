@@ -1,4 +1,4 @@
-# Rhinestone Adapter Expansion Specification v0.1
+# Rhinestone Adapter拡張仕様 v0.1
 
 > **文書ステータス: 履歴資料。** Adapter拡張時の過去の計画と判断を保存する文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](documentation-status.md)を確認してください。
 
@@ -59,7 +59,7 @@ AdapterはProvider固有の知識を持つが、CoreへProvider固有構造を�
 
 ---
 
-# 4. ［GSI Tile Adapter］
+# 4. ［GSIタイルAdapter］
 
 ## 4.1 目的
 
@@ -69,7 +69,7 @@ AdapterはProvider固有の知識を持つが、CoreへProvider固有構造を�
 
 ---
 
-## 4.2 Adapter
+## 4.2 Adapterの構成
 
 GSIタイル専用のAdapterは追加しない。既存の汎用 `StaticAdapter` を使用し、
 GSI固有の固定知識はCatalog itemとして管理する。
@@ -84,7 +84,7 @@ source:
 
 ---
 
-## 4.3 Config
+## 4.3 Configの指定
 
 Catalogの `sources.json` に定義されたitem名を `id` で指定する。
 
@@ -152,7 +152,7 @@ Rhinestoneは法的可否を推測しない。
 
 ---
 
-## 4.6 Source
+## 4.6 Sourceの生成
 
 概念例:
 
@@ -170,7 +170,7 @@ Source
 
 ---
 
-## 4.7 Resource
+## 4.7 Resourceの生成
 
 Resource概念例:
 
@@ -189,7 +189,7 @@ Resource
 
 ---
 
-## 4.8 AccessPlan
+## 4.8 AccessPlanの生成
 
 タイルは原則としてRemote Datasetとして扱う。
 
@@ -216,7 +216,7 @@ URL templateをAccessPlanに保持する。
 
 ---
 
-## 4.10 Search
+## 4.10 検索
 
 初期実装ではRhinestone内部の既知Specから検索してよい。
 
@@ -244,7 +244,7 @@ Config
 
 ---
 
-## 4.11 Fail Rather Than Guess
+## 4.11 推測せず明示的に失敗する
 
 以下の場合は失敗する。
 
@@ -259,7 +259,7 @@ URLからtile IDを推測しない。
 
 ---
 
-# 5. ［PLATEAU Adapter］
+# 5. ［PLATEAU Adapter］（PLATEAUアダプター）
 
 ## 5.1 目的
 
@@ -269,7 +269,7 @@ PLATEAUのオープンデータはG空間情報センターから公開されて
 
 ---
 
-## 5.2 Adapter
+## 5.2 Adapterの構成
 
 ```text
 ［PlateauAdapter］
@@ -277,7 +277,7 @@ PLATEAUのオープンデータはG空間情報センターから公開されて
 
 を追加する。
 
-Config:
+Configの例:
 
 ```yaml
 source:
@@ -286,7 +286,7 @@ source:
 
 ---
 
-## 5.3 Config
+## 5.3 Configの指定
 
 代表的なConfig:
 
@@ -365,7 +365,7 @@ distribution_provider = actual catalog/distribution provider
 
 ---
 
-## 5.6 Source
+## 5.6 Sourceの生成
 
 ```text
 Source
@@ -398,7 +398,7 @@ AmbiguousResourceError
 
 ---
 
-## 5.8 AccessPlan
+## 5.8 AccessPlanの生成
 
 配布形態に応じて、
 
@@ -431,7 +431,7 @@ PLATEAU固有の変換処理を［PlateauAdapter］へ埋め込まない。
 
 ---
 
-## 5.10 Search
+## 5.10 検索
 
 検索条件候補:
 
@@ -448,7 +448,7 @@ text
 
 ---
 
-## 5.11 Example
+## 5.11 例
 
 ```python
 results = rs.search(
@@ -461,7 +461,7 @@ resource = rs.fetch(results[0].config)
 
 ---
 
-# 6. ［GSI Fundamental Data Adapter］
+# 6. ［基盤地図情報Adapter］
 
 ## 6.1 目的
 
@@ -476,13 +476,13 @@ resource = rs.fetch(results[0].config)
 
 ---
 
-## 6.2 Adapter
+## 6.2 Adapterの構成
 
 ```text
 ［GsiFundamentalAdapter］
 ```
 
-Config:
+Configの例:
 
 ```yaml
 source:
@@ -516,7 +516,7 @@ Credential実体は外部注入とする。
 
 ---
 
-## 6.4 Config
+## 6.4 Configの指定
 
 例:
 
@@ -559,7 +559,7 @@ release date
 
 ---
 
-## 6.6 Schema Version
+## 6.6 スキーマバージョン
 
 基盤地図情報では歴代XML Schemaが存在する。
 
@@ -624,7 +624,7 @@ mesh
 
 ---
 
-## 6.9 Resource
+## 6.9 Resourceの生成
 
 例:
 
@@ -659,7 +659,7 @@ GML/XMLの解析方法は［Execution Adapter］側へ委譲する。
 
 ---
 
-# 7. ［DCAT Adapter］
+# 7. ［DCAT Adapter］（DCATアダプター）
 
 ## 7.1 目的
 
@@ -669,13 +669,13 @@ DCAT 3は2024年8月22日にW3C Recommendationとなっており、Dataset、Dis
 
 ---
 
-## 7.2 Adapter
+## 7.2 Adapterの構成
 
 ```text
 ［DcatAdapter］
 ```
 
-Config:
+Configの例:
 
 ```yaml
 source:
@@ -684,7 +684,7 @@ source:
 
 ---
 
-## 7.3 Config
+## 7.3 Configの指定
 
 Dataset URI指定:
 
@@ -751,7 +751,7 @@ DCATではDatasetとDistributionが明確に分離されており、Distribution
 
 ---
 
-## 7.6 Distribution
+## 7.6 Distributionの解釈
 
 以下を優先的に読む。
 
@@ -769,7 +769,7 @@ license
 
 ---
 
-## 7.7 DataService
+## 7.7 DataServiceの解釈
 
 DataServiceが存在する場合、
 
@@ -783,11 +783,11 @@ ServiceQueryPlan
 
 ---
 
-## 7.8 Search
+## 7.8 検索
 
 DCATは分散型catalog/federated searchとの親和性を前提とするため、Rhinestoneの［Search Coordinator］と組み合わせる。citeturn862912search0turn862912search2
 
-SearchResult:
+SearchResultの例:
 
 ```text
 SearchResult
@@ -801,7 +801,7 @@ SearchResult
 
 ---
 
-## 7.9 Profile
+## 7.9 プロファイル
 
 DCAT Profile固有拡張をCoreへ持ち込まない。
 
@@ -815,7 +815,7 @@ organization-specific vocabulary
 
 ---
 
-# 8. ［ODPT Adapter］
+# 8. ［ODPT Adapter］（ODPTアダプター）
 
 ## 8.1 目的
 
@@ -825,13 +825,13 @@ ODPTのAPI利用にはユーザー登録とAPIキーが必要である。cite
 
 ---
 
-## 8.2 Adapter
+## 8.2 Adapterの構成
 
 ```text
 ［OdptAdapter］
 ```
 
-Config:
+Configの例:
 
 ```yaml
 source:
@@ -840,7 +840,7 @@ source:
 
 ---
 
-## 8.3 Credential
+## 8.3 Credential（認証情報）
 
 ConfigにAPI tokenを直接入れない。
 
@@ -853,7 +853,7 @@ source:
   credential: odpt
 ```
 
-runtime:
+Runtimeの例:
 
 ```python
 rs = Rhinestone(
@@ -867,7 +867,7 @@ rs = Rhinestone(
 
 ---
 
-## 8.4 Config
+## 8.4 Configの指定
 
 概念例:
 
@@ -922,7 +922,7 @@ response semantics
 
 ---
 
-## 8.6 Source
+## 8.6 Sourceの生成
 
 ```text
 Source
@@ -937,7 +937,7 @@ Source
 
 ---
 
-## 8.7 AccessPlan
+## 8.7 AccessPlanの生成
 
 ODPTはService型Sourceとして扱う。
 
@@ -951,7 +951,7 @@ Config → API Requestの変換は［OdptAdapter］の責務。
 
 ---
 
-## 8.8 Temporal Data
+## 8.8 時間情報
 
 公共交通データでは時刻や運行状態等、更新頻度が高いデータが存在する。
 
@@ -967,7 +967,7 @@ validity / update information
 
 ---
 
-## 8.9 Search
+## 8.9 検索
 
 初期実装ではAPIが提供する検索・filter capabilityのみを利用する。
 
@@ -975,7 +975,7 @@ Rhinestone側で全文検索indexを構築しない。
 
 ---
 
-## 8.10 Terms
+## 8.10 利用条件
 
 ODPTには利用規約・基本ライセンス・開発者ガイドライン等が存在するため、関連Metadataを保持できること。citeturn862912search5
 
@@ -983,7 +983,7 @@ Rhinestoneは利用規約への適合性を自動保証しない。
 
 ---
 
-# 9. ［Credential Registry］
+# 9. ［Credential Registry］（認証情報の管理）
 
 今回のAdapter拡張に伴い、credential injectionの概念を正式に導入する。
 
@@ -1026,7 +1026,7 @@ credential: odpt
 
 ---
 
-## 9.3 runtime
+## 9.3 Runtime（外部ライブラリ）
 
 ```python
 Rhinestone(
@@ -1039,7 +1039,7 @@ Rhinestone(
 
 ---
 
-# 10. Spec Registry
+# 10. 仕様Registry
 
 ［GSI Tile Adapter］等では、外部APIアクセスだけでなくRhinestone自身が保持する既知Specが重要になる。
 
@@ -1089,7 +1089,7 @@ max_zoom: 18
 
 # 12. Adapter間の責務
 
-## ［Source Adapter］
+## ［Source Adapter］（提供元アダプター）
 
 知るもの:
 
@@ -1103,7 +1103,7 @@ Provider authentication semantics
 
 ---
 
-## ［Resolver］
+## ［Resolver］（解決処理）
 
 知るもの:
 
@@ -1113,7 +1113,7 @@ SourceからどのResourceを選ぶか
 
 ---
 
-## ［Execution Adapter］
+## ［Execution Adapter］（実行アダプター）
 
 知るもの:
 
@@ -1123,7 +1123,7 @@ ResourceをGDAL等でどう開くか
 
 ---
 
-## ［Credential Registry］
+## ［Credential Registry］（認証情報の管理）
 
 知るもの:
 
@@ -1173,7 +1173,7 @@ odpt_station.py
 
 ---
 
-# 15. Tests
+# 15. テスト
 
 各Adapterについて最低限、
 
@@ -1212,7 +1212,7 @@ Exampleや実装の都合からfixture contractを逆算してはならない。
 
 ---
 
-# 17. Live Tests
+# 17. 実サービスを使うテスト
 
 Scheduled CIで以下を監視可能とする。
 
@@ -1230,7 +1230,7 @@ ODPT API
 
 # 18. 優先実装順
 
-## Phase 1
+## 第1段階
 
 ```text
 ［StaticAdapter］
@@ -1248,7 +1248,7 @@ Execution Adapter連携確認
 
 ---
 
-## Phase 2
+## 第2段階
 
 ```text
 ［PlateauAdapter］
@@ -1265,7 +1265,7 @@ Resource selection実証
 
 ---
 
-## Phase 3
+## 第3段階
 
 ```text
 ［GsiFundamentalAdapter］
@@ -1282,7 +1282,7 @@ credential injection
 
 ---
 
-## Phase 4
+## 第4段階
 
 ```text
 ［DcatAdapter］
@@ -1299,7 +1299,7 @@ Dataset / Distribution mapping
 
 ---
 
-## Phase 5
+## 第5段階
 
 ```text
 ［OdptAdapter］

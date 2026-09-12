@@ -1,4 +1,4 @@
-# Discovery と Resolution の検証
+# 発見と解決の検証
 
 Issue #18 のPhase 0として、現在の5 Sourceを「発見結果から実行可能なResourceへ到達するまで」の観点で比較します。Rhinestoneはcatalog metadataを再収集・再ホストせず、既存のcatalog / provider APIをupstreamとして利用します。
 
@@ -21,7 +21,7 @@ discover
   -> specialist runtimeへ引き渡す
 ```
 
-## Go / Pivot 判定
+## 継続判断
 
 現時点ではGoと判定します。
 
@@ -33,13 +33,13 @@ discover
 一方、Rhinestoneは次を実装しません。
 
 - 全国metadata indexの常設・再ホスト
-- HTML scraping
+- HTMLのスクレイピング
 - STAC / CKAN protocolの再実装
 - GIS分析、変換、workflow実行
 
 この判断は実装の拡張を無条件に正当化するものではなく、各Sourceでresolutionが利用者側のprovider-specific codeを実際に削減できるかをfixtureとvertical sliceで継続検証します。
 
-## Portable boundary の判断
+## 持ち運び可能な境界の判断
 
 今回の実装では、runtime-boundな`Resource`全体をそのままJSONやIntakeへ変換する公開APIは追加しません。portableな境界は次のdomain情報です。
 
@@ -50,7 +50,7 @@ discover
 
 Credential、runtime instance、`Resource._opener`はこの境界に含めません。`SearchResult`はtarget Configへ変換して別Sourceへ解決でき、解決後はアプリケーション側のResourceへ発見時のmetadata / provenanceを引き継ぎます。JSON schemaやIntake exportは、複数Sourceで情報損失と利用価値を確認してから追加します。
 
-## Serialization / Intake export の評価
+## 直列化／Intake出力の評価
 
 STAC、CKANの現在のResourceを、JSON round-tripとIntakeの`driver / args / metadata`へ写す観点で比較します。
 
@@ -61,7 +61,7 @@ STAC、CKANの現在のResourceを、JSON round-tripとIntakeの`driver / args /
 
 複数Sourceに共通するlosslessなIntake mappingは、現時点では成立しません。URIをdriver引数へ移すだけのexportは可能ですが、Rhinestoneが保持するprovider固有identity、解決理由、metadata、provenanceを失い、単なるURL passthroughになります。任意の情報をIntake metadataへ複製しても、復元規則と互換性契約がなければround-tripにはなりません。
 
-### JSON round-tripを追加しない理由
+### JSONの往復変換を追加しない理由
 
 現在のdomain modelは、serialization schemaとして次の契約をまだ持ちません。
 

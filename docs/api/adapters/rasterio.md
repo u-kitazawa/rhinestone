@@ -1,4 +1,4 @@
-# RasterioAdapter
+# RasterioAdapter（Rasterio実行アダプター）
 
 `RasterioAdapter` は選択済み raster Resource を利用者提供の Rasterio runtime で開きます。
 

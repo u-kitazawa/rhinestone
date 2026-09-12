@@ -1,4 +1,4 @@
-# GsiFundamentalAdapter
+# GsiFundamentalAdapter（基盤地図情報アダプター）
 
 `GsiFundamentalAdapter` は、取得済みの基盤地図情報 GML をローカル Resource として
 解決します。

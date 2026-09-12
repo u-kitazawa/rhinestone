@@ -1,49 +1,38 @@
-# Spec contract tests
+# 仕様適合テスト
 
-These tests translate the provider-independent requirements in
-`docs/spec_v4.md` into executable contracts before implementation.
+これらのテストは、`docs/spec_v4.md`にある提供元に依存しない要件を、実行可能な契約へ変換します。
+`docs/spec_v4.md`は履歴資料として凍結されており、このREADMEやテストがその内容を更新することはありません。
 
-## API assumptions
+## APIに関する前提
 
-The specification defines model and component names, but intentionally does not
-fix Python module paths or complete constructor signatures.  The tests use the
-following minimal layout so implementation can start from an explicit design:
+仕様書はモデル名とコンポーネント名を定義しますが、Pythonのモジュールパスや完全なコンストラクタの
+シグネチャは意図的に固定していません。実装を明確な設計から始められるよう、テストでは次の最小構成を使います。
 
-- domain values live in `rhinestone.models`;
-- stable, cause-specific failures live in `rhinestone.errors`;
-- registries, resolution, search, and execution selection are separate modules;
-- adapters are accepted by behaviour (duck typing), so Core does not need to
-  expose a premature third-party adapter API.
+- ドメインの値は`rhinestone.models`に置く。
+- 原因ごとに分かれた安定したエラーは`rhinestone.errors`に置く。
+- Registry、解決、検索、実行先の選択は別モジュールに分ける。
+- Adapterは振る舞い（ダックタイピング）で受け入れ、Coreに未成熟な外部Adapter APIを公開しない。
 
-These are test-design assumptions rather than additional product requirements.
-If implementation reveals a better public layout, update this note and the
-imports without weakening the behavioural assertions.
+これはテスト設計上の前提であり、追加の製品要件ではありません。実装によってよりよい公開配置が分かった場合は、
+振る舞いに関する検証を弱めず、この説明とimportを更新してください。
 
-Provider-specific tests use small, deterministic fixtures derived from the
-official CKAN Action API, e-Stat API 3.0, STAC API 1.0.0, and OGC API Features
-1.0 contracts. They specify only behaviour supported by those standards and
-their fixtures; deployment-specific extensions remain out of scope.
+提供元固有のテストでは、公式のCKAN Action API、e-Stat API 3.0、STAC API 1.0.0、OGC API Features 1.0の
+契約をもとにした小さく決定的なfixtureを使います。各標準とfixtureが対応する振る舞いだけを定義し、
+環境固有の拡張は対象外とします。
 
-Source Adapter classes are internal contracts. The public composition API maps
-named `SourceDefinition` values to built-in adapters, allowing multiple source
-ids to share one adapter type. Repository-managed Catalog values are loaded into
-SourceDefinition objects before composition. Tests may instantiate adapters
-directly to verify their request, preservation, explicit-selection, and failure
-behaviour.
+Source Adapterクラスは内部契約です。公開構成APIは名前付きの`SourceDefinition`を組み込みAdapterへ対応付け、
+複数のsource idで同じAdapter型を共有できます。リポジトリ管理のCatalog値は構成前にSourceDefinitionへ読み込みます。
+テストではAdapterを直接生成し、リクエスト、情報の保持、明示的な選択、失敗時の振る舞いを検証できます。
 
-The first execution vertical slice temporarily places execution adapters in
-`rhinestone.adapters.execution` and connects them through `AccessPipeline.open`.
-Those package and constructor shapes may evolve; the stable contracts are that
-the selected Resource is translated without being re-selected, runtime
-dependencies stay lazy and user-owned, and runtime failures retain their cause.
+最初の実行垂直スライスでは、実行Adapterを一時的に`rhinestone.adapters.execution`へ置き、
+`AccessPipeline.open`で接続します。パッケージやコンストラクタの形は変わる可能性がありますが、
+選択済みResourceを再選択せずに変換すること、外部ライブラリを遅延かつ利用者所有で扱うこと、
+実行時の失敗原因を保持することは安定した契約です。
 
-Execution Adapter classes are also composed internally. Their stable name,
-priority, support predicate, and runtime-opening operation remain internal
-contracts; users provide only runtime dependency factories.
+Execution Adapterクラスも内部で構成します。名前、優先度、対応判定、Runtimeを開く操作は内部契約として維持し、
+利用者は外部ライブラリのfactoryだけを渡します。
 
-The following public-composition slice treats `rhinestone.configure()` as a
-factory for an isolated application context rather than mutable process-global
-configuration. A Resource resolved by that context is bound to its executor so
-`resource.open(library)` can follow the documented interface. The binding
-mechanism is not itself a permanent API; context isolation, lazy dependencies,
-normal resolution, and explicit adapter selection are the guarantees.
+現在の公開構成では、`rhinestone.configure()`をプロセス全体で変更される設定ではなく、分離されたアプリケーション
+コンテキストを作るfactoryとして扱います。そのコンテキストで解決したResourceは実行先に結び付くため、
+`resource.open(library)`で文書化されたインターフェースを使えます。結び付け方自体は固定APIではありませんが、
+コンテキストの分離、外部ライブラリの遅延評価、通常の解決、実行先の明示選択を保証します。

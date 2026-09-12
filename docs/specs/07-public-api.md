@@ -46,7 +46,7 @@ app = configure(
 
 ## 公開モデル
 
-### v0.5のDiscovery / Resolution semantics
+### v0.5の発見／解決の意味
 
 `SearchResult.to_config()` は解決先のtarget Configを返します。発見元Sourceと解決先Sourceは異なってよく、横断catalog側のprovenanceと元provider側のprovenanceを失わないようにします。
 
@@ -63,7 +63,7 @@ resource.provenance
 resource.access_plan
 ```
 
-## runtime dependency
+## 外部ライブラリ
 
 利用者はRhinestoneが実装しない外部 runtime を 実体またはfactoryとして供給します。組み込み Execution Adapter はRhinestone側で構成され、登録済みdependencyとの互換性から選択されます。Core が GDAL 等を直接 import してはなりません（MUST NOT）。
 
@@ -75,7 +75,7 @@ resource.open("gdal")
 
 `configure()` は process-global state を変更せず、独立した application context を返します。同じ process 内に異なる Source・dependency 構成を共存させられます。
 
-## credential
+## 認証情報
 
 `credentials` は logical name と secret factory の対応です。secret を Catalog、SourceDefinition、Config、Source、Metadata、Provenance へ保存してはなりません（MUST NOT）。Source API 認証の評価時点と統一方法は別途 credential 契約で定義します。
 

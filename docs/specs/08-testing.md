@@ -2,7 +2,7 @@
 
 > **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
 
-## Deterministic Tests
+## 決定的なテスト
 
 通常の CI はネットワークへ依存しない代表 Fixture と golden/contract test を使用します。CKAN、e-Stat、STAC、OGC などの Source Adapter ごとに次を検証します。
 
@@ -19,7 +19,7 @@
 
 同じ Config、Metadata、利用可能な Capability から同じ AccessPlan が生成されることを、登録順を変えたケースも含めて検証します。
 
-## Live Tests
+## 実サービスを使うテスト
 
 外部 provider の実 API との適合は scheduled CI で確認し、通常の PR CI から分離します。Live Test は API や schema の変化を検出するために使い、変動する title、件数、timestamp、availability を不変の契約として固定しません。
 

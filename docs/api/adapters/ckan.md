@@ -1,4 +1,4 @@
-# CkanAdapter
+# CkanAdapter（CKAN提供元アダプター）
 
 `CkanAdapter` は CKAN Action API の resource を解決します。
 

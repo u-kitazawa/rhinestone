@@ -1,10 +1,10 @@
-# DCAT Dataset
+# DCATカタログのDataset
 
-## Setup
+## 準備と実行
 
-Install Rhinestone, `rdflib`, and `pyogrio`. HTTP document retrieval uses Rhinestone's built-in transport. Set the three
-`RHINESTONE_DCAT_*_URI` values from one DCAT catalog and run
-`python examples/11_dcat_dataset/example.py`.
+Rhinestone、`rdflib`、`pyogrio`を用意します。DCATカタログから3つの
+`RHINESTONE_DCAT_*_URI`を設定し、`python examples/11_dcat_dataset/example.py`を実行します。
+文書の取得には組み込みHTTP通信を使います。
 
-Choose a Distribution with a direct GeoJSON or GeoPackage `downloadURL`; a
-landing page `accessURL` is metadata only and is not opened.
+直接取得できるGeoJSONまたはGeoPackageの`downloadURL`を持つDistributionを選んでください。
+ランディングページを示す`accessURL`はメタデータとして扱い、開きません。

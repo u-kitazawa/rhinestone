@@ -6,9 +6,11 @@ Rhinestoneの公開メンタルモデルは次のとおりです。
 Catalog -> Provider -> Result -> Resource
 ```
 
-## Catalog
+## 最初に覚える4つの言葉
 
-`Catalog`は、Rhinestoneが知っているProviderの集合です。組み込みProviderと利用者が追加するProviderを同じモデルで扱います。
+### Catalog（一覧）
+
+`Catalog`は、Rhinestoneが使う提供元の一覧です。組み込みの一覧と、利用者が追加する提供元を同じ形で扱います。
 
 ```python
 from rhinestone.catalogs import BUILTIN
@@ -18,38 +20,38 @@ app = configure(catalog=BUILTIN)
 
 `BUILTIN`はリポジトリ管理のCatalogです。`rhinestone.sources`は組み込みProviderを名前で参照するための互換facadeであり、通常の中心概念ではありません。
 
-## Provider
+### Provider（提供元）
 
-`Provider`はデータを提供する主体・サービスです。endpointやサービス固有の固定知識を持ち、Catalogからアプリケーションへ選択されます。
+`Provider`はデータを提供するサービスや組織です。接続先やサービス固有の設定を持ち、`Catalog`から選びます。
 
 Providerは、以前の実装で`SourceDefinition`が担っていた「利用する提供元の定義」に相当します。`Source`とは異なり、公開APIではProviderを使います。
 
-## Result
+### Result（検索結果）
 
-`Result`は検索で見つかった候補です。発見元と、解決先の`Config`、metadata、provenanceを持ちます。
+`Result`は検索で見つかったデータ候補です。タイトルなどの表示情報と、次に解決するための情報を持ちます。
 
 ```python
 result = app.search(text="河川")[0]
 resource = app.resolve(result)
 ```
 
-`result.discovered_by`は検索を実行したSource ID、`result.target`は通常の解決フローへ渡す`Config`です。この2つは異なっていてよく、横断カタログが別のproviderのresourceを発見するケースを表現できます。
+`result.discovered_by`や`result.target`は高度な情報です。提供元をまたいで検索する場合に、検索した場所と実際のデータの場所が異なることを表します。
 
 `SearchQuery`、`SearchResult`、`to_config()`は高度な内部パイプラインを扱うための名前です。通常の利用では検索パラメータと`Result`だけを使います。
 
-## Resource
+### Resource（利用するデータ）
 
-`Resource`は解決済みの具体的なデータです。URI、format、metadata、provenance、アクセス方法を保持し、`open()`でRuntimeへ渡せます。
+`Resource`は、URI、形式、メタデータ、アクセス方法が確定したデータです。`open()`でGDALやRasterioなどへ渡せます。
 
-## Runtime
+### Runtime（外部ライブラリ）
 
-Runtimeは、Rhinestoneが外部実行に利用する利用者所有の環境です。GDAL、Rasterio、pyogrio、RDFLibなどが該当します。実体はそのまま、遅延評価する場合は `RuntimeFactory` として構成します。以前の文書で使っていたdependencyやruntime dependencyという表記は、利用者向けにはRuntimeへ統一します。
+Runtimeは、Rhinestoneが処理を任せる利用者所有の外部ライブラリです。GDAL、Rasterio、pyogrio、RDFLibなどが該当します。必要になるまで読み込まない場合は`RuntimeFactory`を使います。
 
-## Credential
+### Credential（認証情報）
 
-CredentialはAPI keyやtokenなどのsecretです。ProviderやResultへ埋め込まず、アプリケーション構成時にfactoryとして渡します。
+CredentialはAPI keyやtokenなどの秘密情報です。ProviderやResultへ埋め込まず、アプリケーション構成時にfactoryとして渡します。
 
-## 内部概念
+## 内部の仕組み
 
 内部では、ProviderをAdapterが解釈して`Source`を作り、`Resolver`が候補から`AccessPlan`と`Resource`を決定します。`Config`、`ResourceCandidate`、Resolver、AccessPlan、Execution Adapter Selector、Registryは責務分離のための内部概念です。
 
@@ -62,4 +64,4 @@ Provider
   -> Resource
 ```
 
-これらは拡張やアーキテクチャの文書では必要ですが、通常ユーザーが最初に覚える概念ではありません。
+これらはAdapterを追加する場合などに必要ですが、通常の利用では意識する必要はありません。

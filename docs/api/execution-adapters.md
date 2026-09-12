@@ -1,4 +1,4 @@
-# Execution Adapter
+# Execution Adapter（実行アダプター）
 
 Execution Adapter は選択済みの `Resource` を実行runtimeのAPI呼び出しへ変換します。Resource の選択やデータ形式の変換は行いません。
 
@@ -11,12 +11,12 @@ Execution Adapter は選択済みの `Resource` を実行runtimeのAPI呼び出�
 場合は `RuntimeFactory(factory)` を使います。bare callableはRuntime実体として扱われます。
 JSON serviceのHTTP runtimeはRhinestoneが組み込みで提供します。依存境界とSourceごとの採用方針は[外部ライブラリ依存方針](../dependency-policy.md)を参照してください。
 
-| Adapter | 選択名 / Runtime名 | Runtime |
+| アダプター | 選択名／Runtime名 | 呼び出す操作 |
 | --- | --- | --- |
 | [GDAL](adapters/gdal.md) | `gdal` | `OpenEx` |
 | [Rasterio](adapters/rasterio.md) | `rasterio` | `open` |
 | [pyogrio](adapters/pyogrio.md) | `pyogrio` | `read_dataframe` |
-| [JSON service](adapters/json-service.md) | `json-service` | built-in HTTP runtime |
+| [JSONサービス](adapters/json-service.md) | `json-service` | 組み込みHTTP通信 |
 
 独自 Adapter は `ExecutionAdapterDefinition` として明示登録します。factory が返す Adapter は
 `name`、`priority`、`supports(resource, dependencies)`、`open(resource, runtime)` を実装します。

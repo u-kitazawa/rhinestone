@@ -1,6 +1,7 @@
 # アプリケーションを構成する
 
-アプリケーションはCatalog、Runtime、Credentialを組み合わせて作ります。
+Rhinestoneのアプリケーションは、使うデータ提供元、必要な外部ライブラリ、認証情報を組み合わせて作ります。
+最初は組み込みCatalogだけで構成し、必要になったときにRuntimeやCredentialを追加してください。
 
 ## Catalogを指定する
 
@@ -23,7 +24,7 @@ app = configure(catalog=Catalog((
 )))
 ```
 
-## 独自Providerを追加する
+## 独自の提供元を追加する
 
 ```python
 from rhinestone import Catalog, Provider, configure
@@ -38,7 +39,7 @@ catalog = Catalog((
 app = configure(catalog=catalog)
 ```
 
-`Provider`の`adapter_type`や`settings`は拡張向けの構成情報です。通常は組み込みCatalogのProviderを使います。
+`Provider`の`adapter_type`や`settings`は接続方法を指定する構成情報です。通常は組み込みCatalogのProviderを使います。
 
 ## 独自 Adapter を追加する
 
@@ -103,7 +104,7 @@ Knowledge Adapter factoryにはSource/Execution Adapterと同じくContextが渡
 Metadata/Provenanceやcanonical valueを扱いますが、Credential、Runtime、データ処理は保持しません。
 同じ`adapter_type`またはExecution名を複数登録することはできません。
 
-## Runtime
+## 外部ライブラリ（Runtime）
 
 外部Runtimeは利用者が所有し、実体または明示的な `RuntimeFactory` として渡します。
 公開APIではどちらも単一の`dependencies`引数へ渡しますが、内部では利用段階に応じて
@@ -146,7 +147,7 @@ app = configure(
 `configure()`は `RuntimeFactory` を評価しません。Source Runtimeは解決済みResourceや
 AccessPlanへ保持されず、Execution RuntimeだけがResourceのopen経路から参照されます。
 
-## Credential
+## 認証情報（Credential）
 
 secretはCatalogやProviderに保存せず、Credential factoryとして渡します。
 

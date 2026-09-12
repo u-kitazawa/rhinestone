@@ -1,4 +1,4 @@
-# PyogrioAdapter
+# PyogrioAdapter（pyogrio実行アダプター）
 
 `PyogrioAdapter` は選択済み vector Resource を利用者提供の pyogrio runtime で読み込みます。
 

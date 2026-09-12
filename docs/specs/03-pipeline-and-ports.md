@@ -17,19 +17,19 @@ Config
   -> Data
 ```
 
-### Source Adapter
+### Source Adapter（提供元アダプター）
 
 Config に含まれる provider 固有情報を解釈し、公式の機械可読インターフェースから必要な Metadata を取得して Source を生成します。provider 固有 Reference は Adapter 内部に閉じ込めます。
 
-### Resolver
+### Resolver（解決処理）
 
 Source の Resource 候補から、利用する Resource とアクセス方法を決定します。データ本体は原則として読み込みません（MUST NOT）。
 
-### Execution Adapter Selector
+### Execution Adapter Selector（実行アダプターの選択）
 
 Resource と利用可能な依存から適切な Execution Adapter を決定します。利用者による明示指定も受け付けられます。
 
-### Execution Adapter
+### Execution Adapter（実行アダプター）
 
 選択済み Resource を、既存 OSS が理解する URI、open option、layer/subdataset 等へ翻訳します。Resource の選択、汎用データ処理エンジンの実装、runtime dependency の version 管理を行ってはなりません（MUST NOT）。
 

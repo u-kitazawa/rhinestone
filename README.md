@@ -1,39 +1,36 @@
 # Rhinestone
 
-Rhinestoneは、日本の公的・地理空間データを探し、利用可能なResourceへ解決し、既存の専門ライブラリへ渡すPythonライブラリです。
+Rhinestoneは、日本の公的・地理空間データを探し、使えるデータの場所と形式を確定し、GDALやRasterioなどの既存ライブラリへ渡すPythonライブラリです。
 
-利用者が覚える中心概念は次の4つです。
+まずは次の流れだけ覚えれば使い始められます。
 
 ```text
-Catalog -> Provider -> Result -> Resource
+configure -> search -> resolve -> open
 ```
 
-- `Catalog`: Rhinestoneが知っているProviderの集合
-- `Provider`: データを提供する主体・サービス
-- `Result`: 検索で見つかった候補
-- `Resource`: 実際に利用できる具体的なデータ
+検索結果を選び、開くまでの最小例は[はじめに](docs/getting-started.md)にあります。
 
-## 対象ユーザー
+## できること
 
 Rhinestoneは、次のような利用者を対象にしています。
 
-- 日本の行政・公的オープンデータをPythonから横断的に探索したい利用者
+- 日本の行政・公的オープンデータをPythonから探したい利用者
 - GIS・リモートセンシングの研究者
 - 公的データを扱うデータエンジニア・データ基盤開発者
 - Rasterio、GDAL、pyogrioなどへ渡す前のProvider固有処理を共通化したい利用者
 
-Rhinestoneは、Catalogに構成されたProvider内のデータを検索してResultとして発見し、Resourceへ解決することを担当します。実際のGIS処理やデータ解析は既存の専門ライブラリへ委譲します。
+Rhinestoneは、データ提供元の検索方法や配布形式の違いを吸収し、利用するデータを`Resource`として確定します。実際のGIS処理やデータ解析は既存の専門ライブラリへ委譲します。
 
-## 対象外のユースケース
+## しないこと
 
 RhinestoneはGIS処理ライブラリやワークフローエンジンではありません。次の用途には、そのまま利用できないか、追加の検討が必要です。
 
 - GISの空間演算・形式変換・解析そのもの
 - ETLやワークフローの実行基盤
-- 外部RuntimeやProvider固有の制約を完全に隠蔽すること
+- 外部ライブラリやProvider固有の制約を完全に隠すこと
 - 0.1.x時点で公開APIの長期固定を前提とする本番システム
 
-対応するProvider、Runtime、形式の範囲は[Compatibility](docs/compatibility.md)を、Runtimeの注入方法は[Configuration](docs/configuration.md)を参照してください。RhinestoneはAlpha版のため、公開APIは今後変更される可能性があります。
+対応する提供元、形式、外部ライブラリは[対応状況](docs/compatibility.md)を参照してください。RhinestoneはAlpha版のため、公開APIは今後変更される可能性があります。
 
 ## インストール
 
@@ -55,8 +52,8 @@ print(resource.uri)
 print(resource.metadata)
 ```
 
-`BUILTIN`はRhinestoneが提供する組み込みCatalogです。`search()`はCatalogに構成されたProvider内のデータを検索してResultを返し、検索結果は`app.resolve(result)`で直接Resourceへ解決できます。
-複数Provider時の整数indexingは構成したProvider順の走査用であり、Providerを横断した関連度rankingではありません。詳細は[Search resultの順序](docs/search.md#結果の順序)を参照してください。
+`BUILTIN`はRhinestoneが用意する提供元の一覧です。`search()`はその中のデータ候補を返し、検索結果は`app.resolve(result)`で使えるデータ情報へ解決できます。
+複数の提供元を使う場合、結果の順番は設定した順番であり、提供元をまたいだ関連度順ではありません。詳細は[検索結果の順序](docs/search.md#結果の順序)を参照してください。
 
 検索を使わず、既知のProviderを選んで構成することもできます。
 
@@ -73,9 +70,9 @@ catalog = Catalog((
 app = configure(catalog=catalog)
 ```
 
-## RuntimeとCredential
+## 外部ライブラリと認証情報
 
-GDAL、Rasterio、pyogrio、RDFLibなどの外部Runtimeは利用者が用意します。API keyやtokenはCredentialとして分離します。
+GDAL、Rasterio、pyogrio、RDFLibなど、データを開いたり解釈したりする外部ライブラリは利用者が用意します。API keyやtokenは設定値に直接書かず、認証情報として分離します。
 
 ```python
 app = configure(
@@ -89,19 +86,18 @@ HTTP通信はRhinestoneに組み込まれています。
 
 ## 内部アーキテクチャ
 
-利用者が意識する必要のない`Source`、`Config`、`AccessPlan`、`Resolver`、各種Adapter、Registryは内部実装です。内部では責務分離のためにこれらの段階を保持しますが、通常の利用導線には出しません。
+`Source`、`Config`、`AccessPlan`、`Resolver`、Adapter、Registryは、提供元ごとの差を処理する内部概念です。通常は`Catalog`、検索結果、`Resource`だけを意識すれば十分です。
 
 RhinestoneはGIS I/O、形式変換、空間演算、データ解析を実装せず、解決済みResourceを既存の専門Runtimeへ渡します。
 
-## ドキュメント
+## 次に読む
 
-- [Documentation](docs/index.md)
-- [Getting started](docs/getting-started.md)
-- [Configuration](docs/configuration.md)
-- [API reference](docs/api.md)
-- [Compatibility](docs/compatibility.md)
-- [Runtime guide](docs/runtimes.md)
-- [API stability and release policy](docs/release-policy.md)
+- [ドキュメント入口](docs/index.md)
+- [はじめに](docs/getting-started.md)
+- [アプリケーションを構成する](docs/configuration.md)
+- [APIリファレンス](docs/api.md)
+- [対応状況](docs/compatibility.md)
+- [外部ライブラリの導入](docs/runtimes.md)
 
 ## 開発環境
 

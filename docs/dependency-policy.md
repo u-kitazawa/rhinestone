@@ -7,9 +7,9 @@ Rhinestoneは、配信元・プロトコル固有の解釈を必要な範囲で�
 | 層 | Rhinestoneの方針 | 例 |
 | --- | --- | --- |
 | Core | 軽量な必須依存だけを持つ | `jsonschema` |
-| HTTP transport | 組み込みで提供する | provider metadata、JSON service |
-| Source Adapter | provider / protocolの解釈を担当する。専用ライブラリは意味論の委譲が必要な場合だけ採用する | STAC、DCAT |
-| Execution Adapter | 解決済みResourceを専門runtimeの呼び出しへ翻訳する | GDAL、Rasterio、pyogrio |
+| HTTP通信 | 組み込みで提供する | 提供元メタデータ、JSONサービス |
+| Source Adapter | 提供元／通信仕様の解釈を担当する。専用ライブラリは意味の委譲が必要な場合だけ採用する | STAC、DCAT |
+| Execution Adapter | 解決済みResourceを専門ライブラリの呼び出しへ翻訳する | GDAL、Rasterio、pyogrio |
 | Runtime | 利用者が実体または明示的な`RuntimeFactory`として供給する | `gdal`、`rasterio`、`pyogrio`、`rdflib` |
 
 CoreはGDAL、Rasterio、pyogrio、RDFLibなどを直接importしません。HTTP通信も公開APIでtransportを注入させず、Rhinestoneの組み込みtransportを使います。
@@ -65,7 +65,7 @@ Runtime identity           = どの外部実行環境を呼び出すか
 
 現行の組み込みAdapterは1つのAdapterと1つのRuntimeが対応するため、`ExecutionAdapter.name`を選択名とDependency Registryのキーに兼用します。これは現在の契約として維持します。
 
-## Adapter chain
+## Adapterの連結
 
 Execution Adapterのchainは導入しません。1つのExecution Adapterが、必要なrequest、pagination、decodeなどを内部で行い、1つの解決済みResourceを1つの専門runtimeへ渡します。
 

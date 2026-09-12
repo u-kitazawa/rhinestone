@@ -26,7 +26,7 @@ nav:
       - v0.5 実装状態マトリクス: v05-status-matrix.md
       - APIリファレンス:
           - 概要: api.md
-          - Source Adapter:
+          - 提供元アダプター:
               - 概要: api/source-adapters.md
               - CKAN: api/adapters/ckan.md
               - DCAT: api/adapters/dcat.md
@@ -37,10 +37,10 @@ nav:
               - PLATEAU: api/adapters/plateau.md
               - STAC: api/adapters/stac.md
               - Static: api/adapters/static.md
-          - Execution Adapter:
+          - 実行アダプター:
               - 概要: api/execution-adapters.md
               - GDAL: api/adapters/gdal.md
-              - JSON service: api/adapters/json-service.md
+              - JSONサービス: api/adapters/json-service.md
               - pyogrio: api/adapters/pyogrio.md
               - Rasterio: api/adapters/rasterio.md
 

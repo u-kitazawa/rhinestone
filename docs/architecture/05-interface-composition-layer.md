@@ -1,4 +1,4 @@
-# Interface / Composition 層仕様
+# インターフェース／アプリケーション構成層の仕様
 
 > **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
 
@@ -19,7 +19,7 @@
 
 具体的な function/class 名は公開 API の実装とともに定義します。概念的な `resource.open(adapter="gdal")` は、明示選択可能な実行境界を表します。
 
-## Composition
+## アプリケーションの構成
 
 Application 構成は Adapter Registry と Dependency Registry を組み立て、Resolver、Search Coordinator、Execution Adapter Selector へ注入します。Process-global な可変登録へ Domain を依存させません（MUST NOT）。
 

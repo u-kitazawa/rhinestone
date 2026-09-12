@@ -1,8 +1,8 @@
-# Direct Source Adapter
+# 直接指定の提供元アダプター
 
 `DirectAdapter` は利用者が完全に記述した単一 Resource を `Source` に変換します。
 
-- `source_type`: `direct`
+- 提供元の種類（`source_type`）: `direct`
 - 必須設定: `uri`, `format`
 - 任意設定: `media_type`, `metadata`, `archive`, `encoding`, `layer`, `subdataset`
 

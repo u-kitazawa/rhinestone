@@ -2,7 +2,7 @@
 
 > **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
 
-## ［Adapter Registry］
+## ［Adapter Registry］（アダプター一覧）
 
 Source Adapter と Execution Adapter の登録状態を管理します。Registry は Core データから参照する service locator ではなく、composition 境界から調整コンポーネントへ渡します。
 
@@ -20,7 +20,7 @@ Execution: GdalAdapter, RasterioAdapter, PyogrioAdapter
 
 一覧は実装義務ではなく、Registry が扱う代表的な分類を示します。
 
-## ［Dependency Registry］
+## ［Dependency Registry］（外部ライブラリ一覧）
 
 利用者が所有する runtime dependency を callback/factory として管理します。
 

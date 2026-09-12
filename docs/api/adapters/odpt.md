@@ -1,4 +1,4 @@
-# OdptAdapter
+# OdptAdapter（ODPT提供元アダプター）
 
 `OdptAdapter` は ODPT v4 の service query を解決します。データ取得は行わず、`JsonServiceAdapter` が実行します。
 
@@ -8,7 +8,7 @@
 
 `dataset`（`station`、`railway`、`train`）と logical credential 名の `credential` が必須です。公式フィールドだけを含む `filters` は任意です。
 
-## Endpoint と実行
+## 接続先と実行
 
 endpoint、resource type、許可される filter は `sources.ODPT` の Catalog 定義から Adapter へ渡されます。HTTP実行runtimeはRhinestoneに組み込まれているため、利用者はcredential factoryだけを構成します。
 

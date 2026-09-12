@@ -2,7 +2,7 @@
 
 > **文書ステータス: 履歴資料。** v0.4の設計を実装境界へ整理した文書で、現行APIの契約ではありません。現在の参照先は[ドキュメントの位置付け](../documentation-status.md)を確認してください。
 
-## ［Source Adapter］
+## ［Source Adapter］（提供元アダプター）
 
 ### 責務
 
@@ -20,7 +20,7 @@ HTML scraping、endpoint/download URL の推測、非公式 DOM 構造への依�
 
 Source Adapter の内部で HTTP 通信まで行えます。外部契約を安定させ、Client 等への内部分割は必要性に応じて行います。
 
-## ［Execution Adapter］
+## ［Execution Adapter］（実行アダプター）
 
 ### 責務
 

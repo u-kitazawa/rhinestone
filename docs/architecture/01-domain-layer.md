@@ -6,31 +6,31 @@
 
 Core データ層は、Rhinestone が所有する知識を外部ライブラリから独立したモデルとして表現します。GDAL、Rasterio、pyogrio、QGIS 等を import してはなりません（MUST NOT）。
 
-## Config
+## Config（設定）
 
 対象データを宣言します。Source type と、その Source Adapter が必要とする設定を持ちます。実行時依存や OSS option は持ちません。
 
-## Source
+## Source（解釈済みの提供元情報）
 
 Source Adapter が provider を解釈した結果であり、Metadata、Resource 候補、Capability 情報、Provenance、source-specific raw metadata を保持します。provider 固有 Reference 型は持ちません。
 
-## Metadata
+## Metadata（メタデータ）
 
 共通利用される最小限の field と、provider が返した raw metadata を保持します。共通 schema に合わせるために元の情報を破棄してはなりません（MUST NOT）。
 
-## AccessPlan
+## AccessPlan（アクセス方法）
 
 Resource へのアクセス方法を表します。File、remote dataset、service query 等の違いを型または明示的 field で表現し、外部 OSS の module instance は持ちません。
 
-## Resource
+## Resource（利用するデータ）
 
 URI、format、media type、Metadata、Provenance、AccessPlan、Source、必要に応じて local path を保持します。解決済み知識を一体として後続処理へ渡します。
 
-## Provenance
+## Provenance（出典情報）
 
 provider、identifier、endpoint、original URL、query parameter、retrieved time、checksum、Adapter 情報、raw metadata など、取得と解決の経路を保持します。
 
-## SearchQuery / SearchResult
+## SearchQuery / SearchResult（検索条件と検索結果）
 
 SearchQuery は provider 横断で意味が共有できる最小限の条件だけを持ちます。SearchResult は表示用情報だけでなく、provider 固有 Config、Metadata、Provenance を保持します。
 

@@ -1,10 +1,10 @@
-# PlateauAdapter
+# PlateauAdapter（PLATEAU提供元アダプター）
 
 `PlateauAdapter` は G 空間情報センターの CKAN catalog から PLATEAU 配布物を解決します。
 
 [Source Adapter 一覧](../source-adapters.md) · source type: `plateau`
 
-## 設定と endpoint
+## 設定と接続先
 
 `dataset_id` または `resource_id` のいずれかが必須です。`archive="zip"`、`entry_point` は任意です。`time` を指定する場合は、必要に応じて `time_kind` に `calendar_year`、`fiscal_year`、`survey_year`、`as_of_date` のいずれかを指定して意味を明示できます。組み込みSourceではendpointはCatalogから渡され、CKAN Action APIへのHTTP通信はRhinestoneの組み込みtransportを使用します。検索条件は `text` と `limit` です。
 

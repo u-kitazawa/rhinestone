@@ -6,7 +6,7 @@
 
 この層は Core データと Adapter を調整し、provider 固有処理や外部 OSS の処理自体は実装しません。
 
-## ［Resolver］
+## ［Resolver］（解決処理）
 
 Source に含まれる Resource 候補から利用対象を選び、そのアクセス方法を AccessPlan として確定し、Resource を構成します。
 
@@ -16,7 +16,7 @@ Source に含まれる Resource 候補から利用対象を選び、そのアク
 - format、protocol、候補の曖昧さを silent fallback で解消しない（MUST NOT）。
 - 決定理由を診断可能にする（SHOULD）。
 
-## ［Search Coordinator］
+## ［Search Coordinator］（検索の調整役）
 
 SearchQuery を検索 Capability のある Source Adapter へ配布し、SearchResult を集約します。
 
@@ -25,7 +25,7 @@ SearchQuery を検索 Capability のある Source Adapter へ配布し、SearchR
 - 結果を provider ごとのまとまりとして保持する（MUST）。
 - reranking を行う場合は exact title match、official provider、Metadata completeness 等の共通信号だけを使用する（MUST）。
 
-## ［Execution Adapter Selector］
+## ［Execution Adapter Selector］（実行アダプターの選択）
 
 Resource の性質と Dependency Registry で利用可能な runtime をもとに Execution Adapter を決定します。
 

@@ -1,16 +1,16 @@
-# Getting started
+# はじめに
 
-Rhinestoneは、Catalogに構成されたProvider内のデータを検索してResultとして発見し、ResultをResourceへ解決するライブラリです。
+Rhinestoneは、データ提供元を検索し、検索結果を使えるデータ情報へ変換するライブラリです。
 
-## インストール
+## 1. インストール
 
 ```console
 pip install rhinestone
 ```
 
-HTTP通信は組み込みです。GDAL、Rasterio、pyogrioなど、データを開くためのRuntimeだけを必要に応じて用意します。
+HTTP通信は組み込みです。データを開くときだけ、GDAL、Rasterio、pyogrioなど必要な外部ライブラリを用意します。
 
-## 組み込みCatalogを使う
+## 2. 組み込みの提供元を使う
 
 ```python
 from rhinestone import configure
@@ -19,9 +19,9 @@ from rhinestone.catalogs import BUILTIN
 app = configure(catalog=BUILTIN)
 ```
 
-## 検索して解決する
+## 3. 検索して解決する
 
-`search()`はCatalogに構成されたProviderを検索対象として、その中のデータ候補をResultとして返します。Provider自体を発見するAPIではありません。
+`search()`は、設定した提供元の中にあるデータ候補を返します。提供元そのものを探すAPIではありません。
 
 ```python
 results = app.search(text="河川", limit=5)
@@ -33,11 +33,10 @@ print(resource.format)
 print(resource.provenance)
 ```
 
-検索結果の解決にConfigは必要ありません。
-複数Provider時の`results[0]`は構成順で最初のProviderの先頭結果であり、Providerを
-横断した関連度1位ではありません。順序とgroup別の参照方法は[データを検索する](search.md)を参照してください。
+検索結果の解決に`Config`を組み立てる必要はありません。複数の提供元を設定した場合、
+`results[0]`は設定順で最初の提供元の先頭結果です。関連度1位を意味しません。詳しくは[データを検索する](search.md)を参照してください。
 
-## Providerを限定する
+## 4. 提供元を限定する
 
 ```python
 from rhinestone import Catalog, configure
@@ -47,9 +46,10 @@ catalog = Catalog(BUILTIN.providers[:2])
 app = configure(catalog=catalog)
 ```
 
-## 既知のURIを直接扱う
+## 5. URIが分かっている場合
 
-既知のURIを扱う高度な用途では、`direct`のConfigを使えます。通常の利用では検索結果から`app.resolve(result)`を使ってください。
+URIと形式がすでに分かっている場合は、`direct`の`Config`で直接指定できます。通常は検索結果から
+`app.resolve(result)`を使う方が簡単です。
 
 ```python
 from rhinestone import Config, configure

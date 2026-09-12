@@ -1,8 +1,8 @@
-# OGC API Features Source Adapter
+# OGC API Featuresの提供元アダプター
 
 `OgcFeaturesAdapter` は OGC API Features の collection または feature を `Source` に変換します。
 
-- `source_type`: `ogc-features`
+- 提供元の種類（`source_type`）: `ogc-features`
 - 必須設定: `endpoint`, `collection_id`
 - 任意設定: `feature_id`
 - 検索: `bbox`, `time`, `limit`。構築時に `collection_id` も指定します。

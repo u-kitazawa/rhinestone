@@ -130,7 +130,7 @@ resource.open(...)
 
 ## 6. 2つの入口
 
-### 6.1 Discovery-driven
+### 6.1 検索から始める経路
 
 何を使うべきかまだ確定していない場合は検索から始める。
 
@@ -159,7 +159,7 @@ resource = app.resolve(results[0].to_config())
 
 公開 API は将来 `app.resolve(result)` 等へ簡略化してよい。内部的に `SearchResult → Config → Resource` の経路を維持することは妨げない。
 
-### 6.2 Deterministic / config-driven
+### 6.2 決定的なConfig指定の経路
 
 利用する provider / dataset / identifier が既に分かっている場合は検索を通さない。
 
@@ -177,7 +177,7 @@ Resource
 
 ---
 
-## 7. Config
+## 7. Config（設定）
 
 Config は、Rhinestone に対して「何を利用したいか」を宣言する入力である。
 
@@ -275,11 +275,11 @@ SearchResult
 
 ---
 
-## 10. Federated Search
+## 10. 複数提供元の検索
 
 Rhinestone の search は中央 index を前提とせず、構成済み Source へ問い合わせる federated search を基本とする。
 
-### 10.1 SearchQuery
+### 10.1 SearchQuery（検索条件）
 
 Core の公開 SearchQuery は必要最小限に保つ。
 
@@ -304,7 +304,7 @@ plateau_city_code
 
 必要な日本固有解釈は内部の search context / provider translation で扱う。
 
-### 10.2 Capability-aware projection
+### 10.2 対応条件に合わせた検索条件の投影
 
 各 Source は、自身が理解できる検索条件だけを受け取る。
 
@@ -328,7 +328,7 @@ unsupported condition は Source ごとに無視・skip・diagnostic として�
 
 ただし、条件を無視したことで意味のない全件検索になる場合、Adapter はその Source 自体を skip できる。
 
-### 10.3 Source-scoped search
+### 10.3 提供元を限定した検索
 
 特定 Source のみを検索する経路を許容する。
 
@@ -353,7 +353,7 @@ Rhinestone は日本に特化するが、テーマ別 taxonomy は作らない�
 
 代わりに、provider をまたいで再利用できる **横断的な解決知識** を持つ。
 
-### 11.1 Identity
+### 11.1 識別情報（Identity）
 
 「これは何か」を解決する。
 
@@ -377,7 +377,7 @@ canonical municipality identity
 13104
 ```
 
-### 11.2 Space
+### 11.2 空間情報（Space）
 
 「どこか」を解決する。
 
@@ -392,7 +392,7 @@ JGD2000 / JGD2011 / JGD2024
 高さ・測地基準
 ```
 
-### 11.3 Time
+### 11.3 時間情報（Time）
 
 「いつか」を解決する。
 
@@ -407,7 +407,7 @@ as-of date
 
 `令和2年` と `2020年度` を無条件に同一視しない。
 
-### 11.4 Representation
+### 11.4 データ形式（Representation）
 
 日本の公的データで頻出する配布上の表現を理解する。
 
@@ -428,7 +428,7 @@ GML
 
 Rhinestone は必要な encoding / entry point / access hint を Resource へ保持できるが、データ内容の transformation を Core の責務にはしない。
 
-### 11.5 Provenance / Policy
+### 11.5 出典情報と方針（Provenance / Policy）
 
 以下を区別する。
 
@@ -487,7 +487,7 @@ canonical municipality -> PLATEAU dataset
 
 ---
 
-## 13. ［Source Adapter］
+## 13. ［Source Adapter］（提供元アダプター）
 
 ［Source Adapter］は provider / catalog と Rhinestone Core の境界である。
 
@@ -550,7 +550,7 @@ PLATEAU -> plateaukit（適合性を確認した範囲）
 
 単純な HTTP request や少量の metadata extraction のためだけに依存を増やす必要はない。
 
-### 14.1 e-Stat
+### 14.1 e-Stat（統計データ）
 
 pyestat は単なる Execution runtime に限定せず、e-Stat provider specialist として利用してよい。
 
@@ -574,7 +574,7 @@ native statistical object
 
 重要なのは、pyestat の型を Rhinestone の検索 API 全体へ漏らすことではなく、e-Stat semantics の実装を専門ライブラリへ委譲することである。
 
-### 14.2 STAC
+### 14.2 STAC（衛星画像等のカタログ）
 
 STAC の conformance、pagination、extensions、Item / Asset semantics 等は、可能な範囲で pystac-client / pystac へ委譲する。
 
@@ -582,7 +582,7 @@ Rhinestone は STAC の再実装ではなく、検索結果から利用対象 as
 
 ---
 
-## 15. Source
+## 15. Source（解釈済み情報）
 
 Source は、［Source Adapter］が Config を解釈した結果として Core へ渡す内部モデルである。
 
@@ -636,7 +636,7 @@ PLATEAU Dataset
 
 ---
 
-## 17. AccessPlan
+## 17. AccessPlan（アクセス方法）
 
 AccessPlan は、解決済み Resource へアクセスするための仕様である。
 
@@ -675,7 +675,7 @@ AccessPlan が単なる driver args の再包装にしかならない場合は�
 
 ---
 
-## 18. Resource
+## 18. Resource（利用するデータ）
 
 Resource は Rhinestone によって解決された、利用可能な具体的データ資源である。
 
@@ -714,7 +714,7 @@ query / selection provenance
 
 ---
 
-## 19. Portable Resource Specification
+## 19. 持ち運び可能なResource仕様
 
 v0.5 では Resource の runtime-bound 部分と、持ち運び可能な解決仕様を分離できる方向を採る。
 
@@ -755,7 +755,7 @@ JSON round-trip、MCP、別 process、Intake export 等は、この境界の上�
 
 Metadata と Provenance は Rhinestone の主要な価値である。
 
-### 20.1 Metadata
+### 20.1 Metadata（メタデータ）
 
 共通項目は必要最小限にする。
 
@@ -773,7 +773,7 @@ media_type
 
 provider metadata は raw form でも保持できる。
 
-### 20.2 Provenance
+### 20.2 Provenance（出典情報）
 
 少なくとも以下を可能な範囲で保持する。
 
@@ -827,17 +827,17 @@ Execution Adapter の chaining は Core に導入しない。
 
 ---
 
-## 22. Dependency Policy
+## 22. 外部ライブラリの依存方針
 
 v0.5 では依存を次のように考える。
 
-### 22.1 Core dependency
+### 22.1 Coreの依存関係
 
 Core 全体に必要で軽量なもの。
 
 HTTP transport 等を含む。
 
-### 22.2 Provider / protocol extra
+### 22.2 提供元／通信仕様ごとの追加依存
 
 特定 Source を正しく扱うための専門ライブラリ。
 
@@ -859,7 +859,7 @@ rhinestone[rdf]
 
 実際の extra 名は packaging 設計時に決定する。
 
-### 22.3 Execution runtime
+### 22.3 実行用Runtime
 
 GDAL、Rasterio、pyogrio 等、データを開くための runtime。
 
@@ -869,7 +869,7 @@ provider specialist と execution runtime を機械的に完全分離するこ�
 
 ---
 
-## 23. Credential
+## 23. Credential（認証情報）
 
 Credential は SourceDefinition / Config / portable Resource specification と分離する。
 
@@ -886,7 +886,7 @@ API key、token 等を metadata / provenance / serialization に混入させて�
 
 ## 24. 代表的な Source の責務
 
-### 24.1 e-Stat
+### 24.1 e-Stat（統計データ）
 
 ```text
 search
@@ -922,7 +922,7 @@ cross-catalog search
 
 Rhinestone 自身は同等の全国 index を再構築しない。
 
-### 24.4 STAC
+### 24.4 STAC（衛星画像等のカタログ）
 
 ```text
 STAC search
@@ -933,7 +933,7 @@ STAC search
 
 STAC protocol semantics は専門ライブラリへ委譲し、Rhinestone は Resource selection と provenance を担う。
 
-### 24.5 PLATEAU
+### 24.5 PLATEAU（3D都市モデル）
 
 ```text
 catalog dataset
@@ -951,7 +951,7 @@ GSI 固有の配布仕様、GML、tile、測地系等を理解し、最終的な
 
 ---
 
-## 25. Direct Resource
+## 25. 直接指定するResource
 
 既に最終 URI と format が分かっている場合、Rhinestone を通す価値が小さいことを認める。
 
@@ -1010,7 +1010,7 @@ Intake-compatible entry / catalog
 
 ---
 
-## 27. AI / GIS Integration
+## 27. AI／GISとの連携
 
 AI / MCP / GIS は Rhinestone Core の責務ではなく integration target である。
 
@@ -1034,7 +1034,7 @@ MCP 経由では巨大な native data object を転送するより、SearchResul
 
 ---
 
-## 28. Error Policy
+## 28. エラー方針
 
 Rhinestone は「便利さ」のために provider facts を推測しない。
 
@@ -1055,7 +1055,7 @@ archive entry pointが特定できない
 
 ---
 
-## 29. Extension Policy
+## 29. 拡張方針
 
 新しい Source を追加するときは、次を優先する。
 
@@ -1120,7 +1120,7 @@ v0.5 は、利用者が知っている要求・identifier と実際に利用可�
 
 pyestat、pystac-client、rdflib 等を単なる user-provided runtime として扱うだけでなく、provider semantics の専門実装として Source Adapter 内から利用することを認める。
 
-### 31.6 portable Resource boundary
+### 31.6 持ち運び可能なResourceの境界
 
 Resource に保持した解決情報を、credential / live runtime と分離して serialization / MCP / Intake 等へ利用できる方向を明文化する。
 

@@ -1,4 +1,4 @@
-# Source Adapter
+# Source Adapter（提供元アダプター）
 
 Source Adapter は provider 固有の Config と公式 API、またはリポジトリ管理の静的定義を解釈し、`Source` を作ります。
 利用者はAdapter classを直接import・登録せず、`SourceDefinition.adapter_type`で選びます。
@@ -11,13 +11,13 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 を読んでください。HTTPを使うproviderはRhinestoneの組み込みtransportを使用します。各ページの
 `Config.settings` は Adapter が検証する値であり、認証 secret 自体を入れる場所ではありません。
 
-| Adapter | adapter type | API / 配布元 |
+| アダプター | 種類 | API／配布元 |
 | --- | --- | --- |
-| [Direct](adapters/direct.md) | `direct` | 利用者が明示する Resource |
-| [Static](adapters/static.md) | `static` | リポジトリまたは利用者管理の静的定義 |
+| [Direct](adapters/direct.md) | `direct` | 利用者が明示するResource |
+| [Static](adapters/static.md) | `static` | リポジトリまたは利用者が管理する静的定義 |
 | [CKAN](adapters/ckan.md) | `ckan` | CKAN Action API |
 | [DCAT](adapters/dcat.md) | `dcat` | DCAT RDF catalog |
-| [GSI Fundamental](adapters/gsi-fundamental.md) | `gsi-fundamental` | 基盤地図情報のローカル GML |
+| [基盤地図情報](adapters/gsi-fundamental.md) | `gsi-fundamental` | 基盤地図情報のローカルGML |
 | [ODPT](adapters/odpt.md) | `odpt` | ODPT v4 |
 | [OGC API Features](adapters/ogc-features.md) | `ogc-features` | OGC API Features 1.0 |
 | [PLATEAU](adapters/plateau.md) | `plateau` | G 空間情報センター CKAN |

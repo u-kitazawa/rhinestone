@@ -1,8 +1,8 @@
-# DCAT Source Adapter
+# DCATの提供元アダプター
 
 `DcatAdapter` は明示された DCAT RDF catalog の Dataset を `Source` に変換します。
 
-- `source_type`: `dcat`
+- 提供元の種類（`source_type`）: `dcat`
 - 必須設定: `uri`, `dataset`
 - 任意設定: `serialization` (`json-ld`, `turtle`, `xml`), `distribution`
 - 検索: `text`, `limit`

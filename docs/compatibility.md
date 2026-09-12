@@ -1,18 +1,24 @@
 # 対応状況と既知の非対応
 
-この文書は Rhinestone 0.1.0 の実装済み互換性を示す。表にない provider、protocol、format は対応していると見なしてはならない。Rhinestone は URL suffix や応答内容から format を推測しない。
+この文書は Rhinestone 0.1.0 の実装済み範囲を示します。表にない提供元、通信仕様、形式は、
+対応しているとは限りません。RhinestoneはURLの拡張子や応答内容だけから形式を推測しません。
+
+「Source Adapter」は提供元のAPIやメタデータを読み取る部分、「Execution Adapter」は確定した
+ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
 ## 実行環境
 
-| 対象 | 対応範囲 | 注記 |
+| 対象 | 対応範囲 | 補足 |
 | --- | --- | --- |
 | Python | 3.10 以上 | CI は 3.10〜3.13 を対象にする。 |
-| HTTP | Python standard library | Source metadata、DCAT文書、ODPT JSON serviceのHTTP通信はRhinestoneに組み込む。 |
+| HTTP | Python標準ライブラリ | Sourceメタデータ、DCAT文書、ODPT JSONサービスのHTTP通信はRhinestoneに組み込まれています。 |
 | GDAL / Rasterio / pyogrio | 利用者が供給する版 | Rhinestone は version を固定・管理しない。各 adapter が呼ぶ API と対象 format の互換性は利用者側で確認する。検証済み範囲は[Runtimeの導入ガイド](runtimes.md)に記載する。 |
 
-この表は、Rhinestoneが対応するProvider、format、APIの範囲を示します。Runtime packageのインストール可能性やnative libraryの組み合わせを保証するものではありません。Runtimeごとの installation recipe、lifecycle、tested versionは[Runtimeの導入ガイド](runtimes.md)を参照してください。
+この表は、Rhinestoneが対応する提供元、形式、APIの範囲を示します。外部ライブラリのインストール可能性や
+ネイティブライブラリの組み合わせを保証するものではありません。ライブラリごとの導入方法、管理方法、
+検証済みバージョンは[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
-## Source Adapter
+## Source Adapter（提供元アダプター）
 
 | source type | 対応する提供仕様・版 | 解決できる対象 | 明示的な制限 |
 | --- | --- | --- | --- |

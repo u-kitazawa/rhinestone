@@ -23,7 +23,7 @@ Source Adapter は次を満たさなければなりません。
 
 HTTP通信はComposition RootからRhinestone組み込みtransportとして供給し、標準の公開APIで利用者にtransport callbackを要求しません（MUST）。Adapterを直接構築するテストや内部再利用ではtransportを注入可能な境界を維持します。
 
-## Catalog loading
+## Catalogの読み込み
 
 `rhinestone.catalogs` が Catalog resource を読み込み、`SourceDefinition` を生成します。Catalogの `name` は公開facade名だけを定義し、Adapterの種類や実行処理には影響しません。`rhinestone.sources` は組み込み定義を公開する facade です。Source Adapter は Catalog のファイル名・パッケージ配置・loader を参照せず、constructor 引数または `SourceDefinition.settings` として宣言値を受け取ります。
 
@@ -39,11 +39,11 @@ HTTP通信はComposition RootからRhinestone組み込みtransportとして供�
 
 `OdptAdapter` は Catalog から渡された v4 endpoint、dataset type、公式 filter を検証して ServiceQueryPlan を作ります。`JsonServiceAdapter` が選択済みの Plan をRhinestone組み込みHTTP runtimeへ渡し、credential factory から得た secret をその直前に `acl:consumerKey` として付与します。
 
-## Search Capability
+## 検索Capability
 
 検索を提供する Adapter だけが search Capability を宣言します。未対応条件を黙って無視せず、結果には Config へ戻るための provider 固有情報、Metadata、Provenance を含めます。
 
-## Adapter Registry
+## Adapter Registry（アダプター一覧）
 
 Source Adapter と Execution Adapter の登録状態は内部 Adapter Registry が管理します。利用者は Adapter instance を登録しません（MUST NOT）。Composition Root は `SourceDefinition.adapter_type` から組み込み Source Adapter を生成し、利用者が供給した外部dependencyと組み込みHTTP runtimeに対応する組み込み Execution Adapter を構成します。
 

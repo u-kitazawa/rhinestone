@@ -6,12 +6,12 @@
 
 Rhinestone は provider の知名度ではなく、検証可能性、再現可能性、明示的な失敗によって信頼性を確保します。
 
-- schema validation
-- semantic validation
-- explicit resource selection
-- checksum where applicable
-- provenance preservation
-- no silent fallback
+- スキーマ検証
+- 意味の検証
+- Resourceの明示的な選択
+- 必要な場合のチェックサム検証
+- 出典情報の保持
+- 暗黙のフォールバックを行わない
 
 ## 判断規則
 

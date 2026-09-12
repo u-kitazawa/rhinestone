@@ -1,4 +1,4 @@
-# Knowledge Adapter
+# Knowledge Adapter（共有知識アダプター）
 
 Rhinestoneの共有知識は、Source Adapterに直接埋め込まず、独立したKnowledge Adapterとして
 注入できます。現在の対象は自治体 identity と time semantics です。
@@ -30,13 +30,13 @@ app = configure(
 追加設定なしで利用できます。factoryは必要なSource Adapterが初めて知識を利用したときに評価されます。factoryには
 `KnowledgeAdapterContext`が渡されます。
 
-## Identity
+## 地域や自治体の識別（Identity）
 
 Identity Adapterは、明示された名称またはコードを`MunicipalityIdentity`へ解決します。
 Provider固有のidentifierはcanonical codeとは別に保持してください。unknown、ambiguous、
 不正な入力を推測で解決してはいけません。
 
-## Time
+## 時間の意味（Time）
 
 Time Adapterは、暦年、年度、survey year、as-of dateを別の意味として返します。
 `StandardTimeAdapter`は明示的な西暦、和暦、年度、ISO日付だけを扱います。

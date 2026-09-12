@@ -1,8 +1,9 @@
-# Runtime の導入ガイド
+# 外部ライブラリ（Runtime）の導入ガイド
 
-Rhinestone Core は、外部 Runtime をインストール・選択・更新しません。利用者が用途に合う Runtime を用意し、`configure(dependencies=...)` へ実体または明示的な `RuntimeFactory` として渡します。
+Rhinestone Coreは、外部ライブラリをインストール・選択・更新しません。利用者が用途に合うライブラリを用意し、
+`configure(dependencies=...)`へ実体または明示的な`RuntimeFactory`として渡します。
 
-この責務分離により、Runtime の依存関係、native library、ライセンス、更新時期は利用者の環境で管理できます。Rhinestone が保証するのは、対応表に記載した Adapter が、供給された Runtime の公開 API を呼び出すことです。
+この責務分離により、Runtimeの依存関係、ネイティブライブラリ、ライセンス、更新時期は利用者の環境で管理できます。Rhinestoneが保証するのは、対応表に記載したAdapterが、供給されたRuntimeの公開APIを呼び出すことです。
 
 ## まず確認すること
 
@@ -127,18 +128,20 @@ DCAT Source を直接構成する場合も、`dependencies={"rdflib": rdflib}` �
 
 `pystac-client`、`pystac` は現行の built-in Adapter が要求する Runtime ではありません。STAC は組み込み HTTP Adapterで動作します。これらを Rhinestone の Runtime として追加インストールしても、現行 Adapter の機能は増えません。
 
-## Tested compatibility matrix
+## 検証済みバージョン
 
-`tested` は package の dependency constraint ではなく、Rhinestone の Adapter を実際に実行した範囲です。`tested (manual)` は CI ではなく、記載した環境で再現可能な smoke test を手動実行したことを示します。OS、Python、native library の組み合わせが変われば、同じ package version でも再確認が必要です。
+「検証済み」はパッケージの依存条件ではなく、RhinestoneのAdapterを実際に実行した範囲です。
+「手動検証済み」はCIではなく、記載した環境で再現可能な動作確認を手動実行したことを示します。
+OS、Python、ネイティブライブラリの組み合わせが変われば、同じパッケージバージョンでも再確認が必要です。
 
 基準日: 2026-09-08
 
-| Runtime | Version | Role / required phase | Tested environment | Status |
+| 外部ライブラリ | バージョン | 役割／必要な段階 | 検証環境 | 状態 |
 | --- | --- | --- | --- | --- |
-| RDFLib | 7.6.0 | Source / `search`, `resolve` | Linux x86_64, CPython 3.12.13 | tested (manual) |
-| Rasterio | 1.5.1 | Execution / `open` | Linux x86_64, CPython 3.12.13 | tested (manual) |
-| pyogrio + GeoPandas | 0.13.0 + 1.1.4 | Execution / `open` | Linux x86_64, CPython 3.12.13 | tested (manual) |
-| GDAL | 3.13.3 | Execution / `open` | — | not tested; native installation was unavailable in the verification environment |
+| RDFLib | 7.6.0 | Source／`search`、`resolve` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
+| Rasterio | 1.5.1 | Execution／`open` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
+| pyogrio + GeoPandas | 0.13.0 + 1.1.4 | Execution／`open` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
+| GDAL | 3.13.3 | Execution／`open` | — | 未検証（検証環境で導入できなかった） |
 
 Rhinestone の通常 CI は `uv.lock` に固定された RDFLib 6.3.2 を Python 3.10〜3.13、`ubuntu-latest` で検証します。これは package metadata の制約や lockfile の再現性を確認するための範囲であり、上表の latest stable を意味しません。
 

@@ -1,8 +1,8 @@
-# Contributing to Rhinestone
+# Rhinestoneへの貢献
 
 Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Source Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
 
-Rhinestoneは、日本の公的・地理空間データへアクセスするためのKnowledge / Specification Layerです。変更を始める前に、[README](README.md)と[ドキュメントの位置付け](docs/documentation-status.md)を確認してください。
+Rhinestoneは、日本の公的・地理空間データを使える形へ解決するPythonライブラリです。変更を始める前に、[README](README.md)と[ドキュメントの位置付け](docs/documentation-status.md)を確認してください。
 
 ## 基本方針
 
@@ -39,7 +39,7 @@ uv sync --dev --locked
 - `pyproject.toml`: パッケージ、開発ツール、型チェックの設定
 - `.github/workflows/`: CIとドキュメント公開の設定
 
-`docs/`には現行の公開契約に加えて、v0.5への移行先を示す設計草案と履歴資料が含まれます。ナビゲーションに掲載されたガイドとAPIリファレンスを現行の利用者向け契約とし、公開APIの正確な振る舞いは実装とテストで固定します。`docs/spec_v5.md`は段階移行中の設計草案、`docs/spec_v4.md`、`docs/adapter_expansion.md`、`docs/architecture/`、`docs/specs/`は履歴資料です。詳しい更新規則は[ドキュメントの位置付け](docs/documentation-status.md)を参照してください。
+`docs/`には現行の公開契約に加えて、v0.5への移行先を示す設計草案と履歴資料が含まれます。ナビゲーションに掲載されたガイドとAPIリファレンスを現行の利用者向け契約とし、公開APIの正確な振る舞いは実装とテストで固定します。`docs/spec_v5.md`は段階移行中の設計草案、`docs/spec_v4.md`は内容を変更しない凍結資料、`docs/adapter_expansion.md`、`docs/architecture/`、`docs/specs/`は履歴資料です。詳しい更新規則は[ドキュメントの位置付け](docs/documentation-status.md)を参照してください。
 
 ## ローカル検証
 

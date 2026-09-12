@@ -1,4 +1,4 @@
-# StaticAdapter
+# StaticAdapter（静的定義アダプター）
 
 `StaticAdapter` は、リポジトリまたは利用者が管理する静的なサービス定義を
 `Source` として解決します。

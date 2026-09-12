@@ -1,4 +1,4 @@
-# DcatAdapter
+# DcatAdapter（DCAT提供元アダプター）
 
 `DcatAdapter` は明示した DCAT RDF catalog の Dataset を解決します。
 
@@ -13,7 +13,7 @@
 解決時の `Config.settings["uri"]` がこの値と一致しない場合は、取得前に拒否されます。
 `catalog_uri` を設定しない構成では取得先を信頼済みProvider値で検証できないため、
 外部入力をそのまま `Config` に渡さないでください。
-## Catalog と runtime
+## カタログとRuntime
 
 標準の`configure()`経路ではDCAT文書の取得にRhinestoneの組み込みHTTP transportを使い、RDF解釈runtimeだけを`dependencies={"rdflib": ...}`として利用者が供給します。遅延評価する場合は `RuntimeFactory(factory)` を指定し、DCATの`search()`または`resolve()`で初めて評価されます。未設定またはfactoryの失敗は`DependencyUnavailableError`、文書取得の失敗は`ProviderMetadataError`として区別されます。解決済みResourceやAccessPlanは`rdflib`の実体・factoryを保持しません。
 

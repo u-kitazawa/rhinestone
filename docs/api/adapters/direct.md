@@ -1,4 +1,4 @@
-# DirectAdapter
+# DirectAdapter（直接指定アダプター）
 
 `DirectAdapter` は、完全に記述された単一 Resource を解決します。
 

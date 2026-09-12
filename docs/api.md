@@ -1,16 +1,18 @@
-# API reference
+# APIリファレンス
 
-このページは通常利用する公開APIを先に説明します。公開メンタルモデルや用語は[用語と概念](concepts.md)、拡張向けの現行Adapter契約は[Source Adapter](api/source-adapters.md)と[Execution Adapter](api/execution-adapters.md)を参照してください。履歴資料の`architecture/`は現行APIの規範ではありません。
+このページは、通常の利用で使う公開APIを説明します。初めて使う場合は先に[はじめに](getting-started.md)を読んでください。
+用語は[用語と概念](concepts.md)、Adapterを追加する場合は[Source Adapter](api/source-adapters.md)と
+[Execution Adapter](api/execution-adapters.md)を参照してください。履歴資料の`architecture/`は現行APIの規範ではありません。
 
-## `Catalog`
+## `Catalog`（提供元の一覧）
 
-Providerのimmutableな集合です。組み込みCatalogは`rhinestone.catalogs.BUILTIN`です。
+データ提供元の設定をまとめた、変更されない一覧です。組み込みCatalogは`rhinestone.catalogs.BUILTIN`です。
 
 ```python
 from rhinestone.catalogs import BUILTIN
 ```
 
-## `Provider`
+## `Provider`（データ提供元）
 
 Catalogからアプリケーションへ登録するデータ提供元です。
 
@@ -26,7 +28,7 @@ provider = Provider(
 
 `adapter_type`と`settings`はProviderを構成する拡張向け情報です。secretやRuntimeは保持しません。
 
-## `configure()`
+## `configure()`（アプリケーションを作る）
 
 Catalog、Runtime、Credentialを組み合わせて`Rhinestone`アプリケーションを作ります。
 
@@ -47,7 +49,7 @@ app = configure(
 | `catalog` | 利用するProviderのCatalog |
 | `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
 | `dependencies` | 利用者が所有するSource / Execution Runtime実体、または明示的な`RuntimeFactory`。公開引数は共通だが内部では利用段階ごとに分離される |
-| `credentials` | Credential factory |
+| `credentials` | 認証情報を取得するfactory |
 | `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
 | `adapters` | `SourceAdapterDefinition`／`ExecutionAdapterDefinition`／`KnowledgeAdapterDefinition` の iterable。組み込みは自動登録され、独自定義だけを指定する |
 
@@ -61,7 +63,7 @@ Provider の `settings` に `credential` を論理名として指定すると、
 Provider、Catalog、Result、Resource には保存されません。`credentialed` では、factory の
 評価前に Catalog 由来の endpoint へ送信できることを検証します。
 
-## `Rhinestone.search()`
+## `Rhinestone.search()`（データを検索する）
 
 Catalogに構成されたProvider内のデータ候補を検索し、Resultを返します。Provider自体を発見するAPIではありません。
 
@@ -77,7 +79,7 @@ result = results[0]
 横断した関連度rankingではありません。Provider固有のrankingを扱う場合は
 `results.items()`または`results["provider-id"]`でgroupごとに参照します。
 
-## `Result`
+## `Result`（検索結果）
 
 検索で見つかった候補です。通常は次のようにResourceへ解決します。
 
@@ -89,7 +91,7 @@ resource = app.resolve(result)
 
 検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。Providerの通信・metadata・response障害は`reason="provider_failure"`、`failure_type`（`metadata`または`response`）として診断され、他のSourceの結果は継続して返されます。予期しないプログラムエラーはこの診断へ変換されません。
 
-## `Rhinestone.resolve()`
+## `Rhinestone.resolve()`（Resourceを確定する）
 
 `Result`または高度な`Config`をResourceへ解決します。
 
@@ -97,7 +99,7 @@ resource = app.resolve(result)
 resource = app.resolve(result)
 ```
 
-## `Resource`
+## `Resource`（利用するデータ）
 
 解決済みの具体的なデータです。`uri`、`format`、`media_type`、`metadata`、`provenance`を持ち、Runtimeを明示して開きます。
 
@@ -105,7 +107,7 @@ resource = app.resolve(result)
 data = resource.open("rasterio")
 ```
 
-## Representation vocabulary
+## 形式名の共通定義
 
 Source Adapter 間で共有する format 名と media type 対応は
 `rhinestone.representations` から利用できます。
@@ -121,7 +123,7 @@ format の alias と既知の media type だけを正規化し、URL の拡張�
 `FORMAT_ALIASES`、`MEDIA_TYPE_FORMATS`、`FORMAT_CATEGORIES` は共有定義です。
 Execution Adapter がどの format を実行できるかは、各 Adapter の capability として管理されます。
 
-## `Rhinestone.open()`
+## `Rhinestone.open()`（データを開く）
 
 Resourceを渡すか、Result/Configを渡して解決とopenを一度に行えます。
 
@@ -129,7 +131,7 @@ Resourceを渡すか、Result/Configを渡して解決とopenを一度に行え�
 data = app.open(result, "rasterio")
 ```
 
-## `Runtime`
+## `Runtime`（外部ライブラリ）
 
 GDAL、Rasterio、pyogrio、RDFLibなど、利用者が所有する外部実行環境です。RDFLibはDCATの検索・解決時に、GDAL、Rasterio、pyogrioは`Resource.open()`時に必要になります。HTTP JSON、HTTP text、JSON serviceは組み込みRuntimeを使用します。インストール例と検証済み範囲は[Runtimeの導入ガイド](runtimes.md)を参照してください。
 

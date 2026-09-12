@@ -77,7 +77,7 @@ Source Adapter は `load(config) -> Source` を必ず実装します。Source �
 場合の選択は Adapter ではなく Resolver の責務です。Adapter は URL や形式を推測せず、
 判断できない場合は専用のエラーを送出してください。
 
-## SourceAdapterContext
+## SourceAdapterContext（提供元アダプターへ渡す情報）
 
 Source factory には `SourceAdapterContext` が渡されます。
 
@@ -142,7 +142,7 @@ ranking は行わないため、Adapter は provider 固有の結果順を保ち
 検索結果の `target` は通常の `Config` に戻せる形にし、`metadata` と `provenance` を
 失わないようにします。検索を実装しない Adapter は `load()` だけで利用できます。
 
-## Execution Adapter
+## Execution Adapter（実行アダプター）
 
 Execution Adapter は Resource を選択せず、すでに Resolver が選んだ Resource を Runtime
 へ翻訳します。

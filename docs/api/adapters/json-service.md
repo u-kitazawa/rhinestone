@@ -1,4 +1,4 @@
-# JsonServiceAdapter
+# JsonServiceAdapter（JSONサービス実行アダプター）
 
 `JsonServiceAdapter` は選択済み JSON service query をHTTP runtimeへ渡します。標準の`configure()`経路ではRhinestoneの組み込みruntimeが使われます。
 

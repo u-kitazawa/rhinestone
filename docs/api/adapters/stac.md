@@ -1,4 +1,4 @@
-# StacAdapter
+# StacAdapter（STAC提供元アダプター）
 
 `StacAdapter` は STAC API 1.0 の Item asset を解決します。
 
@@ -10,7 +10,7 @@ SourceDefinition の `settings` へ `endpoint`、Config へ `collection_id`、`i
 
 `collection_id` と `item_id` は未エンコードの論理IDとして指定します。RhinestoneはHTTP requestを組み立てる際に各IDを1つのpath segmentとしてpercent-encodeします。既にエンコードされたように見える値も推測で復号しないため、例えば論理IDの`%2F`はrequest pathでは`%252F`になります。`.`と`..`だけのIDもpath traversalとして正規化されないようエンコードします。Metadataとprovenanceには元の論理IDを保持します。
 
-## Endpoint と認証
+## 接続先と認証
 
 Item と Search の公式 STAC API endpoint はRhinestoneの組み込みHTTP transportで呼びます。`api_token` または `api_key` を既存 Adapter の直接利用時に指定できます。検索結果では data role の asset がちょうど一件である必要があり、asset format は推測しません。
 

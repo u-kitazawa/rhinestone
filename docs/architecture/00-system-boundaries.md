@@ -10,10 +10,10 @@ Rhinestone は異なる公的データ provider と既存 OSS の間にある知
 
 | 所有者 | 対象 |
 | --- | --- |
-| Rhinestone | Config interpretation、Source、Metadata、AccessPlan、Resource、Provenance、provider/format/access knowledge |
-| Rhinestone components | Source Adapter、Resolver、Search Coordinator、Execution Adapter Selector、Execution Adapter、各 Registry |
-| 利用者 | runtime dependency、version、application-specific processing |
-| 既存 OSS | file parsing、GIS I/O、raster/vector processing、format conversion、analysis |
+| Rhinestone | Configの解釈、Source、Metadata、AccessPlan、Resource、Provenance、提供元／形式／アクセス方法の知識 |
+| Rhinestoneの構成要素 | Source Adapter、Resolver、Search Coordinator、Execution Adapter Selector、Execution Adapter、各Registry |
+| 利用者 | 外部ライブラリ、バージョン、アプリケーション固有の処理 |
+| 既存OSS | ファイル解析、GIS入出力、ラスタ／ベクター処理、形式変換、分析 |
 
 ## アクセス境界
 

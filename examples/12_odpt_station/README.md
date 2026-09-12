@@ -1,8 +1,8 @@
-# ODPT Station
+# ODPTの駅データ
 
-## Setup
+## 準備と実行
 
-Register with ODPT, install Rhinestone, and set `ODPT_CONSUMER_KEY`. HTTP communication uses Rhinestone's built-in transport. Run `python examples/12_odpt_station/example.py`.
+ODPTへ登録し、Rhinestoneをインストールして`ODPT_CONSUMER_KEY`を設定します。
+HTTP通信は組み込みtransportを使い、`python examples/12_odpt_station/example.py`で実行します。
 
-The consumer key is resolved only when the request is opened. It is never put
-in Config, Source metadata, or Provenance.
+consumer keyはリクエストを実行するときだけ取得します。Config、Sourceのメタデータ、出典情報には保存しません。

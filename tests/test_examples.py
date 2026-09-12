@@ -32,7 +32,7 @@ def test_each_example_has_runnable_code_and_setup_readme(name: str) -> None:
     assert script.is_file()
     assert readme.is_file()
     instructions = readme.read_text(encoding="utf-8").lower()
-    assert "setup" in instructions
+    assert "setup" in instructions or "準備" in instructions
     assert "python" in instructions
 
 
