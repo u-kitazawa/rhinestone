@@ -4,6 +4,8 @@ Execution Adapter は選択済みの `Resource` を実行runtimeのAPI呼び出�
 
 [API リファレンス](../api.md) · [Source Adapter](source-adapters.md)
 
+実装チュートリアルは[Custom Adapter を作る](../custom-adapters.md)を参照してください。
+
 外部Runtimeの供給方法と `resource.open()` の使い方は[Resource を解決して開く](../resolve-and-open.md)
 を参照してください。GDAL等の外部Runtimeは `dependencies` に実体として渡し、遅延評価する
 場合は `RuntimeFactory(factory)` を使います。bare callableはRuntime実体として扱われます。
@@ -16,5 +18,7 @@ JSON serviceのHTTP runtimeはRhinestoneが組み込みで提供します。依�
 | [pyogrio](adapters/pyogrio.md) | `pyogrio` | `read_dataframe` |
 | [JSON service](adapters/json-service.md) | `json-service` | built-in HTTP runtime |
 
-独自 Adapter は `ExecutionAdapter` を継承し、`name`、`priority`、
-`supports(resource, dependencies)`、`open(resource, runtime)` を実装します。
+独自 Adapter は `ExecutionAdapterDefinition` として明示登録します。factory が返す Adapter は
+`name`、`priority`、`supports(resource, dependencies)`、`open(resource, runtime)` を実装します。
+基底クラスの継承は必須ではありません。Runtime と DestinationPolicy は
+`ExecutionAdapterContext` から取得できます。

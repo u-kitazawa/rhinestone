@@ -1,5 +1,11 @@
 """Compatibility exports for built-in source adapters."""
 
+from .contracts import (
+    ExecutionAdapterContext,
+    ExecutionAdapterDefinition,
+    SourceAdapterContext,
+    SourceAdapterDefinition,
+)
 from .execution import ExecutionAdapter
 from .source import (
     CkanAdapter,
@@ -30,4 +36,8 @@ __all__ = [
     "StacAdapter",
     "StaticAdapter",
     "ExecutionAdapter",
+    "ExecutionAdapterContext",
+    "ExecutionAdapterDefinition",
+    "SourceAdapterContext",
+    "SourceAdapterDefinition",
 ]

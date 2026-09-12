@@ -197,7 +197,13 @@ def _credential_rules(provider: Provider) -> Tuple[CredentialDestinationRule, ..
             if isinstance(resource_type, str) and resource_type
         )
         credential: Optional[str] = None
-    elif provider.adapter_type in {"ckan", "ogc-features", "plateau", "stac"}:
+    elif provider.adapter_type not in {
+        "direct",
+        "static",
+        "search-ckan-jp",
+        "gsi-fundamental",
+        "dcat",
+    }:
         configured_credential = provider.settings.get("credential")
         if configured_credential is None:
             credential = None

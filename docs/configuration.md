@@ -40,6 +40,49 @@ app = configure(catalog=catalog)
 
 `Provider`の`adapter_type`や`settings`は拡張向けの構成情報です。通常は組み込みCatalogのProviderを使います。
 
+## 独自 Adapter を追加する
+
+詳しい実装手順、Context、検索、エラー処理は[Custom Adapter を作る](custom-adapters.md)を参照してください。
+
+Source と Execution は、組み込みと同じパイプラインへ明示的に登録できます。
+
+```python
+from rhinestone import (
+    Catalog, ExecutionAdapterDefinition, Provider, SourceAdapterDefinition, configure,
+)
+
+catalog = Catalog((Provider("example", "example-source"),))
+
+class ExampleSource:
+    def load(self, config):
+        ...  # Source を返す
+
+class ExampleExecution:
+    name = "example-runtime"
+    priority = 100
+    def supports(self, resource, dependencies): ...
+    def open(self, resource, runtime, *, destination_policy=None): ...
+
+app = configure(
+    catalog=catalog,
+    adapters=(
+        SourceAdapterDefinition(
+            "example-source",
+            lambda provider, context: ExampleSource(),
+        ),
+        ExecutionAdapterDefinition(
+            "example-runtime",
+            lambda context: ExampleExecution(),
+        ),
+    ),
+    dependencies={"example-runtime": example_runtime},
+)
+```
+
+Source factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
+`SourceAdapterContext`として渡します。Execution factoryには`ExecutionAdapterContext`を渡します。
+同じ`adapter_type`またはExecution名を複数登録することはできません。
+
 ## Runtime
 
 外部Runtimeは利用者が所有し、実体または明示的な `RuntimeFactory` として渡します。

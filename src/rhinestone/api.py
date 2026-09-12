@@ -15,6 +15,13 @@ from typing import (
 )
 
 from . import _http
+from .adapters.contracts import (
+    AdapterDefinition,
+    ExecutionAdapterContext,
+    ExecutionAdapterDefinition,
+    SourceAdapterContext,
+    SourceAdapterDefinition,
+)
 from .adapters.execution import (
     GdalAdapter,
     JsonServiceAdapter,
@@ -54,16 +61,15 @@ from .resolution import Resolver
 from .search import SearchCoordinator, SearchResults
 from .security import DestinationPolicy, NetworkPolicyLevel
 
-_SOURCE_RUNTIME_NAMES = frozenset({"rdflib"})
-_EXECUTION_RUNTIME_NAMES = frozenset({"gdal", "json-service", "rasterio", "pyogrio"})
-
 
 class _ConfiguredSourceAdapter:
     """Bind one public source id to one built-in adapter instance."""
 
-    def __init__(self, source_id: str, adapter: ProviderAdapter) -> None:
+    def __init__(
+        self, source_id: str, adapter: ProviderAdapter, adapter_type: str | None = None
+    ) -> None:
         self.source_id = source_id
-        self.adapter_type = adapter.adapter_type
+        self.adapter_type = adapter_type or adapter.adapter_type
         self.searchable = callable(getattr(adapter, "search", None))
         empty_conditions: FrozenSet[str] = frozenset()
         self.search_conditions = cast(
@@ -115,6 +121,7 @@ class Rhinestone:
         dependencies: Optional[Mapping[str, DependencyValue]] = None,
         credentials: Optional[Mapping[str, Callable[[], str]]] = None,
         network_policy: NetworkPolicyLevel = "credentialed",
+        adapters: Iterable[AdapterDefinition] = (),
     ) -> None:
         selected_sources = tuple(sources)
         if catalog is not None:
@@ -122,18 +129,20 @@ class Rhinestone:
                 raise TypeError("pass either catalog or sources, not both")
             selected_sources = tuple(catalog)
 
-        runtime_dependencies = dict(dependencies or {})
-        source_dependencies = DependencyRegistry(
-            {
-                name: value
-                for name, value in runtime_dependencies.items()
-                if name in _SOURCE_RUNTIME_NAMES
-            }
+        custom_source_definitions, custom_execution_definitions = _split_definitions(
+            adapters
         )
+        source_definitions = _source_definitions(custom_source_definitions)
+        execution_definitions = _execution_definitions(custom_execution_definitions)
+        execution_runtime_names = frozenset(
+            definition.name for definition in execution_definitions
+        )
+        runtime_dependencies = dict(dependencies or {})
+        source_dependency_registry = DependencyRegistry(runtime_dependencies)
         execution_dependencies = {
             name: value
             for name, value in runtime_dependencies.items()
-            if name in _EXECUTION_RUNTIME_NAMES
+            if name in execution_runtime_names
         }
         execution_dependencies.setdefault(
             "json-service", RuntimeFactory(lambda: _http.JsonServiceRuntime())
@@ -144,8 +153,26 @@ class Rhinestone:
             selected_sources, level=network_policy
         )
 
-        configured_sources = [_ConfiguredSourceAdapter("direct", DirectAdapter())]
+        configured_sources: list[_ConfiguredSourceAdapter] = []
         configured_ids = {"direct"}
+        direct_provider = Provider("direct", "direct")
+        configured_sources.append(
+            _ConfiguredSourceAdapter(
+                "direct",
+                _build_source_adapter(
+                    direct_provider,
+                    source_definitions,
+                    _source_context(
+                        direct_provider,
+                        source_definitions,
+                        source_dependency_registry,
+                        credential_registry,
+                        destination_policy,
+                    ),
+                ),
+                "direct",
+            )
+        )
         for source_definition in selected_sources:
             source_id = source_definition.id
             if source_id in configured_ids:
@@ -158,36 +185,49 @@ class Rhinestone:
                     source_id,
                     _build_source_adapter(
                         source_definition,
-                        source_dependencies,
-                        credential_registry,
-                        destination_policy,
+                        source_definitions,
+                        _source_context(
+                            source_definition,
+                            source_definitions,
+                            source_dependency_registry,
+                            credential_registry,
+                            destination_policy,
+                        ),
                     ),
+                    source_definition.adapter_type,
                 )
             )
 
-        source_adapters = tuple(configured_sources)
-        executions = (
-            GdalAdapter(),
-            RasterioAdapter(),
-            PyogrioAdapter(),
-            JsonServiceAdapter(
-                OdptAdapter.prepare_request,
-                "odpt",
-                destination_policy=destination_policy,
-            ),
-        )
+        source_adapters: Tuple[Any, ...] = tuple(configured_sources)
 
         def bind(adapter: Any) -> Any:
             binder = getattr(adapter, "bind_credentials", None)
             return binder(credential_registry) if callable(binder) else adapter
 
-        adapters = AdapterRegistry(
-            source_adapters, (bind(adapter) for adapter in executions)
+        configured_executions: list[Any] = []
+        for definition in execution_definitions:
+            execution = definition.factory(
+                ExecutionAdapterContext(
+                    credentials=credential_registry,
+                    dependencies=execution_dependency_registry,
+                    destination_policy=destination_policy,
+                )
+            )
+            if execution.name != definition.name:
+                raise AdapterRegistrationError(
+                    f"Execution adapter factory returned {execution.name!r}; "
+                    f"expected {definition.name!r}"
+                )
+            configured_executions.append(execution)
+        adapter_registry = AdapterRegistry(
+            source_adapters, (bind(adapter) for adapter in configured_executions)
         )
         self._pipeline = AccessPipeline(
-            adapter_registry=adapters,
+            adapter_registry=adapter_registry,
             resolver=Resolver(),
-            execution_selector=ExecutionAdapterSelector(adapters.execution_adapters),
+            execution_selector=ExecutionAdapterSelector(
+                adapter_registry.execution_adapters
+            ),
             dependencies=execution_dependency_registry,
             destination_policy=destination_policy,
         )
@@ -252,6 +292,7 @@ def configure(
     dependencies: Optional[Mapping[str, DependencyValue]] = None,
     credentials: Optional[Mapping[str, Callable[[], str]]] = None,
     network_policy: NetworkPolicyLevel = "credentialed",
+    adapters: Iterable[AdapterDefinition] = (),
 ) -> Rhinestone:
     """Compose built-in adapters around selected sources and runtime inputs."""
     return Rhinestone(
@@ -260,10 +301,11 @@ def configure(
         dependencies=dependencies,
         credentials=credentials,
         network_policy=network_policy,
+        adapters=adapters,
     )
 
 
-def _build_source_adapter(
+def _build_builtin_source_adapter(
     source: Provider,
     dependencies: DependencyRegistry,
     credentials: CredentialRegistry,
@@ -381,7 +423,7 @@ def _build_source_adapter(
             ),
         )
         return OdptAdapter(**settings)
-    raise AdapterRegistrationError(
+    raise AdapterRegistrationError(  # pragma: no cover
         f"Built-in source adapter {adapter_type!r} is not supported"
     )
 
@@ -394,3 +436,154 @@ def _reject_options(
         raise ConfigValidationError(
             f"Unknown {adapter_type} source options: {', '.join(unknown)}"
         )
+
+
+def _split_definitions(
+    definitions: Iterable[AdapterDefinition],
+) -> Tuple[Tuple[SourceAdapterDefinition, ...], Tuple[ExecutionAdapterDefinition, ...]]:
+    sources: list[SourceAdapterDefinition] = []
+    executions: list[ExecutionAdapterDefinition] = []
+    for definition in definitions:
+        candidate = cast(Any, definition)
+        if isinstance(candidate, SourceAdapterDefinition):
+            sources.append(candidate)
+        elif isinstance(candidate, ExecutionAdapterDefinition):
+            executions.append(candidate)
+        else:
+            raise AdapterRegistrationError("Unknown adapter definition")
+    return tuple(sources), tuple(executions)
+
+
+def _source_definitions(
+    custom: Iterable[SourceAdapterDefinition],
+) -> Mapping[str, SourceAdapterDefinition]:
+    def builtin(adapter_type: str) -> SourceAdapterDefinition:
+        return SourceAdapterDefinition(
+            adapter_type,
+            lambda provider, context: _build_builtin_source_adapter(
+                provider,
+                context.dependencies,
+                context.credentials,
+                context.destination_policy,
+            ),
+            dependencies=(
+                frozenset({"rdflib"}) if adapter_type == "dcat" else frozenset()
+            ),
+        )
+
+    definitions = {
+        "direct": SourceAdapterDefinition(
+            "direct", lambda provider, context: DirectAdapter()
+        ),
+        **{
+            adapter_type: builtin(adapter_type)
+            for adapter_type in (
+                "ckan",
+                "stac",
+                "ogc-features",
+                "plateau",
+                "static",
+                "search-ckan-jp",
+                "gsi-fundamental",
+                "dcat",
+                "odpt",
+            )
+        },
+    }
+    custom_types: set[str] = set()
+    for definition in custom:
+        if definition.adapter_type in custom_types:
+            raise AdapterRegistrationError(
+                f"Source adapter {definition.adapter_type!r} is registered more than once"
+            )
+        if definition.adapter_type in definitions:
+            raise AdapterRegistrationError(
+                f"Source adapter {definition.adapter_type!r} is registered more than once"
+            )
+        custom_types.add(definition.adapter_type)
+        definitions[definition.adapter_type] = definition
+    return definitions
+
+
+def _source_context(
+    provider: Provider,
+    definitions: Mapping[str, SourceAdapterDefinition],
+    dependencies: DependencyRegistry,
+    credentials: CredentialRegistry,
+    destination_policy: DestinationPolicy,
+) -> SourceAdapterContext:
+    try:
+        definition = definitions[provider.adapter_type]
+    except KeyError:
+        raise AdapterRegistrationError(
+            f"Source adapter {provider.adapter_type!r} is not registered"
+        ) from None
+    return SourceAdapterContext(
+        get_json=_http.get_json,
+        get_text=_http.get_text,
+        credentials=credentials,
+        dependencies=dependencies.scoped(definition.dependencies),
+        destination_policy=destination_policy,
+        provider_id=provider.id,
+    )
+
+
+def _execution_definitions(
+    custom: Iterable[ExecutionAdapterDefinition],
+) -> Tuple[ExecutionAdapterDefinition, ...]:
+    preinstalled = (
+        ExecutionAdapterDefinition(
+            "gdal", lambda context: GdalAdapter(context.destination_policy)
+        ),
+        ExecutionAdapterDefinition(
+            "rasterio", lambda context: RasterioAdapter(context.destination_policy)
+        ),
+        ExecutionAdapterDefinition(
+            "pyogrio", lambda context: PyogrioAdapter(context.destination_policy)
+        ),
+        ExecutionAdapterDefinition(
+            "json-service",
+            lambda context: JsonServiceAdapter(
+                OdptAdapter.prepare_request,
+                "odpt",
+                credentials=context.credentials,
+                destination_policy=context.destination_policy,
+            ),
+        ),
+    )
+    names = {definition.name for definition in preinstalled}
+    definitions = list(preinstalled)
+    for definition in custom:
+        if definition.name in names:
+            raise AdapterRegistrationError(
+                f"Execution adapter {definition.name!r} is registered more than once"
+            )
+        names.add(definition.name)
+        definitions.append(definition)
+    return tuple(definitions)
+
+
+def _build_source_adapter(
+    source: Provider,
+    definitions: Mapping[str, SourceAdapterDefinition] | DependencyRegistry,
+    context: SourceAdapterContext | CredentialRegistry,
+    destination_policy: Optional[DestinationPolicy] = None,
+) -> Any:
+    # Keep the old private composition helper usable for downstream tests and
+    # integrations while the public path uses Definition + Context.
+    if isinstance(definitions, DependencyRegistry):
+        return _build_builtin_source_adapter(
+            source,
+            definitions,
+            context
+            if isinstance(context, CredentialRegistry)
+            else CredentialRegistry({}),
+            destination_policy,
+        )
+    try:
+        definition = definitions[source.adapter_type]
+    except KeyError:
+        raise AdapterRegistrationError(
+            f"Source adapter {source.adapter_type!r} is not registered"
+        ) from None
+    return definition.factory(source, cast(SourceAdapterContext, context))
