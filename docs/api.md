@@ -49,6 +49,7 @@ app = configure(
 | `dependencies` | 利用者が所有するSource / Execution Runtime実体、または明示的な`RuntimeFactory`。公開引数は共通だが内部では利用段階ごとに分離される |
 | `credentials` | Credential factory |
 | `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
+| `adapters` | `SourceAdapterDefinition`／`ExecutionAdapterDefinition` の iterable。組み込みと同じ Registry へ明示登録する |
 
 通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
 遅延Runtimeは `RuntimeFactory(factory)` として指定します。bare valueはcallableでもRuntime

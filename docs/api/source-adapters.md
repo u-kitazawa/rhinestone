@@ -5,6 +5,8 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 
 [API リファレンス](../api.md) · [Execution Adapter](execution-adapters.md)
 
+実装チュートリアルは[Custom Adapter を作る](../custom-adapters.md)を参照してください。
+
 初めてproviderを構成する場合は、先に[アプリケーションを構成する](../configuration.md)
 を読んでください。HTTPを使うproviderはRhinestoneの組み込みtransportを使用します。各ページの
 `Config.settings` は Adapter が検証する値であり、認証 secret 自体を入れる場所ではありません。
@@ -21,7 +23,10 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 | [PLATEAU](adapters/plateau.md) | `plateau` | G 空間情報センター CKAN |
 | [STAC](adapters/stac.md) | `stac` | STAC API 1.0 |
 
-Source Adapter APIは内部契約です。外部Adapter登録機構はまだ公開しません。同じ
-adapter typeを異なるsource idへ複数割り当てられます。
+Source Adapter は `SourceAdapterDefinition` として明示登録できます。Definition は
+`adapter_type` と `(provider, context) -> adapter` factory から構成され、同じ Definition を
+異なる source id へ複数割り当てられます。Adapter は `load(config) -> Source` を実装し、
+`search(query)` は任意です。Context には組み込み transport、Credential、Runtime、
+DestinationPolicy が含まれます。
 
 内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。
