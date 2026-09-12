@@ -1,4 +1,4 @@
-"""Compatibility exports for built-in source adapters."""
+"""Public exports for built-in adapters."""
 
 from .contracts import (
     ExecutionAdapterContext,
@@ -7,6 +7,11 @@ from .contracts import (
     SourceAdapterDefinition,
 )
 from .execution import ExecutionAdapter
+from .knowledge import (
+    KnowledgeAdapterContext,
+    KnowledgeAdapterDefinition,
+    KnowledgeAdapterRegistry,
+)
 from .source import (
     CkanAdapter,
     DcatAdapter,
@@ -38,6 +43,9 @@ __all__ = [
     "ExecutionAdapter",
     "ExecutionAdapterContext",
     "ExecutionAdapterDefinition",
+    "KnowledgeAdapterDefinition",
+    "KnowledgeAdapterContext",
+    "KnowledgeAdapterRegistry",
     "SourceAdapterContext",
     "SourceAdapterDefinition",
 ]

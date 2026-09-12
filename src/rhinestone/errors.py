@@ -57,6 +57,18 @@ class AdapterRegistrationError(RhinestoneError):
     """An adapter registration is invalid or ambiguous."""
 
 
+class KnowledgeAdapterUnavailableError(RhinestoneError):
+    """A required shared knowledge adapter is not configured."""
+
+
+class KnowledgeResolutionError(RhinestoneError):
+    """A shared knowledge adapter could not resolve or validate a value."""
+
+
+class KnowledgeValidationError(RhinestoneError):
+    """A canonical shared knowledge value is structurally invalid."""
+
+
 class ResourceNotFoundError(RhinestoneError):
     """No candidate matches the explicit resource selection."""
 

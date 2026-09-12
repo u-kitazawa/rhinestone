@@ -8,6 +8,14 @@ from .adapters.contracts import (
     SourceAdapterContext,
     SourceAdapterDefinition,
 )
+from .adapters.knowledge import (
+    KnowledgeAdapterContext,
+    KnowledgeAdapterDefinition,
+    KnowledgeAdapterRegistry,
+    MunicipalityIdentity,
+    StandardTimeAdapter,
+    TimeSemantic,
+)
 from .api import Rhinestone, configure
 from .catalogs import Catalog
 from .models import (
@@ -56,6 +64,9 @@ __all__ = [
     "FORMAT_ALIASES",
     "FORMAT_CATEGORIES",
     "LibraryName",
+    "KnowledgeAdapterDefinition",
+    "KnowledgeAdapterContext",
+    "KnowledgeAdapterRegistry",
     "Metadata",
     "MEDIA_TYPE_FORMATS",
     "NetworkPolicyLevel",
@@ -77,6 +88,9 @@ __all__ = [
     "SourceAdapterContext",
     "SourceAdapterDefinition",
     "SourceDefinition",
+    "MunicipalityIdentity",
+    "StandardTimeAdapter",
+    "TimeSemantic",
     "configure",
     "canonical_format",
     "format_from_media_type",

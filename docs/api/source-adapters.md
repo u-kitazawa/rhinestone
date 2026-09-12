@@ -27,6 +27,6 @@ Source Adapter は `SourceAdapterDefinition` として明示登録できます�
 `adapter_type` と `(provider, context) -> adapter` factory から構成され、同じ Definition を
 異なる source id へ複数割り当てられます。Adapter は `load(config) -> Source` を実装し、
 `search(query)` は任意です。Context には組み込み transport、Credential、Runtime、
-DestinationPolicy が含まれます。
+DestinationPolicy、共有Knowledge Adapterを取得する`knowledge` Registryが含まれます。
 
 内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。

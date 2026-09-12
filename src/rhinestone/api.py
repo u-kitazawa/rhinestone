@@ -28,6 +28,12 @@ from .adapters.execution import (
     PyogrioAdapter,
     RasterioAdapter,
 )
+from .adapters.knowledge import (
+    KnowledgeAdapterContext,
+    KnowledgeAdapterDefinition,
+    KnowledgeAdapterRegistry,
+    StandardTimeAdapter,
+)
 from .adapters.source import (
     CkanAdapter,
     DcatAdapter,
@@ -129,11 +135,14 @@ class Rhinestone:
                 raise TypeError("pass either catalog or sources, not both")
             selected_sources = tuple(catalog)
 
-        custom_source_definitions, custom_execution_definitions = _split_definitions(
-            adapters
-        )
+        (
+            custom_source_definitions,
+            custom_execution_definitions,
+            knowledge_definitions,
+        ) = _split_definitions(adapters)
         source_definitions = _source_definitions(custom_source_definitions)
         execution_definitions = _execution_definitions(custom_execution_definitions)
+        knowledge_definitions = _knowledge_definitions(knowledge_definitions)
         execution_runtime_names = frozenset(
             definition.name for definition in execution_definitions
         )
@@ -152,6 +161,16 @@ class Rhinestone:
         destination_policy = DestinationPolicy.from_catalog(
             selected_sources, level=network_policy
         )
+        knowledge_registry = KnowledgeAdapterRegistry(
+            knowledge_definitions,
+            KnowledgeAdapterContext(
+                get_json=_http.get_json,
+                get_text=_http.get_text,
+                credentials=credential_registry,
+                dependencies=source_dependency_registry,
+                destination_policy=destination_policy,
+            ),
+        )
 
         configured_sources: list[_ConfiguredSourceAdapter] = []
         configured_ids = {"direct"}
@@ -166,6 +185,7 @@ class Rhinestone:
                         direct_provider,
                         source_definitions,
                         source_dependency_registry,
+                        knowledge_registry,
                         credential_registry,
                         destination_policy,
                     ),
@@ -190,6 +210,7 @@ class Rhinestone:
                             source_definition,
                             source_definitions,
                             source_dependency_registry,
+                            knowledge_registry,
                             credential_registry,
                             destination_policy,
                         ),
@@ -294,7 +315,7 @@ def configure(
     network_policy: NetworkPolicyLevel = "credentialed",
     adapters: Iterable[AdapterDefinition] = (),
 ) -> Rhinestone:
-    """Compose built-in adapters around selected sources and runtime inputs."""
+    """Compose adapters around selected sources, runtimes, and shared knowledge."""
     return Rhinestone(
         sources=sources,
         catalog=catalog,
@@ -310,9 +331,11 @@ def _build_builtin_source_adapter(
     dependencies: DependencyRegistry,
     credentials: CredentialRegistry,
     destination_policy: Optional[DestinationPolicy] = None,
+    knowledge: Optional[KnowledgeAdapterRegistry] = None,
 ) -> ProviderAdapter:
     adapter_type = source.adapter_type
     settings = dict(source.settings)
+    knowledge = knowledge or KnowledgeAdapterRegistry()
 
     def json_transport(
         url: str,
@@ -376,6 +399,7 @@ def _build_builtin_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
+            knowledge=knowledge,
             provider_id=source.id,
             **settings,
         )
@@ -394,7 +418,7 @@ def _build_builtin_source_adapter(
         )
     if adapter_type == "gsi-fundamental":
         _reject_options(adapter_type, settings, ())
-        return GsiFundamentalAdapter()
+        return GsiFundamentalAdapter(knowledge=knowledge)
     if adapter_type == "dcat":
         _reject_options(adapter_type, settings, ("catalog_uri", "serialization"))
 
@@ -440,18 +464,25 @@ def _reject_options(
 
 def _split_definitions(
     definitions: Iterable[AdapterDefinition],
-) -> Tuple[Tuple[SourceAdapterDefinition, ...], Tuple[ExecutionAdapterDefinition, ...]]:
+) -> Tuple[
+    Tuple[SourceAdapterDefinition, ...],
+    Tuple[ExecutionAdapterDefinition, ...],
+    Tuple[KnowledgeAdapterDefinition, ...],
+]:
     sources: list[SourceAdapterDefinition] = []
     executions: list[ExecutionAdapterDefinition] = []
+    knowledge: list[KnowledgeAdapterDefinition] = []
     for definition in definitions:
         candidate = cast(Any, definition)
         if isinstance(candidate, SourceAdapterDefinition):
             sources.append(candidate)
         elif isinstance(candidate, ExecutionAdapterDefinition):
             executions.append(candidate)
+        elif isinstance(candidate, KnowledgeAdapterDefinition):
+            knowledge.append(candidate)
         else:
             raise AdapterRegistrationError("Unknown adapter definition")
-    return tuple(sources), tuple(executions)
+    return tuple(sources), tuple(executions), tuple(knowledge)
 
 
 def _source_definitions(
@@ -465,6 +496,7 @@ def _source_definitions(
                 context.dependencies,
                 context.credentials,
                 context.destination_policy,
+                context.knowledge,
             ),
             dependencies=(
                 frozenset({"rdflib"}) if adapter_type == "dcat" else frozenset()
@@ -509,6 +541,7 @@ def _source_context(
     provider: Provider,
     definitions: Mapping[str, SourceAdapterDefinition],
     dependencies: DependencyRegistry,
+    knowledge: KnowledgeAdapterRegistry,
     credentials: CredentialRegistry,
     destination_policy: DestinationPolicy,
 ) -> SourceAdapterContext:
@@ -523,6 +556,7 @@ def _source_context(
         get_text=_http.get_text,
         credentials=credentials,
         dependencies=dependencies.scoped(definition.dependencies),
+        knowledge=knowledge,
         destination_policy=destination_policy,
         provider_id=provider.id,
     )
@@ -563,6 +597,38 @@ def _execution_definitions(
     return tuple(definitions)
 
 
+def _knowledge_definitions(
+    custom: Iterable[KnowledgeAdapterDefinition],
+) -> Tuple[KnowledgeAdapterDefinition, ...]:
+    """Return built-in knowledge definitions plus user replacements."""
+    custom_definitions = tuple(custom)
+    custom_by_kind: dict[str, KnowledgeAdapterDefinition] = {}
+    for definition in custom_definitions:
+        if definition.kind in custom_by_kind:
+            raise AdapterRegistrationError(
+                f"Knowledge adapter kind {definition.kind!r} is registered more than once"
+            )
+        custom_by_kind[definition.kind] = definition
+
+    preinstalled = (
+        KnowledgeAdapterDefinition(
+            "standard-time",
+            lambda _context: StandardTimeAdapter(),
+            "time",
+        ),
+    )
+    preinstalled_kinds = frozenset(definition.kind for definition in preinstalled)
+    definitions = [
+        custom_by_kind.get(definition.kind, definition) for definition in preinstalled
+    ]
+    definitions.extend(
+        definition
+        for definition in custom_definitions
+        if definition.kind not in preinstalled_kinds
+    )
+    return tuple(definitions)
+
+
 def _build_source_adapter(
     source: Provider,
     definitions: Mapping[str, SourceAdapterDefinition] | DependencyRegistry,
@@ -578,7 +644,7 @@ def _build_source_adapter(
             context
             if isinstance(context, CredentialRegistry)
             else CredentialRegistry({}),
-            destination_policy,
+            destination_policy=destination_policy,
         )
     try:
         definition = definitions[source.adapter_type]

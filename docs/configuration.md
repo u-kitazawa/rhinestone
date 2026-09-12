@@ -81,6 +81,26 @@ app = configure(
 
 Source factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
 `SourceAdapterContext`として渡します。Execution factoryには`ExecutionAdapterContext`を渡します。
+
+共有知識をSource Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
+追加設定なしで西暦・年度・元号を利用できます。自治体辞書など独自の公式データを使う場合は、
+`adapters`へ`KnowledgeAdapterDefinition`を渡します。独自定義は同じ種別の標準実装を置き換えます。
+
+```python
+from rhinestone import KnowledgeAdapterDefinition, configure
+from rhinestone.adapters.knowledge import StandardTimeAdapter
+
+app = configure(
+    adapters=(
+        KnowledgeAdapterDefinition(
+            "official-municipality", make_municipality_adapter, "identity"
+        ),
+    )
+)
+```
+
+Knowledge Adapter factoryにはSource/Execution Adapterと同じくContextが渡されます。Source Adapter Contextの`knowledge`から必要なadapterだけを取得します。Knowledge Adapterは
+Metadata/Provenanceやcanonical valueを扱いますが、Credential、Runtime、データ処理は保持しません。
 同じ`adapter_type`またはExecution名を複数登録することはできません。
 
 ## Runtime

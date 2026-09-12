@@ -6,6 +6,7 @@ nav:
       - インストールと最初の一歩: getting-started.md
       - 用語と概念: concepts.md
       - アプリケーションを構成する: configuration.md
+      - Knowledge Adapter を構成する: knowledge.md
       - Custom Adapter を作る: custom-adapters.md
   - ガイド:
       - 目的別チュートリアル:

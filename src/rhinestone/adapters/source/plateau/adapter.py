@@ -7,7 +7,8 @@ from ....models import Config, ResourceCandidate, Source
 from ....registry import CredentialRegistry
 from ....representations import canonical_format
 from ....security import DestinationPolicy
-from .._knowledge import entry_point, source, string
+from ...knowledge import KnowledgeAdapterRegistry
+from .._knowledge import entry_point, resolve_knowledge, source, string
 from ..base import JsonTransport
 from ..ckan import CkanAdapter
 
@@ -24,6 +25,7 @@ class PlateauAdapter(CkanAdapter):
         credential_scheme: Optional[str] = None,
         credentials: Optional[CredentialRegistry] = None,
         destination_policy: Optional[DestinationPolicy] = None,
+        knowledge: Optional[KnowledgeAdapterRegistry] = None,
         provider_id: Optional[str] = None,
     ) -> None:
         if not isinstance(endpoint, str) or not endpoint.strip():
@@ -38,6 +40,7 @@ class PlateauAdapter(CkanAdapter):
             destination_policy=destination_policy,
             provider_id=provider_id,
         )
+        self._knowledge = knowledge or KnowledgeAdapterRegistry()
 
     def load(self, config: Config) -> Source:
         settings = self._config_settings(config)
@@ -58,6 +61,7 @@ class PlateauAdapter(CkanAdapter):
         )
         resources = self._objects(package.get("resources"), "CKAN resources")
         member = entry_point(settings)
+        knowledge = resolve_knowledge(settings, self._knowledge)
         candidates: List[ResourceCandidate] = []
         for item in resources:
             identifier = string(item, "id")
@@ -75,6 +79,7 @@ class PlateauAdapter(CkanAdapter):
                     "access_kind": "file",
                     "archive": settings.get("archive"),
                     "access_options": {"entry_point": member},
+                    "knowledge": knowledge,
                 }
             )
             candidates.append(

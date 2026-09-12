@@ -87,6 +87,7 @@ Source factory には `SourceAdapterContext` が渡されます。
 | `get_text(url)` | 組み込み HTTP text transport |
 | `credentials` | 論理名から Credential を取得する Registry |
 | `dependencies` | Definition が宣言した Source Runtime の Registry |
+| `knowledge` | Identity / Time などの共有 Knowledge Adapter Registry |
 | `destination_policy` | 通信先を認可する Policy |
 | `provider_id` | 現在構成している `Provider.id` |
 

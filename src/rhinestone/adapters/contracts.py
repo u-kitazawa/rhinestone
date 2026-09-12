@@ -6,6 +6,7 @@ from typing import Any, Callable, FrozenSet, Protocol, Tuple
 from ..models import Config, Provider, Resource, Result, Source
 from ..registry import CredentialRegistry, DependencyRegistry
 from ..security import DestinationPolicy
+from .knowledge import KnowledgeAdapterDefinition, KnowledgeAdapterRegistry
 
 
 class SourceAdapter(Protocol):
@@ -41,6 +42,7 @@ class SourceAdapterContext:
     dependencies: DependencyRegistry
     destination_policy: DestinationPolicy
     provider_id: str
+    knowledge: KnowledgeAdapterRegistry
 
 
 @dataclass(frozen=True)
@@ -86,7 +88,9 @@ class ExecutionAdapterDefinition:
             raise ValueError("factory must be callable")
 
 
-AdapterDefinition = SourceAdapterDefinition | ExecutionAdapterDefinition
+AdapterDefinition = (
+    SourceAdapterDefinition | ExecutionAdapterDefinition | KnowledgeAdapterDefinition
+)
 
 
 __all__ = [

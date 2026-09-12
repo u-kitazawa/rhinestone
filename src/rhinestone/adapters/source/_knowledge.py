@@ -5,6 +5,7 @@ from typing import Any, Mapping, Optional, Tuple
 
 from ...errors import ConfigValidationError
 from ...models import Metadata, Provenance, ResourceCandidate, Source
+from ..knowledge import KnowledgeAdapterRegistry
 
 
 def string(settings: Mapping[str, Any], name: str) -> str:
@@ -57,3 +58,17 @@ def source(
         ),
         raw_metadata=raw,
     )
+
+
+def resolve_knowledge(
+    settings: Mapping[str, Any], registry: KnowledgeAdapterRegistry
+) -> Mapping[str, Mapping[str, object]]:
+    """Resolve explicit shared knowledge settings without guessing provider data."""
+    resolved: dict[str, Mapping[str, object]] = {}
+    if "municipality" in settings:
+        value = string(settings, "municipality")
+        resolved["identity"] = registry.resolve_municipality(value).as_mapping()
+    if "time" in settings:
+        value = string(settings, "time")
+        resolved["time"] = registry.resolve_time(value).as_mapping()
+    return resolved
