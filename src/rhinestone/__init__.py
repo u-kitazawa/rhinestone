@@ -1,6 +1,13 @@
 """Rhinestone public package."""
 
 from . import sources
+from .adapters.contracts import (
+    AdapterDefinition,
+    ExecutionAdapterContext,
+    ExecutionAdapterDefinition,
+    SourceAdapterContext,
+    SourceAdapterDefinition,
+)
 from .api import Rhinestone, configure
 from .catalogs import Catalog
 from .models import (
@@ -30,10 +37,13 @@ from .security import DestinationPolicy, DestinationRule, NetworkPolicyLevel
 
 __all__ = [
     "AccessPlan",
+    "AdapterDefinition",
     "Catalog",
     "Config",
     "DestinationPolicy",
     "DestinationRule",
+    "ExecutionAdapterContext",
+    "ExecutionAdapterDefinition",
     "Dependencies",
     "FileAccessPlan",
     "LibraryName",
@@ -54,6 +64,8 @@ __all__ = [
     "SearchResults",
     "ServiceQueryPlan",
     "Source",
+    "SourceAdapterContext",
+    "SourceAdapterDefinition",
     "SourceDefinition",
     "configure",
     "sources",

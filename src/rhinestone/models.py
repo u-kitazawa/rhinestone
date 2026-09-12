@@ -23,8 +23,8 @@ from typing import (
 
 from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
 
-LibraryName = Literal["gdal", "json-service", "pyogrio", "rasterio"]
-"""Execution runtime names accepted by the public open API."""
+LibraryName = str
+"""Execution runtime name accepted by the public open API."""
 
 
 @dataclass(frozen=True)
@@ -221,6 +221,9 @@ class Resource:
 
     @overload
     def open(self, library: Literal["json-service"]) -> object: ...
+
+    @overload
+    def open(self, library: str) -> object: ...
 
     def open(self, library: LibraryName) -> object:
         """Open this Resource through the explicitly selected runtime library."""
