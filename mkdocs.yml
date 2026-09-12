@@ -31,6 +31,7 @@ nav:
               - CKAN: api/adapters/ckan.md
               - DCAT: api/adapters/dcat.md
               - Direct: api/adapters/direct.md
+              - e-Stat Statistics GIS: api/adapters/estat-gis.md
               - 基盤地図情報: api/adapters/gsi-fundamental.md
               - ODPT: api/adapters/odpt.md
               - OGC API Features: api/adapters/ogc-features.md

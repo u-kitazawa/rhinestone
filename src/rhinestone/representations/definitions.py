@@ -35,6 +35,7 @@ FORMAT_CATEGORIES: Mapping[str, str] = MappingProxyType(
         "geojson": "vector",
         "geotiff": "raster",
         "gml": "vector",
+        "kml": "vector",
         "gpkg": "vector",
         "json": "table",
         "netcdf": "raster",

@@ -1,21 +1,26 @@
 """Public exports for built-in adapters."""
 
 from .contracts import (
+    CredentialPort,
+    DependencyPort,
     ExecutionAdapterContext,
     ExecutionAdapterDefinition,
     SourceAdapterContext,
     SourceAdapterDefinition,
+    TransportPort,
 )
 from .execution import ExecutionAdapter
 from .knowledge import (
     KnowledgeAdapterContext,
     KnowledgeAdapterDefinition,
     KnowledgeAdapterRegistry,
+    KnowledgePort,
 )
 from .source import (
     CkanAdapter,
     DcatAdapter,
     DirectAdapter,
+    EstatGisAdapter,
     GsiFundamentalAdapter,
     JsonGetter,
     JsonObject,
@@ -30,6 +35,7 @@ from .source import (
 __all__ = [
     "CkanAdapter",
     "DirectAdapter",
+    "EstatGisAdapter",
     "DcatAdapter",
     "GsiFundamentalAdapter",
     "JsonGetter",
@@ -41,11 +47,15 @@ __all__ = [
     "StacAdapter",
     "StaticAdapter",
     "ExecutionAdapter",
+    "CredentialPort",
+    "DependencyPort",
     "ExecutionAdapterContext",
     "ExecutionAdapterDefinition",
     "KnowledgeAdapterDefinition",
     "KnowledgeAdapterContext",
     "KnowledgeAdapterRegistry",
+    "KnowledgePort",
     "SourceAdapterContext",
     "SourceAdapterDefinition",
+    "TransportPort",
 ]

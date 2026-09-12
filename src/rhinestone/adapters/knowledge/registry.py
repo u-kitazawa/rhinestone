@@ -8,6 +8,7 @@ from ...errors import (
     KnowledgeAdapterUnavailableError,
     KnowledgeResolutionError,
 )
+from ...registry import DependencyRegistry
 from .base import (
     IdentityKnowledgeAdapter,
     KnowledgeAdapter,
@@ -110,7 +111,9 @@ class KnowledgeAdapterRegistry:
             )
         context = replace(
             self._context,
-            dependencies=self._context.dependencies.scoped(definition.dependencies),
+            dependencies=cast(DependencyRegistry, self._context.dependencies).scoped(
+                definition.dependencies
+            ),
         )
         try:
             adapter = definition.factory(context)

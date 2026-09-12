@@ -16,7 +16,7 @@ class GdalAdapter(ExecutionAdapter):
     name = "gdal"
     priority = 20
     _formats = frozenset(
-        {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "citygml"}
+        {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "kml", "citygml"}
     )
 
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
