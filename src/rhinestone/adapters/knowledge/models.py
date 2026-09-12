@@ -1,6 +1,6 @@
 """Immutable canonical values shared by knowledge adapters."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from types import MappingProxyType
 from typing import Any, Literal, Mapping, Optional, cast
@@ -24,7 +24,7 @@ class MunicipalityIdentity:
     prefecture_code: str
     prefecture_name: str
     level: MunicipalityLevel = "municipality"
-    provider_identifiers: Mapping[str, str] = MappingProxyType({})
+    provider_identifiers: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for field_name in (
