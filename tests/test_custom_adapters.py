@@ -137,6 +137,36 @@ def test_source_dependencies_are_scoped_to_each_definition() -> None:
     }
 
 
+def test_source_dependency_instances_are_cached_across_provider_contexts() -> None:
+    calls: list[bool] = []
+    runtime = object()
+
+    def load_runtime() -> object:
+        calls.append(True)
+        return runtime
+
+    def factory(provider: Provider, context: Any) -> Any:
+        assert context.dependencies.get("shared-runtime") is runtime
+        return custom_source(provider, context)
+
+    app = configure(
+        sources=(
+            Provider("first", "shared-source"),
+            Provider("second", "shared-source"),
+        ),
+        adapters=(
+            SourceAdapterDefinition(
+                "shared-source", factory, dependencies=frozenset({"shared-runtime"})
+            ),
+        ),
+        dependencies={"shared-runtime": RuntimeFactory(load_runtime)},
+    )
+
+    app.resolve(Config("first", {"title": "First"}))
+    app.resolve(Config("second", {"title": "Second"}))
+    assert len(calls) == 1
+
+
 def test_custom_provider_credentials_are_authorized_by_default_policy() -> None:
     provider = Provider(
         "custom",

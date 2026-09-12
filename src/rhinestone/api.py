@@ -138,6 +138,7 @@ class Rhinestone:
             definition.name for definition in execution_definitions
         )
         runtime_dependencies = dict(dependencies or {})
+        source_dependency_registry = DependencyRegistry(runtime_dependencies)
         execution_dependencies = {
             name: value
             for name, value in runtime_dependencies.items()
@@ -164,7 +165,7 @@ class Rhinestone:
                     _source_context(
                         direct_provider,
                         source_definitions,
-                        runtime_dependencies,
+                        source_dependency_registry,
                         credential_registry,
                         destination_policy,
                     ),
@@ -188,7 +189,7 @@ class Rhinestone:
                         _source_context(
                             source_definition,
                             source_definitions,
-                            runtime_dependencies,
+                            source_dependency_registry,
                             credential_registry,
                             destination_policy,
                         ),
@@ -507,7 +508,7 @@ def _source_definitions(
 def _source_context(
     provider: Provider,
     definitions: Mapping[str, SourceAdapterDefinition],
-    runtime_dependencies: Mapping[str, DependencyValue],
+    dependencies: DependencyRegistry,
     credentials: CredentialRegistry,
     destination_policy: DestinationPolicy,
 ) -> SourceAdapterContext:
@@ -517,18 +518,11 @@ def _source_context(
         raise AdapterRegistrationError(
             f"Source adapter {provider.adapter_type!r} is not registered"
         ) from None
-    dependencies = DependencyRegistry(
-        {
-            name: runtime_dependencies[name]
-            for name in definition.dependencies
-            if name in runtime_dependencies
-        }
-    )
     return SourceAdapterContext(
         get_json=_http.get_json,
         get_text=_http.get_text,
         credentials=credentials,
-        dependencies=dependencies,
+        dependencies=dependencies.scoped(definition.dependencies),
         destination_policy=destination_policy,
         provider_id=provider.id,
     )

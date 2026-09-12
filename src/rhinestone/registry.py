@@ -1,6 +1,6 @@
 """Internal adapter and user-owned dependency registries."""
 
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Tuple
 
 from .errors import (
     AdapterRegistrationError,
@@ -34,9 +34,21 @@ class CredentialRegistry:
 class DependencyRegistry:
     """Resolve injected runtime objects, supporting optional lazy factories."""
 
-    def __init__(self, values: Mapping[str, DependencyValue]) -> None:
+    def __init__(
+        self,
+        values: Mapping[str, DependencyValue],
+        instances: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self._values = dict(values)
-        self._instances: Dict[str, Any] = {}
+        self._instances = instances if instances is not None else {}
+
+    def scoped(self, names: Iterable[str]) -> "DependencyRegistry":
+        """Return a view with the same lazy-instance cache and limited names."""
+        allowed = frozenset(names)
+        return DependencyRegistry(
+            {name: value for name, value in self._values.items() if name in allowed},
+            self._instances,
+        )
 
     def get(self, name: str) -> Any:
         if name in self._instances:
