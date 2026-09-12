@@ -12,6 +12,7 @@ from rhinestone.adapters.knowledge import (
     MeshCode,
     MunicipalityIdentity,
     MunicipalityRecord,
+    StandardTimeAdapter,
     StaticMunicipalityAdapter,
     require_lossless_crs84,
 )
@@ -341,11 +342,13 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
     adapter.config_schema = lambda: None  # type: ignore[method-assign]
     with pytest.raises(ConfigValidationError, match="Unknown"):
         adapter.load(Config("estat-gis", {"unexpected": "value"}))
+    calendar_adapter = EstatGisAdapter(
+        distributions, knowledge=cast(Any, StandardTimeAdapter())
+    )
+    calendar_adapter.config_schema = lambda: None  # type: ignore[method-assign]
     with pytest.raises(ConfigValidationError, match="survey_year"):
-        EstatGisAdapter._matches(
-            distributions[0],
-            {"time": "2020"},
-            {"time": {"year": 2020, "kind": "calendar_year"}},
+        calendar_adapter.load(
+            Config("estat-gis", {"time": "2020", "time_kind": "calendar_year"})
         )
 
 
