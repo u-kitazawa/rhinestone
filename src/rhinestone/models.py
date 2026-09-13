@@ -204,7 +204,8 @@ class DiscoveryRecord:
     raw_metadata: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.source_id, str) or not self.source_id.strip():
+        source_id = cast(object, self.source_id)
+        if not isinstance(source_id, str) or not source_id.strip():
             raise ConfigValidationError(
                 "DiscoveryRecord.source_id must be a non-empty string"
             )
