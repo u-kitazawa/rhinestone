@@ -366,6 +366,8 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
         )
     with pytest.raises(ConfigValidationError, match="survey_year"):
         app.resolve(Config("estat", {"time": "2019"}))
+    with pytest.raises(ConfigValidationError, match="survey_year"):
+        app.resolve(Config("estat", {"boundary_kind": "missing", "time": "2019"}))
 
     adapter = EstatGisAdapter(distributions)
     assert len(adapter.search(SearchQuery(text="Shape", limit=1))) == 1
@@ -408,6 +410,7 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
         {key: value for key, value in valid.items() if key != "distribution_id"},
         {**valid, "distribution_id": ""},
         {**valid, "distribution_id": "d1", "survey_year": 0},
+        {**valid, "distribution_id": "d2", "region_code": 13},
         {**valid, "distribution_id": "d2", "format": "csv"},
         {**valid, "distribution_id": "d2", "title": " "},
         {**valid, "distribution_id": "d2", "description": 123},

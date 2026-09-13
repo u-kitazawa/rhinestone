@@ -96,6 +96,7 @@ class EstatGisAdapter(ProviderAdapter):
         if "format" in settings:
             settings["format"] = canonical_format(settings["format"])
         knowledge = resolve_knowledge(settings, self._knowledge)
+        self._validate_time_semantic(settings, knowledge)
         matches = tuple(
             item
             for item in self._distributions
@@ -228,13 +229,20 @@ class EstatGisAdapter(ProviderAdapter):
             return False
         if "time" in settings:
             time = knowledge.get("time", {})
-            if time.get("kind") != "survey_year":
-                raise ConfigValidationError(
-                    "e-Stat GIS time selector must be a survey_year"
-                )
             if time.get("year") != item["survey_year"]:
                 return False
         return True
+
+    @staticmethod
+    def _validate_time_semantic(
+        settings: Mapping[str, Any], knowledge: Mapping[str, Mapping[str, object]]
+    ) -> None:
+        if "time" in settings and knowledge.get("time", {}).get("kind") != (
+            "survey_year"
+        ):
+            raise ConfigValidationError(
+                "e-Stat GIS time selector must be a survey_year"
+            )
 
     @classmethod
     def _validate_distributions(
@@ -274,6 +282,13 @@ class EstatGisAdapter(ProviderAdapter):
             year = item.get("survey_year")
             if type(year) is not int or not 1 <= year <= 9999:
                 raise ConfigValidationError("estat-gis survey_year must be 1..9999")
+            if "region_code" in item and (
+                not isinstance(item["region_code"], str)
+                or not item["region_code"].strip()
+            ):
+                raise ConfigValidationError(
+                    "estat-gis region_code must be a non-empty string"
+                )
             format_name = canonical_format(item.get("format"))
             if format_name not in _FORMATS:
                 raise ConfigValidationError(
