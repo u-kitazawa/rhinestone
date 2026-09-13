@@ -48,7 +48,7 @@ discover
 - `Provenance`
 - `AccessPlan`のprovider非依存な値
 
-Credential、runtime instance、`Resource._opener`はこの境界に含めません。`SearchResult`はtarget Configへ変換して別Sourceへ解決でき、解決後はアプリケーション側のResourceへ発見時のmetadata / provenanceを引き継ぎます。JSON schemaやIntake exportは、複数Sourceで情報損失と利用価値を確認してから追加します。
+Credential、runtime instance、`Resource._opener`はこの境界に含めません。`SearchResult`はtarget Configへ変換して別Sourceへ解決でき、解決後の`Resource`はtarget Sourceの`metadata` / `provenance` / `source.raw_metadata`を保持します。cross-sourceの場合は、発見側の`metadata` / `provenance` / `raw_metadata`を`Resource.discovery`へ別 record として保持し、target側の記録を上書きしません。JSON schemaやIntake exportは、複数Sourceで情報損失と利用価値を確認してから追加します。
 
 ## 直列化／Intake出力の評価
 

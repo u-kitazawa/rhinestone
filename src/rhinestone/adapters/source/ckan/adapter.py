@@ -154,6 +154,7 @@ class CkanAdapter(ProviderAdapter):
                             adapter="ckan",
                             raw=package,
                         ),
+                        raw_metadata={"package": package, "resource": resource},
                     )
                 )
         return tuple(found)

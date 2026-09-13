@@ -129,6 +129,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                     target=Config("direct", target_settings),
                     metadata=metadata,
                     provenance=provenance,
+                    raw_metadata={"catalog": package, "resource": resource},
                 )
             )
         return tuple(found)

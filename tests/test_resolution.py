@@ -104,6 +104,17 @@ def test_removed_estat_format_is_not_a_builtin_service_format() -> None:
     assert resource.access_plan.kind == "file"
 
 
+def test_resolution_consumes_shared_canonical_format_vocabulary() -> None:
+    candidate = ResourceCandidate(
+        "https://example.jp/resource", "GeoPackage", "application/octet-stream"
+    )
+
+    resource = Resolver().resolve(make_source(candidate))
+
+    assert resource.format == "gpkg"
+    assert resource.access_plan.kind == "file"
+
+
 def test_archive_knowledge_is_preserved_in_file_plan() -> None:
     """ZIP Resource の archive 情報を Execution Adapter の翻訳へ渡すために必要である。"""
     candidate = ResourceCandidate(

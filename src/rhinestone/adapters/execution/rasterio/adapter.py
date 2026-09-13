@@ -4,6 +4,7 @@ from typing import Any, FrozenSet
 
 from ....errors import ResourceAccessError
 from ....models import Resource
+from ....representations import canonical_format
 from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
 
@@ -21,8 +22,9 @@ class RasterioAdapter(ExecutionAdapter):
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
         """Return whether Rasterio and the Resource's raster format are compatible."""
         return (
-            resource.format or ""
-        ).lower() in self._formats and self.name in dependencies
+            canonical_format(resource.format) in self._formats
+            and self.name in dependencies
+        )
 
     def open(
         self,

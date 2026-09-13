@@ -4,6 +4,7 @@ from typing import Any, Dict, FrozenSet
 
 from ....errors import ResourceAccessError
 from ....models import Resource
+from ....representations import canonical_format
 from ....security import DestinationPolicy
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
@@ -22,8 +23,9 @@ class PyogrioAdapter(ExecutionAdapter):
     def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
         """Return whether pyogrio and the Resource's vector format are compatible."""
         return (
-            resource.format or ""
-        ).lower() in self._formats and self.name in dependencies
+            canonical_format(resource.format) in self._formats
+            and self.name in dependencies
+        )
 
     def open(
         self,

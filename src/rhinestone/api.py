@@ -34,6 +34,7 @@ from .adapters.knowledge import (
     KnowledgeAdapterRegistry,
     StandardTimeAdapter,
 )
+from .adapters.ports import TransportPort
 from .adapters.source import (
     CkanAdapter,
     DcatAdapter,
@@ -49,11 +50,16 @@ from .adapters.source import (
     StaticAdapter,
 )
 from .catalogs import Catalog
-from .errors import AdapterRegistrationError, ConfigValidationError
+from .errors import (
+    AdapterRegistrationError,
+    ConfigValidationError,
+    ProviderMetadataError,
+)
 from .execution import ExecutionAdapterSelector
 from .models import (
     Config,
     DependencyValue,
+    DiscoveryRecord,
     LibraryName,
     Provider,
     Resource,
@@ -115,6 +121,88 @@ class _ConfiguredSourceAdapter:
             )
             for result in search(query)
         )
+
+
+class _SourceTransport:
+    """Bind the core HTTP transport to one configured provider boundary."""
+
+    def __init__(
+        self,
+        policy: DestinationPolicy,
+        provider_id: str,
+        service: str,
+        credential: Optional[str] = None,
+    ) -> None:
+        self._policy = policy
+        self._provider_id = provider_id
+        self._service = service
+        self._credential = credential
+
+    def get_json(
+        self,
+        url: str,
+        params: Mapping[str, Any],
+        headers: Optional[Mapping[str, str]] = None,
+        *,
+        credential: Optional[str] = None,
+    ) -> Any:
+        logical_credential = self._credential if credential is None else credential
+        self._authorize(url, headers, logical_credential)
+        try:
+            if headers is None:
+                return _http.get_json(url, params)
+            return _http.get_json(url, params, headers)
+        except OSError as error:
+            raise ProviderMetadataError(
+                f"Provider metadata request failed for {url!r}"
+            ) from error
+
+    def get_text(
+        self,
+        url: str,
+        headers: Optional[Mapping[str, str]] = None,
+        *,
+        credential: Optional[str] = None,
+    ) -> str:
+        logical_credential = self._credential if credential is None else credential
+        self._authorize(url, headers, logical_credential)
+        try:
+            if headers is None:
+                return _http.get_text(url)
+            return _http.get_text(url, headers)
+        except OSError as error:
+            raise ProviderMetadataError(
+                f"Provider metadata request failed for {url!r}"
+            ) from error
+
+    def _authorize(
+        self,
+        url: str,
+        headers: Optional[Mapping[str, str]],
+        credential: Optional[str],
+    ) -> None:
+        self._policy.authorize(
+            url,
+            credentialed=credential is not None or bool(headers),
+            provider=self._provider_id,
+            service=self._service,
+            credential=credential,
+        )
+
+
+def _source_transport(
+    provider: Provider, destination_policy: DestinationPolicy
+) -> _SourceTransport:
+    configured_credential = provider.settings.get("credential")
+    credential = (
+        configured_credential if isinstance(configured_credential, str) else None
+    )
+    return _SourceTransport(
+        destination_policy,
+        provider.id,
+        provider.adapter_type,
+        credential,
+    )
 
 
 class Rhinestone:
@@ -288,16 +376,14 @@ class Rhinestone:
         resource = self._pipeline.resolve(value.to_config())
         if value.discovered_by == value.target.source_id:
             return resource
-        source = replace(
-            resource.source,
-            metadata=value.metadata,
-            provenance=value.provenance,
-        )
         return replace(
             resource,
-            metadata=value.metadata,
-            provenance=value.provenance,
-            source=source,
+            discovery=DiscoveryRecord(
+                source_id=value.discovered_by,
+                metadata=value.metadata,
+                provenance=value.provenance,
+                raw_metadata=value.raw_metadata,
+            ),
         )
 
     def open(
@@ -416,17 +502,20 @@ def _build_builtin_source_adapter(
     credentials: CredentialRegistry,
     destination_policy: Optional[DestinationPolicy] = None,
     knowledge: Optional[KnowledgeAdapterRegistry] = None,
+    transport: Optional[TransportPort] = None,
 ) -> ProviderAdapter:
     adapter_type = source.adapter_type
     settings = dict(source.settings)
     knowledge = knowledge or KnowledgeAdapterRegistry()
+    destination_policy = destination_policy or DestinationPolicy.unrestricted()
+    transport = transport or _source_transport(source, destination_policy)
 
     def json_transport(
         url: str,
         params: Mapping[str, Any],
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
-        return _http.get_json(url, params, headers)
+        return transport.get_json(url, params, headers)
 
     if adapter_type == "ckan":
         _reject_options(
@@ -521,7 +610,7 @@ def _build_builtin_source_adapter(
         _reject_options(adapter_type, settings, ("catalog_uri", "serialization"))
 
         def get_document(uri: str) -> str:
-            return _http.get_text(uri)
+            return transport.get_text(uri)
 
         def rdf_runtime() -> Any:
             return dependencies.get("rdflib")
@@ -599,6 +688,7 @@ def _source_definitions(
                 cast(CredentialRegistry, context.credentials),
                 context.destination_policy,
                 cast(KnowledgeAdapterRegistry, context.knowledge),
+                context.transport,
             ),
             dependencies=(
                 frozenset({"rdflib"}) if adapter_type == "dcat" else frozenset()
@@ -658,8 +748,7 @@ def _source_context(
             "matching SourceAdapterDefinition"
         ) from None
     return SourceAdapterContext(
-        get_json=_http.get_json,
-        get_text=_http.get_text,
+        transport=_source_transport(provider, destination_policy),
         credentials=credentials,
         dependencies=dependencies.scoped(definition.dependencies),
         knowledge=knowledge,

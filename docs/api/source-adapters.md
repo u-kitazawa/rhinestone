@@ -30,4 +30,9 @@ Source Adapter は `SourceAdapterDefinition` として明示登録できます�
 `search(query)` は任意です。Context には組み込み transport、読み取り専用の Credential /
 Runtime Port、DestinationPolicy、共有Knowledge Adapterを取得する`knowledge` Portが含まれます。
 
+Source factory に渡される `SourceAdapterContext` の通信境界は `context.transport` に一本化
+されています。`context.transport.get_json()` / `get_text()` は宛先認可と通信エラー分類を
+Core 側で適用します。Credential の secret を URL、header、`Provider`、`Result`、`Resource` に
+保存せず、必要な論理名を `credential=` で指定してください。
+
 内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。

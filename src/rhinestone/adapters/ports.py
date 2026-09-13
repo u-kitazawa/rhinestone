@@ -32,12 +32,24 @@ class TransportPort(Protocol):
         url: str,
         params: Mapping[str, Any],
         headers: Optional[Mapping[str, str]] = None,
+        *,
+        credential: Optional[str] = None,
     ) -> Any:
-        """Fetch and decode one JSON response."""
+        """Fetch and decode one JSON response.
+
+        ``credential`` is the logical credential name, never the secret.
+        Passing it lets the core apply provider-scoped credential policy.
+        """
         ...
 
-    def get_text(self, url: str) -> str:
-        """Fetch one text response."""
+    def get_text(
+        self,
+        url: str,
+        headers: Optional[Mapping[str, str]] = None,
+        *,
+        credential: Optional[str] = None,
+    ) -> str:
+        """Fetch one text response through the same policy boundary."""
         ...
 
 

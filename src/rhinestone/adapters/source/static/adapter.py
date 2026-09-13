@@ -69,6 +69,7 @@ class StaticAdapter(ProviderAdapter):
                     target=Config(self.adapter_type, {"id": identifier}),
                     metadata=source.metadata,
                     provenance=source.provenance,
+                    raw_metadata=source.raw_metadata,
                 )
             )
         return tuple(results[: query.limit])

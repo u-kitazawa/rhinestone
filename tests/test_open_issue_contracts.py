@@ -22,6 +22,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     KnowledgeResolutionError,
     KnowledgeValidationError,
+    ProviderMetadataError,
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
@@ -633,3 +634,156 @@ def test_municipality_projection_checks_all_canonical_matching_records() -> None
             ),
             snapshot_version="v1",
         )
+
+
+def test_custom_source_receives_one_core_managed_transport_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rhinestone._http as http
+    from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
+
+    calls: list[tuple[str, object]] = []
+
+    def get_json(url: str, params: object) -> dict[str, object]:
+        calls.append((url, params))
+        return {"ok": True}
+
+    monkeypatch.setattr(http, "get_json", get_json)
+
+    def factory(provider: Provider, context: Any) -> Any:
+        assert hasattr(context, "transport")
+        assert not hasattr(context, "get_json")
+        assert not hasattr(context, "get_text")
+        context.transport.get_json("https://custom.example/data", {})
+
+        class Adapter:
+            def load(self, config: Config) -> Any:
+                return Source(
+                    metadata=Metadata(title="target"),
+                    candidates=(
+                        ResourceCandidate(
+                            "https://custom.example/data",
+                            "GeoPackage",
+                            "application/octet-stream",
+                        ),
+                    ),
+                    capabilities=frozenset(),
+                    provenance=Provenance(provider=provider.id),
+                    raw_metadata={},
+                )
+
+        return Adapter()
+
+    configure(
+        sources=(
+            Provider("custom", "custom-source", {"endpoint": "https://custom.example"}),
+        ),
+        adapters=(SourceAdapterDefinition("custom-source", factory),),
+    )
+    assert calls == [("https://custom.example/data", {})]
+
+
+def test_custom_transport_preserves_text_headers_and_normalizes_network_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rhinestone._http as http
+
+    seen: dict[str, object] = {}
+
+    def get_text(url: str, headers: object) -> str:
+        seen["url"] = url
+        seen["headers"] = headers
+        return "document"
+
+    monkeypatch.setattr(http, "get_text", get_text)
+
+    def factory(provider: Provider, context: Any) -> Any:
+        class Adapter:
+            def load(self, config: Config) -> Any:
+                assert (
+                    context.transport.get_text(
+                        "https://custom.example/catalog",
+                        {"Authorization": "secret"},
+                        credential="custom-key",
+                    )
+                    == "document"
+                )
+                from rhinestone.models import (
+                    Metadata,
+                    Provenance,
+                    ResourceCandidate,
+                    Source,
+                )
+
+                return Source(
+                    metadata=Metadata(title="target"),
+                    candidates=(
+                        ResourceCandidate(
+                            "https://custom.example/data", "geojson", None
+                        ),
+                    ),
+                    capabilities=frozenset(),
+                    provenance=Provenance(provider=provider.id),
+                    raw_metadata={},
+                )
+
+        return Adapter()
+
+    app = configure(
+        sources=(
+            Provider(
+                "custom",
+                "custom-source",
+                {"endpoint": "https://custom.example", "credential": "custom-key"},
+            ),
+        ),
+        adapters=(SourceAdapterDefinition("custom-source", factory),),
+    )
+    app.resolve(Config("custom", {}))
+    assert seen == {
+        "url": "https://custom.example/catalog",
+        "headers": {"Authorization": "secret"},
+    }
+
+
+def test_custom_transport_normalizes_network_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rhinestone._http as http
+
+    def fail_json(url: str, params: object) -> object:
+        raise OSError("offline")
+
+    monkeypatch.setattr(http, "get_json", fail_json)
+
+    def factory(provider: Provider, context: Any) -> Any:
+        class Adapter:
+            def load(self, config: Config) -> Any:
+                context.transport.get_json("https://custom.example/data", {})
+                raise AssertionError("transport should have failed")
+
+        return Adapter()
+
+    app = configure(
+        sources=(
+            Provider("custom", "custom-source", {"endpoint": "https://custom.example"}),
+        ),
+        adapters=(SourceAdapterDefinition("custom-source", factory),),
+    )
+    with pytest.raises(ProviderMetadataError, match="Provider metadata request failed"):
+        app.resolve(Config("custom", {}))
+
+
+def test_discovery_record_rejects_empty_source_and_exposes_alias() -> None:
+    from rhinestone.models import DiscoveryRecord, Metadata, Provenance
+
+    record = DiscoveryRecord(
+        "catalog",
+        Metadata(title="found"),
+        Provenance(provider="catalog"),
+        {"source": "raw"},
+    )
+    assert record.discovered_by == "catalog"
+    assert record.raw_metadata == {"source": "raw"}
+    with pytest.raises(ConfigValidationError, match="source_id"):
+        DiscoveryRecord("", Metadata(), Provenance(provider="catalog"))

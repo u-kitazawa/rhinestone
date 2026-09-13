@@ -77,8 +77,7 @@ Source factory には `SourceAdapterContext` が渡されます。
 
 | 属性 | 用途 |
 | --- | --- |
-| `get_json(url, params, headers=None)` | 組み込み HTTP JSON transport |
-| `get_text(url)` | 組み込み HTTP text transport |
+| `transport` | 組み込み HTTP transport。`get_json()` / `get_text()` と宛先認可を一つの Port として提供 |
 | `credentials` | 論理名から Credential を取得する読み取り専用 Port |
 | `dependencies` | Definition が宣言した Source Runtime を取得する読み取り専用 Port |
 | `knowledge` | Identity / Time などを解決する読み取り専用 Knowledge Port |
@@ -115,8 +114,22 @@ process-global な登録、package 自動発見には依存しないでくださ
 Python は利用者の trust boundary 内で、`configure()` 時に明示的に合成します。
 
 認証付き HTTP は secret を自前の header に埋め込まず、`context.credentials.get(name)` を
-使います。`context.get_json()` と DestinationPolicy を使うことで、組み込み transport の
-エラー分類と通信先制限を維持できます。
+使います。`context.transport.get_json()` / `get_text()` と DestinationPolicy を使うことで、
+組み込み transport のエラー分類と通信先制限を維持できます。`credential=` に渡す値は
+Credential の論理名であり、secret そのものではありません。`headers` を渡す場合も secret を
+Adapter の設定や Resource に保存しないでください。
+
+```python
+document = context.transport.get_text(
+    "https://custom.example/catalog",
+    {"Accept": "text/turtle"},
+    credential="custom-api-key",
+)
+payload = context.transport.get_json(
+    "https://custom.example/api/items",
+    {"limit": 10},
+)
+```
 
 Resource の URI や Source endpoint に userinfo（`https://user:password@...`）を埋め込んでは
 いけません。Rhinestone はこの形式を検証時に拒否します。File の `archive` は `zip` のみを

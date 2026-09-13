@@ -320,8 +320,17 @@ def test_discovery_result_resolves_through_a_different_target_source(
     assert result.discovered_by == "search-ckan-jp"
     assert result.target.source_id == "direct"
     assert resource.metadata.title == "Example Rivers"
-    assert resource.provenance.provider == "Example CKAN"
-    assert resource.provenance.resource_identifier == "resource-1"
+    assert resource.provenance.provider == "direct"
+    assert resource.discovery is not None
+    assert resource.discovery.source_id == "search-ckan-jp"
+    assert resource.discovery.provenance.provider == "Example CKAN"
+    assert resource.discovery.provenance.resource_identifier == "resource-1"
+    assert resource.discovery.raw_metadata == result.raw_metadata
+    assert resource.discovery.raw_metadata["resource"]["id"] == "resource-1"
+    assert resource.source.raw_metadata["uri"].endswith(
+        "resource-1/download/rivers.geojson"
+    )
+    assert resource.source.raw_metadata["metadata"]["raw"]["title"] == "Example Rivers"
     assert bound_resource == resource
     assert bound_resource.source.metadata is bound_resource.metadata
     assert bound_resource.source.provenance is bound_resource.provenance

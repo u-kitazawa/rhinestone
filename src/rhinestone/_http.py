@@ -66,9 +66,12 @@ def get_json(
         return decoded
 
 
-def get_text(url: str) -> str:
+def get_text(url: str, headers: Optional[Mapping[str, str]] = None) -> str:
     """Fetch a text document without following HTTP redirects."""
-    request = Request(url, headers={"User-Agent": "rhinestone"})
+    request = Request(
+        url,
+        headers={"User-Agent": "rhinestone", **dict(headers or {})},
+    )
     opener = build_opener(_NoRedirectHandler())
     with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
         charset = response.headers.get_content_charset() or "utf-8"

@@ -136,6 +136,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
                         adapter="ogc-features",
                         raw=feature,
                     ),
+                    raw_metadata=feature,
                 )
             )
         return tuple(found)
