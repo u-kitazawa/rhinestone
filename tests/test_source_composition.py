@@ -47,7 +47,7 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
 ) -> None:
     document = (
         Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
     def get_document(uri: str) -> str:
         return document
@@ -122,7 +122,7 @@ def test_dcat_search_loads_source_runtime_on_demand(
 ) -> None:
     document = (
         Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
     def get_document(uri: str) -> str:
         return document
@@ -180,7 +180,7 @@ def test_resolved_resource_does_not_retain_source_runtime(
 ) -> None:
     document = (
         Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
-    ).read_text()
+    ).read_text(encoding="utf-8")
 
     def get_document(uri: str) -> str:
         return document

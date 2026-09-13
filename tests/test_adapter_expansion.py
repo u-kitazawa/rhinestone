@@ -225,7 +225,11 @@ def test_fundamental_does_not_guess_missing_knowledge(
 
 
 def dcat_adapter(document: Any = None) -> DcatAdapter:
-    text = (FIXTURES / "catalog.ttl").read_text() if document is None else document
+    text = (
+        (FIXTURES / "catalog.ttl").read_text(encoding="utf-8")
+        if document is None
+        else document
+    )
     return DcatAdapter(
         lambda uri: text,
         lambda: importlib.import_module("rdflib"),
@@ -268,7 +272,8 @@ def test_dcat_preserves_rdf_and_excludes_landing_pages() -> None:
 def test_dcat_serializations_have_equivalent_candidates(serialization: str) -> None:
     rdf: Any = importlib.import_module("rdflib")
     graph = rdf.Graph().parse(
-        data=(FIXTURES / "catalog.ttl").read_text(), format="turtle"
+        data=(FIXTURES / "catalog.ttl").read_text(encoding="utf-8"),
+        format="turtle",
     )
     document = graph.serialize(format=serialization)
     result = dcat_adapter(document).load(dcat_config(serialization=serialization))
@@ -410,7 +415,7 @@ def test_odpt_runtime_filters_are_validated() -> None:
 
 def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None:
     calls: Dict[str, Any] = {}
-    data = json.loads((FIXTURES / "odpt.json").read_text())
+    data = json.loads((FIXTURES / "odpt.json").read_text(encoding="utf-8"))
 
     def get(uri: str, **kwargs: Any) -> Any:
         calls.update(kwargs)
