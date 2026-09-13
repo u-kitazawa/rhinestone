@@ -479,7 +479,7 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
 
 
 def test_estat_gis_deep_copies_nested_raw_distribution_metadata() -> None:
-    extension = {
+    extension: dict[str, Any] = {
         "tags": ["original"],
         "tuple": ("original",),
         "set": {"original"},
