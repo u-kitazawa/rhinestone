@@ -80,6 +80,8 @@ def test_snapshot_municipality_resolver_is_strict_and_projects_one_way() -> None
         lambda: AreaCode(" scheme", "1"),
         lambda: AreaCode("scheme", ""),
         lambda: AreaCode("scheme", "1a"),
+        lambda: AreaCode("japan-standard-area-code", "１３"),
+        lambda: AreaCode("japan-standard-area-code", "1310"),
     ),
 )
 def test_municipality_value_validation_is_fail_closed(factory: Any) -> None:
@@ -92,6 +94,16 @@ def test_municipality_snapshot_validation_and_lookup_errors() -> None:
         MunicipalityRecord(None)  # type: ignore[arg-type]
     with pytest.raises(KnowledgeValidationError):
         MunicipalityRecord(municipality_records()[0].identity, codes=(None,))  # type: ignore[arg-type]
+    with pytest.raises(KnowledgeValidationError, match="identity level"):
+        MunicipalityRecord(
+            municipality_records()[0].identity,
+            codes=(AreaCode("japan-standard-area-code", "13"),),
+        )
+    with pytest.raises(KnowledgeValidationError, match="identity level"):
+        MunicipalityRecord(
+            MunicipalityIdentity("13", "東京都", "13", "東京都", level="prefecture"),
+            codes=(AreaCode("japan-standard-area-code", "13101"),),
+        )
     with pytest.raises(KnowledgeValidationError):
         MunicipalityRecord(municipality_records()[0].identity, aliases=(None,))  # type: ignore[arg-type]
     with pytest.raises(KnowledgeValidationError):
@@ -211,6 +223,7 @@ def test_space_values_fail_closed_without_reprojection() -> None:
         lambda: BoundingBox.from_tuple([1, 2, 3, 4]),  # type: ignore[arg-type]
         lambda: BoundingBox.from_tuple(("x", 2, 3, 4)),  # type: ignore[arg-type]
         lambda: MeshCode("", 3, "53394567"),
+        lambda: MeshCode("unknown", 3, "53394567"),
         lambda: MeshCode("JIS-X-0410", 7, "53394567"),  # type: ignore[arg-type]
         lambda: MeshCode("JIS-X-0410", 3, "5339"),
         lambda: MeshCode("JIS-X-0410", 3, "5339456x"),

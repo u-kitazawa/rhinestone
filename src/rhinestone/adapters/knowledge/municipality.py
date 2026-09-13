@@ -32,6 +32,12 @@ class AreaCode:
             raise KnowledgeValidationError(
                 "area code value must be a non-empty decimal string"
             )
+        if self.scheme == STANDARD_AREA_CODE and (
+            not self.value.isascii() or len(self.value) not in {2, 5}
+        ):
+            raise KnowledgeValidationError(
+                "standard area code must be an ASCII two- or five-digit string"
+            )
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,15 @@ class MunicipalityRecord:
             codes = (AreaCode(STANDARD_AREA_CODE, self.identity.code),)
         if any(not isinstance(cast(object, code), AreaCode) for code in codes):
             raise KnowledgeValidationError("municipality record codes are invalid")
+        expected_standard_length = 2 if self.identity.level == "prefecture" else 5
+        if any(
+            code.scheme == STANDARD_AREA_CODE
+            and len(code.value) != expected_standard_length
+            for code in codes
+        ):
+            raise KnowledgeValidationError(
+                "standard area code length must match municipality identity level"
+            )
         aliases = tuple(self.aliases)
         if any(
             not isinstance(cast(object, alias), str) or not alias.strip()
