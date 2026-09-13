@@ -155,6 +155,7 @@ def test_media_type_alone_does_not_trigger_format_guessing() -> None:
         {"archive": "tar"},
         {"archive": "zip", "access_options": {"entry_point": "../outside.gml"}},
         {"archive": "zip", "access_options": {"entry_point": "dir\\file.gml"}},
+        {"archive": "zip", "access_options": {"entry_point": "."}},
         {"access_options": {"entry_point": "file.gml"}},
     ),
 )

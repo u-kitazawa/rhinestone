@@ -8,6 +8,7 @@ HTML or guesses a download URL.
 """
 
 import json
+from copy import deepcopy
 from importlib import resources
 from types import MappingProxyType
 from typing import Any, Iterable, List, Mapping, Optional, Tuple, cast
@@ -265,8 +266,8 @@ class EstatGisAdapter(ProviderAdapter):
                 raise ConfigValidationError(
                     "each estat-gis distribution must be an object"
                 )
-            item = dict(raw)
-            raw_result.append(dict(item))
+            item = deepcopy(dict(raw))
+            raw_result.append(deepcopy(item))
             for field in (
                 "distribution_id",
                 "dataset_id",

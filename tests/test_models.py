@@ -53,6 +53,7 @@ def test_resource_candidate_rejects_embedded_http_credentials() -> None:
         "https://exa mple/data.csv",
         "https://%ZZ/data.csv",
         "https://-bad.example/data.csv",
+        "https://bad_name.example/data.csv",
         "https://[gggg::1]/data.csv",
     ),
 )

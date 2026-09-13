@@ -446,6 +446,7 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
         {**valid, "distribution_id": "d2", "archive": "tar"},
         {**valid, "distribution_id": "d2", "archive": "zip"},
         {**valid, "distribution_id": "d2", "archive": "zip", "entry_point": "../d.gml"},
+        {**valid, "distribution_id": "d2", "archive": "zip", "entry_point": "."},
         {**valid, "distribution_id": "d2", "entry_point": "d.gml"},
         {
             **valid,
@@ -475,6 +476,29 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
         EstatGisAdapter([])
     with pytest.raises(ConfigValidationError, match="unique"):
         EstatGisAdapter([valid, valid])
+
+
+def test_estat_gis_deep_copies_nested_raw_distribution_metadata() -> None:
+    extension = {"tags": ["original"]}
+    distribution = {
+        "distribution_id": "d1",
+        "dataset_id": "ds1",
+        "boundary_kind": "municipality",
+        "survey_year": 2020,
+        "level": "municipality",
+        "uri": "https://example.test/d.gml",
+        "format": "gml",
+        "extension": extension,
+    }
+    adapter = EstatGisAdapter([distribution])
+    extension["tags"].append("mutated")
+
+    source = adapter.load(Config("estat-gis", {"distribution_id": "d1"}))
+
+    assert source.raw_metadata["distribution_index"][0]["extension"]["tags"] == (
+        "original",
+    )
+    assert source.provenance.raw["distribution"]["extension"]["tags"] == ("original",)
 
 
 def test_custom_adapter_context_uses_public_ports_only() -> None:

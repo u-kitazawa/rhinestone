@@ -131,6 +131,7 @@ class Resolver:
                 path = PurePosixPath(entry_point)
                 if (
                     not entry_point.strip()
+                    or not path.parts
                     or path.is_absolute()
                     or ".." in path.parts
                     or "\\" in entry_point
