@@ -479,7 +479,12 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
 
 
 def test_estat_gis_deep_copies_nested_raw_distribution_metadata() -> None:
-    extension = {"tags": ["original"]}
+    extension = {
+        "tags": ["original"],
+        "tuple": ("original",),
+        "set": {"original"},
+        "frozen_set": frozenset({"original"}),
+    }
     distribution = {
         "distribution_id": "d1",
         "dataset_id": "ds1",
@@ -499,6 +504,28 @@ def test_estat_gis_deep_copies_nested_raw_distribution_metadata() -> None:
         "original",
     )
     assert source.provenance.raw["distribution"]["extension"]["tags"] == ("original",)
+
+
+def test_estat_gis_accepts_provider_frozen_distribution_settings() -> None:
+    distribution = {
+        "distribution_id": "d1",
+        "dataset_id": "ds1",
+        "boundary_kind": "municipality",
+        "survey_year": 2020,
+        "level": "municipality",
+        "uri": "https://example.test/d.gml",
+        "format": "gml",
+        "extension": {"nested": {"tags": ["original"]}},
+    }
+    provider = Provider("estat", "estat-gis", {"distributions": [distribution]})
+
+    resource = configure(sources=(provider,)).resolve(
+        Config("estat", {"distribution_id": "d1"})
+    )
+
+    assert resource.source.raw_metadata["distribution_index"][0]["extension"]["nested"][
+        "tags"
+    ] == ("original",)
 
 
 def test_custom_adapter_context_uses_public_ports_only() -> None:

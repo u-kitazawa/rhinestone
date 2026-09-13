@@ -50,6 +50,26 @@ _SELECTORS = frozenset(
 )
 
 
+def _thaw_copy(value: Any) -> Any:
+    """Copy frozen provider settings into adapter-owned containers."""
+    if isinstance(value, Mapping):
+        mapping = cast(Mapping[Any, Any], value)
+        return {key: _thaw_copy(item) for key, item in mapping.items()}
+    if isinstance(value, tuple):
+        items = cast(Iterable[Any], value)
+        return tuple(_thaw_copy(item) for item in items)
+    if isinstance(value, list):
+        items = cast(Iterable[Any], value)
+        return [_thaw_copy(item) for item in items]
+    if isinstance(value, frozenset):
+        items = cast(Iterable[Any], value)
+        return frozenset(_thaw_copy(item) for item in items)
+    if isinstance(value, set):
+        items = cast(Iterable[Any], value)
+        return {_thaw_copy(item) for item in items}
+    return deepcopy(value)
+
+
 class EstatGisAdapter(ProviderAdapter):
     """Resolve explicit e-Stat GIS distributions to ordinary GIS Resources."""
 
@@ -266,8 +286,8 @@ class EstatGisAdapter(ProviderAdapter):
                 raise ConfigValidationError(
                     "each estat-gis distribution must be an object"
                 )
-            item = deepcopy(dict(raw))
-            raw_result.append(deepcopy(item))
+            item = cast(dict[str, Any], _thaw_copy(raw))
+            raw_result.append(cast(Mapping[str, Any], _thaw_copy(item)))
             for field in (
                 "distribution_id",
                 "dataset_id",
