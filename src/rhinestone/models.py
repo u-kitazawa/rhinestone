@@ -20,6 +20,7 @@ from typing import (
     cast,
     overload,
 )
+from urllib.parse import urlsplit
 
 from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
 
@@ -87,6 +88,10 @@ def _freeze(value: Any) -> Any:
     return value
 
 
+def _empty_mapping() -> Mapping[str, Any]:
+    return {}
+
+
 @dataclass(frozen=True)
 class Provider:
     """Describe one configured data provider.
@@ -99,7 +104,7 @@ class Provider:
 
     id: str
     adapter_type: str
-    settings: Mapping[str, Any] = field(default_factory=dict)
+    settings: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -152,7 +157,7 @@ class Metadata:
     publisher: Optional[str] = None
     license: Optional[str] = None
     updated_at: Optional[datetime] = None
-    raw: Mapping[str, Any] = field(default_factory=dict)
+    raw: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "raw", _freeze(self.raw))
@@ -171,12 +176,12 @@ class Provenance:
     resource_identifier: Optional[str] = None
     api_endpoint: Optional[str] = None
     original_url: Optional[str] = None
-    query_parameters: Mapping[str, Any] = field(default_factory=dict)
+    query_parameters: Mapping[str, Any] = field(default_factory=_empty_mapping)
     retrieved_at: Optional[datetime] = None
     checksum: Optional[str] = None
     adapter: Optional[str] = None
     adapter_version: Optional[str] = None
-    raw: Mapping[str, Any] = field(default_factory=dict)
+    raw: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "query_parameters", _freeze(self.query_parameters))
@@ -195,9 +200,37 @@ class ResourceCandidate:
     uri: str
     format: Optional[str]
     media_type: Optional[str]
-    attributes: Mapping[str, Any] = field(default_factory=dict)
+    attributes: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
+        uri = cast(object, self.uri)
+        if not isinstance(uri, str) or not uri.strip():
+            raise ConfigValidationError(
+                "ResourceCandidate.uri must be a non-empty string"
+            )
+        try:
+            parsed_uri = urlsplit(uri)
+            if parsed_uri.scheme.casefold() in {"http", "https"} and (
+                not parsed_uri.hostname
+                or parsed_uri.username is not None
+                or parsed_uri.password is not None
+            ):
+                raise ConfigValidationError(
+                    "ResourceCandidate.uri must not contain embedded credentials"
+                )
+        except ValueError:
+            raise ConfigValidationError("ResourceCandidate.uri is invalid") from None
+        for name in ("format", "media_type"):
+            value = cast(object, getattr(self, name))
+            if value is not None and not isinstance(value, str):
+                raise ConfigValidationError(
+                    f"ResourceCandidate.{name} must be a string or None"
+                )
+        attributes = cast(object, self.attributes)
+        if not isinstance(attributes, Mapping):
+            raise ConfigValidationError(
+                "ResourceCandidate.attributes must be a mapping"
+            )
         object.__setattr__(self, "attributes", _freeze(self.attributes))
 
 
@@ -231,7 +264,7 @@ class AccessPlan:
 
     kind: str
     uri: str
-    options: Mapping[str, Any] = field(default_factory=dict)
+    options: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "options", _freeze(self.options))

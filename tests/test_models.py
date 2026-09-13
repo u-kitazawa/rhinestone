@@ -42,6 +42,40 @@ def test_source_definition_and_config_ids_must_be_non_empty() -> None:
         Config("", {})
 
 
+def test_resource_candidate_rejects_embedded_http_credentials() -> None:
+    with pytest.raises(ConfigValidationError, match="credentials"):
+        ResourceCandidate("https://user:password@example.jp/data.csv", "csv", None)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    (
+        ({"uri": "", "format": "csv", "media_type": None}, "non-empty"),
+        ({"uri": 1, "format": "csv", "media_type": None}, "non-empty"),
+        ({"uri": "https://[invalid", "format": "csv", "media_type": None}, "invalid"),
+        ({"uri": "https://example.jp/data", "format": 1, "media_type": None}, "format"),
+        (
+            {"uri": "https://example.jp/data", "format": "csv", "media_type": 1},
+            "media_type",
+        ),
+        (
+            {
+                "uri": "https://example.jp/data",
+                "format": "csv",
+                "media_type": None,
+                "attributes": [],
+            },
+            "attributes",
+        ),
+    ),
+)
+def test_resource_candidate_validates_public_field_shapes(
+    kwargs: Dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigValidationError, match=message):
+        ResourceCandidate(**cast(Any, kwargs))
+
+
 @pytest.mark.parametrize("limit", (-1, True, 1.5, "1"))
 def test_search_query_rejects_invalid_limits(limit: object) -> None:
     with pytest.raises(ConfigValidationError, match="limit"):

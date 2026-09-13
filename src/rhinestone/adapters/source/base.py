@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from importlib import resources
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from jsonschema import Draft202012Validator, ValidationError
 
@@ -161,6 +161,18 @@ class ProviderAdapter(ABC):
 
     @staticmethod
     def _normalize_endpoint(endpoint: str) -> str:
+        try:
+            parsed = urlsplit(endpoint)
+        except ValueError:
+            raise ConfigValidationError("endpoint must be a valid URI") from None
+        if parsed.scheme.casefold() in {"http", "https"} and (
+            not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            raise ConfigValidationError(
+                "endpoint must not contain embedded credentials"
+            )
         return endpoint.rstrip("/")
 
     @staticmethod

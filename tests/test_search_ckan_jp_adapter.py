@@ -190,3 +190,21 @@ def test_search_ckan_jp_rejects_unsuccessful_response() -> None:
 
     with pytest.raises(ProviderResponseError, match="not successful"):
         adapter.search(SearchQuery(text="archive"))
+
+
+def test_search_ckan_jp_rejects_resource_urls_with_embedded_credentials() -> None:
+    adapter = SearchCkanJpAdapter(get_json=lambda url, params: {})
+
+    with pytest.raises(ProviderResponseError, match="embedded credentials"):
+        adapter._package_results(  # pyright: ignore[reportPrivateUsage]
+            {
+                "title": "Private URL",
+                "resources": {
+                    "id": "secret-1",
+                    "url": "https://user:password@example.jp/data.csv",
+                    "format": "CSV",
+                },
+            },
+            "https://search.ckan.jp/backend/api",
+            {},
+        )

@@ -19,6 +19,7 @@ from rhinestone.adapters import (
     StacAdapter,
 )
 from rhinestone.adapters.source._knowledge import string
+from rhinestone.adapters.source._uri import has_embedded_credentials
 from rhinestone.errors import (
     ConfigValidationError,
     ProviderMetadataError,
@@ -85,6 +86,16 @@ def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
         ProbeAdapter(lambda url, params: {}).endpoint({})
     with pytest.raises(ConfigValidationError, match="id"):
         adapter.required({"id": 1}, "id")
+    with pytest.raises(ConfigValidationError, match="credentials"):
+        ProbeAdapter(lambda url, params: {}, endpoint="https://user:pass@example.test")
+    with pytest.raises(ConfigValidationError, match="valid URI"):
+        ProbeAdapter(lambda url, params: {}, endpoint="https://[invalid")
+
+
+def test_uri_credential_detection_rejects_only_http_userinfo() -> None:
+    assert has_embedded_credentials("https://user:pass@example.test/data") is True
+    assert has_embedded_credentials("file:///data/file.gml") is False
+    assert has_embedded_credentials("https://[invalid") is False
 
 
 def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> None:

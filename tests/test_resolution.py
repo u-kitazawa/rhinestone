@@ -1,4 +1,4 @@
-from typing import Tuple, cast
+from typing import Mapping, Tuple, cast
 
 import pytest
 
@@ -146,4 +146,24 @@ def test_media_type_alone_does_not_trigger_format_guessing() -> None:
     )
 
     with pytest.raises(UnsupportedAccessError):
+        Resolver().resolve(make_source(candidate))
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    (
+        {"archive": "tar"},
+        {"archive": "zip", "access_options": {"entry_point": "../outside.gml"}},
+        {"archive": "zip", "access_options": {"entry_point": "dir\\file.gml"}},
+        {"access_options": {"entry_point": "file.gml"}},
+    ),
+)
+def test_file_plan_rejects_unsupported_or_unsafe_archive_metadata(
+    attributes: Mapping[str, object],
+) -> None:
+    candidate = ResourceCandidate(
+        "https://example.jp/resource", "gml", None, attributes
+    )
+
+    with pytest.raises(UnsupportedAccessError, match="archive|entry_point"):
         Resolver().resolve(make_source(candidate))

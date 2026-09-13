@@ -118,6 +118,11 @@ Python は利用者の trust boundary 内で、`configure()` 時に明示的に�
 使います。`context.get_json()` と DestinationPolicy を使うことで、組み込み transport の
 エラー分類と通信先制限を維持できます。
 
+Resource の URI や Source endpoint に userinfo（`https://user:password@...`）を埋め込んでは
+いけません。Rhinestone はこの形式を検証時に拒否します。File の `archive` は `zip` のみを
+扱い、`entry_point` を指定する場合は安全な相対 archive path として
+`AccessPlan.options` に保持してください。
+
 ## Search を追加する
 
 `search(query)` は任意の機能です。実装する場合は、Adapter に対応条件を宣言します。
