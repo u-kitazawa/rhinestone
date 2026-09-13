@@ -167,9 +167,12 @@ class StaticMunicipalityAdapter:
         ]
         name_matches = list(self._by_name.get(raw, ()))
         matches: list[MunicipalityIdentity] = []
+        match_keys: set[tuple[str, str, str, str, str]] = set()
         for record in (*code_matches, *name_matches):
-            if record.identity not in matches:
+            identity_key = _canonical_identity_key(record.identity)
+            if identity_key not in match_keys:
                 matches.append(record.identity)
+                match_keys.add(identity_key)
         if len(matches) > 1:
             raise KnowledgeResolutionError(
                 "municipality is ambiguous; provide an unambiguous code or name"

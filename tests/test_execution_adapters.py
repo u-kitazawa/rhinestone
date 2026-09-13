@@ -109,6 +109,17 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
     assert GdalAdapter().supports(resource, frozenset({"gdal"})) is True
 
 
+def test_gdal_translates_uppercase_https_remote_zip() -> None:
+    resource = make_resource(
+        "HTTPS://files.example/rivers.zip", "shapefile", {"archive": "zip"}
+    )
+    runtime = FakeGdal()
+
+    GdalAdapter().open(resource, runtime)
+
+    assert runtime.calls == [("/vsizip//vsicurl/HTTPS://files.example/rivers.zip", ())]
+
+
 def test_gdal_exposes_tile_xml_translation() -> None:
     xml = GdalAdapter.tile_xml(
         {"url": "https://tiles.example/{z}/{x}/{y}.png", "min_zoom": 2, "max_zoom": 5}

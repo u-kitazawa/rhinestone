@@ -176,21 +176,18 @@ class EstatGisAdapter(ProviderAdapter):
             candidate_settings["entry_point"] = entry_point(
                 {"archive": archive, "entry_point": item.get("entry_point")}
             )
-        attributes = dict(item)
-        attributes.update(
-            {
-                "access_kind": "file",
-                "archive": archive,
-                "access_options": candidate_settings,
-                "knowledge": knowledge,
-                "dataset_identity": {
-                    "dataset_id": item["dataset_id"],
-                    "boundary_kind": item["boundary_kind"],
-                    "survey_year": item["survey_year"],
-                    "level": item["level"],
-                },
-            }
-        )
+        attributes = {
+            "access_kind": "file",
+            "archive": archive,
+            "access_options": candidate_settings,
+            "knowledge": knowledge,
+            "dataset_identity": {
+                "dataset_id": item["dataset_id"],
+                "boundary_kind": item["boundary_kind"],
+                "survey_year": item["survey_year"],
+                "level": item["level"],
+            },
+        }
         return ResourceCandidate(
             uri=cast(str, item["uri"]),
             format=cast(str, item["format"]),

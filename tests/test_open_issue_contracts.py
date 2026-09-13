@@ -254,6 +254,7 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
             "media_type": "application/gml+xml",
             "uri": "https://www.e-stat.go.jp/gis/download/census-2020.gml",
             "title": "国勢調査 2020 小地域 東京都",
+            "matches_config": False,
         },
         {
             "distribution_id": "census-2020-small-area-tokyo-shp",
@@ -291,12 +292,16 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
     assert resource.access_plan.kind == "file"
     assert resource.provenance.adapter == "estat-gis"
     assert resource.source.raw_metadata["distribution_index"][0]["format"] == "GML"
+    assert (
+        resource.source.raw_metadata["distribution_index"][0]["matches_config"] is False
+    )
     assert resource.source.metadata.raw["distribution_index"][0]["format"] == "GML"
     assert resource.provenance.raw["distribution"]["format"] == "GML"
     assert (
         resource.source.candidates[0].attributes["dataset_identity"]["dataset_id"]
         == "census-2020"
     )
+    assert "matches_config" not in resource.source.candidates[0].attributes
 
     with pytest.raises(AmbiguousResourceError, match="exactly one"):
         app.resolve(Config("estat", {"dataset_id": "census-2020"}))
@@ -497,4 +502,5 @@ def test_municipality_projection_checks_all_canonical_matching_records() -> None
         ),
         snapshot_version="v1",
     )
+    assert snapshot.resolve_municipality("千代田区").code == "13101"
     assert snapshot.project(identity, "second") == "second-13101"
