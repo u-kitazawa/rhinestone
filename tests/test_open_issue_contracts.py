@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any, Mapping, Optional, cast
 
 import pytest
 
@@ -642,10 +642,12 @@ def test_custom_source_receives_one_core_managed_transport_port(
     import rhinestone._http as http
     from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
 
-    calls: list[tuple[str, object]] = []
+    calls: list[tuple[str, object, object]] = []
 
-    def get_json(url: str, params: object) -> dict[str, object]:
-        calls.append((url, params))
+    def get_json(
+        url: str, params: object, headers: Optional[Mapping[str, str]] = None
+    ) -> dict[str, object]:
+        calls.append((url, params, headers))
         return {"ok": True}
 
     monkeypatch.setattr(http, "get_json", get_json)
@@ -655,6 +657,12 @@ def test_custom_source_receives_one_core_managed_transport_port(
         assert not hasattr(context, "get_json")
         assert not hasattr(context, "get_text")
         context.transport.get_json("https://custom.example/data", {})
+        context.transport.get_json(
+            "https://custom.example/data",
+            {},
+            {"Authorization": "secret"},
+            credential="custom-key",
+        )
 
         class Adapter:
             def load(self, config: Config) -> Any:
@@ -680,7 +688,10 @@ def test_custom_source_receives_one_core_managed_transport_port(
         ),
         adapters=(SourceAdapterDefinition("custom-source", factory),),
     )
-    assert calls == [("https://custom.example/data", {})]
+    assert calls[0] == ("https://custom.example/data", {}, None)
+    assert calls[1][0:2] == ("https://custom.example/data", {})
+    assert calls[1][2] == {"Authorization": "secret"}
+    assert getattr(calls[1][2], "_rhinestone_no_redirects") is True
 
 
 def test_custom_transport_preserves_text_headers_and_normalizes_network_errors(

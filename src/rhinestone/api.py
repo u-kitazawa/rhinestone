@@ -148,10 +148,13 @@ class _SourceTransport:
     ) -> Any:
         logical_credential = self._credential if credential is None else credential
         self._authorize(url, headers, logical_credential)
+        request_headers = headers
+        if headers is not None and (logical_credential is not None or headers):
+            request_headers = _NoRedirectHeaders(headers)
         try:
-            if headers is None:
+            if request_headers is None:
                 return _http.get_json(url, params)
-            return _http.get_json(url, params, headers)
+            return _http.get_json(url, params, request_headers)
         except OSError as error:
             raise ProviderMetadataError(
                 f"Provider metadata request failed for {url!r}"
@@ -188,6 +191,12 @@ class _SourceTransport:
             service=self._service,
             credential=credential,
         )
+
+
+class _NoRedirectHeaders(dict[str, str]):
+    """Mark custom transport headers as unsafe to forward across redirects."""
+
+    _rhinestone_no_redirects = True
 
 
 def _source_transport(
