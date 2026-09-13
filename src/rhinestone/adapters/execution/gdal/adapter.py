@@ -1,6 +1,7 @@
 """Built-in adapters that delegate selected Resources to user-owned runtimes."""
 
 from typing import Any, FrozenSet, List, Mapping, cast
+from urllib.parse import urlparse
 
 from ....errors import ResourceAccessError
 from ....models import FileAccessPlan, Resource
@@ -16,7 +17,7 @@ class GdalAdapter(ExecutionAdapter):
     name = "gdal"
     priority = 20
     _formats = frozenset(
-        {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "citygml"}
+        {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "kml", "citygml"}
     )
 
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
@@ -85,7 +86,7 @@ class GdalAdapter(ExecutionAdapter):
         if archive == "zip":
             uri = (
                 "/vsizip//vsicurl/" + uri
-                if uri.startswith(("http://", "https://"))
+                if urlparse(uri).scheme.casefold() in {"http", "https"}
                 else "/vsizip/" + uri
             )
             member = resource.access_plan.options.get("entry_point")

@@ -4,6 +4,7 @@ from .base import JsonGetter, JsonObject, ProviderAdapter
 from .ckan import CkanAdapter
 from .dcat import DcatAdapter
 from .direct import DirectAdapter
+from .estat_gis import EstatGisAdapter
 from .gsi_fundamental import GsiFundamentalAdapter
 from .odpt import OdptAdapter
 from .ogc import OgcFeaturesAdapter
@@ -15,6 +16,7 @@ from .static import StaticAdapter
 __all__ = [
     "CkanAdapter",
     "DirectAdapter",
+    "EstatGisAdapter",
     "DcatAdapter",
     "GsiFundamentalAdapter",
     "JsonGetter",

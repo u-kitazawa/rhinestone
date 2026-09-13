@@ -22,7 +22,7 @@
 | V05-04 | discovery source と resolution target の分離 | `Implemented` | `Result.discovered_by` と `Result.target`、`Rhinestone.resolve(Result)`、[DiscoveryとResolution](discovery-resolution.md)、`tests/test_public_api.py::test_discovery_result_resolves_through_a_different_target_source` | 両SourceのMetadata / Provenance保持はV05-09bで別管理する |
 | V05-05 | federated search、capability projection、diagnostics | `Implemented` | `SearchCoordinator`、`SearchDiagnostic`、[データを検索する](search.md)、`tests/test_search.py` | Provider横断sequenceは非ranking。共通rerankerは導入しない |
 | V05-06 | source-scoped search の専用公開API | `Deferred` | 結果は `SearchResults["source-id"]` でProvider別に参照可能だが、検索実行を1 Sourceへ限定する公開引数はない | 特定Providerだけの実行が、Catalogを絞る現行手段では不十分な具体例とAPI形状が確定した時に再評価する |
-| V05-07 | Identity / Time / Space の日本横断Knowledge Layer | `Deferred` | 責務境界はIssue #49、実装は#50、#51、#52で管理 | #49の最小契約確定後、同じ知識を少なくとも2 Providerで再利用できることを条件に実装する |
+| V05-07 | Identity / Time / Space の日本横断Knowledge Layer | `Implemented` | `KnowledgeAdapter` の公開境界、snapshot-backed Identity、Time semantics、明示的な Space value、`tests/test_knowledge.py`、`tests/test_open_issue_contracts.py` | Provider projection の追加は同じ canonical value が2 Provider以上で必要になった場合だけ行う |
 | V05-08 | Representation knowledge（encoding、archive、配布形式） | `Implemented` | `ResourceCandidate.attributes`、`AccessPlan.options`、GDAL/pyogrio Adapter、[対応状況](compatibility.md)、`tests/test_execution_adapters.py`、`tests/test_resolution.py` | 新しい共通抽象は、同じ知識が2 Provider以上で重複した場合だけ検討する |
 | V05-09a | 単一Source内でMetadata / ProvenanceをURLへ縮退させず保持 | `Implemented` | `Metadata`、`Provenance`、`Source`、`Resource`、[DiscoveryとResolution](discovery-resolution.md)、`tests/test_models.py` | 現行のモデル契約を維持する |
 | V05-09b | discovery sourceとresolution target双方のMetadata / Provenanceを保持 | `Deferred` | 現行の`Rhinestone.resolve(Result)`は横断Source解決時にdiscovery側の記録でtarget側の記録を上書きする。既存のcross-source回帰テストはtargetが追加記録を持たないため、この損失を検出しない | 両記録を表現するモデルと公開API、競合時の優先規則、cross-provider fixtureを確定してから実装する |
@@ -37,7 +37,7 @@
 | V05-18 | Direct Resourceは補助経路であり中心価値ではない | `Implemented` | `DirectAdapter`、[Resourceを解決して開く](resolve-and-open.md)、`tests/test_direct_adapter.py` | 最終URIとreaderが既知なら専門Runtimeの直接利用を妨げない |
 | V05-19 | AI / MCP / GIS integration | `Deferred` | Coreにはintegration framework、巨大native object転送、GIS解析を実装していない | portable consumerと具体的なintegration要件が確定した時にCore外の連携として再評価する |
 | V05-20 | Fail Rather Than Guess とdomain error policy | `Implemented` | `errors.py`、Adapter/Resolverの明示検証、`tests/test_errors.py`、`tests/test_provider_edge_cases.py` | 新しい推測規則を追加せず、公式仕様または決定的metadataを根拠にする |
-| V05-21 | 外部自作Adapterの登録・公開SDK契約 | `Deferred` | 組み込みAdapterの内部登録経路はあるが、public `configure()`から任意Adapterを登録するAPIはない | Issue #85で実利用例、互換性責任、名前衝突、security boundaryを確定してから公開を再評価する |
+| V05-21 | 外部自作Adapterの登録・公開SDK契約 | `Implemented` | `configure(adapters=...)`、公開 Definition / Context / Port、重複 fail-fast、`tests/test_source_composition.py`、`tests/test_open_issue_contracts.py` | transport の named port と conformance evidence は #85 の後続作業として追加する |
 | V05-22 | No Scraping、No Central Index、No Transformation Pipeline | `Implemented` | 組み込みHTTP/公式API/静的Catalogをupstreamとし、`open()`後の解析は専門Runtimeへ委譲。[ホーム](index.md)、[DiscoveryとResolution](discovery-resolution.md) | HTML scrapingやGIS解析をCoreへ追加しない |
 | V05-23 | 複数SourceでURL passthrough以上のresolution価値を検証 | `Implemented` | [DiscoveryとResolution](discovery-resolution.md)でCKAN、横断CKAN、STAC、PLATEAU、GSIを比較し、fixtureベースのvertical sliceを保持 | 新Sourceも同じ基準でprovider-specific codeを実質的に減らせるか評価する |
 
@@ -53,10 +53,10 @@
 
 この一覧から見た未完了ゲートは次のとおりです。
 
-1. V05-07: #49の契約確定と、#50/#51の実装。#52は完了または明示的なDeferred判断。
+1. V05-07: #49の契約確定と、#50/#51/#52の実装を完了する。
 2. V05-16: #55のe-Stat統計GIS方針と実装を、削除済み統計表APIと分離して完了する。
 3. V05-09b: discovery sourceとresolution target双方の記録を表現する契約を確定し、cross-provider fixtureで保持を検証する。
 4. V05-15: #93/#94/#96/#98/#99でrelease時のsecurity保証範囲を実装・文書化する。
-5. V05-06、V05-13、V05-19、V05-21は再評価条件が成立するまでDeferredとして扱い、暗黙の実装残件に戻さない。
+5. V05-06、V05-13、V05-19は再評価条件が成立するまでDeferredとして扱い、暗黙の実装残件に戻さない。V05-21は公開 SDK closure を満たしたが、transport port の名称統一は #85 の後続作業とする。
 
 状態を変更する場合は、同じ変更で根拠となる実装、テスト、公開ドキュメント、関連Issueを更新します。

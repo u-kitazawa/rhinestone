@@ -79,9 +79,9 @@ Source factory には `SourceAdapterContext` が渡されます。
 | --- | --- |
 | `get_json(url, params, headers=None)` | 組み込み HTTP JSON transport |
 | `get_text(url)` | 組み込み HTTP text transport |
-| `credentials` | 論理名から Credential を取得する Registry |
-| `dependencies` | Definition が宣言した Source Runtime の Registry |
-| `knowledge` | Identity / Time などの共有 Knowledge Adapter Registry |
+| `credentials` | 論理名から Credential を取得する読み取り専用 Port |
+| `dependencies` | Definition が宣言した Source Runtime を取得する読み取り専用 Port |
+| `knowledge` | Identity / Time などを解決する読み取り専用 Knowledge Port |
 | `destination_policy` | 通信先を認可する Policy |
 | `provider_id` | 現在構成している `Provider.id` |
 
@@ -109,9 +109,19 @@ Runtime Factory は `configure()` 時には評価されず、Adapter が
 `context.dependencies.get("rdflib")` を呼んだ時に初めて評価されます。Runtime 実体と
 Credential secret は `Provider`、`Config`、`Source`、`Resource` に保存しません。
 
+外部 Adapter の安定した拡張境界は `rhinestone.adapters.contracts` の Definition と
+Context、および `rhinestone.adapters.ports` の Port です。内部 Registry の storage、
+process-global な登録、package 自動発見には依存しないでください。任意の third-party
+Python は利用者の trust boundary 内で、`configure()` 時に明示的に合成します。
+
 認証付き HTTP は secret を自前の header に埋め込まず、`context.credentials.get(name)` を
 使います。`context.get_json()` と DestinationPolicy を使うことで、組み込み transport の
 エラー分類と通信先制限を維持できます。
+
+Resource の URI や Source endpoint に userinfo（`https://user:password@...`）を埋め込んでは
+いけません。Rhinestone はこの形式を検証時に拒否します。File の `archive` は `zip` のみを
+扱い、`entry_point` を指定する場合は安全な相対 archive path として
+`AccessPlan.options` に保持してください。
 
 ## Search を追加する
 

@@ -42,6 +42,61 @@ def test_source_definition_and_config_ids_must_be_non_empty() -> None:
         Config("", {})
 
 
+def test_resource_candidate_rejects_embedded_http_credentials() -> None:
+    with pytest.raises(ConfigValidationError, match="credentials"):
+        ResourceCandidate("https://user:password@example.jp/data.csv", "csv", None)
+
+
+@pytest.mark.parametrize(
+    "uri",
+    (
+        "https://exa mple/data.csv",
+        "https://%ZZ/data.csv",
+        "https://-bad.example/data.csv",
+        "https://bad_name.example/data.csv",
+        "https://[gggg::1]/data.csv",
+    ),
+)
+def test_resource_candidate_rejects_malformed_http_hostnames(uri: str) -> None:
+    with pytest.raises(ConfigValidationError, match="authority"):
+        ResourceCandidate(uri, "csv", None)
+
+
+def test_resource_candidate_accepts_valid_ipv6_http_authority() -> None:
+    candidate = ResourceCandidate("https://[2001:db8::1]/data.csv", "csv", None)
+
+    assert candidate.uri == "https://[2001:db8::1]/data.csv"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    (
+        ({"uri": "", "format": "csv", "media_type": None}, "non-empty"),
+        ({"uri": 1, "format": "csv", "media_type": None}, "non-empty"),
+        ({"uri": "https://[invalid", "format": "csv", "media_type": None}, "invalid"),
+        ({"uri": "https://example.jp/data", "format": 1, "media_type": None}, "format"),
+        (
+            {"uri": "https://example.jp/data", "format": "csv", "media_type": 1},
+            "media_type",
+        ),
+        (
+            {
+                "uri": "https://example.jp/data",
+                "format": "csv",
+                "media_type": None,
+                "attributes": [],
+            },
+            "attributes",
+        ),
+    ),
+)
+def test_resource_candidate_validates_public_field_shapes(
+    kwargs: Dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigValidationError, match=message):
+        ResourceCandidate(**cast(Any, kwargs))
+
+
 @pytest.mark.parametrize("limit", (-1, True, 1.5, "1"))
 def test_search_query_rejects_invalid_limits(limit: object) -> None:
     with pytest.raises(ConfigValidationError, match="limit"):

@@ -1,5 +1,6 @@
 """Deterministic conversion from Source candidates to Resource access plans."""
 
+from pathlib import PurePosixPath
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, cast
 
 from .errors import (
@@ -94,10 +95,7 @@ class Resolver:
         if normalized in {"wms", "wfs", "api", "ogc-api-features"}:
             return ServiceQueryPlan(uri=candidate.uri)
         if normalized:
-            archive = candidate.attributes.get("archive")
-            if archive is None and normalized in {"shapefile-zip", "zip"}:
-                archive = "zip"
-            return FileAccessPlan(uri=candidate.uri, archive=archive)
+            return self._make_plan("file", candidate)
         raise UnsupportedAccessError(
             f"No access plan supports media type {candidate.media_type!r}; "
             "provide a known format or explicit access_kind"
@@ -113,9 +111,37 @@ class Resolver:
             )
         options = cast(Mapping[str, Any], options)
         if kind == "file":
+            archive = candidate.attributes.get("archive")
+            if archive is None and (candidate.format or "").lower() in {
+                "shapefile-zip",
+                "zip",
+            }:
+                archive = "zip"
+            if archive not in (None, "zip"):
+                raise UnsupportedAccessError(
+                    "Only archive='zip' is supported; provide an explicit ZIP "
+                    "access plan"
+                )
+            entry_point = options.get("entry_point")
+            if entry_point is not None:
+                if archive != "zip" or not isinstance(entry_point, str):
+                    raise UnsupportedAccessError(
+                        "entry_point requires archive='zip' and a string path"
+                    )
+                path = PurePosixPath(entry_point)
+                if (
+                    not entry_point.strip()
+                    or not path.parts
+                    or path.is_absolute()
+                    or ".." in path.parts
+                    or "\\" in entry_point
+                ):
+                    raise UnsupportedAccessError(
+                        "entry_point must be a safe relative archive path"
+                    )
             return FileAccessPlan(
                 uri=candidate.uri,
-                archive=candidate.attributes.get("archive"),
+                archive=archive,
                 options=options,
             )
         if kind == "remote-dataset":

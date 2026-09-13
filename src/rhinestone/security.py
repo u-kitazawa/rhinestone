@@ -5,6 +5,7 @@ from posixpath import normpath
 from typing import Any, Iterable, Literal, Mapping, Optional, Tuple, cast
 from urllib.parse import unquote, urlsplit
 
+from ._uri import is_valid_http_authority
 from .errors import ConfigValidationError, DestinationNotAllowedError
 from .models import Provider
 
@@ -33,7 +34,7 @@ class DestinationRule:
             return None
         if parsed.username is not None or parsed.password is not None:
             return None
-        if not hostname:
+        if not hostname or not is_valid_http_authority(url):
             return None
         default_port = 443 if parsed.scheme.lower() == "https" else 80
         return cls(

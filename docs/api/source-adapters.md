@@ -15,6 +15,7 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 | --- | --- | --- |
 | [Direct](adapters/direct.md) | `direct` | 利用者が明示するResource |
 | [Static](adapters/static.md) | `static` | リポジトリまたは利用者が管理する静的定義 |
+| [e-Stat Statistics GIS](adapters/estat-gis.md) | `estat-gis` | 利用者が管理する明示的な配布物インデックス |
 | [CKAN](adapters/ckan.md) | `ckan` | CKAN Action API |
 | [DCAT](adapters/dcat.md) | `dcat` | DCAT RDF catalog |
 | [基盤地図情報](adapters/gsi-fundamental.md) | `gsi-fundamental` | 基盤地図情報のローカルGML |
@@ -26,7 +27,7 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 Source Adapter は `SourceAdapterDefinition` として明示登録できます。Definition は
 `adapter_type` と `(provider, context) -> adapter` factory から構成され、同じ Definition を
 異なる source id へ複数割り当てられます。Adapter は `load(config) -> Source` を実装し、
-`search(query)` は任意です。Context には組み込み transport、Credential、Runtime、
-DestinationPolicy、共有Knowledge Adapterを取得する`knowledge` Registryが含まれます。
+`search(query)` は任意です。Context には組み込み transport、読み取り専用の Credential /
+Runtime Port、DestinationPolicy、共有Knowledge Adapterを取得する`knowledge` Portが含まれます。
 
 内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。

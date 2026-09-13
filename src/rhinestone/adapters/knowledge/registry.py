@@ -5,9 +5,11 @@ from typing import Dict, Iterable, Optional, Tuple, cast
 
 from ...errors import (
     AdapterRegistrationError,
+    DependencyUnavailableError,
     KnowledgeAdapterUnavailableError,
     KnowledgeResolutionError,
 )
+from ..ports import DependencyPort
 from .base import (
     IdentityKnowledgeAdapter,
     KnowledgeAdapter,
@@ -17,6 +19,25 @@ from .base import (
     TimeKnowledgeAdapter,
 )
 from .models import MunicipalityIdentity, TimeKind, TimeSemantic
+
+
+class _ScopedDependencyPort:
+    """Restrict a public dependency port without requiring registry methods."""
+
+    def __init__(self, dependencies: DependencyPort, names: Iterable[str]) -> None:
+        self._dependencies = dependencies
+        self._names = frozenset(names)
+
+    @property
+    def available(self) -> frozenset[str]:
+        return frozenset(self._names.intersection(self._dependencies.available))
+
+    def get(self, name: str) -> object:
+        if name not in self._names:
+            raise DependencyUnavailableError(
+                f"Runtime dependency {name!r} is not declared for this adapter"
+            )
+        return self._dependencies.get(name)
 
 
 class KnowledgeAdapterRegistry:
@@ -110,7 +131,9 @@ class KnowledgeAdapterRegistry:
             )
         context = replace(
             self._context,
-            dependencies=self._context.dependencies.scoped(definition.dependencies),
+            dependencies=_ScopedDependencyPort(
+                self._context.dependencies, definition.dependencies
+            ),
         )
         try:
             adapter = definition.factory(context)

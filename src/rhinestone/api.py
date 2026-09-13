@@ -38,6 +38,7 @@ from .adapters.source import (
     CkanAdapter,
     DcatAdapter,
     DirectAdapter,
+    EstatGisAdapter,
     GsiFundamentalAdapter,
     OdptAdapter,
     OgcFeaturesAdapter,
@@ -505,6 +506,17 @@ def _build_builtin_source_adapter(
     if adapter_type == "gsi-fundamental":
         _reject_options(adapter_type, settings, ())
         return GsiFundamentalAdapter(knowledge=knowledge)
+    if adapter_type == "estat-gis":
+        _reject_options(adapter_type, settings, ("distributions",))
+        distributions = settings.get("distributions")
+        if not isinstance(distributions, (list, tuple)):
+            raise ConfigValidationError(
+                "estat-gis source requires distributions: provide an explicit "
+                "machine-readable distribution index"
+            )
+        return EstatGisAdapter(
+            cast(Iterable[Mapping[str, Any]], distributions), knowledge=knowledge
+        )
     if adapter_type == "dcat":
         _reject_options(adapter_type, settings, ("catalog_uri", "serialization"))
 
@@ -583,10 +595,10 @@ def _source_definitions(
             adapter_type,
             lambda provider, context: _build_builtin_source_adapter(
                 provider,
-                context.dependencies,
-                context.credentials,
+                cast(DependencyRegistry, context.dependencies),
+                cast(CredentialRegistry, context.credentials),
                 context.destination_policy,
-                context.knowledge,
+                cast(KnowledgeAdapterRegistry, context.knowledge),
             ),
             dependencies=(
                 frozenset({"rdflib"}) if adapter_type == "dcat" else frozenset()
@@ -609,6 +621,7 @@ def _source_definitions(
                 "gsi-fundamental",
                 "dcat",
                 "odpt",
+                "estat-gis",
             )
         },
     }
@@ -673,7 +686,7 @@ def _execution_definitions(
             lambda context: JsonServiceAdapter(
                 OdptAdapter.prepare_request,
                 "odpt",
-                credentials=context.credentials,
+                credentials=cast(CredentialRegistry, context.credentials),
                 destination_policy=context.destination_policy,
             ),
         ),

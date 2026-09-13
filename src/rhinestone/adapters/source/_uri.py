@@ -18,3 +18,14 @@ def append_path_segment(uri: str, segment: str) -> str:
     )
     path = f"{components.path.rstrip('/')}/{encoded}"
     return urlunsplit(components._replace(path=path))
+
+
+def has_embedded_credentials(uri: str) -> bool:
+    """Return whether an HTTP(S) URI contains userinfo credentials."""
+    try:
+        parsed = urlsplit(uri)
+    except ValueError:
+        return False
+    return parsed.scheme.casefold() in {"http", "https"} and (
+        parsed.username is not None or parsed.password is not None
+    )

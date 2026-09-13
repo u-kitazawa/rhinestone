@@ -9,6 +9,7 @@ from ....errors import (
 )
 from ....models import Config, Metadata, Provenance, SearchQuery, SearchResult, Source
 from ....security import DestinationPolicy
+from .._uri import has_embedded_credentials
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
@@ -84,6 +85,10 @@ class SearchCkanJpAdapter(ProviderAdapter):
             format_name = resource_format(resource)
             if resource_id is None or uri is None or format_name is None:
                 continue
+            if has_embedded_credentials(uri):
+                raise ProviderResponseError(
+                    "search.ckan.jp resource URL must not contain embedded credentials"
+                )
             metadata = Metadata(
                 title=title,
                 description=description,

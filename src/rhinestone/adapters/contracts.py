@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, FrozenSet, Protocol, Tuple
 
 from ..models import Config, Provider, Resource, Result, Source
-from ..registry import CredentialRegistry, DependencyRegistry
 from ..security import DestinationPolicy
-from .knowledge import KnowledgeAdapterDefinition, KnowledgeAdapterRegistry
+from .knowledge.base import KnowledgeAdapterDefinition, KnowledgePort
+from .ports import CredentialPort, DependencyPort, TransportPort
 
 
 class SourceAdapter(Protocol):
@@ -57,11 +57,11 @@ class SourceAdapterContext:
 
     get_json: Callable[..., Any]
     get_text: Callable[[str], str]
-    credentials: CredentialRegistry
-    dependencies: DependencyRegistry
+    credentials: CredentialPort
+    dependencies: DependencyPort
     destination_policy: DestinationPolicy
     provider_id: str
-    knowledge: KnowledgeAdapterRegistry
+    knowledge: KnowledgePort
 
 
 @dataclass(frozen=True)
@@ -73,8 +73,8 @@ class ExecutionAdapterContext:
     the Resolver and execution selector.
     """
 
-    credentials: CredentialRegistry
-    dependencies: DependencyRegistry
+    credentials: CredentialPort
+    dependencies: DependencyPort
     destination_policy: DestinationPolicy
 
 
@@ -93,7 +93,7 @@ class SourceAdapterDefinition:
 
     adapter_type: str
     factory: SourceAdapterFactory
-    dependencies: FrozenSet[str] = field(default_factory=frozenset)
+    dependencies: FrozenSet[str] = field(default_factory=lambda: frozenset[str]())
 
     def __post_init__(self) -> None:
         if not self.adapter_type.strip():
@@ -128,6 +128,8 @@ AdapterDefinition = (
 
 __all__ = [
     "AdapterDefinition",
+    "CredentialPort",
+    "DependencyPort",
     "ExecutionAdapter",
     "ExecutionAdapterContext",
     "ExecutionAdapterDefinition",
@@ -137,4 +139,5 @@ __all__ = [
     "SourceAdapterContext",
     "SourceAdapterDefinition",
     "SourceAdapterFactory",
+    "TransportPort",
 ]

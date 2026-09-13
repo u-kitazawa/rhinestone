@@ -11,6 +11,10 @@ TimeKind = Literal["calendar_year", "fiscal_year", "survey_year", "as_of_date"]
 MunicipalityLevel = Literal["prefecture", "municipality"]
 
 
+def _empty_provider_identifiers() -> Mapping[str, str]:
+    return {}
+
+
 @dataclass(frozen=True)
 class MunicipalityIdentity:
     """A canonical municipality identity independent of provider identifiers.
@@ -24,7 +28,9 @@ class MunicipalityIdentity:
     prefecture_code: str
     prefecture_name: str
     level: MunicipalityLevel = "municipality"
-    provider_identifiers: Mapping[str, str] = field(default_factory=dict)
+    provider_identifiers: Mapping[str, str] = field(
+        default_factory=_empty_provider_identifiers
+    )
 
     def __post_init__(self) -> None:
         for field_name in (

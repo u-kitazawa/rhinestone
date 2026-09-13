@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 from jsonschema import Draft202012Validator, ValidationError
 
+from ..._uri import is_valid_http_authority
 from ...errors import (
     ConfigValidationError,
     ProviderMetadataError,
@@ -161,6 +162,11 @@ class ProviderAdapter(ABC):
 
     @staticmethod
     def _normalize_endpoint(endpoint: str) -> str:
+        if not is_valid_http_authority(endpoint):
+            raise ConfigValidationError(
+                "endpoint must be a valid URI with a valid HTTP(S) authority and "
+                "without embedded credentials"
+            )
         return endpoint.rstrip("/")
 
     @staticmethod

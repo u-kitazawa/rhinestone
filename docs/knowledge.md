@@ -1,7 +1,7 @@
 # Knowledge Adapter（共有知識アダプター）
 
 Rhinestoneの共有知識は、Source Adapterに直接埋め込まず、独立したKnowledge Adapterとして
-注入できます。現在の対象は自治体 identity と time semantics です。
+注入できます。現在の対象は自治体 identity、time semantics、明示的な space value です。
 
 ```text
 Source Adapter -> KnowledgeAdapterRegistry -> Identity / Time Adapter
@@ -36,6 +36,19 @@ app = configure(
 Identity Adapterは、明示された名称またはコードを`MunicipalityIdentity`へ解決します。
 Provider固有のidentifierはcanonical codeとは別に保持してください。unknown、ambiguous、
 不正な入力を推測で解決してはいけません。
+
+`StaticMunicipalityAdapter` は、利用者が供給する一つの immutable snapshot を厳密に
+参照します。`MunicipalityIdentity`（行政上の identity）、`AreaCode`（コード体系と値）、
+Provider projection は分離され、snapshot の `snapshot_version` は evidence として保持されます。
+同名は ambiguous、辞書にない値は unknown、形式不正なコードは invalid として失敗します。
+
+## 空間値（Space）
+
+`BoundingBox` は axis order、範囲、明示的な `CRSRef` を持つ値オブジェクトです。既定値の
+`CRS84` は shorthand であり、core は CRS の検証・変換や antimeridian の推測を行いません。
+`MeshCode` は system、level、code の identity だけを保持し、geometry を導出しません。
+非 `CRS84` の値を扱えるかは各 Provider の capability と projection に委ねられ、未対応なら
+`unsupported` として閉じます。
 
 ## 時間の意味（Time）
 

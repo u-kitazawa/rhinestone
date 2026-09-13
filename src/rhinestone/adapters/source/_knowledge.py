@@ -23,7 +23,7 @@ def entry_point(settings: Mapping[str, Any]) -> Optional[str]:
         return None
     value = string(settings, "entry_point")
     path = PurePosixPath(value)
-    if path.is_absolute() or ".." in path.parts or "\\" in value:
+    if not path.parts or path.is_absolute() or ".." in path.parts or "\\" in value:
         raise ConfigValidationError("entry_point must be a relative archive path")
     return value
 

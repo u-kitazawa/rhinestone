@@ -52,6 +52,8 @@ def test_destination_rule_uses_url_boundaries() -> None:
         "https:///missing-host",
         "https://catalog.example:not-a-port/data",
         "https://user:pass@catalog.example/data",
+        "https://exa mple/data",
+        "https://%ZZ/data",
     ),
 )
 def test_destination_rule_rejects_non_http_or_ambiguous_urls(url: str) -> None:
