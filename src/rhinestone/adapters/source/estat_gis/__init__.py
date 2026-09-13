@@ -71,7 +71,9 @@ class EstatGisAdapter(ProviderAdapter):
     ) -> None:
         super().__init__(get_json=lambda url, params: None)
         self._knowledge = knowledge or KnowledgeAdapterRegistry()
-        self._distributions = self._validate_distributions(distributions)
+        self._raw_distributions, self._distributions = self._validate_distributions(
+            distributions
+        )
 
     def load(self, config: Config) -> Source:
         """Resolve one distribution using explicit selectors only."""
@@ -97,7 +99,8 @@ class EstatGisAdapter(ProviderAdapter):
             )
         candidates = tuple(self._candidate(item, knowledge) for item in matches)
         first = matches[0]
-        raw = {"distribution_index": self._distributions}
+        raw_first = self._raw_distribution(first)
+        raw = {"distribution_index": self._raw_distributions}
         return Source(
             metadata=Metadata(
                 title=cast(str, first["title"]),
@@ -115,7 +118,7 @@ class EstatGisAdapter(ProviderAdapter):
                 ),
                 query_parameters=dict(settings),
                 adapter=self.adapter_type,
-                raw={"distribution": first, "knowledge": knowledge},
+                raw={"distribution": raw_first, "knowledge": knowledge},
             ),
             raw_metadata=raw,
         )
@@ -137,6 +140,7 @@ class EstatGisAdapter(ProviderAdapter):
             if needle and needle not in haystack:
                 continue
             distribution_id = cast(str, item["distribution_id"])
+            raw_item = self._raw_distribution(item)
             results.append(
                 SearchResult(
                     title=cast(str, item["title"]),
@@ -149,14 +153,14 @@ class EstatGisAdapter(ProviderAdapter):
                         title=cast(str, item["title"]),
                         description=cast(Optional[str], item.get("description")),
                         publisher="e-Stat Statistics GIS",
-                        raw=item,
+                        raw=raw_item,
                     ),
                     provenance=Provenance(
                         provider=self.adapter_type,
                         dataset_identifier=cast(str, item["dataset_id"]),
                         resource_identifier=distribution_id,
                         adapter=self.adapter_type,
-                        raw=item,
+                        raw=raw_item,
                     ),
                 )
             )
@@ -193,6 +197,14 @@ class EstatGisAdapter(ProviderAdapter):
             attributes=attributes,
         )
 
+    def _raw_distribution(self, item: Mapping[str, Any]) -> Mapping[str, Any]:
+        distribution_id = cast(str, item["distribution_id"])
+        return next(
+            raw
+            for raw in self._raw_distributions
+            if raw["distribution_id"] == distribution_id
+        )
+
     @staticmethod
     def _matches(
         item: Mapping[str, Any],
@@ -224,7 +236,7 @@ class EstatGisAdapter(ProviderAdapter):
     @classmethod
     def _validate_distributions(
         cls, distributions: Iterable[Mapping[str, Any]]
-    ) -> Tuple[Mapping[str, Any], ...]:
+    ) -> Tuple[Tuple[Mapping[str, Any], ...], Tuple[Mapping[str, Any], ...]]:
         try:
             values = tuple(distributions)
         except TypeError:
@@ -234,6 +246,7 @@ class EstatGisAdapter(ProviderAdapter):
         if not values:
             raise ConfigValidationError("estat-gis distributions must not be empty")
         identifiers: set[str] = set()
+        raw_result: List[Mapping[str, Any]] = []
         result: List[Mapping[str, Any]] = []
         for raw in values:
             if not isinstance(cast(object, raw), Mapping):
@@ -241,6 +254,7 @@ class EstatGisAdapter(ProviderAdapter):
                     "each estat-gis distribution must be an object"
                 )
             item = dict(raw)
+            raw_result.append(dict(item))
             for field in (
                 "distribution_id",
                 "dataset_id",
@@ -283,7 +297,7 @@ class EstatGisAdapter(ProviderAdapter):
             if item.get("archive") == "zip":
                 entry_point(item)
             result.append(item)
-        return tuple(result)
+        return tuple(raw_result), tuple(result)
 
 
 __all__ = ["EstatGisAdapter"]

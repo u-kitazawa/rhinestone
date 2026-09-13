@@ -185,6 +185,14 @@ def test_space_values_fail_closed_without_reprojection() -> None:
         MeshCode("JIS-X-0410", 1.0, "5339")  # type: ignore[arg-type]
     with pytest.raises(KnowledgeValidationError):
         MeshCode("JIS-X-0410", 1, "５３３９")
+    with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", 2, "533988")
+    with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", 4, "533945679")
+    with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", 5, "5339456791")
+    with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", 6, "53394567129")
     assert MeshCode("JIS-X-0410", 3, "53394567").code == "53394567"
     assert tuple(BoundingBox(139, 35, 140, 36)) == (139, 35, 140, 36)
 
@@ -269,6 +277,9 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
     assert resource.format == "gml"
     assert resource.access_plan.kind == "file"
     assert resource.provenance.adapter == "estat-gis"
+    assert resource.source.raw_metadata["distribution_index"][0]["format"] == "GML"
+    assert resource.source.metadata.raw["distribution_index"][0]["format"] == "GML"
+    assert resource.provenance.raw["distribution"]["format"] == "GML"
     assert (
         resource.source.candidates[0].attributes["dataset_identity"]["dataset_id"]
         == "census-2020"

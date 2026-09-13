@@ -17,6 +17,14 @@ MeshLevel = Literal[1, 2, 3, 4, 5, 6]
 _CRS_AUTHORITY = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]*$")
 _CRS_CODE = re.compile(r"^[A-Za-z0-9_.-]+$")
 _MESH_LENGTHS = {1: 4, 2: 6, 3: 8, 4: 9, 5: 10, 6: 11}
+_MESH_DIGIT_RULES = {
+    1: (0, 4, "0123456789"),
+    2: (4, 6, "01234567"),
+    3: (6, 8, "0123456789"),
+    4: (8, 9, "1234"),
+    5: (8, 10, "1234"),
+    6: (8, 11, "1234"),
+}
 
 
 @dataclass(frozen=True)
@@ -126,6 +134,11 @@ class MeshCode:
         ):
             raise KnowledgeValidationError(
                 "mesh code has an invalid length for its explicit level"
+            )
+        start, end, allowed = _MESH_DIGIT_RULES[cast(int, self.level)]
+        if any(digit not in allowed for digit in self.code[start:end]):
+            raise KnowledgeValidationError(
+                "mesh code contains an invalid digit for its explicit level"
             )
 
 
