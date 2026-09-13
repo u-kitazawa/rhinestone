@@ -174,10 +174,9 @@ class StaticMunicipalityAdapter:
         identity_key = _canonical_identity_key(identity)
         for record in self._records:
             if _canonical_identity_key(record.identity) == identity_key:
-                try:
-                    return record.provider_identifiers[provider]
-                except KeyError:
-                    break
+                projected = record.provider_identifiers.get(provider)
+                if projected is not None:
+                    return projected
         raise KnowledgeResolutionError(
             f"municipality projection unsupported for provider {provider!r}"
         )

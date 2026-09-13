@@ -183,6 +183,8 @@ def test_space_values_fail_closed_without_reprojection() -> None:
         MeshCode("JIS-X-0410", True, "5339")  # type: ignore[arg-type]
     with pytest.raises(KnowledgeValidationError):
         MeshCode("JIS-X-0410", 1.0, "5339")  # type: ignore[arg-type]
+    with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", 1, "５３３９")
     assert MeshCode("JIS-X-0410", 3, "53394567").code == "53394567"
     assert tuple(BoundingBox(139, 35, 140, 36)) == (139, 35, 140, 36)
 
@@ -438,3 +440,21 @@ def test_municipality_projection_ignores_provider_specific_identity_fields() -> 
         provider_identifiers={"other": "external-13101"},
     )
     assert snapshot.project(projected, "plateau") == "13101-tokyo"
+
+
+def test_municipality_projection_checks_all_canonical_matching_records() -> None:
+    identity = MunicipalityIdentity("13101", "千代田区", "13", "東京都")
+    snapshot = StaticMunicipalityAdapter(
+        (
+            MunicipalityRecord(
+                identity,
+                provider_identifiers={"first": "first-13101"},
+            ),
+            MunicipalityRecord(
+                identity,
+                provider_identifiers={"second": "second-13101"},
+            ),
+        ),
+        snapshot_version="v1",
+    )
+    assert snapshot.project(identity, "second") == "second-13101"

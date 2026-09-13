@@ -120,6 +120,7 @@ class MeshCode:
             raise KnowledgeValidationError("mesh level must be an integer from 1 to 6")
         if (
             not isinstance(cast(object, self.code), str)
+            or not self.code.isascii()
             or not self.code.isdigit()
             or len(self.code) != _MESH_LENGTHS[cast(int, self.level)]
         ):
