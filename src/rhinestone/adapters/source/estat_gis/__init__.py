@@ -317,6 +317,7 @@ class EstatGisAdapter(ProviderAdapter):
                     and bool(host)
                     and parsed_uri.username is None
                     and parsed_uri.password is None
+                    and not parsed_uri.query
                 )
             except ValueError:
                 valid_uri = False
@@ -333,11 +334,12 @@ class EstatGisAdapter(ProviderAdapter):
                     "estat-gis archive must be zip when present"
                 )
             media_type = item.get("media_type")
-            if (
-                isinstance(media_type, str)
-                and media_type.casefold() == "application/zip"
-                and item.get("archive") != "zip"
-            ):
+            base_media_type = (
+                media_type.split(";", 1)[0].strip().casefold()
+                if isinstance(media_type, str)
+                else None
+            )
+            if base_media_type == "application/zip" and item.get("archive") != "zip":
                 raise ConfigValidationError(
                     "estat-gis application/zip distributions require archive=zip"
                 )

@@ -1,6 +1,6 @@
 """A deterministic, snapshot-backed municipality knowledge adapter."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Iterable, Mapping, Tuple, Union, cast
 
@@ -76,8 +76,19 @@ class MunicipalityRecord:
             raise KnowledgeValidationError(
                 "municipality aliases must be non-empty strings"
             )
-        projections = self.provider_identifiers or self.identity.provider_identifiers
-        if not isinstance(cast(object, projections), Mapping) or any(
+        record_projections = cast(object, self.provider_identifiers)
+        if not isinstance(record_projections, Mapping):
+            raise KnowledgeValidationError(
+                "municipality provider identifiers must be a mapping"
+            )
+        projections = dict(self.identity.provider_identifiers)
+        for key, value in cast(Mapping[str, str], record_projections).items():
+            if key in projections and projections[key] != value:
+                raise KnowledgeValidationError(
+                    "municipality provider identifiers conflict with identity"
+                )
+            projections[key] = value
+        if any(
             not isinstance(cast(object, key), str)
             or not key.strip()
             or not isinstance(cast(object, value), str)
@@ -110,6 +121,7 @@ class StaticMunicipalityAdapter:
     _records: Tuple[MunicipalityRecord, ...]
     _by_code: Mapping[tuple[str, str], MunicipalityRecord]
     _by_name: Mapping[str, Tuple[MunicipalityRecord, ...]]
+    _identity_by_key: Mapping[tuple[str, str, str, str, str], MunicipalityIdentity]
 
     def __init__(
         self,
@@ -135,8 +147,12 @@ class StaticMunicipalityAdapter:
         projections_by_identity: dict[
             tuple[str, str, str, str, str], dict[str, str]
         ] = {}
+        identities_by_key: dict[
+            tuple[str, str, str, str, str], MunicipalityIdentity
+        ] = {}
         for record in normalized:
             identity_key = _canonical_identity_key(record.identity)
+            identities_by_key.setdefault(identity_key, record.identity)
             known_projections = projections_by_identity.setdefault(identity_key, {})
             for provider, identifier in record.provider_identifiers.items():
                 if (
@@ -166,6 +182,14 @@ class StaticMunicipalityAdapter:
             "_by_name",
             MappingProxyType({key: tuple(value) for key, value in by_name.items()}),
         )
+        identity_by_key = {
+            key: replace(
+                identities_by_key[key],
+                provider_identifiers=projections,
+            )
+            for key, projections in projections_by_identity.items()
+        }
+        object.__setattr__(self, "_identity_by_key", MappingProxyType(identity_by_key))
 
     @property
     def snapshot_version(self) -> str:
@@ -185,7 +209,7 @@ class StaticMunicipalityAdapter:
         for record in (*code_matches, *name_matches):
             identity_key = _canonical_identity_key(record.identity)
             if identity_key not in match_keys:
-                matches.append(record.identity)
+                matches.append(self._identity_by_key[identity_key])
                 match_keys.add(identity_key)
         if len(matches) > 1:
             raise KnowledgeResolutionError(

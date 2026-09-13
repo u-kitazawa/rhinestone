@@ -111,6 +111,24 @@ def test_municipality_snapshot_validation_and_lookup_errors() -> None:
             municipality_records()[0].identity,
             provider_identifiers=cast(Any, {"x": None}),
         )
+    with pytest.raises(KnowledgeValidationError, match="mapping"):
+        MunicipalityRecord(
+            municipality_records()[0].identity,
+            provider_identifiers=cast(Any, []),
+        )
+    merged = MunicipalityRecord(
+        municipality_records()[0].identity,
+        provider_identifiers={"other": "external-13101"},
+    )
+    assert merged.provider_identifiers == {
+        "plateau": "13101-tokyo",
+        "other": "external-13101",
+    }
+    with pytest.raises(KnowledgeValidationError, match="conflict"):
+        MunicipalityRecord(
+            municipality_records()[0].identity,
+            provider_identifiers={"plateau": "different-13101"},
+        )
     with pytest.raises(KnowledgeValidationError):
         StaticMunicipalityAdapter((), snapshot_version="v1")
     with pytest.raises(KnowledgeValidationError):
@@ -420,6 +438,11 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
         {**valid, "distribution_id": "d2", "uri": "https://[invalid/d.gml"},
         {**valid, "distribution_id": "d2", "media_type": 1},
         {**valid, "distribution_id": "d2", "media_type": "application/zip"},
+        {
+            **valid,
+            "distribution_id": "d2",
+            "media_type": "application/zip; charset=binary",
+        },
         {**valid, "distribution_id": "d2", "archive": "tar"},
         {**valid, "distribution_id": "d2", "archive": "zip"},
         {**valid, "distribution_id": "d2", "archive": "zip", "entry_point": "../d.gml"},
@@ -428,6 +451,11 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
             **valid,
             "distribution_id": "d2",
             "uri": "https://user:password@example.test/d.gml",
+        },
+        {
+            **valid,
+            "distribution_id": "d2",
+            "uri": "https://example.test/d.gml?token=secret",
         },
     ]
     for value in invalid:
@@ -518,6 +546,11 @@ def test_municipality_projection_checks_all_canonical_matching_records() -> None
     )
     assert snapshot.resolve_municipality("千代田区").code == "13101"
     assert snapshot.project(identity, "second") == "second-13101"
+    split_identity = snapshot.resolve_municipality("13101")
+    assert split_identity.provider_identifiers == {
+        "first": "first-13101",
+        "second": "second-13101",
+    }
     with pytest.raises(KnowledgeValidationError, match="conflicting"):
         StaticMunicipalityAdapter(
             (
