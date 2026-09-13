@@ -9,6 +9,7 @@ HTML or guesses a download URL.
 
 import json
 from importlib import resources
+from types import MappingProxyType
 from typing import Any, Iterable, List, Mapping, Optional, Tuple, cast
 from urllib.parse import urlparse
 
@@ -75,6 +76,12 @@ class EstatGisAdapter(ProviderAdapter):
         self._raw_distributions, self._distributions = self._validate_distributions(
             distributions
         )
+        self._raw_by_distribution_id = MappingProxyType(
+            {
+                cast(str, item["distribution_id"]): item
+                for item in self._raw_distributions
+            }
+        )
 
     def load(self, config: Config) -> Source:
         """Resolve one distribution using explicit selectors only."""
@@ -133,6 +140,8 @@ class EstatGisAdapter(ProviderAdapter):
         results: List[SearchResult] = []
         needle = query.text.casefold() if query.text else None
         for item in self._distributions:
+            if query.limit is not None and len(results) >= query.limit:
+                break
             haystack = " ".join(
                 cast(str, item[field])
                 for field in ("distribution_id", "title", "dataset_id", "level")
@@ -197,11 +206,7 @@ class EstatGisAdapter(ProviderAdapter):
 
     def _raw_distribution(self, item: Mapping[str, Any]) -> Mapping[str, Any]:
         distribution_id = cast(str, item["distribution_id"])
-        return next(
-            raw
-            for raw in self._raw_distributions
-            if raw["distribution_id"] == distribution_id
-        )
+        return self._raw_by_distribution_id[distribution_id]
 
     @staticmethod
     def _matches(
@@ -279,6 +284,14 @@ class EstatGisAdapter(ProviderAdapter):
             if not isinstance(title, str) or not title.strip():
                 raise ConfigValidationError("estat-gis title must be non-empty")
             item["title"] = title
+            if (
+                "description" in item
+                and item["description"] is not None
+                and not isinstance(item["description"], str)
+            ):
+                raise ConfigValidationError(
+                    "estat-gis description must be a string when present"
+                )
             uri = cast(str, item["uri"])
             try:
                 parsed_uri = urlparse(uri)

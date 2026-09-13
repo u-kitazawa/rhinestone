@@ -22,8 +22,8 @@ _MESH_DIGIT_RULES = {
     2: (4, 6, "01234567"),
     3: (6, 8, "0123456789"),
     4: (8, 9, "1234"),
-    5: (8, 10, "1234"),
-    6: (8, 11, "1234"),
+    5: (9, 10, "1234"),
+    6: (10, 11, "1234"),
 }
 
 
@@ -137,11 +137,12 @@ class MeshCode:
             raise KnowledgeValidationError(
                 "mesh code has an invalid length for its explicit level"
             )
-        start, end, allowed = _MESH_DIGIT_RULES[cast(int, self.level)]
-        if any(digit not in allowed for digit in self.code[start:end]):
-            raise KnowledgeValidationError(
-                "mesh code contains an invalid digit for its explicit level"
-            )
+        for mesh_level in range(1, cast(int, self.level) + 1):
+            start, end, allowed = _MESH_DIGIT_RULES[mesh_level]
+            if any(digit not in allowed for digit in self.code[start:end]):
+                raise KnowledgeValidationError(
+                    "mesh code contains an invalid digit for its explicit level"
+                )
 
 
 def require_lossless_crs84(bbox: BoundingBox) -> Tuple[float, float, float, float]:

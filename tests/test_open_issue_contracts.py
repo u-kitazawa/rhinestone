@@ -200,6 +200,8 @@ def test_space_values_fail_closed_without_reprojection() -> None:
     with pytest.raises(KnowledgeValidationError):
         MeshCode("JIS-X-0410", 2, "533988")
     with pytest.raises(KnowledgeValidationError):
+        MeshCode("JIS-X-0410", 3, "53398800")
+    with pytest.raises(KnowledgeValidationError):
         MeshCode("JIS-X-0410", 4, "533945679")
     with pytest.raises(KnowledgeValidationError):
         MeshCode("JIS-X-0410", 5, "5339456791")
@@ -367,6 +369,7 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
 
     adapter = EstatGisAdapter(distributions)
     assert len(adapter.search(SearchQuery(text="Shape", limit=1))) == 1
+    assert len(adapter.search(SearchQuery(limit=1))) == 1
     app_results = app.search(text="Shape", limit=1)
     assert app_results[0].target.source_id == "estat"
     with pytest.raises(UnsupportedSearchConditionError):
@@ -407,6 +410,7 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
         {**valid, "distribution_id": "d1", "survey_year": 0},
         {**valid, "distribution_id": "d2", "format": "csv"},
         {**valid, "distribution_id": "d2", "title": " "},
+        {**valid, "distribution_id": "d2", "description": 123},
         {**valid, "distribution_id": "d2", "uri": "http://example.test/d.gml"},
         {**valid, "distribution_id": "d2", "uri": "https://"},
         {**valid, "distribution_id": "d2", "uri": "https:///download.gml"},
