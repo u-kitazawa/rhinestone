@@ -20,8 +20,8 @@ from typing import (
     cast,
     overload,
 )
-from urllib.parse import urlsplit
 
+from ._uri import is_valid_http_authority
 from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
 
 LibraryName = str
@@ -208,18 +208,11 @@ class ResourceCandidate:
             raise ConfigValidationError(
                 "ResourceCandidate.uri must be a non-empty string"
             )
-        try:
-            parsed_uri = urlsplit(uri)
-            if parsed_uri.scheme.casefold() in {"http", "https"} and (
-                not parsed_uri.hostname
-                or parsed_uri.username is not None
-                or parsed_uri.password is not None
-            ):
-                raise ConfigValidationError(
-                    "ResourceCandidate.uri must not contain embedded credentials"
-                )
-        except ValueError:
-            raise ConfigValidationError("ResourceCandidate.uri is invalid") from None
+        if not is_valid_http_authority(uri):
+            raise ConfigValidationError(
+                "ResourceCandidate.uri must not contain embedded credentials or "
+                "an invalid HTTP(S) authority"
+            )
         for name in ("format", "media_type"):
             value = cast(object, getattr(self, name))
             if value is not None and not isinstance(value, str):

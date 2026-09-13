@@ -457,6 +457,13 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
             "distribution_id": "d2",
             "uri": "https://example.test/d.gml?token=secret",
         },
+        {
+            **valid,
+            "distribution_id": "d2",
+            "uri": "https://example.test/d.gml#access_token=secret",
+        },
+        {**valid, "distribution_id": "d2", "uri": "https://exa mple/d.gml"},
+        {**valid, "distribution_id": "d2", "uri": "https://%ZZ/data.gml"},
     ]
     for value in invalid:
         with pytest.raises(ConfigValidationError):

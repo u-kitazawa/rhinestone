@@ -4,10 +4,11 @@ import json
 from abc import ABC, abstractmethod
 from importlib import resources
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 from jsonschema import Draft202012Validator, ValidationError
 
+from ..._uri import is_valid_http_authority
 from ...errors import (
     ConfigValidationError,
     ProviderMetadataError,
@@ -161,17 +162,10 @@ class ProviderAdapter(ABC):
 
     @staticmethod
     def _normalize_endpoint(endpoint: str) -> str:
-        try:
-            parsed = urlsplit(endpoint)
-        except ValueError:
-            raise ConfigValidationError("endpoint must be a valid URI") from None
-        if parsed.scheme.casefold() in {"http", "https"} and (
-            not parsed.hostname
-            or parsed.username is not None
-            or parsed.password is not None
-        ):
+        if not is_valid_http_authority(endpoint):
             raise ConfigValidationError(
-                "endpoint must not contain embedded credentials"
+                "endpoint must be a valid URI with a valid HTTP(S) authority and "
+                "without embedded credentials"
             )
         return endpoint.rstrip("/")
 

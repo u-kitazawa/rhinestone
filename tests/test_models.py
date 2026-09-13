@@ -48,6 +48,26 @@ def test_resource_candidate_rejects_embedded_http_credentials() -> None:
 
 
 @pytest.mark.parametrize(
+    "uri",
+    (
+        "https://exa mple/data.csv",
+        "https://%ZZ/data.csv",
+        "https://-bad.example/data.csv",
+        "https://[gggg::1]/data.csv",
+    ),
+)
+def test_resource_candidate_rejects_malformed_http_hostnames(uri: str) -> None:
+    with pytest.raises(ConfigValidationError, match="authority"):
+        ResourceCandidate(uri, "csv", None)
+
+
+def test_resource_candidate_accepts_valid_ipv6_http_authority() -> None:
+    candidate = ResourceCandidate("https://[2001:db8::1]/data.csv", "csv", None)
+
+    assert candidate.uri == "https://[2001:db8::1]/data.csv"
+
+
+@pytest.mark.parametrize(
     ("kwargs", "message"),
     (
         ({"uri": "", "format": "csv", "media_type": None}, "non-empty"),

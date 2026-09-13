@@ -84,6 +84,9 @@ def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
         adapter.settings(Config("other", {}))
     with pytest.raises(ConfigValidationError, match="endpoint"):
         ProbeAdapter(lambda url, params: {}).endpoint({})
+    for endpoint in ("https://exa mple/api", "https://%ZZ/api"):
+        with pytest.raises(ConfigValidationError, match="endpoint"):
+            ProbeAdapter(lambda url, params: {}, endpoint=endpoint)
     with pytest.raises(ConfigValidationError, match="id"):
         adapter.required({"id": 1}, "id")
     with pytest.raises(ConfigValidationError, match="credentials"):

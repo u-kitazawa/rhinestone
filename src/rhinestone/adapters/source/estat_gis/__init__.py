@@ -13,6 +13,7 @@ from types import MappingProxyType
 from typing import Any, Iterable, List, Mapping, Optional, Tuple, cast
 from urllib.parse import urlparse
 
+from ...._uri import is_valid_http_authority
 from ....errors import (
     ConfigValidationError,
     ResourceNotFoundError,
@@ -310,14 +311,12 @@ class EstatGisAdapter(ProviderAdapter):
             uri = cast(str, item["uri"])
             try:
                 parsed_uri = urlparse(uri)
-                host = parsed_uri.hostname
                 parsed_uri.port
                 valid_uri = (
                     parsed_uri.scheme.casefold() == "https"
-                    and bool(host)
-                    and parsed_uri.username is None
-                    and parsed_uri.password is None
+                    and is_valid_http_authority(uri)
                     and not parsed_uri.query
+                    and not parsed_uri.fragment
                 )
             except ValueError:
                 valid_uri = False
