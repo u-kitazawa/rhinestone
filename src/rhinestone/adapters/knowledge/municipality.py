@@ -132,7 +132,21 @@ class StaticMunicipalityAdapter:
             raise KnowledgeValidationError("municipality snapshot must not be empty")
         by_code: dict[tuple[str, str], MunicipalityRecord] = {}
         by_name: dict[str, list[MunicipalityRecord]] = {}
+        projections_by_identity: dict[
+            tuple[str, str, str, str, str], dict[str, str]
+        ] = {}
         for record in normalized:
+            identity_key = _canonical_identity_key(record.identity)
+            known_projections = projections_by_identity.setdefault(identity_key, {})
+            for provider, identifier in record.provider_identifiers.items():
+                if (
+                    provider in known_projections
+                    and known_projections[provider] != identifier
+                ):
+                    raise KnowledgeValidationError(
+                        "municipality snapshot contains conflicting provider projections"
+                    )
+                known_projections[provider] = identifier
             for code in record.codes:
                 key = (code.scheme, code.value)
                 if key in by_code and _canonical_identity_key(

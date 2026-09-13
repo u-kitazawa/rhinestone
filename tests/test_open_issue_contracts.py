@@ -419,9 +419,16 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
         {**valid, "distribution_id": "d2", "uri": "https:///download.gml"},
         {**valid, "distribution_id": "d2", "uri": "https://[invalid/d.gml"},
         {**valid, "distribution_id": "d2", "media_type": 1},
+        {**valid, "distribution_id": "d2", "media_type": "application/zip"},
         {**valid, "distribution_id": "d2", "archive": "tar"},
         {**valid, "distribution_id": "d2", "archive": "zip"},
         {**valid, "distribution_id": "d2", "archive": "zip", "entry_point": "../d.gml"},
+        {**valid, "distribution_id": "d2", "entry_point": "d.gml"},
+        {
+            **valid,
+            "distribution_id": "d2",
+            "uri": "https://user:password@example.test/d.gml",
+        },
     ]
     for value in invalid:
         with pytest.raises(ConfigValidationError):
@@ -511,3 +518,27 @@ def test_municipality_projection_checks_all_canonical_matching_records() -> None
     )
     assert snapshot.resolve_municipality("千代田区").code == "13101"
     assert snapshot.project(identity, "second") == "second-13101"
+    with pytest.raises(KnowledgeValidationError, match="conflicting"):
+        StaticMunicipalityAdapter(
+            (
+                MunicipalityRecord(
+                    MunicipalityIdentity(
+                        "13101",
+                        "千代田区",
+                        "13",
+                        "東京都",
+                        provider_identifiers={"same": "first-13101"},
+                    )
+                ),
+                MunicipalityRecord(
+                    MunicipalityIdentity(
+                        "13101",
+                        "千代田区",
+                        "13",
+                        "東京都",
+                        provider_identifiers={"same": "second-13101"},
+                    )
+                ),
+            ),
+            snapshot_version="v1",
+        )

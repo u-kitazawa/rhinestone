@@ -312,7 +312,12 @@ class EstatGisAdapter(ProviderAdapter):
                 parsed_uri = urlparse(uri)
                 host = parsed_uri.hostname
                 parsed_uri.port
-                valid_uri = parsed_uri.scheme.casefold() == "https" and bool(host)
+                valid_uri = (
+                    parsed_uri.scheme.casefold() == "https"
+                    and bool(host)
+                    and parsed_uri.username is None
+                    and parsed_uri.password is None
+                )
             except ValueError:
                 valid_uri = False
             if not valid_uri:
@@ -326,6 +331,19 @@ class EstatGisAdapter(ProviderAdapter):
             if "archive" in item and item["archive"] not in (None, "zip"):
                 raise ConfigValidationError(
                     "estat-gis archive must be zip when present"
+                )
+            media_type = item.get("media_type")
+            if (
+                isinstance(media_type, str)
+                and media_type.casefold() == "application/zip"
+                and item.get("archive") != "zip"
+            ):
+                raise ConfigValidationError(
+                    "estat-gis application/zip distributions require archive=zip"
+                )
+            if "entry_point" in item and item.get("archive") != "zip":
+                raise ConfigValidationError(
+                    "estat-gis entry_point requires archive=zip"
                 )
             if item.get("archive") == "zip":
                 entry_point(item)
