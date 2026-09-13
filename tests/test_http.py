@@ -29,6 +29,7 @@ class _Response:
     ) -> None:
         self._body = body
         self._status = status
+        self.status = status
         self.headers = _Headers(charset)
         self._final_url = final_url
 

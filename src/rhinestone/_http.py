@@ -95,7 +95,7 @@ class JsonServiceRuntime:
             response = error
         with response:
             charset = response.headers.get_content_charset() or "utf-8"
-            status_code = cast(int, response.getcode())
+            status_code = cast(int, response.status)
             return JsonResponse(status_code, response.read(), charset)
 
 

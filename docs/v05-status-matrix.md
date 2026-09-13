@@ -37,7 +37,7 @@
 | V05-18 | Direct Resourceは補助経路であり中心価値ではない | `Implemented` | `DirectAdapter`、[Resourceを解決して開く](resolve-and-open.md)、`tests/test_direct_adapter.py` | 最終URIとreaderが既知なら専門Runtimeの直接利用を妨げない |
 | V05-19 | AI / MCP / GIS integration | `Deferred` | Coreにはintegration framework、巨大native object転送、GIS解析を実装していない | portable consumerと具体的なintegration要件が確定した時にCore外の連携として再評価する |
 | V05-20 | Fail Rather Than Guess とdomain error policy | `Implemented` | `errors.py`、Adapter/Resolverの明示検証、`tests/test_errors.py`、`tests/test_provider_edge_cases.py` | 新しい推測規則を追加せず、公式仕様または決定的metadataを根拠にする |
-| V05-21 | 外部自作Adapterの登録・公開SDK契約 | `Implemented` | `configure(adapters=...)`、公開 Definition / Context / Port、重複 fail-fast、`tests/test_source_composition.py`、`tests/test_open_issue_contracts.py` | transport の named port と conformance evidence は #85 の後続作業として追加する |
+| V05-21 | 外部自作Adapterの登録・公開SDK契約 | `Implemented` | `configure(adapters=...)`、公開 Definition / Context / Port、重複 fail-fast、`tests/test_source_composition.py`、`tests/test_open_issue_contracts.py` | explicit registration を維持し、自動 discovery と process-global registry は導入しない |
 | V05-22 | No Scraping、No Central Index、No Transformation Pipeline | `Implemented` | 組み込みHTTP/公式API/静的Catalogをupstreamとし、`open()`後の解析は専門Runtimeへ委譲。[ホーム](index.md)、[DiscoveryとResolution](discovery-resolution.md) | HTML scrapingやGIS解析をCoreへ追加しない |
 | V05-23 | 複数SourceでURL passthrough以上のresolution価値を検証 | `Implemented` | [DiscoveryとResolution](discovery-resolution.md)でCKAN、横断CKAN、STAC、PLATEAU、GSIを比較し、fixtureベースのvertical sliceを保持 | 新Sourceも同じ基準でprovider-specific codeを実質的に減らせるか評価する |
 
@@ -51,12 +51,12 @@
 
 ## #47 の統合判定
 
-この一覧から見た未完了ゲートは次のとおりです。
+この一覧から見た v0.5 統合の判定は次のとおりです。
 
-1. V05-07: #49の契約確定と、#50/#51/#52の実装を完了する。
-2. V05-16: #55のe-Stat統計GIS方針と実装を、削除済み統計表APIと分離して完了する。
-3. V05-09b: discovery sourceとresolution target双方の記録を表現する契約を確定し、cross-provider fixtureで保持を検証する。
-4. V05-15: #93/#94/#96/#98/#99でrelease時のsecurity保証範囲を実装・文書化する。
-5. V05-06、V05-13、V05-19は再評価条件が成立するまでDeferredとして扱い、暗黙の実装残件に戻さない。V05-21は公開 SDK closure を満たしたが、transport port の名称統一は #85 の後続作業とする。
+1. V05-07: #49 の契約に従い、#50（Identity）、#51（Time）、#52（Space）を実装済みとする。
+2. V05-16: 統計表 API は Superseded、#55 の e-Stat 統計GIS discovery / resolution は実装済みとする。
+3. V05-09b: discovery source と resolution target の記録を一つの既存モデルへ無理に統合せず、両者の公開契約が確定するまで Deferred とする。
+4. V05-15: Credential / Runtime / AccessPlan の責務分離と release 向け security hardening を実装・文書化済みとする。
+5. V05-06、V05-13、V05-19 は再評価条件が成立するまで Deferred として扱う。V05-21（#85）は explicit registration、stable surface、authoring guide、contract test を含めて Implemented とする。
 
 状態を変更する場合は、同じ変更で根拠となる実装、テスト、公開ドキュメント、関連Issueを更新します。
