@@ -29,12 +29,12 @@ from ....models import (
     SearchResult,
     Source,
 )
-from ....representations import canonical_format
+from ....representations import CANONICAL_FORMATS, canonical_format
 from ...knowledge import KnowledgeAdapterRegistry
 from .._knowledge import entry_point, resolve_knowledge
 from ..base import ProviderAdapter
 
-_FORMATS = frozenset({"shapefile", "gml", "kml"})
+_FORMATS = frozenset({"shapefile", "gml", "kml"}) & CANONICAL_FORMATS
 _SELECTORS = frozenset(
     {
         "distribution_id",
@@ -195,6 +195,7 @@ class EstatGisAdapter(ProviderAdapter):
                         adapter=self.adapter_type,
                         raw=raw_item,
                     ),
+                    raw_metadata=raw_item,
                 )
             )
         return tuple(results[: query.limit])

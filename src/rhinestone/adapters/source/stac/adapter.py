@@ -135,6 +135,7 @@ class StacAdapter(ProviderAdapter):
                         adapter="stac",
                         raw=item,
                     ),
+                    raw_metadata=item,
                 )
             )
         return tuple(found)

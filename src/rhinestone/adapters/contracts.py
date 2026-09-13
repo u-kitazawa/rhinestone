@@ -55,8 +55,7 @@ class SourceAdapterContext:
     Adapter factories should retain only the services they need.
     """
 
-    get_json: Callable[..., Any]
-    get_text: Callable[[str], str]
+    transport: TransportPort
     credentials: CredentialPort
     dependencies: DependencyPort
     destination_policy: DestinationPolicy

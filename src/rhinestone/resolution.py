@@ -1,5 +1,6 @@
 """Deterministic conversion from Source candidates to Resource access plans."""
 
+from dataclasses import replace
 from pathlib import PurePosixPath
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, cast
 
@@ -17,6 +18,7 @@ from .models import (
     ServiceQueryPlan,
     Source,
 )
+from .representations import canonical_format
 
 ResolutionRule = Callable[[ResourceCandidate], Optional[Tuple[int, str]]]
 
@@ -55,6 +57,9 @@ class Resolver:
                 f"got {len(candidates)}; add an explicit resource selector"
             )
         candidate = candidates[0]
+        format_name = canonical_format(candidate.format)
+        if format_name != candidate.format:
+            candidate = replace(candidate, format=format_name)
         if candidate.format is None and candidate.media_type is None:
             raise UnsupportedAccessError(
                 "Resource format and media type are unknown; URI suffix is not "
@@ -63,7 +68,7 @@ class Resolver:
         plan = self._select_plan(candidate)
         return Resource(
             uri=candidate.uri,
-            format=candidate.format,
+            format=format_name,
             media_type=candidate.media_type,
             metadata=source.metadata,
             provenance=source.provenance,

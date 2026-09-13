@@ -189,6 +189,35 @@ class Provenance:
 
 
 @dataclass(frozen=True)
+class DiscoveryRecord:
+    """Retain the record produced by a Source that discovered a result.
+
+    Cross-source resolution must not overwrite the metadata or provenance
+    produced by the target Source.  A resolved ``Resource`` keeps its target
+    record in the usual ``metadata`` / ``provenance`` fields and stores this
+    discovery-side record separately.
+    """
+
+    source_id: str
+    metadata: Metadata
+    provenance: Provenance
+    raw_metadata: Mapping[str, Any] = field(default_factory=_empty_mapping)
+
+    def __post_init__(self) -> None:
+        source_id = cast(object, self.source_id)
+        if not isinstance(source_id, str) or not source_id.strip():
+            raise ConfigValidationError(
+                "DiscoveryRecord.source_id must be a non-empty string"
+            )
+        object.__setattr__(self, "raw_metadata", _freeze(self.raw_metadata))
+
+    @property
+    def discovered_by(self) -> str:
+        """Return the source id using the terminology of ``Result``."""
+        return self.source_id
+
+
+@dataclass(frozen=True)
 class ResourceCandidate:
     """One provider-advertised delivery option considered by the Resolver.
 
@@ -305,6 +334,7 @@ class Resource:
     _opener: Optional[Callable[[LibraryName], object]] = field(
         default=None, repr=False, compare=False
     )
+    discovery: Optional[DiscoveryRecord] = None
 
     @overload
     def open(self, library: Literal["rasterio"]) -> _RasterioDatasetReader: ...
@@ -470,6 +500,7 @@ class Result:
     _resolver: Optional[Callable[[], Resource]] = field(
         default=None, repr=False, compare=False
     )
+    raw_metadata: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
         if not self.discovered_by:
@@ -477,6 +508,7 @@ class Result:
                 "Result.discovered_by must be a non-empty string; identify the "
                 "source that discovered this result"
             )
+        object.__setattr__(self, "raw_metadata", _freeze(self.raw_metadata))
 
     def to_config(self) -> Config:
         """Return the immutable target configuration for resolution."""
@@ -505,6 +537,7 @@ __all__ = [
     "AccessPlan",
     "Config",
     "Dependencies",
+    "DiscoveryRecord",
     "DependencyValue",
     "FileAccessPlan",
     "LibraryName",

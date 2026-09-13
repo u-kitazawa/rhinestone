@@ -131,10 +131,9 @@ def test_search_ckan_jp_handles_minimal_package_metadata() -> None:
 
     results = adapter.search(SearchQuery(text="archive"))
 
-    assert len(results) == 1
-    assert results[0].title == "fallback-dataset"
-    assert results[0].provenance.provider == "search-ckan-jp"
-    assert results[0].target.settings["format"] == "zip"
+    # ``application/zip`` is container evidence, not a payload format.  Without
+    # an explicit provider format the discovery result must fail closed.
+    assert results == ()
 
     csv_results = adapter._package_results(  # pyright: ignore[reportPrivateUsage]
         {

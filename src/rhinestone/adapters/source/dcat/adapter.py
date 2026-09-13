@@ -173,6 +173,7 @@ class DcatAdapter(ProviderAdapter):
                     ),
                     metadata=item.metadata,
                     provenance=item.provenance,
+                    raw_metadata=item.raw_metadata,
                 )
             )
         return tuple(results[: query.limit])

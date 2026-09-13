@@ -11,6 +11,7 @@ FORMAT_ALIASES: Mapping[str, str] = MappingProxyType(
     {
         "geopackage": "gpkg",
         "gtiff": "geotiff",
+        "shp": "shapefile",
         "tiff": "geotiff",
     }
 )
@@ -19,12 +20,15 @@ MEDIA_TYPE_FORMATS: Mapping[str, str] = MappingProxyType(
     {
         "application/geo+json": "geojson",
         "application/geopackage+sqlite3": "gpkg",
+        "application/gml+xml": "gml",
         "application/json": "json",
-        "application/zip": "zip",
+        "application/vnd.google-earth.kml+xml": "kml",
         "image/tiff": "geotiff",
         "text/csv": "csv",
     }
 )
+
+CONTAINER_MEDIA_TYPES: Mapping[str, str] = MappingProxyType({"application/zip": "zip"})
 
 FORMAT_CATEGORIES: Mapping[str, str] = MappingProxyType(
     {
@@ -41,7 +45,19 @@ FORMAT_CATEGORIES: Mapping[str, str] = MappingProxyType(
         "netcdf": "raster",
         "shapefile": "vector",
         "zip": "archive",
+        "wms": "service",
+        "wfs": "service",
+        "api": "service",
+        "ogc-api-features": "service",
     }
 )
 
-__all__ = ["FORMAT_ALIASES", "FORMAT_CATEGORIES", "MEDIA_TYPE_FORMATS"]
+CANONICAL_FORMATS = frozenset(FORMAT_CATEGORIES)
+
+__all__ = [
+    "CANONICAL_FORMATS",
+    "CONTAINER_MEDIA_TYPES",
+    "FORMAT_ALIASES",
+    "FORMAT_CATEGORIES",
+    "MEDIA_TYPE_FORMATS",
+]

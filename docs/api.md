@@ -110,8 +110,10 @@ resource = app.resolve(result)
 
 検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。Providerの通信・metadata・response障害は`reason="provider_failure"`、`failure_type`（`metadata`または`response`）として診断され、他のSourceの結果は継続して返されます。予期しないプログラムエラーはこの診断へ変換されません。
 
-`Result.metadata`と`Result.provenance`は検索時の情報です。`app.resolve(result)`は解決後も
-これらをResourceへ引き継ぎます。アプリケーションから独立して作成したResultでは
+`Result.metadata`、`Result.raw_metadata`、`Result.provenance`は検索時の情報です。`app.resolve(result)`は
+cross-source解決後もこれらを`resource.discovery`へ保持し、target Sourceが生成した
+`resource.metadata`、`resource.provenance`、`resource.source.raw_metadata`を上書きしません。
+アプリケーションから独立して作成したResultでは
 `result.resolve()`を使えないため、`app.resolve(result)`を使用してください。
 
 ## `Rhinestone.resolve()`（Resourceを確定する）
@@ -124,7 +126,7 @@ resource = app.resolve(result)
 
 ## `Resource`（利用するデータ）
 
-解決済みの具体的なデータです。`uri`、`format`、`media_type`、`metadata`、`provenance`を持ち、Runtimeを明示して開きます。
+解決済みの具体的なデータです。`uri`、`format`、`media_type`、`metadata`、`provenance`を持ち、Runtimeを明示して開きます。cross-source解決では、発見側の`metadata`、`raw_metadata`、`provenance`が`discovery`に入り、target側の記録と分離されます。
 
 ```python
 data = resource.open("rasterio")

@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from ....errors import ResourceAccessError
 from ....models import FileAccessPlan, Resource
+from ....representations import canonical_format
 from ....security import DestinationPolicy
 from .._resource import resource_attributes
 from ..base import ExecutionAdapter
@@ -27,7 +28,7 @@ class GdalAdapter(ExecutionAdapter):
         """Return whether GDAL and the Resource's format are compatible."""
         tile = resource.access_plan.options.get("tile")
         return self.name in dependencies and (
-            (resource.format or "").lower() in self._formats
+            canonical_format(resource.format) in self._formats
             or (
                 isinstance(tile, Mapping)
                 and cast(Mapping[str, Any], tile).get("scheme") == "xyz"

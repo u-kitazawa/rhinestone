@@ -43,8 +43,9 @@ Resultは次の情報を持ちます。
 - `discovered_by`: 結果を発見したSource ID
 - `target`: `app.resolve()`へ渡す解決先の`Config`
 - `metadata` / `provenance`: 発見時に得られた知識
+- `raw_metadata`: 発見元が返した未加工の provider metadata
 
-横断CKAN検索の結果は、`discovered_by="search-ckan-jp"`、`target.source_id="direct"` のようになります。`target`は`result.to_config()`で取得できます。解決先が発見元と異なる場合も、発見元のmetadataとprovenanceはResourceへ引き継がれます。
+横断CKAN検索の結果は、`discovered_by="search-ckan-jp"`、`target.source_id="direct"` のようになります。`target`は`result.to_config()`で取得できます。解決先が発見元と異なる場合、target側の`resource.metadata` / `resource.provenance` / `resource.source.raw_metadata`を保持したまま、発見元の3つの記録は`resource.discovery`へ保持されます。
 
 ## 結果の順序
 
@@ -79,5 +80,5 @@ for diagnostic in results.diagnostics:
 Providerの通信・metadata取得・response解釈に失敗した場合は、失敗したSourceだけを隔離し、他のSourceの検索結果を返します。この場合は`reason="provider_failure"`となり、`failure_type`に`metadata`または`response`が入ります。Provider障害の診断には例外メッセージやtracebackを含めません。全Sourceがこの種の障害になった場合も、空の`SearchResults`と診断を返します。一方、検索クエリの検証失敗や予期しないプログラムエラーはProvider障害として握りつぶしません。
 
 検索結果は`app.resolve(result)`で直接Resourceへ解決できます。`app.search()`が返したResultでは
-`result.resolve()`も同じResourceを返し、発見元と解決先が異なる場合もmetadataとprovenanceを
-保持します。`result.to_config()`は内部パイプラインを調査する高度なAPIです。
+`result.resolve()`も同じResourceを返し、発見元と解決先が異なる場合も両側のmetadata、raw metadata、
+provenanceを保持します。`result.to_config()`は内部パイプラインを調査する高度なAPIです。
