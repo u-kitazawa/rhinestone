@@ -135,7 +135,9 @@ class StaticMunicipalityAdapter:
         for record in normalized:
             for code in record.codes:
                 key = (code.scheme, code.value)
-                if key in by_code and by_code[key].identity != record.identity:
+                if key in by_code and _canonical_identity_key(
+                    by_code[key].identity
+                ) != _canonical_identity_key(record.identity):
                     raise KnowledgeValidationError(
                         "municipality snapshot contains a duplicate active area code"
                     )

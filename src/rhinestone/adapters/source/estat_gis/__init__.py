@@ -10,6 +10,7 @@ HTML or guesses a download URL.
 import json
 from importlib import resources
 from typing import Any, Iterable, List, Mapping, Optional, Tuple, cast
+from urllib.parse import urlparse
 
 from ....errors import (
     ConfigValidationError,
@@ -225,12 +226,12 @@ class EstatGisAdapter(ProviderAdapter):
             return False
         if "time" in settings:
             time = knowledge.get("time", {})
-            if time.get("year") != item["survey_year"]:
-                return False
             if time.get("kind") != "survey_year":
                 raise ConfigValidationError(
                     "e-Stat GIS time selector must be a survey_year"
                 )
+            if time.get("year") != item["survey_year"]:
+                return False
         return True
 
     @classmethod
@@ -282,7 +283,14 @@ class EstatGisAdapter(ProviderAdapter):
                 raise ConfigValidationError("estat-gis title must be non-empty")
             item["title"] = title
             uri = cast(str, item["uri"])
-            if not uri.startswith("https://"):
+            try:
+                parsed_uri = urlparse(uri)
+                host = parsed_uri.hostname
+                parsed_uri.port
+                valid_uri = parsed_uri.scheme.casefold() == "https" and bool(host)
+            except ValueError:
+                valid_uri = False
+            if not valid_uri:
                 raise ConfigValidationError("estat-gis distribution uri must use HTTPS")
             if (
                 "media_type" in item

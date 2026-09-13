@@ -357,6 +357,8 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
                 },
             )
         )
+    with pytest.raises(ConfigValidationError, match="survey_year"):
+        app.resolve(Config("estat", {"time": "2019"}))
 
     adapter = EstatGisAdapter(distributions)
     assert len(adapter.search(SearchQuery(text="Shape", limit=1))) == 1
@@ -401,6 +403,9 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
         {**valid, "distribution_id": "d2", "format": "csv"},
         {**valid, "distribution_id": "d2", "title": " "},
         {**valid, "distribution_id": "d2", "uri": "http://example.test/d.gml"},
+        {**valid, "distribution_id": "d2", "uri": "https://"},
+        {**valid, "distribution_id": "d2", "uri": "https:///download.gml"},
+        {**valid, "distribution_id": "d2", "uri": "https://[invalid/d.gml"},
         {**valid, "distribution_id": "d2", "media_type": 1},
         {**valid, "distribution_id": "d2", "archive": "tar"},
         {**valid, "distribution_id": "d2", "archive": "zip"},
@@ -409,6 +414,7 @@ def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
     for value in invalid:
         with pytest.raises(ConfigValidationError):
             EstatGisAdapter([value])  # type: ignore[list-item]
+    EstatGisAdapter([{**valid, "uri": "HTTPS://example.test/d.gml"}])
     with pytest.raises(ConfigValidationError, match="array"):
         EstatGisAdapter(None)  # type: ignore[arg-type]
     with pytest.raises(ConfigValidationError, match="must not be empty"):
@@ -471,12 +477,22 @@ def test_municipality_projection_checks_all_canonical_matching_records() -> None
     snapshot = StaticMunicipalityAdapter(
         (
             MunicipalityRecord(
-                identity,
-                provider_identifiers={"first": "first-13101"},
+                MunicipalityIdentity(
+                    "13101",
+                    "千代田区",
+                    "13",
+                    "東京都",
+                    provider_identifiers={"first": "first-13101"},
+                ),
             ),
             MunicipalityRecord(
-                identity,
-                provider_identifiers={"second": "second-13101"},
+                MunicipalityIdentity(
+                    "13101",
+                    "千代田区",
+                    "13",
+                    "東京都",
+                    provider_identifiers={"second": "second-13101"},
+                ),
             ),
         ),
         snapshot_version="v1",
