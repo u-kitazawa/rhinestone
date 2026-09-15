@@ -36,6 +36,7 @@ nav:
               - ODPT: api/adapters/odpt.md
               - OGC API Features: api/adapters/ogc-features.md
               - PLATEAU: api/adapters/plateau.md
+              - 横断CKAN検索: api/adapters/search-ckan-jp.md
               - STAC: api/adapters/stac.md
               - Static: api/adapters/static.md
           - 実行アダプター:

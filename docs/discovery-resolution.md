@@ -1,6 +1,6 @@
 # 発見と解決の検証
 
-Issue #18 のPhase 0として、現在の5 Sourceを「発見結果から実行可能なResourceへ到達するまで」の観点で比較します。Rhinestoneはcatalog metadataを再収集・再ホストせず、既存のcatalog / provider APIをupstreamとして利用します。
+Issue #18 のPhase 0として、現行の主要6 Sourceを「発見結果から実行可能なResourceへ到達するまで」の観点で比較します。Rhinestoneはcatalog metadataを再収集・再ホストせず、既存のcatalog / provider APIをupstreamとして利用します。
 
 ## 比較
 
@@ -12,7 +12,7 @@ Issue #18 のPhase 0として、現在の5 Sourceを「発見結果から実行�
 | PLATEAU | CKAN packageと複数distribution | archive、format、CityGML entry pointを選択する | ZIP内CityGMLまたは配布file | distribution / archive memberを解釈する |
 | GSI | catalog定義のtile scheme、CRS、zoom、attribution | tile access planと静的仕様を確定する | XYZ tile Resource | URLだけでなくscheme・CRS・範囲を保持する |
 
-5 Sourceすべてで、少なくとも識別子・配布形態・runtimeへの引き渡し条件を解釈する責務が残ります。したがって、Rhinestoneの責務はデータ処理ではなく、次の境界に限定できます。
+これらのSourceでは、少なくとも識別子・配布形態・runtimeへの引き渡し条件を解釈する責務が残ります。したがって、Rhinestoneの責務はデータ処理ではなく、次の境界に限定できます。
 
 ```text
 discover

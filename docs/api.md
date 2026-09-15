@@ -51,13 +51,17 @@ resource = app.resolve(config)
 Catalog、Runtime、Credentialを組み合わせて`Rhinestone`アプリケーションを作ります。
 
 ```python
+import os
+
+import rasterio
+
 from rhinestone import configure
 from rhinestone.catalogs import BUILTIN
 
 app = configure(
     catalog=BUILTIN,
     dependencies={"rasterio": rasterio},
-    credentials={"odpt": lambda: odpt_key},
+    credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
     network_policy="credentialed",
 )
 ```
