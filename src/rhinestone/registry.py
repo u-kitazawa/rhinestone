@@ -1,6 +1,7 @@
 """Internal adapter and user-owned dependency registries."""
 
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Tuple
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any
 
 from .errors import (
     AdapterRegistrationError,
@@ -55,17 +56,21 @@ class DependencyRegistry:
     def __init__(
         self,
         values: Mapping[str, DependencyValue],
-        instances: Optional[Dict[str, Any]] = None,
+        instances: dict[str, Any] | None = None,
     ) -> None:
-        self._values = dict(values)
-        self._instances = instances if instances is not None else {}
+        self._dependency_values = dict(values)
+        self._loaded_dependencies = instances if instances is not None else {}
 
     def scoped(self, names: Iterable[str]) -> "DependencyRegistry":
         """Return a view with the same lazy-instance cache and limited names."""
         allowed = frozenset(names)
         return DependencyRegistry(
-            {name: value for name, value in self._values.items() if name in allowed},
-            self._instances,
+            {
+                name: value
+                for name, value in self._dependency_values.items()
+                if name in allowed
+            },
+            self._loaded_dependencies,
         )
 
     def get(self, name: str) -> Any:
@@ -75,10 +80,10 @@ class DependencyRegistry:
             DependencyUnavailableError: If the name is missing or its factory
                 cannot load the runtime. The original factory error is chained.
         """
-        if name in self._instances:
-            return self._instances[name]
+        if name in self._loaded_dependencies:
+            return self._loaded_dependencies[name]
         try:
-            value = self._values[name]
+            value = self._dependency_values[name]
         except KeyError:
             raise DependencyUnavailableError(
                 f"Runtime dependency {name!r} is not configured; inject it in "
@@ -90,13 +95,13 @@ class DependencyRegistry:
             raise DependencyUnavailableError(
                 f"Runtime dependency {name!r} could not be loaded"
             ) from error
-        self._instances[name] = instance
+        self._loaded_dependencies[name] = instance
         return instance
 
     @property
-    def available(self) -> FrozenSet[str]:
+    def available(self) -> frozenset[str]:
         """Return names of dependencies declared in this registry scope."""
-        return frozenset(self._values)
+        return frozenset(self._dependency_values)
 
 
 class AdapterRegistry:
@@ -105,12 +110,12 @@ class AdapterRegistry:
     def __init__(
         self, source_adapters: Iterable[Any], execution_adapters: Iterable[Any]
     ) -> None:
-        self._sources = self._index(source_adapters, "source_id")
-        self._executions = self._index(execution_adapters, "name")
+        self._source_adapters = self._index(source_adapters, "source_id")
+        self._execution_adapters = self._index(execution_adapters, "name")
 
     @staticmethod
-    def _index(adapters: Iterable[Any], identity_attribute: str) -> Dict[str, Any]:
-        indexed: Dict[str, Any] = {}
+    def _index(adapters: Iterable[Any], identity_attribute: str) -> dict[str, Any]:
+        indexed: dict[str, Any] = {}
         for adapter in adapters:
             identity = getattr(adapter, identity_attribute)
             if identity in indexed:
@@ -124,7 +129,7 @@ class AdapterRegistry:
     def source(self, source_id: str) -> Any:
         """Return the configured Source Adapter for ``source_id``."""
         try:
-            return self._sources[source_id]
+            return self._source_adapters[source_id]
         except KeyError:
             raise UnsupportedSourceError(
                 f"Source {source_id!r} is not configured; add it to the "
@@ -134,7 +139,7 @@ class AdapterRegistry:
     def execution(self, name: str) -> Any:
         """Return the registered Execution Adapter named ``name``."""
         try:
-            return self._executions[name]
+            return self._execution_adapters[name]
         except KeyError:
             raise ExecutionAdapterUnavailableError(
                 f"Execution adapter {name!r} is not registered; provide a "
@@ -142,6 +147,6 @@ class AdapterRegistry:
             )
 
     @property
-    def execution_adapters(self) -> Tuple[Any, ...]:
+    def execution_adapters(self) -> tuple[Any, ...]:
         """Return registered Execution Adapters in deterministic order."""
-        return tuple(self._executions.values())
+        return tuple(self._execution_adapters.values())

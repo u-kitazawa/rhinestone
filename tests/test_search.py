@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import pytest
 
 from rhinestone.errors import ProviderMetadataError, ProviderResponseError
@@ -12,9 +10,9 @@ class SearchableAdapter:
     search_conditions = frozenset({"text", "limit"})
 
     def __init__(self) -> None:
-        self.queries: List[SearchQuery] = []
+        self.queries: list[SearchQuery] = []
 
-    def search(self, query: SearchQuery) -> Tuple[object, ...]:
+    def search(self, query: SearchQuery) -> tuple[object, ...]:
         self.queries.append(query)
         return (object(),)
 
@@ -31,12 +29,12 @@ class ResolveOnlyAdapter:
 
 
 class OrderedSearchableAdapter(SearchableAdapter):
-    def __init__(self, source_id: str, results: Tuple[object, ...]) -> None:
+    def __init__(self, source_id: str, results: tuple[object, ...]) -> None:
         super().__init__()
         self.source_id = source_id
         self.results = results
 
-    def search(self, query: SearchQuery) -> Tuple[object, ...]:
+    def search(self, query: SearchQuery) -> tuple[object, ...]:
         self.queries.append(query)
         return self.results
 
@@ -51,7 +49,7 @@ class FailingSearchableAdapter(SearchableAdapter):
         self.source_id = source_id
         self.error = error
 
-    def search(self, query: SearchQuery) -> Tuple[object, ...]:
+    def search(self, query: SearchQuery) -> tuple[object, ...]:
         self.queries.append(query)
         raise self.error
 

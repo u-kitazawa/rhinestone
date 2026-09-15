@@ -1,6 +1,7 @@
 """Deterministic selection of execution adapters."""
 
-from typing import Any, FrozenSet, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from .errors import ExecutionAdapterUnavailableError
 from .models import LibraryName
@@ -15,8 +16,8 @@ class ExecutionAdapterSelector:
     def select(
         self,
         resource: Any,
-        dependencies: FrozenSet[str],
-        requested: Optional[LibraryName] = None,
+        dependencies: frozenset[str],
+        requested: LibraryName | None = None,
     ) -> Any:
         """Select an adapter for a Resource and optional explicit library name.
 

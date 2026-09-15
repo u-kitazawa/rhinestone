@@ -2,12 +2,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Tuple
 
 import pytest
 
 EXAMPLES_ROOT = Path(__file__).parents[1] / "examples"
-EXAMPLE_NAMES: Tuple[str, ...] = (
+EXAMPLE_NAMES: tuple[str, ...] = (
     "01_direct_resource",
     "02_ckan_shapefile",
     "04_inspect_resource",

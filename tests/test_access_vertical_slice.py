@@ -1,14 +1,12 @@
-from typing import List, Tuple
-
 from rhinestone import Config, configure
 from rhinestone.models import RuntimeFactory
 
 
 class FakeGdal:
     def __init__(self) -> None:
-        self.calls: List[Tuple[str, Tuple[str, ...]]] = []
+        self.calls: list[tuple[str, tuple[str, ...]]] = []
 
-    def OpenEx(self, uri: str, open_options: Tuple[str, ...] = ()) -> object:
+    def OpenEx(self, uri: str, open_options: tuple[str, ...] = ()) -> object:
         self.calls.append((uri, open_options))
         return object()
 
@@ -16,7 +14,7 @@ class FakeGdal:
 def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> None:
     """Specの全アクセス順序とruntime callbackの遅延評価を垂直スライスで保証するために必要である。"""
     runtime = FakeGdal()
-    dependency_calls: List[str] = []
+    dependency_calls: list[str] = []
     app = configure(
         dependencies={
             "gdal": RuntimeFactory(lambda: dependency_calls.append("gdal") or runtime)

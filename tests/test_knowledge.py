@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import pytest
 

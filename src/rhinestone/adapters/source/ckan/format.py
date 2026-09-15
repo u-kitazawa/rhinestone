@@ -1,11 +1,11 @@
 """Compatibility exports for CKAN format helpers."""
 
-from typing import Any, Optional
+from typing import Any
 
 from ....representations import canonical_format
 
 
-def optional_string(value: Any) -> Optional[str]:
+def optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 

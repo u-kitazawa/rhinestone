@@ -1,12 +1,13 @@
 """Source adapter for an explicitly described direct resource."""
 
-from typing import Any, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ....models import Config, Metadata, Provenance, ResourceCandidate, Source
-from ..base import ProviderAdapter
+from ..base import SourceAdapterBase
 
 
-class DirectAdapter(ProviderAdapter):
+class DirectAdapter(SourceAdapterBase):
     """Interpret a complete direct-resource declaration without guessing."""
 
     adapter_type = "direct"
@@ -53,5 +54,5 @@ class DirectAdapter(ProviderAdapter):
         )
 
 
-def _optional_string(value: Any) -> Optional[str]:
+def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None

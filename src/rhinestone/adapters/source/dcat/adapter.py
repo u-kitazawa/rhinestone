@@ -1,6 +1,7 @@
 """DCAT RDF catalog interpretation using a user-owned RDFLib runtime."""
 
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from ....errors import (
     ConfigValidationError,
@@ -14,14 +15,14 @@ from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Sou
 from ....representations import canonical_format, format_from_media_type
 from ....security import DestinationPolicy
 from .._knowledge import source, string
-from ..base import ProviderAdapter
+from ..base import SourceAdapterBase
 
 _DCAT = "http://www.w3.org/ns/dcat#"
 _DCT = "http://purl.org/dc/terms/"
 _RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 
 
-class DcatAdapter(ProviderAdapter):
+class DcatAdapter(SourceAdapterBase):
     """Interpret a DCAT RDF catalog and resolve one Dataset distribution."""
 
     adapter_type = "dcat"
@@ -31,20 +32,20 @@ class DcatAdapter(ProviderAdapter):
         self,
         get_document: Callable[[str], str],
         rdf_runtime_factory: Callable[[], Any],
-        catalog_uri: Optional[str] = None,
+        catalog_uri: str | None = None,
         serialization: str = "turtle",
-        destination_policy: Optional[DestinationPolicy] = None,
+        destination_policy: DestinationPolicy | None = None,
     ) -> None:
         super().__init__(
             get_json=lambda url, params: None,
             destination_policy=destination_policy,
         )
-        self._get_document = get_document
+        self._document_loader = get_document
         self._rdf_runtime_factory = rdf_runtime_factory
         self._catalog_uri = catalog_uri
         self._serialization = serialization
 
-    def _catalog(self, settings: Mapping[str, Any]) -> Tuple[Any, Any, str, str]:
+    def _load_catalog(self, settings: Mapping[str, Any]) -> tuple[Any, Any, str, str]:
         uri = string(settings, "uri")
         if self._catalog_uri is not None and uri != self._catalog_uri:
             raise ConfigValidationError(
@@ -63,7 +64,7 @@ class DcatAdapter(ProviderAdapter):
                 "RDF runtime could not be loaded"
             ) from error
         try:
-            document = self._get_document(uri)
+            document = self._document_loader(uri)
         except Exception as error:
             raise ProviderMetadataError("Could not load RDF catalog") from error
         try:
@@ -74,7 +75,7 @@ class DcatAdapter(ProviderAdapter):
         return rdf, graph, document, uri
 
     @staticmethod
-    def _value(rdf: Any, graph: Any, subject: Any, predicate: str) -> Optional[str]:
+    def _value(rdf: Any, graph: Any, subject: Any, predicate: str) -> str | None:
         values = sorted(
             str(item) for item in graph.objects(subject, rdf.URIRef(predicate))
         )
@@ -83,21 +84,36 @@ class DcatAdapter(ProviderAdapter):
     def load(self, config: Config) -> Source:
         """Load the configured Dataset URI and expose its distribution."""
         settings = self._config_settings(config)
-        rdf, graph, document, uri = self._catalog(settings)
+        rdf_runtime, catalog_graph, document, catalog_uri = self._load_catalog(settings)
         dataset_uri = string(settings, "dataset")
-        dataset = rdf.URIRef(dataset_uri)
-        if (dataset, rdf.URIRef(_RDF_TYPE), rdf.URIRef(_DCAT + "Dataset")) not in graph:
+        dataset = rdf_runtime.URIRef(dataset_uri)
+        if (
+            dataset,
+            rdf_runtime.URIRef(_RDF_TYPE),
+            rdf_runtime.URIRef(_DCAT + "Dataset"),
+        ) not in catalog_graph:
             raise ResourceNotFoundError("DCAT Dataset URI was not found")
-        candidates: List[ResourceCandidate] = []
+        candidates: list[ResourceCandidate] = []
         for distribution in sorted(
-            set(graph.objects(dataset, rdf.URIRef(_DCAT + "distribution"))), key=str
+            set(
+                catalog_graph.objects(
+                    dataset, rdf_runtime.URIRef(_DCAT + "distribution")
+                )
+            ),
+            key=str,
         ):
-            media_type = self._value(rdf, graph, distribution, _DCAT + "mediaType")
+            media_type = self._value(
+                rdf_runtime, catalog_graph, distribution, _DCAT + "mediaType"
+            )
             format_name = canonical_format(
-                self._value(rdf, graph, distribution, _DCT + "format")
+                self._value(rdf_runtime, catalog_graph, distribution, _DCT + "format")
             ) or format_from_media_type(media_type)
             for url in sorted(
-                set(graph.objects(distribution, rdf.URIRef(_DCAT + "downloadURL"))),
+                set(
+                    catalog_graph.objects(
+                        distribution, rdf_runtime.URIRef(_DCAT + "downloadURL")
+                    )
+                ),
                 key=str,
             ):
                 candidates.append(
@@ -113,7 +129,10 @@ class DcatAdapter(ProviderAdapter):
                             == str(distribution),
                             "access_kind": "file",
                             "license": self._value(
-                                rdf, graph, distribution, _DCT + "license"
+                                rdf_runtime,
+                                catalog_graph,
+                                distribution,
+                                _DCT + "license",
                             ),
                         },
                     )
@@ -121,33 +140,46 @@ class DcatAdapter(ProviderAdapter):
         return source(
             self.adapter_type,
             dataset_uri,
-            {"document": document, "catalog_uri": uri},
+            {"document": document, "catalog_uri": catalog_uri},
             tuple(candidates),
-            title=self._value(rdf, graph, dataset, _DCT + "title"),
-            description=self._value(rdf, graph, dataset, _DCT + "description"),
-            license_name=self._value(rdf, graph, dataset, _DCT + "license"),
-            endpoint=uri,
+            title=self._value(rdf_runtime, catalog_graph, dataset, _DCT + "title"),
+            description=self._value(
+                rdf_runtime, catalog_graph, dataset, _DCT + "description"
+            ),
+            license_name=self._value(
+                rdf_runtime, catalog_graph, dataset, _DCT + "license"
+            ),
+            endpoint=catalog_uri,
             capabilities=("download", "search"),
         )
 
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
         """Search Dataset subjects by text while preserving their distributions."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError("Unsupported DCAT search")
-        settings: Dict[str, Any] = {
+        settings: dict[str, Any] = {
             "uri": self._catalog_uri,
             "serialization": self._serialization,
         }
-        rdf, graph, document, uri = self._catalog(settings)
-        results: List[SearchResult] = []
+        rdf_runtime, catalog_graph, document, catalog_uri = self._load_catalog(settings)
+        results: list[SearchResult] = []
         for dataset in sorted(
-            set(graph.subjects(rdf.URIRef(_RDF_TYPE), rdf.URIRef(_DCAT + "Dataset"))),
+            set(
+                catalog_graph.subjects(
+                    rdf_runtime.URIRef(_RDF_TYPE),
+                    rdf_runtime.URIRef(_DCAT + "Dataset"),
+                )
+            ),
             key=str,
         ):
-            if not isinstance(dataset, rdf.URIRef):
+            if not isinstance(dataset, rdf_runtime.URIRef):
                 continue
-            title = self._value(rdf, graph, dataset, _DCT + "title") or str(dataset)
-            description = self._value(rdf, graph, dataset, _DCT + "description")
+            title = self._value(
+                rdf_runtime, catalog_graph, dataset, _DCT + "title"
+            ) or str(dataset)
+            description = self._value(
+                rdf_runtime, catalog_graph, dataset, _DCT + "description"
+            )
             if (
                 query.text
                 and query.text.casefold()
@@ -161,7 +193,7 @@ class DcatAdapter(ProviderAdapter):
                 (),
                 title=title,
                 description=description,
-                endpoint=uri,
+                endpoint=catalog_uri,
             )
             results.append(
                 SearchResult(

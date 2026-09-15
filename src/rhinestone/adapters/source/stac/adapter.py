@@ -1,6 +1,7 @@
 """STAC API 1.0 source adapter."""
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
@@ -16,10 +17,10 @@ from ....registry import CredentialRegistry
 from ....representations import format_from_media_type
 from ....security import DestinationPolicy
 from .._uri import resolve_response_href
-from ..base import JsonObject, JsonTransport, ProviderAdapter
+from ..base import JsonObject, JsonTransport, SourceAdapterBase
 
 
-class StacAdapter(ProviderAdapter):
+class StacAdapter(SourceAdapterBase):
     """Interpret STAC API Items, Assets, and standard search responses."""
 
     adapter_type = "stac"
@@ -28,16 +29,16 @@ class StacAdapter(ProviderAdapter):
     def __init__(
         self,
         get_json: JsonTransport,
-        endpoint: Optional[str] = None,
-        api_token: Optional[str] = None,
-        api_key: Optional[str] = None,
+        endpoint: str | None = None,
+        api_token: str | None = None,
+        api_key: str | None = None,
         api_key_header: str = "X-API-Key",
-        credential: Optional[str] = None,
-        credential_header: Optional[str] = None,
-        credential_scheme: Optional[str] = None,
-        credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
-        provider_id: Optional[str] = None,
+        credential: str | None = None,
+        credential_header: str | None = None,
+        credential_scheme: str | None = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
+        provider_id: str | None = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -92,7 +93,7 @@ class StacAdapter(ProviderAdapter):
 
     def search(
         self, query: SearchQuery, collections: Sequence[str] = ()
-    ) -> Tuple[SearchResult, ...]:
+    ) -> tuple[SearchResult, ...]:
         """Search STAC Items using bbox, datetime, limit, and collections."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
@@ -105,7 +106,7 @@ class StacAdapter(ProviderAdapter):
             params["collections"] = ",".join(collections)
         response = self._request(f"{endpoint}/search", params)
         items = self._objects(response.get("features"), "STAC features")
-        found: List[SearchResult] = []
+        found: list[SearchResult] = []
         for item in items:
             item_id = self._required_string(item, "id")
             collection_id = self._required_string(item, "collection")
@@ -141,8 +142,8 @@ class StacAdapter(ProviderAdapter):
         return tuple(found)
 
     @staticmethod
-    def _query_parameters(query: SearchQuery) -> Dict[str, Any]:
-        params: Dict[str, Any] = {}
+    def _query_parameters(query: SearchQuery) -> dict[str, Any]:
+        params: dict[str, Any] = {}
         if query.bbox is not None:
             params["bbox"] = ",".join(str(value) for value in query.bbox)
         if query.time is not None:
@@ -181,7 +182,7 @@ class StacAdapter(ProviderAdapter):
 
     def _single_data_asset_key(self, item: JsonObject) -> str:
         assets = self._object(item.get("assets"), "STAC assets")
-        data_keys: List[str] = []
+        data_keys: list[str] = []
         for key, raw_asset in assets.items():
             asset = self._object(raw_asset, f"STAC asset {key!r}")
             roles = asset.get("roles", [])
@@ -194,5 +195,5 @@ class StacAdapter(ProviderAdapter):
         return data_keys[0]
 
 
-def _optional_string(value: Any) -> Optional[str]:
+def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None

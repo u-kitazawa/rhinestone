@@ -1,8 +1,9 @@
 """Destination authorization derived from trusted Source definitions."""
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from posixpath import normpath
-from typing import Any, Iterable, Literal, Mapping, Optional, Tuple, cast
+from typing import Any, Literal, Optional, cast
 from urllib.parse import unquote, urlsplit
 
 from ._uri import is_valid_http_authority
@@ -68,16 +69,16 @@ class CredentialDestinationRule:
 
     provider: str
     service: str
-    credential: Optional[str]
+    credential: str | None
     destination: DestinationRule
 
     def matches(
         self,
         url: str,
         *,
-        provider: Optional[str],
-        service: Optional[str],
-        credential: Optional[str],
+        provider: str | None,
+        service: str | None,
+        credential: str | None,
     ) -> bool:
         """Return whether URL and logical credential context match this rule."""
         if provider is not None and provider != self.provider:
@@ -98,8 +99,8 @@ class DestinationPolicy:
     """
 
     level: NetworkPolicyLevel = "credentialed"
-    rules: Tuple[DestinationRule, ...] = ()
-    credential_rules: Optional[Tuple[CredentialDestinationRule, ...]] = None
+    rules: tuple[DestinationRule, ...] = ()
+    credential_rules: tuple[CredentialDestinationRule, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.level not in {"none", "credentialed"}:
@@ -142,9 +143,9 @@ class DestinationPolicy:
         url: str,
         *,
         credentialed: bool = False,
-        provider: Optional[str] = None,
-        service: Optional[str] = None,
-        credential: Optional[str] = None,
+        provider: str | None = None,
+        service: str | None = None,
+        credential: str | None = None,
     ) -> None:
         """Raise when ``url`` is outside this policy's authorized URL space.
 
@@ -186,7 +187,7 @@ def _normalize_path(path: str) -> str:
     return normalized or "/"
 
 
-def _urls(value: Any) -> Tuple[str, ...]:
+def _urls(value: Any) -> tuple[str, ...]:
     found: list[str] = []
     if isinstance(value, str):
         if DestinationRule.from_url(value) is not None:
@@ -195,13 +196,13 @@ def _urls(value: Any) -> Tuple[str, ...]:
         mapping = cast(Mapping[Any, Any], value)
         for item in mapping.values():
             found.extend(_urls(item))
-    elif isinstance(value, (list, tuple, set, frozenset)):
+    elif isinstance(value, list | tuple | set | frozenset):
         for item in cast(Iterable[Any], value):
             found.extend(_urls(item))
     return tuple(found)
 
 
-def _credential_rules(provider: Provider) -> Tuple[CredentialDestinationRule, ...]:
+def _credential_rules(provider: Provider) -> tuple[CredentialDestinationRule, ...]:
     endpoint = provider.settings.get("endpoint")
     if not isinstance(endpoint, str):
         return ()
@@ -215,7 +216,7 @@ def _credential_rules(provider: Provider) -> Tuple[CredentialDestinationRule, ..
             for resource_type in cast(Mapping[Any, Any], resource_types).values()
             if isinstance(resource_type, str) and resource_type
         )
-        credential: Optional[str] = None
+        credential: str | None = None
     elif provider.adapter_type not in {
         "direct",
         "static",

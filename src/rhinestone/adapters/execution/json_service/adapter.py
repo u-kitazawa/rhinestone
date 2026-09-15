@@ -1,6 +1,7 @@
 """Selected JSON service requests delegated to a requests-compatible runtime."""
 
-from typing import Any, Callable, FrozenSet, List, Mapping, Optional, Tuple, cast
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 from ....errors import ProviderResponseError, ResourceAccessError
 from ....models import AccessPlan, Resource, ServiceQueryPlan
@@ -9,7 +10,7 @@ from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
 
 RequestPreparer = Callable[
-    [AccessPlan, CredentialRegistry], Tuple[Mapping[str, Any], Mapping[str, str]]
+    [AccessPlan, CredentialRegistry], tuple[Mapping[str, Any], Mapping[str, str]]
 ]
 
 
@@ -23,8 +24,8 @@ class JsonServiceAdapter(ExecutionAdapter):
         self,
         prepare_request: RequestPreparer,
         service: str,
-        credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
     ) -> None:
         super().__init__(destination_policy)
         self._prepare_request = prepare_request
@@ -40,7 +41,7 @@ class JsonServiceAdapter(ExecutionAdapter):
             self._destination_policy,
         )
 
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
         """Return whether this service and JSON response shape are compatible."""
         return (
             self.name in dependencies
@@ -87,7 +88,7 @@ class JsonServiceAdapter(ExecutionAdapter):
             ) from None
         if resource.access_plan.options.get("response_type") == "array" and (
             not isinstance(data, list)
-            or any(not isinstance(item, Mapping) for item in cast(List[Any], data))
+            or any(not isinstance(item, Mapping) for item in cast(list[Any], data))
         ):
             raise ProviderResponseError(
                 "Service must return an array of objects; response_type='array' "

@@ -1,8 +1,9 @@
 import ast
 import json
+from collections.abc import Mapping
 from importlib import resources
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -16,6 +17,7 @@ from rhinestone.adapters import (
     OgcFeaturesAdapter,
     PlateauAdapter,
     ProviderAdapter,
+    SourceAdapterBase,
     StacAdapter,
 )
 from rhinestone.adapters.source._knowledge import string
@@ -71,6 +73,10 @@ class ProbeAdapter(ProviderAdapter):
 
     def objects(self, value: Any):
         return self._objects(value, "values")
+
+
+def test_source_adapter_base_keeps_the_legacy_base_class_alias() -> None:
+    assert ProviderAdapter is SourceAdapterBase
 
 
 def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
@@ -217,6 +223,6 @@ def test_adapter_package_initializers_only_reexport_public_symbols(
     tree = ast.parse((root / package / "__init__.py").read_text())
 
     assert not any(
-        isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef)
         for node in tree.body
     )

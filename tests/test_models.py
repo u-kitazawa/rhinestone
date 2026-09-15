@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 import pytest
 
@@ -20,17 +20,17 @@ from rhinestone.models import (
 
 
 def test_config_is_immutable_and_copies_nested_settings() -> None:
-    settings: Dict[str, Any] = {
+    settings: dict[str, Any] = {
         "resource_id": "resource-1",
         "filters": {"year": 2024},
     }
     config = Config(source_id="ckan", settings=settings)
 
-    cast(Dict[str, int], settings["filters"])["year"] = 2025
+    cast(dict[str, int], settings["filters"])["year"] = 2025
 
     assert config.settings["filters"]["year"] == 2024
     with pytest.raises(TypeError):
-        cast(Dict[str, Any], config.settings)["resource_id"] = "changed"
+        cast(dict[str, Any], config.settings)["resource_id"] = "changed"
 
 
 def test_source_definition_and_config_ids_must_be_non_empty() -> None:
@@ -91,7 +91,7 @@ def test_resource_candidate_accepts_valid_ipv6_http_authority() -> None:
     ),
 )
 def test_resource_candidate_validates_public_field_shapes(
-    kwargs: Dict[str, Any], message: str
+    kwargs: dict[str, Any], message: str
 ) -> None:
     with pytest.raises(ConfigValidationError, match=message):
         ResourceCandidate(**cast(Any, kwargs))
@@ -167,13 +167,13 @@ def test_search_query_accepts_valid_boundary_values() -> None:
 
 
 def test_source_definition_is_deeply_immutable() -> None:
-    settings: Dict[str, Any] = {"endpoint": "https://example.jp", "nested": {"x": 1}}
+    settings: dict[str, Any] = {"endpoint": "https://example.jp", "nested": {"x": 1}}
     source = Provider("catalog", "ckan", settings)
-    cast(Dict[str, int], settings["nested"])["x"] = 2
+    cast(dict[str, int], settings["nested"])["x"] = 2
 
     assert source.settings["nested"]["x"] == 1
     with pytest.raises(TypeError):
-        cast(Dict[str, Any], source.settings)["endpoint"] = "changed"
+        cast(dict[str, Any], source.settings)["endpoint"] = "changed"
 
 
 def test_config_freezes_all_mutable_container_shapes() -> None:

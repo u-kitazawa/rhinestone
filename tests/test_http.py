@@ -1,6 +1,6 @@
 import io
 from email.message import Message
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request
 
@@ -11,10 +11,10 @@ from rhinestone.errors import ProviderResponseError
 
 
 class _Headers:
-    def __init__(self, charset: Optional[str]) -> None:
+    def __init__(self, charset: str | None) -> None:
         self._charset = charset
 
-    def get_content_charset(self) -> Optional[str]:
+    def get_content_charset(self) -> str | None:
         return self._charset
 
 
@@ -24,8 +24,8 @@ class _Response:
         body: bytes,
         *,
         status: int = 200,
-        charset: Optional[str] = None,
-        final_url: Optional[str] = None,
+        charset: str | None = None,
+        final_url: str | None = None,
     ) -> None:
         self._body = body
         self._status = status
@@ -56,7 +56,7 @@ class _Response:
 class _Opener:
     def __init__(self, result: Any) -> None:
         self._result = result
-        self.calls: Dict[str, Any] = {}
+        self.calls: dict[str, Any] = {}
 
     def open(self, request: Request, *, timeout: int) -> Any:
         self.calls["request"] = request
@@ -68,7 +68,7 @@ class _Opener:
 
 
 def test_get_json_builds_query_and_headers(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: Dict[str, Any] = {}
+    calls: dict[str, Any] = {}
 
     def open_url(request: Request, *, timeout: int) -> _Response:
         calls["request"] = request
@@ -95,7 +95,7 @@ def test_get_json_builds_query_and_headers(monkeypatch: pytest.MonkeyPatch) -> N
 def test_get_json_preserves_existing_query_and_fragment_without_new_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: Dict[str, Any] = {}
+    calls: dict[str, Any] = {}
 
     def open_url(request: Request, *, timeout: int) -> _Response:
         calls["request"] = request
@@ -112,7 +112,7 @@ def test_get_json_preserves_existing_query_and_fragment_without_new_parameters(
 def test_get_json_appends_multi_value_query_before_fragment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: Dict[str, Any] = {}
+    calls: dict[str, Any] = {}
 
     def open_url(request: Request, *, timeout: int) -> _Response:
         calls["request"] = request
@@ -170,7 +170,7 @@ def test_get_json_normalizes_invalid_json(
 def test_get_json_rejects_redirects_for_marked_credential_headers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: Dict[str, Any] = {}
+    calls: dict[str, Any] = {}
 
     def build_test_opener(handler: object) -> _Opener:
         calls["handler"] = handler

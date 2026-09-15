@@ -1,27 +1,28 @@
 """ODPT v4 service knowledge; data requests are executed only by open."""
 
-from typing import Any, Dict, Mapping, Optional, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ....errors import ConfigValidationError
 from ....models import AccessPlan, Config, ResourceCandidate, Source
 from ....registry import CredentialRegistry
 from .._knowledge import source, string
-from ..base import ProviderAdapter
+from ..base import SourceAdapterBase
 from .validation import filter_mapping, required_string, string_mapping
 
 
-class OdptAdapter(ProviderAdapter):
+class OdptAdapter(SourceAdapterBase):
     """Create explicit ODPT JSON service access plans."""
 
     adapter_type = "odpt"
 
     def __init__(
         self,
-        endpoint: Optional[str] = None,
-        resource_types: Optional[Mapping[str, str]] = None,
-        filter_fields: Optional[Mapping[str, Any]] = None,
-        spec_source: Optional[str] = None,
-        terms_url: Optional[str] = None,
+        endpoint: str | None = None,
+        resource_types: Mapping[str, str] | None = None,
+        filter_fields: Mapping[str, Any] | None = None,
+        spec_source: str | None = None,
+        terms_url: str | None = None,
     ) -> None:
         if not isinstance(endpoint, str) or not endpoint.strip():
             raise ConfigValidationError("ODPT endpoint must be configured")
@@ -87,7 +88,7 @@ class OdptAdapter(ProviderAdapter):
     def prepare_request(
         plan: AccessPlan,
         credentials: CredentialRegistry,
-    ) -> Tuple[Mapping[str, Any], Mapping[str, str]]:
+    ) -> tuple[Mapping[str, Any], Mapping[str, str]]:
         """Convert an ODPT service plan into request parameters and headers."""
         expected_uri = plan.options.get("endpoint")
         if (
@@ -103,6 +104,6 @@ class OdptAdapter(ProviderAdapter):
         credential = plan.options.get("credential")
         if not isinstance(params_value, Mapping) or not isinstance(credential, str):
             raise ConfigValidationError("ODPT service plan is incomplete")
-        params: Dict[str, Any] = dict(cast(Mapping[str, Any], params_value))
+        params: dict[str, Any] = dict(cast(Mapping[str, Any], params_value))
         params["acl:consumerKey"] = credentials.get(credential)
         return params, {}

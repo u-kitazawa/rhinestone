@@ -1,7 +1,7 @@
 """Application pipeline from Config through Source to user-owned runtime."""
 
 from dataclasses import replace
-from typing import Any, Optional
+from typing import Any
 
 from .errors import ProviderMetadataError, RhinestoneError
 from .execution import ExecutionAdapterSelector
@@ -18,14 +18,14 @@ class AccessPipeline:
         self,
         adapter_registry: AdapterRegistry,
         resolver: Resolver,
-        execution_selector: Optional[ExecutionAdapterSelector] = None,
-        dependencies: Optional[DependencyRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
+        execution_selector: ExecutionAdapterSelector | None = None,
+        dependencies: DependencyRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
     ) -> None:
         self._adapter_registry = adapter_registry
         self._resolver = resolver
-        self._execution_selector = execution_selector
-        self._dependencies = dependencies
+        self._execution_adapter_selector = execution_selector
+        self._dependency_registry = dependencies
         self._destination_policy = (
             destination_policy or DestinationPolicy.unrestricted()
         )
@@ -43,10 +43,13 @@ class AccessPipeline:
                 "loaded; inspect the endpoint and provider availability"
             ) from error
         resource = self._resolver.resolve(source)
-        if self._execution_selector is None or self._dependencies is None:
+        if (
+            self._execution_adapter_selector is None
+            or self._dependency_registry is None
+        ):
             return resource
-        selector = self._execution_selector
-        dependencies = self._dependencies
+        selector = self._execution_adapter_selector
+        dependencies = self._dependency_registry
         destination_policy = self._destination_policy
 
         def open_resource(library: LibraryName) -> object:
@@ -69,7 +72,10 @@ class AccessPipeline:
 
     def open_resource(self, resource: Resource, library: LibraryName) -> object:
         """Open an existing Resource using this pipeline's policy and runtimes."""
-        if self._execution_selector is None or self._dependencies is None:
+        if (
+            self._execution_adapter_selector is None
+            or self._dependency_registry is None
+        ):
             raise ProviderMetadataError(
                 "Execution pipeline is not configured; construct the public "
                 "application with configure() before opening a Resource"
@@ -77,8 +83,8 @@ class AccessPipeline:
         return self._open_resource(
             resource,
             library,
-            self._execution_selector,
-            self._dependencies,
+            self._execution_adapter_selector,
+            self._dependency_registry,
             self._destination_policy,
         )
 

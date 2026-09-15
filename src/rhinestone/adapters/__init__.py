@@ -28,6 +28,7 @@ from .source import (
     OgcFeaturesAdapter,
     PlateauAdapter,
     ProviderAdapter,
+    SourceAdapterBase,
     StacAdapter,
     StaticAdapter,
 )
@@ -44,6 +45,7 @@ __all__ = [
     "OgcFeaturesAdapter",
     "PlateauAdapter",
     "ProviderAdapter",
+    "SourceAdapterBase",
     "StacAdapter",
     "StaticAdapter",
     "ExecutionAdapter",

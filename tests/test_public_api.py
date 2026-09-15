@@ -1,5 +1,6 @@
 import io
-from typing import Any, Dict, List, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 from urllib.request import Request
 
 import pytest
@@ -27,7 +28,7 @@ from .provider_support import fixture_json
 class FakeRasterio:
     def __init__(self, label: str) -> None:
         self.label = label
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     def open(self, uri: str) -> str:
         self.calls.append(uri)
@@ -78,7 +79,7 @@ def direct_config() -> Config:
 
 
 def test_direct_and_execution_adapters_are_built_in() -> None:
-    calls: List[str] = []
+    calls: list[str] = []
     runtime = FakeRasterio("opened")
     app = configure(
         dependencies={
@@ -94,7 +95,7 @@ def test_direct_and_execution_adapters_are_built_in() -> None:
 
 
 def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
-    selected: List[str] = []
+    selected: list[str] = []
 
     class FakeGdal:
         def OpenEx(self, uri: str, **options: object) -> str:
@@ -130,8 +131,8 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         assert url == item_url
         assert params == {}
         return item
@@ -183,8 +184,8 @@ def test_source_definitions_do_not_store_runtime_or_secret_values() -> None:
 
 
 def test_configure_all_composes_without_loading_dependencies_or_credentials() -> None:
-    dependency_calls: List[bool] = []
-    credential_calls: List[bool] = []
+    dependency_calls: list[bool] = []
+    credential_calls: list[bool] = []
 
     configure(
         sources=sources.ALL,
@@ -210,13 +211,13 @@ def test_configure_one_source_only_enables_that_source_and_direct() -> None:
 def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    requests: List[str] = []
+    requests: list[str] = []
 
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         requests.append(url)
         catalog = "first" if url.startswith("https://first.test") else "second"
         resource_id = catalog + "-resource"
@@ -304,11 +305,11 @@ def test_discovery_result_resolves_through_a_different_target_source(
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         assert url == search_url
         assert params == {"q": "river", "rows": 1}
-        return cast(Dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
+        return cast(dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
 
     monkeypatch.setattr(_http, "get_json", get_json)
     app = configure(sources=(sources.SEARCH_CKAN_JP,))
@@ -387,8 +388,8 @@ def test_public_search_skips_search_ckan_jp_without_required_text(
     def fail_if_called(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         raise AssertionError("search-ckan.jp must be skipped without text")
 
     monkeypatch.setattr(_http, "get_json", fail_if_called)
@@ -412,15 +413,15 @@ def test_public_search_skips_search_ckan_jp_without_required_text(
     ),
 )
 def test_invalid_public_search_parameters_fail_before_provider_requests(
-    monkeypatch: pytest.MonkeyPatch, search_parameters: Dict[str, Any]
+    monkeypatch: pytest.MonkeyPatch, search_parameters: dict[str, Any]
 ) -> None:
-    requests: List[str] = []
+    requests: list[str] = []
 
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         requests.append(url)
         return {}
 

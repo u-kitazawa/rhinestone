@@ -1,5 +1,3 @@
-from typing import FrozenSet
-
 import pytest
 
 from rhinestone.errors import ExecutionAdapterUnavailableError
@@ -12,7 +10,7 @@ class FakeExecutionAdapter:
         self.priority = priority
         self.supported_format = supported_format
 
-    def supports(self, resource: object, dependencies: FrozenSet[str]) -> bool:
+    def supports(self, resource: object, dependencies: frozenset[str]) -> bool:
         return (
             getattr(resource, "format", None) == self.supported_format
             and self.name in dependencies

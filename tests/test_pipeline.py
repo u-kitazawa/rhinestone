@@ -1,5 +1,3 @@
-from typing import List
-
 import pytest
 
 from rhinestone.errors import (
@@ -17,7 +15,7 @@ from rhinestone.resolution import Resolver
 class RecordingSourceAdapter:
     source_id = "fixture"
 
-    def __init__(self, events: List[str]) -> None:
+    def __init__(self, events: list[str]) -> None:
         self.events = events
 
     def load(self, config: Config) -> Source:
@@ -34,7 +32,7 @@ class RecordingSourceAdapter:
 
 
 class RecordingResolver(Resolver):
-    def __init__(self, events: List[str]) -> None:
+    def __init__(self, events: list[str]) -> None:
         super().__init__()
         self.events = events
 
@@ -45,7 +43,7 @@ class RecordingResolver(Resolver):
 
 def test_access_pipeline_keeps_source_interpretation_before_resolution() -> None:
     """Provider 解釈と Resource 選択の責務境界・処理順序を維持するために必要である。"""
-    events: List[str] = []
+    events: list[str] = []
     pipeline = AccessPipeline(
         adapter_registry=AdapterRegistry((RecordingSourceAdapter(events),), ()),
         resolver=RecordingResolver(events),
@@ -123,7 +121,7 @@ def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
 
 def test_duplicate_source_adapters_are_rejected_by_pipeline() -> None:
     """同じ Source type の選択が登録順依存になることを防ぐために必要である。"""
-    events: List[str] = []
+    events: list[str] = []
     with pytest.raises(AdapterRegistrationError, match="fixture"):
         AccessPipeline(
             adapter_registry=AdapterRegistry(

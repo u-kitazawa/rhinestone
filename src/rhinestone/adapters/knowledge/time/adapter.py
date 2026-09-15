@@ -2,7 +2,7 @@
 
 import re
 from datetime import date
-from typing import Optional, cast
+from typing import cast
 
 from ....errors import KnowledgeResolutionError
 from ..models import TimeKind, TimeSemantic
@@ -25,9 +25,7 @@ _DATE_PATTERN = re.compile(r"^([1-9][0-9]{3})-([0-9]{2})-([0-9]{2})$")
 class StandardTimeAdapter:
     """Resolve only explicit year, era-year, fiscal-year, and ISO date forms."""
 
-    def resolve_time(
-        self, value: str, *, kind: Optional[TimeKind] = None
-    ) -> TimeSemantic:
+    def resolve_time(self, value: str, *, kind: TimeKind | None = None) -> TimeSemantic:
         """Resolve explicit calendar, fiscal, era, or ISO date expressions."""
         raw_value = cast(object, value)
         if not isinstance(raw_value, str) or not raw_value.strip():
@@ -100,7 +98,7 @@ class StandardTimeAdapter:
         return TimeSemantic(kind=selected, year=year, raw=raw)
 
     def _resolve_era_date(
-        self, match: re.Match[str], raw: str, kind: Optional[TimeKind]
+        self, match: re.Match[str], raw: str, kind: TimeKind | None
     ) -> TimeSemantic:
         if kind not in (None, "as_of_date"):
             raise KnowledgeResolutionError(

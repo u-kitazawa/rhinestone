@@ -1,16 +1,17 @@
 """Explicit local access to downloaded GSI fundamental vector data."""
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 from ....errors import ResourceNotFoundError
 from ....models import Config, ResourceCandidate, Source
 from ...knowledge import KnowledgeAdapterRegistry
 from .._knowledge import entry_point, resolve_knowledge, source, string
-from ..base import ProviderAdapter
+from ..base import SourceAdapterBase
 
 
-class GsiFundamentalAdapter(ProviderAdapter):
+class GsiFundamentalAdapter(SourceAdapterBase):
     """Resolve local GSI Fundamental geospatial data declarations."""
 
     adapter_type = "gsi-fundamental"

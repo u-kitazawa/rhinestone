@@ -6,9 +6,10 @@ belong to the adapter that has the relevant advertised capability.
 """
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from math import isfinite
-from typing import Iterator, Literal, Tuple, cast
+from typing import Literal, cast
 
 from ...errors import KnowledgeResolutionError, KnowledgeValidationError
 
@@ -77,7 +78,7 @@ class BoundingBox:
         values = (self.west, self.south, self.east, self.north)
         if any(
             isinstance(cast(object, value), bool)
-            or not isinstance(cast(object, value), (int, float))
+            or not isinstance(cast(object, value), int | float)
             for value in values
         ):
             raise KnowledgeValidationError("bbox coordinates must be finite numbers")
@@ -99,13 +100,13 @@ class BoundingBox:
 
     @classmethod
     def from_tuple(
-        cls, value: Tuple[float, float, float, float], crs: CRSRef = CRS84
+        cls, value: tuple[float, float, float, float], crs: CRSRef = CRS84
     ) -> "BoundingBox":
         if not isinstance(cast(object, value), tuple) or len(value) != 4:
             raise KnowledgeValidationError("bbox must be a tuple of four numbers")
         return cls(*value, crs=crs)
 
-    def as_tuple(self) -> Tuple[float, float, float, float]:
+    def as_tuple(self) -> tuple[float, float, float, float]:
         return (self.west, self.south, self.east, self.north)
 
     def __iter__(self) -> Iterator[float]:
@@ -145,7 +146,7 @@ class MeshCode:
                 )
 
 
-def require_lossless_crs84(bbox: BoundingBox) -> Tuple[float, float, float, float]:
+def require_lossless_crs84(bbox: BoundingBox) -> tuple[float, float, float, float]:
     """Return a bbox for providers whose contract is explicitly CRS84 only."""
     if bbox.crs != CRS84:
         raise KnowledgeResolutionError(

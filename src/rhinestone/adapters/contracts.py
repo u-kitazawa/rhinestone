@@ -1,7 +1,8 @@
 """Small public contracts used to compose user-owned adapters."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, FrozenSet, Protocol, Tuple
+from typing import Any, Protocol
 
 from ..models import Config, Provider, Resource, Result, Source
 from ..security import DestinationPolicy
@@ -20,7 +21,7 @@ class SourceAdapter(Protocol):
 class SearchableSourceAdapter(SourceAdapter, Protocol):
     """Optional Source Adapter contract for provider-backed search."""
 
-    def search(self, query: Any) -> Tuple[Result, ...]:
+    def search(self, query: Any) -> tuple[Result, ...]:
         """Return results for the already projected source query."""
         ...
 
@@ -31,7 +32,7 @@ class ExecutionAdapter(Protocol):
     name: str
     priority: int
 
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
         """Return whether this adapter can open ``resource`` with dependencies."""
         ...
 
@@ -92,7 +93,7 @@ class SourceAdapterDefinition:
 
     adapter_type: str
     factory: SourceAdapterFactory
-    dependencies: FrozenSet[str] = field(default_factory=lambda: frozenset[str]())
+    dependencies: frozenset[str] = field(default_factory=lambda: frozenset[str]())
 
     def __post_init__(self) -> None:
         if not self.adapter_type.strip():

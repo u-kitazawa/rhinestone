@@ -4,8 +4,8 @@ This module contains values only. Normalization behavior lives in
 ``representations.normalization``.
 """
 
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Mapping
 
 FORMAT_ALIASES: Mapping[str, str] = MappingProxyType(
     {

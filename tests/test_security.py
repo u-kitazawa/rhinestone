@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from dataclasses import replace
 from types import SimpleNamespace
-from typing import Any, Dict, List, Mapping, cast
+from typing import Any, cast
 
 import pytest
 
@@ -26,7 +27,7 @@ from tests.provider_support import fixture_json
 
 class RecordingGdal:
     def __init__(self) -> None:
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     def OpenEx(self, uri: str, **kwargs: Any) -> str:
         self.calls.append(uri)
@@ -119,13 +120,13 @@ def test_policy_levels_control_when_authorization_is_applied() -> None:
 
 
 def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
-    factory_calls: List[bool] = []
+    factory_calls: list[bool] = []
 
     def get_json(*args: Any, **kwargs: Any) -> Any:
         return SimpleNamespace(
             status_code=200,
             raise_for_status=lambda: None,
-            json=lambda: cast(List[Mapping[str, Any]], []),
+            json=lambda: cast(list[Mapping[str, Any]], []),
         )
 
     app = configure(
@@ -164,14 +165,14 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
 
 def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> None:
     endpoint = "https://private-odpt.example/api/v4"
-    calls: List[str] = []
+    calls: list[str] = []
 
     def get(url: str, **kwargs: Any) -> Any:
         calls.append(url)
         return SimpleNamespace(
             status_code=200,
             raise_for_status=lambda: None,
-            json=lambda: cast(List[Mapping[str, Any]], []),
+            json=lambda: cast(list[Mapping[str, Any]], []),
         )
 
     settings = dict(sources.ODPT.settings)
@@ -266,7 +267,7 @@ def test_explicit_rules_remain_usable_for_direct_adapter_credentials() -> None:
     url = endpoint + "/api/3/action/package_search"
     rule = DestinationRule.from_url(endpoint)
     assert rule is not None
-    calls: List[Mapping[str, str]] = []
+    calls: list[Mapping[str, str]] = []
 
     def get_json(
         request_url: str,
@@ -351,8 +352,8 @@ def test_odpt_credential_rule_is_scoped_to_provider_and_resource_path() -> None:
 
 
 def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> None:
-    credential_calls: List[bool] = []
-    runtime_calls: List[bool] = []
+    credential_calls: list[bool] = []
+    runtime_calls: list[bool] = []
     app = configure(
         sources=(sources.ODPT, sources.GSI),
         credentials={
@@ -424,8 +425,8 @@ def test_public_http_sources_bind_credentials_lazily(
     response: Mapping[str, Any],
     expected_header: str,
 ) -> None:
-    calls: List[Mapping[str, str]] = []
-    factory_calls: List[bool] = []
+    calls: list[Mapping[str, str]] = []
+    factory_calls: list[bool] = []
 
     def get_json(
         url: str,
@@ -437,7 +438,7 @@ def test_public_http_sources_bind_credentials_lazily(
         return response
 
     monkeypatch.setattr(_http, "get_json", get_json)
-    settings: Dict[str, Any] = {"endpoint": endpoint, "credential": "secret"}
+    settings: dict[str, Any] = {"endpoint": endpoint, "credential": "secret"}
     if adapter_type == "ogc-features":
         settings["collection_id"] = "rivers"
     app = configure(
@@ -458,7 +459,7 @@ def test_public_http_sources_bind_credentials_lazily(
 def test_configured_source_endpoint_cannot_be_overridden(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: List[bool] = []
+    calls: list[bool] = []
 
     def get_json(*args: Any, **kwargs: Any) -> Mapping[str, Any]:
         calls.append(True)

@@ -1,7 +1,7 @@
 """Public base class for execution adapters."""
 
 from abc import ABC, abstractmethod
-from typing import Any, FrozenSet
+from typing import Any
 
 from ...models import Resource
 from ...security import DestinationPolicy
@@ -24,7 +24,7 @@ class ExecutionAdapter(ABC):
         )
 
     @abstractmethod
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
         """Whether this adapter can open the already selected resource."""
 
     @abstractmethod

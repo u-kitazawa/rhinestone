@@ -1,6 +1,7 @@
 """Built-in adapters that delegate selected Resources to user-owned runtimes."""
 
-from typing import Any, FrozenSet, List, Mapping, cast
+from collections.abc import Mapping
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from ....errors import ResourceAccessError
@@ -24,7 +25,7 @@ class GdalAdapter(ExecutionAdapter):
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
 
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
         """Return whether GDAL and the Resource's format are compatible."""
         tile = resource.access_plan.options.get("tile")
         return self.name in dependencies and (
@@ -45,7 +46,7 @@ class GdalAdapter(ExecutionAdapter):
         """Open the selected Resource with ``runtime.OpenEx``."""
         uri = self._runtime_uri(resource)
         attributes = resource_attributes(resource)
-        options: List[str] = []
+        options: list[str] = []
         encoding = attributes.get("encoding")
         if isinstance(encoding, str):
             options.append("ENCODING=" + encoding.upper())

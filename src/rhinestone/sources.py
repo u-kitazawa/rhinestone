@@ -1,18 +1,16 @@
 """Compatibility facade for the built-in Provider catalog."""
 
-from typing import Dict, List, Tuple
-
 from .catalogs import Catalog, CatalogSource, load_source_catalog
 from .models import Provider
 
-_CATALOG: Tuple[CatalogSource, ...] = load_source_catalog()
-_BUILTINS: Dict[str, Provider] = {
+_CATALOG: tuple[CatalogSource, ...] = load_source_catalog()
+_BUILTINS: dict[str, Provider] = {
     entry.definition.id: entry.definition for entry in _CATALOG
 }
-_BY_NAME: Dict[str, Provider] = {entry.name: entry.definition for entry in _CATALOG}
+_BY_NAME: dict[str, Provider] = {entry.name: entry.definition for entry in _CATALOG}
 
 CATALOG = Catalog(tuple(entry.definition for entry in _CATALOG))
-ALL: Tuple[Provider, ...] = CATALOG.providers
+ALL: tuple[Provider, ...] = CATALOG.providers
 
 
 def __getattr__(name: str) -> Provider:
@@ -24,7 +22,7 @@ def __getattr__(name: str) -> Provider:
         ) from None
 
 
-def __dir__() -> List[str]:
+def __dir__() -> list[str]:
     return sorted(set(globals()) | set(_BY_NAME))
 
 

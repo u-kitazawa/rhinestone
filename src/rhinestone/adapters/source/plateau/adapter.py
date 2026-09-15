@@ -1,6 +1,7 @@
 """PLATEAU distributions published through the G Spatial CKAN catalog."""
 
-from typing import Any, Dict, List, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ....errors import ConfigValidationError
 from ....models import Config, ResourceCandidate, Source
@@ -21,14 +22,14 @@ class PlateauAdapter(CkanAdapter):
     def __init__(
         self,
         get_json: JsonTransport,
-        endpoint: Optional[str] = None,
-        credential: Optional[str] = None,
-        credential_header: Optional[str] = None,
-        credential_scheme: Optional[str] = None,
-        credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
-        provider_id: Optional[str] = None,
-        knowledge: Optional[KnowledgeAdapterRegistry] = None,
+        endpoint: str | None = None,
+        credential: str | None = None,
+        credential_header: str | None = None,
+        credential_scheme: str | None = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
+        provider_id: str | None = None,
+        knowledge: KnowledgeAdapterRegistry | None = None,
     ) -> None:
         if not isinstance(endpoint, str) or not endpoint.strip():
             raise ConfigValidationError("PLATEAU endpoint must be configured")
@@ -48,7 +49,7 @@ class PlateauAdapter(CkanAdapter):
         """Load one PLATEAU resource and preserve its CityGML metadata."""
         settings = self._config_settings(config)
         endpoint = self._endpoint_from(settings)
-        resource_id: Optional[str] = None
+        resource_id: str | None = None
         if "resource_id" in settings:
             resource_id = string(settings, "resource_id")
             resource = self._object(
@@ -65,7 +66,7 @@ class PlateauAdapter(CkanAdapter):
         resources = self._objects(package.get("resources"), "CKAN resources")
         member = entry_point(settings)
         knowledge = resolve_knowledge(settings, self._knowledge)
-        candidates: List[ResourceCandidate] = []
+        candidates: list[ResourceCandidate] = []
         for item in resources:
             identifier = string(item, "id")
             format_name = canonical_format(string(item, "format"))
@@ -75,7 +76,7 @@ class PlateauAdapter(CkanAdapter):
                 matches = matches and format_name == canonical_format(
                     string(settings, "format")
                 )
-            attributes: Dict[str, Any] = dict(item)
+            attributes: dict[str, Any] = dict(item)
             attributes.update(
                 {
                     "matches_config": matches,
@@ -99,9 +100,9 @@ class PlateauAdapter(CkanAdapter):
             package_id,
             raw,
             tuple(candidates),
-            title=cast(Optional[str], package.get("title")),
-            description=cast(Optional[str], package.get("notes")),
-            license_name=cast(Optional[str], package.get("license_title")),
+            title=cast(str | None, package.get("title")),
+            description=cast(str | None, package.get("notes")),
+            license_name=cast(str | None, package.get("license_title")),
             endpoint=endpoint,
             capabilities=("download", "search"),
         )

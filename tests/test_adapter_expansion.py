@@ -2,10 +2,11 @@
 
 import importlib
 import json
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Mapping, Tuple, cast
+from typing import Any, cast
 
 import pytest
 
@@ -110,7 +111,7 @@ def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> No
     assert resource.access_plan.options["entry_point"] == "udx/bldg/city.gml"
     assert item.raw_metadata["package"]["extras"][0]["value"] == "2023"
     assert "distribution_provider" in resource.provenance.raw
-    captured: Dict[str, Any] = {}
+    captured: dict[str, Any] = {}
 
     def open_ex(uri: str, **kwargs: Any) -> str:
         captured["uri"] = uri
@@ -176,7 +177,7 @@ def test_plateau_rejects_unsafe_or_incomplete_archive_selection(
         )
 
 
-def fundamental_settings() -> Dict[str, Any]:
+def fundamental_settings() -> dict[str, Any]:
     return {
         "path": str(FIXTURES / "basic.xml"),
         "dataset": "basic",
@@ -368,7 +369,7 @@ def test_odpt_rejects_unknown_or_secret_settings(settings: Mapping[str, Any]) ->
 
 
 def test_odpt_catalog_shapes_are_rejected() -> None:
-    changes: Tuple[Mapping[str, Any], ...] = (
+    changes: tuple[Mapping[str, Any], ...] = (
         {"endpoint": None},
         {"endpoint": ""},
         {"resource_types": None},
@@ -414,7 +415,7 @@ def test_odpt_runtime_filters_are_validated() -> None:
 
 
 def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None:
-    calls: Dict[str, Any] = {}
+    calls: dict[str, Any] = {}
     data = json.loads((FIXTURES / "odpt.json").read_text(encoding="utf-8"))
 
     def get(uri: str, **kwargs: Any) -> Any:
@@ -424,7 +425,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource() -> None
             status_code=200, raise_for_status=lambda: None, json=lambda: data
         )
 
-    factory_calls: List[bool] = []
+    factory_calls: list[bool] = []
 
     def credential() -> str:
         factory_calls.append(True)

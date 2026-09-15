@@ -8,10 +8,11 @@ HTML or guesses a download URL.
 """
 
 import json
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from importlib import resources
 from types import MappingProxyType
-from typing import Any, Iterable, List, Mapping, Optional, Tuple, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from ...._uri import is_valid_http_authority
@@ -32,7 +33,7 @@ from ....models import (
 from ....representations import CANONICAL_FORMATS, canonical_format
 from ...knowledge import KnowledgeAdapterRegistry
 from .._knowledge import entry_point, resolve_knowledge
-from ..base import ProviderAdapter
+from ..base import SourceAdapterBase
 
 _FORMATS = frozenset({"shapefile", "gml", "kml"}) & CANONICAL_FORMATS
 _SELECTORS = frozenset(
@@ -70,13 +71,13 @@ def _thaw_copy(value: Any) -> Any:
     return deepcopy(value)
 
 
-class EstatGisAdapter(ProviderAdapter):
+class EstatGisAdapter(SourceAdapterBase):
     """Resolve explicit e-Stat GIS distributions to ordinary GIS Resources."""
 
     adapter_type = "estat-gis"
     search_conditions = frozenset({"text", "limit"})
 
-    def config_schema(self) -> Optional[Mapping[str, Any]]:
+    def config_schema(self) -> Mapping[str, Any] | None:
         """Load the schema beside this package's adapter implementation.
 
         The implementation remains re-exported from ``__init__`` for the
@@ -91,7 +92,7 @@ class EstatGisAdapter(ProviderAdapter):
     def __init__(
         self,
         distributions: Iterable[Mapping[str, Any]],
-        knowledge: Optional[KnowledgeAdapterRegistry] = None,
+        knowledge: KnowledgeAdapterRegistry | None = None,
     ) -> None:
         super().__init__(get_json=lambda url, params: None)
         self._knowledge = knowledge or KnowledgeAdapterRegistry()
@@ -135,7 +136,7 @@ class EstatGisAdapter(ProviderAdapter):
         return Source(
             metadata=Metadata(
                 title=cast(str, first["title"]),
-                description=cast(Optional[str], first.get("description")),
+                description=cast(str | None, first.get("description")),
                 publisher="e-Stat Statistics GIS",
                 raw=raw,
             ),
@@ -154,13 +155,13 @@ class EstatGisAdapter(ProviderAdapter):
             raw_metadata=raw,
         )
 
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
         """Search the supplied distribution index, without broadening selectors."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError(
                 "e-Stat GIS search supports only text and limit"
             )
-        results: List[SearchResult] = []
+        results: list[SearchResult] = []
         needle = query.text.casefold() if query.text else None
         for item in self._distributions:
             if query.limit is not None and len(results) >= query.limit:
@@ -177,14 +178,14 @@ class EstatGisAdapter(ProviderAdapter):
             results.append(
                 SearchResult(
                     title=cast(str, item["title"]),
-                    description=cast(Optional[str], item.get("description")),
+                    description=cast(str | None, item.get("description")),
                     discovered_by=self.adapter_type,
                     target=Config(
                         self.adapter_type, {"distribution_id": distribution_id}
                     ),
                     metadata=Metadata(
                         title=cast(str, item["title"]),
-                        description=cast(Optional[str], item.get("description")),
+                        description=cast(str | None, item.get("description")),
                         publisher="e-Stat Statistics GIS",
                         raw=raw_item,
                     ),
@@ -224,7 +225,7 @@ class EstatGisAdapter(ProviderAdapter):
         return ResourceCandidate(
             uri=cast(str, item["uri"]),
             format=cast(str, item["format"]),
-            media_type=cast(Optional[str], item.get("media_type")),
+            media_type=cast(str | None, item.get("media_type")),
             attributes=attributes,
         )
 
@@ -270,7 +271,7 @@ class EstatGisAdapter(ProviderAdapter):
     @classmethod
     def _validate_distributions(
         cls, distributions: Iterable[Mapping[str, Any]]
-    ) -> Tuple[Tuple[Mapping[str, Any], ...], Tuple[Mapping[str, Any], ...]]:
+    ) -> tuple[tuple[Mapping[str, Any], ...], tuple[Mapping[str, Any], ...]]:
         try:
             values = tuple(distributions)
         except TypeError:
@@ -280,8 +281,8 @@ class EstatGisAdapter(ProviderAdapter):
         if not values:
             raise ConfigValidationError("estat-gis distributions must not be empty")
         identifiers: set[str] = set()
-        raw_result: List[Mapping[str, Any]] = []
-        result: List[Mapping[str, Any]] = []
+        raw_result: list[Mapping[str, Any]] = []
+        result: list[Mapping[str, Any]] = []
         for raw in values:
             if not isinstance(cast(object, raw), Mapping):
                 raise ConfigValidationError(

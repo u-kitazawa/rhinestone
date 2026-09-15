@@ -1,4 +1,3 @@
-from typing import List
 from unittest.mock import Mock
 
 import pytest
@@ -10,7 +9,7 @@ from rhinestone.registry import DependencyRegistry
 
 def test_dependency_callback_is_lazy_and_cached_per_registry() -> None:
     """Optional runtime を import 時に要求せず、利用者所有の実体を遅延取得するために必要である。"""
-    calls: List[str] = []
+    calls: list[str] = []
     runtime = object()
     registry = DependencyRegistry(
         {"gdal": RuntimeFactory(lambda: calls.append("gdal") or runtime)}

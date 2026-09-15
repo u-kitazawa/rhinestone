@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import pytest
 
@@ -645,7 +646,7 @@ def test_custom_source_receives_one_core_managed_transport_port(
     calls: list[tuple[str, object, object]] = []
 
     def get_json(
-        url: str, params: object, headers: Optional[Mapping[str, str]] = None
+        url: str, params: object, headers: Mapping[str, str] | None = None
     ) -> dict[str, object]:
         calls.append((url, params, headers))
         return {"ok": True}
