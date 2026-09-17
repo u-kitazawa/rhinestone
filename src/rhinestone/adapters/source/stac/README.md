@@ -2,7 +2,7 @@
 
 `StacAdapter` は STAC API 1.0 の item asset を `Source` に変換します。
 
-- 提供元の種類（`source_type`）: `stac`
+- Adapter 種別（`adapter_type`）: `stac`
 - 必須設定: `endpoint`, `collection_id`, `item_id`, `asset_key`
 - 検索: `bbox`, `time`, `limit`
 - 注入: `get_json(url, params)`。`api_token` または `api_key` を指定できます。

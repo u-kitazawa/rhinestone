@@ -53,11 +53,11 @@ CredentialはAPI keyやtokenなどの秘密情報です。ProviderやResultへ�
 
 ## 内部の仕組み
 
-内部では、ProviderをAdapterが解釈して`Source`を作り、`Resolver`が候補から`AccessPlan`と`Resource`を決定します。`Config`、`ResourceCandidate`、Resolver、AccessPlan、Execution Adapter Selector、Registryは責務分離のための内部概念です。
+内部では、ProviderをAdapterが解釈して`Source`を作り、`Resolver`が候補から`AccessPlan`と`Resource`を決定します。`Config`は高度な直接解決に使う公開モデルで、`ResourceCandidate`、Resolver、AccessPlan、Execution Adapter Selector、Registryは責務分離のための内部概念です。
 
 ```text
 Provider
-  -> internal Config
+  -> Config
   -> Source
   -> Resolver
   -> internal AccessPlan

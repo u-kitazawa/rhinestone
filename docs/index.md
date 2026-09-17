@@ -51,7 +51,7 @@ print("raster size:", dataset.RasterXSize, dataset.RasterYSize)
 | `Runtime` | Resourceを開くために利用者が用意する外部ライブラリ |
 | `Credential` | API keyやtokenなどの認証情報 |
 
-`Source`、`Config`、`AccessPlan`、`Resolver`、Adapter、Registryは内部または高度な拡張向けの概念です。最初から覚える必要はありません。詳しくは[用語と概念](concepts.md)を参照してください。
+`Config`は既知のProviderを直接解決するための高度な公開モデルです。`Source`、`AccessPlan`、`Resolver`、Adapter、Registryは内部または高度な拡張向けの概念で、最初から覚える必要はありません。詳しくは[用語と概念](concepts.md)を参照してください。
 
 ## 次に読む
 

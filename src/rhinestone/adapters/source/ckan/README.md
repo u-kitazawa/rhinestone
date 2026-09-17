@@ -2,7 +2,7 @@
 
 `CkanAdapter` は CKAN Action API の resource を `Source` に変換します。
 
-- 提供元の種類（`source_type`）: `ckan`
+- Adapter 種別（`adapter_type`）: `ckan`
 - 必須設定: `resource_id`
 - 任意設定: `endpoint`
 - 検索: `text`, `limit`

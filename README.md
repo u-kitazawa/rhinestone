@@ -41,6 +41,10 @@ python -m pip install rhinestone
 ## 基本的な使い方
 
 ```python
+import os
+
+import rasterio
+
 from rhinestone import configure
 from rhinestone.catalogs import BUILTIN
 
@@ -78,7 +82,7 @@ GDAL、Rasterio、pyogrio、RDFLibなど、データを開いたり解釈した�
 app = configure(
     catalog=BUILTIN,
     dependencies={"rasterio": rasterio},
-    credentials={"odpt": lambda: odpt_consumer_key},
+    credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 ```
 

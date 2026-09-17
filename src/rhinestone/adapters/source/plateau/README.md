@@ -2,7 +2,7 @@
 
 `PlateauAdapter` は G空間情報センターのCKANカタログからPLATEAU配布物を変換します。
 
-- 提供元の種類（`source_type`）: `plateau`
+- Adapter 種別（`adapter_type`）: `plateau`
 - 必須設定: `resource_id` または `dataset_id`
 - 任意設定: `endpoint`, `format`, `archive: zip`, `entry_point`
 - 検索: CKAN の `text`, `limit`
