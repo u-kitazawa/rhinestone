@@ -100,6 +100,7 @@ RhinestoneはGIS I/O、形式変換、空間演算、データ解析を実装せ
 
 ## 次に読む
 
+- [実行済みNotebook（Showcase）](showcase/README.md)
 - [ドキュメント入口](docs/index.md)
 - [はじめに](docs/getting-started.md)
 - [アプリケーションを構成する](docs/configuration.md)
