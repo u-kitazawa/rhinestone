@@ -38,8 +38,8 @@ from .adapters.source import (
     OdptAdapter,
     OgcFeaturesAdapter,
     PlateauAdapter,
-    SearchCkanJpAdapter,
     ProviderAdapter,
+    SearchCkanJpAdapter,
     StacAdapter,
     StaticAdapter,
 )
