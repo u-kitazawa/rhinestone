@@ -1,6 +1,10 @@
 import pytest
 
-from rhinestone.errors import ProviderMetadataError, ProviderResponseError
+from rhinestone.errors import (
+    CredentialUnavailableError,
+    ProviderMetadataError,
+    ProviderResponseError,
+)
 from rhinestone.models import SearchQuery
 from rhinestone.search import SearchCoordinator
 
@@ -152,17 +156,24 @@ def test_expected_provider_failure_isolated_from_other_sources() -> None:
 def test_all_expected_provider_failures_return_empty_results_and_diagnostics() -> None:
     metadata = FailingSearchableAdapter("metadata", ProviderMetadataError("hidden"))
     response = FailingSearchableAdapter("response", ProviderResponseError("hidden"))
+    credential = FailingSearchableAdapter(
+        "credential", CredentialUnavailableError("hidden")
+    )
 
-    results = SearchCoordinator((metadata, response)).search(SearchQuery(text="river"))
+    results = SearchCoordinator((metadata, response, credential)).search(
+        SearchQuery(text="river")
+    )
 
     assert len(results) == 0
     assert [diagnostic.source_id for diagnostic in results.diagnostics] == [
         "metadata",
         "response",
+        "credential",
     ]
     assert [diagnostic.failure_type for diagnostic in results.diagnostics] == [
         "metadata",
         "response",
+        "credential",
     ]
 
 

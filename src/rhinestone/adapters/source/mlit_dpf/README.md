@@ -2,6 +2,8 @@
 
 `mlit-dpf` は、国土交通データプラットフォームのGraphQL APIを利用する検索専用の
 Discovery Source Adapterです。
+検索時に論理Credentialが未登録の場合は、Search CoordinatorがDPFだけをcredential failureの
+diagnosticとして隔離し、他のSourceの検索を継続します。
 
 検索結果は、明示的な `target_rules` に従って既存のSourceへ委譲します。委譲できない場合だけ、
 明示された `representations` と `DPF:downloadURLs` を使ってDirectへfallbackします。

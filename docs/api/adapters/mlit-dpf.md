@@ -9,6 +9,8 @@
 
 組み込み定義 `sources.MLIT_DPF` はendpointと論理Credential名だけを持ちます。APIキーは
 `credentials` から遅延取得され、`Provider`、`Result`、`Resource`、例外には保存されません。
+`MLIT_DPF` は組み込みCatalogに含まれますが、APIキーを登録せず横断検索した場合はDPFだけが
+`failure_type="credential"` のdiagnosticとして隔離され、他のSourceの検索は継続します。
 
 ```python
 from rhinestone import Provider, configure

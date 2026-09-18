@@ -397,7 +397,7 @@ def test_configure_rejects_unknown_and_self_delegation_targets() -> None:
                 ),
             )
         )
-    with pytest.raises(ConfigValidationError, match="another discovery-only"):
+    with pytest.raises(ConfigValidationError, match="discovery-only Provider"):
         configure(
             sources=(
                 Provider(
@@ -421,6 +421,30 @@ def test_configure_rejects_unknown_and_self_delegation_targets() -> None:
                 ),
             )
         )
+    with pytest.raises(ConfigValidationError, match="discovery-only Provider"):
+        configure(
+            sources=(
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {
+                        **settings,
+                        "target_rules": [
+                            {
+                                "catalog_id": "c",
+                                "source_id": "search",
+                                "settings": {"id": {"record": "id"}},
+                            }
+                        ],
+                    },
+                ),
+                Provider(
+                    "search",
+                    "search-ckan-jp",
+                    {"endpoint": "https://search.ckan.jp/backend/api"},
+                ),
+            )
+        )
 
 
 @pytest.mark.parametrize(
@@ -429,6 +453,7 @@ def test_configure_rejects_unknown_and_self_delegation_targets() -> None:
         tuple[tuple[Mapping[str, Any], str], ...],
         (
             ({"credential": ""}, "credential"),
+            ({"credential": 1}, "credential"),
             ({"target_rules": {}}, "target_rules"),
             ({"target_rules": [1]}, "each mlit-dpf target rule"),
             (
@@ -584,6 +609,29 @@ def test_source_transport_failure_is_metadata_diagnostic_without_secret(
 
     assert results.diagnostics[0].failure_type == "metadata"
     assert "secret-value" not in repr(results.diagnostics)
+
+
+def test_missing_default_dpf_credential_is_isolated_as_search_diagnostic() -> None:
+    app = configure(
+        sources=(
+            Provider(
+                "dpf",
+                "mlit-dpf",
+                {
+                    "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+                    "credential": "mlit-dpf",
+                    "target_rules": [],
+                    "representations": {},
+                },
+            ),
+        )
+    )
+
+    results = app.search(text="roads")
+
+    assert len(results) == 0
+    assert results.diagnostics[0].source_id == "dpf"
+    assert results.diagnostics[0].failure_type == "credential"
 
 
 def test_target_prevalidation_ignores_malformed_rules_for_adapter_validation() -> None:

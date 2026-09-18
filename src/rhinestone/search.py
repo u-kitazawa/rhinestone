@@ -9,7 +9,11 @@ from typing import (
     overload,
 )
 
-from .errors import ProviderMetadataError, ProviderResponseError
+from .errors import (
+    CredentialUnavailableError,
+    ProviderMetadataError,
+    ProviderResponseError,
+)
 from .models import Resource, Result, SearchDiagnostic, SearchQuery
 
 
@@ -176,6 +180,15 @@ class SearchCoordinator:
                         skipped_conditions=frozenset(),
                         reason="provider_failure",
                         failure_type="response",
+                    )
+                )
+            except CredentialUnavailableError:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=adapter.source_id,
+                        skipped_conditions=frozenset(),
+                        reason="provider_failure",
+                        failure_type="credential",
                     )
                 )
         return SearchResults.from_grouped(grouped_results, diagnostics)

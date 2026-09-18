@@ -807,10 +807,12 @@ def _validate_mlit_dpf_targets(sources: tuple[Provider, ...]) -> None:
                 raise ConfigValidationError(
                     "mlit-dpf target rule must not delegate back to itself"
                 )
-            if isinstance(target, str) and adapter_types.get(target) == "mlit-dpf":
+            if isinstance(target, str) and adapter_types.get(target) in {
+                "mlit-dpf",
+                "search-ckan-jp",
+            }:
                 raise ConfigValidationError(
-                    "mlit-dpf target rule must not target another discovery-only "
-                    "mlit-dpf Provider"
+                    "mlit-dpf target rule must not target a discovery-only Provider"
                 )
 
 

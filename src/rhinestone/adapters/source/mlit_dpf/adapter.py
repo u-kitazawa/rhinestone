@@ -37,7 +37,7 @@ class MlitDpfAdapter(ProviderAdapter):
         credentials: CredentialRegistry,
         provider_id: str,
         endpoint: str = DEFAULT_ENDPOINT,
-        credential: str = "mlit-dpf",
+        credential: object = "mlit-dpf",
         target_rules: object = (),
         representations: object = None,
     ) -> None:
@@ -46,7 +46,7 @@ class MlitDpfAdapter(ProviderAdapter):
         self._credentials = credentials
         self._provider_id = provider_id
         self._endpoint = self._normalize_endpoint(endpoint)
-        if not credential:
+        if not isinstance(credential, str) or not credential:
             raise ConfigValidationError(
                 "mlit-dpf credential must be a non-empty logical credential name"
             )
