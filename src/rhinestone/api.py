@@ -39,7 +39,7 @@ from .adapters.source import (
     OgcFeaturesAdapter,
     PlateauAdapter,
     SearchCkanJpAdapter,
-    SourceAdapterBase,
+    ProviderAdapter,
     StacAdapter,
     StaticAdapter,
 )
@@ -75,7 +75,7 @@ class _ConfiguredSourceAdapter:
     def __init__(
         self,
         source_id: str,
-        source_adapter: SourceAdapterBase,
+        source_adapter: ProviderAdapter,
         adapter_type: str | None = None,
     ) -> None:
         self.source_id = source_id
@@ -515,7 +515,7 @@ def _build_builtin_source_adapter(
     destination_policy: DestinationPolicy | None = None,
     knowledge: KnowledgeAdapterRegistry | None = None,
     transport: TransportPort | None = None,
-) -> SourceAdapterBase:
+) -> ProviderAdapter:
     adapter_type = provider.adapter_type
     settings = dict(provider.settings)
     knowledge = knowledge or KnowledgeAdapterRegistry()

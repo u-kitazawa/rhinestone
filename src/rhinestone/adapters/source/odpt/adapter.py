@@ -7,11 +7,11 @@ from ....errors import ConfigValidationError
 from ....models import AccessPlan, Config, ResourceCandidate, Source
 from ....registry import CredentialRegistry
 from .._knowledge import source, string
-from ..base import SourceAdapterBase
+from ..base import ProviderAdapter
 from .validation import filter_mapping, required_string, string_mapping
 
 
-class OdptAdapter(SourceAdapterBase):
+class OdptAdapter(ProviderAdapter):
     """Create explicit ODPT JSON service access plans."""
 
     adapter_type = "odpt"

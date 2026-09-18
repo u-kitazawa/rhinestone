@@ -1,6 +1,6 @@
 """Built-in source adapters."""
 
-from .base import JsonGetter, JsonObject, ProviderAdapter, SourceAdapterBase
+from .base import JsonGetter, JsonObject, ProviderAdapter
 from .ckan import CkanAdapter
 from .dcat import DcatAdapter
 from .direct import DirectAdapter
@@ -25,7 +25,6 @@ __all__ = [
     "OgcFeaturesAdapter",
     "PlateauAdapter",
     "ProviderAdapter",
-    "SourceAdapterBase",
     "StacAdapter",
     "StaticAdapter",
     "SearchCkanJpAdapter",

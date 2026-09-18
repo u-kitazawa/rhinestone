@@ -36,11 +36,10 @@ __all__ = [
     "JsonGetter",
     "JsonObject",
     "ProviderAdapter",
-    "SourceAdapterBase",
 ]
 
 
-class SourceAdapterBase(ABC):
+class ProviderAdapter(ABC):
     """Base for adapters that translate provider metadata into a ``Source``.
 
     Subclasses own provider-specific configuration and response interpretation.
@@ -253,13 +252,7 @@ class SourceAdapterBase(ABC):
                 "is invalid"
             )
         values = cast(list[Any], value)
-        return tuple(SourceAdapterBase._object(item, context) for item in values)
-
-
-# ``ProviderAdapter`` was the original name of this internal base class. Keep
-# it as an alias so existing adapter implementations continue to compose while
-# the canonical name distinguishes it from the public SourceAdapter protocol.
-ProviderAdapter = SourceAdapterBase
+        return tuple(ProviderAdapter._object(item, context) for item in values)
 
 
 def _json_value(value: Any) -> Any:

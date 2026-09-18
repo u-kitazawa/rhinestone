@@ -4,10 +4,10 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from ....models import Config, Metadata, Provenance, ResourceCandidate, Source
-from ..base import SourceAdapterBase
+from ..base import ProviderAdapter
 
 
-class DirectAdapter(SourceAdapterBase):
+class DirectAdapter(ProviderAdapter):
     """Interpret a complete direct-resource declaration without guessing."""
 
     adapter_type = "direct"

@@ -16,10 +16,10 @@ from ....models import (
 from ....registry import CredentialRegistry
 from ....security import DestinationPolicy
 from .._uri import append_path_segment, resolve_response_href
-from ..base import JsonObject, JsonTransport, SourceAdapterBase
+from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
-class OgcFeaturesAdapter(SourceAdapterBase):
+class OgcFeaturesAdapter(ProviderAdapter):
     """Interpret OGC API Features collections and item services."""
 
     adapter_type = "ogc-features"

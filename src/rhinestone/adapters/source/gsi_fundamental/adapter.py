@@ -8,10 +8,10 @@ from ....errors import ResourceNotFoundError
 from ....models import Config, ResourceCandidate, Source
 from ...knowledge import KnowledgeAdapterRegistry
 from .._knowledge import entry_point, resolve_knowledge, source, string
-from ..base import SourceAdapterBase
+from ..base import ProviderAdapter
 
 
-class GsiFundamentalAdapter(SourceAdapterBase):
+class GsiFundamentalAdapter(ProviderAdapter):
     """Resolve local GSI Fundamental geospatial data declarations."""
 
     adapter_type = "gsi-fundamental"

@@ -15,14 +15,14 @@ from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Sou
 from ....representations import canonical_format, format_from_media_type
 from ....security import DestinationPolicy
 from .._knowledge import source, string
-from ..base import SourceAdapterBase
+from ..base import ProviderAdapter
 
 _DCAT = "http://www.w3.org/ns/dcat#"
 _DCT = "http://purl.org/dc/terms/"
 _RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 
 
-class DcatAdapter(SourceAdapterBase):
+class DcatAdapter(ProviderAdapter):
     """Interpret a DCAT RDF catalog and resolve one Dataset distribution."""
 
     adapter_type = "dcat"

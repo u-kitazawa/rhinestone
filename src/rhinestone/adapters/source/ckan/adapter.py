@@ -16,11 +16,11 @@ from ....models import (
 from ....registry import CredentialRegistry
 from ....representations import canonical_format, format_from_media_type
 from ....security import DestinationPolicy
-from ..base import JsonObject, JsonTransport, SourceAdapterBase
+from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .format import optional_string
 
 
-class CkanAdapter(SourceAdapterBase):
+class CkanAdapter(ProviderAdapter):
     """Interpret CKAN Action API package and resource responses."""
 
     adapter_type = "ckan"

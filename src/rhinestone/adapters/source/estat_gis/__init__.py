@@ -33,7 +33,7 @@ from ....models import (
 from ....representations import CANONICAL_FORMATS, canonical_format
 from ...knowledge import KnowledgeAdapterRegistry
 from .._knowledge import entry_point, resolve_knowledge
-from ..base import SourceAdapterBase
+from ..base import ProviderAdapter
 
 _FORMATS = frozenset({"shapefile", "gml", "kml"}) & CANONICAL_FORMATS
 _SELECTORS = frozenset(
@@ -71,7 +71,7 @@ def _thaw_copy(value: Any) -> Any:
     return deepcopy(value)
 
 
-class EstatGisAdapter(SourceAdapterBase):
+class EstatGisAdapter(ProviderAdapter):
     """Resolve explicit e-Stat GIS distributions to ordinary GIS Resources."""
 
     adapter_type = "estat-gis"

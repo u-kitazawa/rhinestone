@@ -10,13 +10,13 @@ from ....errors import (
 from ....models import Config, Metadata, Provenance, SearchQuery, SearchResult, Source
 from ....security import DestinationPolicy
 from .._uri import has_embedded_credentials
-from ..base import JsonObject, JsonTransport, SourceAdapterBase
+from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
 DEFAULT_ENDPOINT = "https://search.ckan.jp/backend/api"
 
 
-class SearchCkanJpAdapter(SourceAdapterBase):
+class SearchCkanJpAdapter(ProviderAdapter):
     """Discover executable direct resources from search.ckan.jp metadata."""
 
     adapter_type = "search-ckan-jp"

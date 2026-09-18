@@ -18,10 +18,10 @@ from ....models import (
     Source,
 )
 from .._knowledge import string
-from ..base import SourceAdapterBase
+from ..base import ProviderAdapter
 
 
-class StaticAdapter(SourceAdapterBase):
+class StaticAdapter(ProviderAdapter):
     """Resolve immutable, repository-managed source definitions."""
 
     adapter_type = "static"

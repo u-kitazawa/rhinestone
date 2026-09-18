@@ -17,10 +17,10 @@ from ....registry import CredentialRegistry
 from ....representations import format_from_media_type
 from ....security import DestinationPolicy
 from .._uri import resolve_response_href
-from ..base import JsonObject, JsonTransport, SourceAdapterBase
+from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
-class StacAdapter(SourceAdapterBase):
+class StacAdapter(ProviderAdapter):
     """Interpret STAC API Items, Assets, and standard search responses."""
 
     adapter_type = "stac"

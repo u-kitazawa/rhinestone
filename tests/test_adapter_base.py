@@ -17,7 +17,6 @@ from rhinestone.adapters import (
     OgcFeaturesAdapter,
     PlateauAdapter,
     ProviderAdapter,
-    SourceAdapterBase,
     StacAdapter,
 )
 from rhinestone.adapters.source._knowledge import string
@@ -73,10 +72,6 @@ class ProbeAdapter(ProviderAdapter):
 
     def objects(self, value: Any):
         return self._objects(value, "values")
-
-
-def test_source_adapter_base_keeps_the_legacy_base_class_alias() -> None:
-    assert ProviderAdapter is SourceAdapterBase
 
 
 def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
