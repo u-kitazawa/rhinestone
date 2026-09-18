@@ -25,6 +25,10 @@ def test_showcase_notebook_has_portable_metadata_and_executed_cells() -> None:
     assert all(cell["execution_count"] is not None for cell in code_cells)
     assert all("ci" in cell["metadata"].get("tags", []) for cell in code_cells)
 
+    setup_source = "".join(code_cells[0]["source"])
+    assert "@fb673a0a0644333e2e4c0aad002973f817876d29" in setup_source
+    assert "@develop" not in setup_source
+
 
 def test_showcase_notebook_code_compiles_and_runs_offline(
     capsys: pytest.CaptureFixture[str],
@@ -48,13 +52,13 @@ def test_showcase_notebook_code_compiles_and_runs_offline(
 
 def test_showcase_notebook_outputs_are_small_and_contain_no_credentials() -> None:
     notebook = load_notebook()
-    output_text = ""
-    for cell in notebook["cells"]:
-        for output in cell.get("outputs", []):
-            output_text += "".join(output.get("text", []))
+    outputs = [
+        output for cell in notebook["cells"] for output in cell.get("outputs", [])
+    ]
+    serialized_outputs = json.dumps(outputs, ensure_ascii=False, sort_keys=True)
 
-    assert len(output_text.encode()) < 50_000
-    lowered = output_text.lower()
+    assert len(serialized_outputs.encode()) < 50_000
+    lowered = serialized_outputs.lower()
     for marker in ("api_key", "api-token", "bearer ", "consumer_key", "secret"):
         assert marker not in lowered
 
