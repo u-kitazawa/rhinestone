@@ -22,6 +22,7 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 | [ODPT](adapters/odpt.md) | `odpt` | ODPT v4 |
 | [OGC API Features](adapters/ogc-features.md) | `ogc-features` | OGC API Features 1.0 |
 | [PLATEAU](adapters/plateau.md) | `plateau` | G 空間情報センター CKAN |
+| [国交DPF](adapters/mlit-dpf.md) | `mlit-dpf` | 国土交通データプラットフォーム GraphQL API |
 | [横断CKAN検索](adapters/search-ckan-jp.md) | `search-ckan-jp` | search.ckan.jp Backend API |
 | [STAC](adapters/stac.md) | `stac` | STAC API 1.0 |
 
@@ -32,7 +33,7 @@ Source Adapter は `SourceAdapterDefinition` として明示登録できます�
 Runtime Port、DestinationPolicy、共有Knowledge Adapterを取得する`knowledge` Portが含まれます。
 
 Source factory に渡される `SourceAdapterContext` の通信境界は `context.transport` に一本化
-されています。`context.transport.get_json()` / `get_text()` は宛先認可と通信エラー分類を
+されています。`context.transport.get_json()` / `get_text()` / `post_json()` は宛先認可と通信エラー分類を
 Core 側で適用します。Credential の secret を URL、header、`Provider`、`Result`、`Resource` に
 保存せず、必要な論理名を `credential=` で指定してください。
 
@@ -41,3 +42,7 @@ Core 側で適用します。Credential の secret を URL、header、`Provider`
 `search-ckan-jp` は検索専用のDiscovery Sourceです。検索結果の `target` は元のCKAN
 配布物を表す `direct` Config になるため、`search-ckan-jp` 自体を `Config` で解決する
 ことはできません。
+
+`mlit-dpf` も検索専用です。明示的な `target_rules` で解決可能な既存Sourceへ委譲し、委譲不能かつ
+`DPF:downloadURLs` と `representations` が揃う場合だけ `direct` Configへfallbackします。
+`target_rules` から `direct` または別の `mlit-dpf` Providerへ委譲する構成は拒否されます。

@@ -19,6 +19,12 @@ results = app.search(text="人口", limit=10)
 
 `search-ckan-jp` では、`limit` はCKANへのpackage取得数（`rows`）に使われるだけでなく、packageをsupported resourceへ展開した後の結果列にも適用されます。そのため、1つのpackageに複数のresourceがある場合、flattened結果全体が`limit`件に達した時点で後続resourceやpackageの結果が省略されます。`limit=None`ならこの展開後の制限はありません。
 
+`mlit-dpf` は `text`、`bbox`、`limit` に対応します。明示的なtarget ruleが成立する結果は
+CKAN、PLATEAU、STAC、OGC等の構成済みSourceへ委譲され、それ以外は明示representationと
+`DPF:downloadURLs` が揃う場合だけDirectへfallbackします。`time` は未対応diagnosticになり、
+landing pageだけの結果やformat不明の結果は返しません。Directはfallback専用なので、
+target ruleの委譲先には指定できません。
+
 ```python
 from rhinestone.models import SearchQuery
 
@@ -46,6 +52,10 @@ Resultは次の情報を持ちます。
 - `raw_metadata`: 発見元が返した未加工の provider metadata
 
 横断CKAN検索の結果は、`discovered_by="search-ckan-jp"`、`target.source_id="direct"` のようになります。`target`は`result.to_config()`で取得できます。解決先が発見元と異なる場合、target側の`resource.metadata` / `resource.provenance` / `resource.source.raw_metadata`を保持したまま、発見元の3つの記録は`resource.discovery`へ保持されます。
+
+国交DPFも同じDiscovery境界を使います。`discovered_by` は構成したDPF Source ID、`target` は
+委譲先Sourceまたは `direct` です。解決後もDPF由来情報は `resource.discovery` に分離して残り、
+Runtimeは `app.open(result, "gdal")` や `resource.open("rasterio")` のように明示します。
 
 ## 結果の順序
 
@@ -77,7 +87,7 @@ for diagnostic in results.diagnostics:
 
 指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。Sourceに必須条件がある場合、その条件が指定されていないSourceも検索せずスキップします。`diagnostic.reason`は通常`unsupported`または`missing_required`で、後者では`missing_conditions`に不足条件が入ります。
 
-Providerの通信・metadata取得・response解釈に失敗した場合は、失敗したSourceだけを隔離し、他のSourceの検索結果を返します。この場合は`reason="provider_failure"`となり、`failure_type`に`metadata`または`response`が入ります。Provider障害の診断には例外メッセージやtracebackを含めません。全Sourceがこの種の障害になった場合も、空の`SearchResults`と診断を返します。一方、検索クエリの検証失敗や予期しないプログラムエラーはProvider障害として握りつぶしません。
+Providerの通信・metadata取得・response解釈に失敗した場合は、失敗したSourceだけを隔離し、他のSourceの検索結果を返します。この場合は`reason="provider_failure"`となり、`failure_type`に`metadata`または`response`が入ります。検索に必要なCredentialが未登録の場合も同様に隔離し、`failure_type="credential"`を返します。これにより、APIキーを設定していない組み込みSourceがあっても、他のSourceの横断検索は継続します。Provider障害の診断には例外メッセージやtracebackを含めません。全Sourceがこの種の障害になった場合も、空の`SearchResults`と診断を返します。一方、検索クエリの検証失敗、Credential factoryの故障、予期しないプログラムエラーはProvider障害として握りつぶしません。
 
 検索結果は`app.resolve(result)`で直接Resourceへ解決できます。`app.search()`が返したResultでは
 `result.resolve()`も同じResourceを返し、発見元と解決先が異なる場合も両側のmetadata、raw metadata、

@@ -3,10 +3,7 @@
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime
-from typing import (
-    Any,
-    cast,
-)
+from typing import Any, cast
 
 from . import _http
 from .adapters.contracts import (
@@ -35,6 +32,7 @@ from .adapters.source import (
     DirectAdapter,
     EstatGisAdapter,
     GsiFundamentalAdapter,
+    MlitDpfAdapter,
     OdptAdapter,
     OgcFeaturesAdapter,
     PlateauAdapter,
@@ -178,6 +176,24 @@ class _SourceTransport:
                 f"Provider metadata request failed for {url!r}"
             ) from error
 
+    def post_json(
+        self,
+        url: str,
+        body: Mapping[str, Any],
+        headers: Mapping[str, str] | None = None,
+        *,
+        credential: str | None = None,
+    ) -> Any:
+        credential_name = self._credential_name if credential is None else credential
+        self._authorize(url, headers, credential_name)
+        request_headers = _NoRedirectHeaders(headers or {})
+        try:
+            return _http.post_json(url, body, request_headers)
+        except OSError as error:
+            raise ProviderMetadataError(
+                f"Provider metadata request failed for {url!r}"
+            ) from error
+
     def _authorize(
         self,
         url: str,
@@ -242,6 +258,8 @@ class Rhinestone:
             if selected_sources:
                 raise TypeError("pass either catalog or sources, not both")
             selected_sources = tuple(catalog)
+
+        _validate_mlit_dpf_targets(selected_sources)
 
         (
             custom_source_definitions,
@@ -604,6 +622,18 @@ def _build_builtin_source_adapter(
             destination_policy=destination_policy,
             **settings,
         )
+    if adapter_type == "mlit-dpf":
+        _reject_options(
+            adapter_type,
+            settings,
+            ("endpoint", "credential", "target_rules", "representations"),
+        )
+        return MlitDpfAdapter(
+            post_json=transport.post_json,
+            credentials=credentials,
+            provider_id=provider.id,
+            **settings,
+        )
     if adapter_type == "gsi-fundamental":
         _reject_options(adapter_type, settings, ())
         return GsiFundamentalAdapter(knowledge=knowledge)
@@ -724,6 +754,7 @@ def _source_definitions(
                 "plateau",
                 "static",
                 "search-ckan-jp",
+                "mlit-dpf",
                 "gsi-fundamental",
                 "dcat",
                 "odpt",
@@ -746,6 +777,43 @@ def _source_definitions(
         custom_types.add(definition.adapter_type)
         definitions[definition.adapter_type] = definition
     return definitions
+
+
+def _validate_mlit_dpf_targets(sources: tuple[Provider, ...]) -> None:
+    configured_ids = {"direct", *(source.id for source in sources)}
+    adapter_types = {source.id: source.adapter_type for source in sources}
+    for source in sources:
+        if source.adapter_type != "mlit-dpf":
+            continue
+        rules = source.settings.get("target_rules", ())
+        if not isinstance(rules, list | tuple):
+            continue
+        for value in cast(list[Any] | tuple[Any, ...], rules):
+            if not isinstance(value, Mapping):
+                continue
+            rule = cast(Mapping[str, Any], value)
+            target = rule.get("source_id")
+            if isinstance(target, str) and target not in configured_ids:
+                raise ConfigValidationError(
+                    f"mlit-dpf target rule names unconfigured source {target!r}; "
+                    "add a Provider with that id"
+                )
+            if target == "direct":
+                raise ConfigValidationError(
+                    "mlit-dpf target rule must not target direct; configure "
+                    "representations for the explicit Direct fallback"
+                )
+            if target == source.id:
+                raise ConfigValidationError(
+                    "mlit-dpf target rule must not delegate back to itself"
+                )
+            if isinstance(target, str) and adapter_types.get(target) in {
+                "mlit-dpf",
+                "search-ckan-jp",
+            }:
+                raise ConfigValidationError(
+                    "mlit-dpf target rule must not target a discovery-only Provider"
+                )
 
 
 def _source_context(

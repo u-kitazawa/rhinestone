@@ -451,8 +451,8 @@ class SearchDiagnostic:
 
     ``reason`` is normally ``unsupported``, ``missing_required``, or
     ``provider_failure``. For provider failures, ``failure_type`` distinguishes
-    metadata retrieval from response interpretation without exposing raw
-    exceptions in search results.
+    metadata retrieval, response interpretation, and unavailable credentials
+    without exposing raw exceptions in search results.
     """
 
     source_id: str

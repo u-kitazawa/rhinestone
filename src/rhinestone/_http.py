@@ -49,22 +49,28 @@ def get_json(
     )
     open_request = opener.open if opener is not None else urlopen
     with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
-        try:
-            decoded = json.load(response, parse_int=_parse_json_int)
-        except (
-            UnicodeDecodeError,
-            json.JSONDecodeError,
-            _JsonIntegerDecodeError,
-        ):
-            raise ProviderResponseError(
-                "Provider response is not valid JSON; expected a JSON document"
-            ) from None
-        if isinstance(decoded, Mapping):
-            response_uri = getattr(response, "geturl", lambda: request.full_url)()
-            return JsonDocument(
-                cast(Mapping[str, Any], decoded), response_uri or request.full_url
-            )
-        return decoded
+        return _decode_json(response, request.full_url)
+
+
+def post_json(
+    url: str,
+    body: Mapping[str, Any],
+    headers: Mapping[str, str] | None = None,
+) -> Any:
+    """POST a JSON object and decode JSON without following redirects."""
+    request = Request(
+        url,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            **_DEFAULT_HEADERS,
+            "Content-Type": "application/json",
+            **dict(headers or {}),
+        },
+        method="POST",
+    )
+    opener = build_opener(_NoRedirectHandler())
+    with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
+        return _decode_json(response, request.full_url)
 
 
 def get_text(url: str, headers: Mapping[str, str] | None = None) -> str:
@@ -130,6 +136,25 @@ class _NoRedirectHandler(HTTPRedirectHandler):
         newurl: str,
     ) -> Request | None:
         return None
+
+
+def _decode_json(response: Any, request_url: str) -> Any:
+    try:
+        decoded = json.load(response, parse_int=_parse_json_int)
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        _JsonIntegerDecodeError,
+    ):
+        raise ProviderResponseError(
+            "Provider response is not valid JSON; expected a JSON document"
+        ) from None
+    if isinstance(decoded, Mapping):
+        response_uri = getattr(response, "geturl", lambda: request_url)()
+        return JsonDocument(
+            cast(Mapping[str, Any], decoded), response_uri or request_url
+        )
+    return decoded
 
 
 def _request(
