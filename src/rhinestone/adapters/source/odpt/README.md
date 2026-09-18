@@ -2,7 +2,7 @@
 
 `OdptAdapter` は ODPT v4 の service query を `Source` に変換します。
 
-- 提供元の種類（`source_type`）: `odpt`
+- Adapter 種別（`adapter_type`）: `odpt`
 - 必須設定: `dataset` (`station`, `railway`, `train`), `credential`
 - 任意設定: 公式フィールドだけを含む `filters`
 - 実行: `JsonServiceAdapter` に `OdptAdapter.prepare_request` を渡します。

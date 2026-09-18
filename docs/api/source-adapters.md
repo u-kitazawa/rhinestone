@@ -22,6 +22,7 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 | [ODPT](adapters/odpt.md) | `odpt` | ODPT v4 |
 | [OGC API Features](adapters/ogc-features.md) | `ogc-features` | OGC API Features 1.0 |
 | [PLATEAU](adapters/plateau.md) | `plateau` | G 空間情報センター CKAN |
+| [横断CKAN検索](adapters/search-ckan-jp.md) | `search-ckan-jp` | search.ckan.jp Backend API |
 | [STAC](adapters/stac.md) | `stac` | STAC API 1.0 |
 
 Source Adapter は `SourceAdapterDefinition` として明示登録できます。Definition は
@@ -36,3 +37,7 @@ Core 側で適用します。Credential の secret を URL、header、`Provider`
 保存せず、必要な論理名を `credential=` で指定してください。
 
 内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。
+
+`search-ckan-jp` は検索専用のDiscovery Sourceです。検索結果の `target` は元のCKAN
+配布物を表す `direct` Config になるため、`search-ckan-jp` 自体を `Config` で解決する
+ことはできません。

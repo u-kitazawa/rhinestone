@@ -2,7 +2,7 @@
 
 `DirectAdapter` は利用者が完全に記述した単一 Resource を `Source` に変換します。
 
-- 提供元の種類（`source_type`）: `direct`
+- Adapter 種別（`adapter_type`）: `direct`
 - 必須設定: `uri`, `format`
 - 任意設定: `media_type`, `metadata`, `archive`, `encoding`, `layer`, `subdataset`
 
