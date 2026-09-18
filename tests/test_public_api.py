@@ -168,6 +168,7 @@ def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
         sources.PLATEAU,
         sources.GSI,
         sources.ODPT,
+        sources.MLIT_DPF,
         sources.SEARCH_CKAN_JP,
     )
     assert all(isinstance(source, Provider) for source in sources.ALL)

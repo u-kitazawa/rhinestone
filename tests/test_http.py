@@ -187,6 +187,37 @@ def test_get_json_rejects_redirects_for_marked_credential_headers(
         )
         == {}
     )
+
+
+def test_post_json_encodes_body_and_always_rejects_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, Any] = {}
+    opener = _Opener(_Response(b'{"ok": true}', final_url="https://example.test/api"))
+
+    def build_test_opener(handler: object) -> _Opener:
+        calls["handler"] = handler
+        return opener
+
+    monkeypatch.setattr(_http, "build_opener", build_test_opener)
+
+    response = _http.post_json(
+        "https://example.test/api",
+        {"query": "東京"},
+        {"apikey": "secret"},
+    )
+
+    assert response == {"ok": True}
+    assert response.response_uri == "https://example.test/api"
+    request = opener.calls["request"]
+    assert request.method == "POST"
+    assert request.data == b'{"query": "\xe6\x9d\xb1\xe4\xba\xac"}'
+    assert dict(request.header_items())["Content-type"] == "application/json"
+    assert dict(request.header_items())["Apikey"] == "secret"
+    assert isinstance(  # pyright: ignore[reportPrivateUsage]
+        calls["handler"],
+        _http._NoRedirectHandler,  # pyright: ignore[reportPrivateUsage]
+    )
     assert isinstance(  # pyright: ignore[reportPrivateUsage]
         calls["handler"],
         _http._NoRedirectHandler,  # pyright: ignore[reportPrivateUsage]
