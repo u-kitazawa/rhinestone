@@ -1,8 +1,9 @@
 """A deterministic, snapshot-backed municipality knowledge adapter."""
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
-from typing import Iterable, Mapping, Tuple, Union, cast
+from typing import cast
 
 from ...errors import KnowledgeResolutionError, KnowledgeValidationError
 from .models import MunicipalityIdentity
@@ -45,8 +46,8 @@ class MunicipalityRecord:
     """One immutable identity plus its code and provider assignments."""
 
     identity: MunicipalityIdentity
-    codes: Tuple[AreaCode, ...] = ()
-    aliases: Tuple[str, ...] = ()
+    codes: tuple[AreaCode, ...] = ()
+    aliases: tuple[str, ...] = ()
     provider_identifiers: Mapping[str, str] = field(
         default_factory=lambda: dict[str, str]()
     )
@@ -105,7 +106,7 @@ class MunicipalityRecord:
         )
 
 
-RecordInput = Union[MunicipalityRecord, MunicipalityIdentity]
+RecordInput = MunicipalityRecord | MunicipalityIdentity
 
 
 class StaticMunicipalityAdapter:
@@ -118,9 +119,9 @@ class StaticMunicipalityAdapter:
     """
 
     _snapshot_version: str
-    _records: Tuple[MunicipalityRecord, ...]
+    _records: tuple[MunicipalityRecord, ...]
     _by_code: Mapping[tuple[str, str], MunicipalityRecord]
-    _by_name: Mapping[str, Tuple[MunicipalityRecord, ...]]
+    _by_name: Mapping[str, tuple[MunicipalityRecord, ...]]
     _identity_by_key: Mapping[tuple[str, str, str, str, str], MunicipalityIdentity]
 
     def __init__(

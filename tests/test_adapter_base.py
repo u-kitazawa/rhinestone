@@ -1,8 +1,9 @@
 import ast
 import json
+from collections.abc import Mapping
 from importlib import resources
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -217,6 +218,6 @@ def test_adapter_package_initializers_only_reexport_public_symbols(
     tree = ast.parse((root / package / "__init__.py").read_text())
 
     assert not any(
-        isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef)
         for node in tree.body
     )

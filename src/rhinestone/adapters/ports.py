@@ -1,6 +1,7 @@
 """Small read-only service ports exposed to user-owned adapters."""
 
-from typing import Any, FrozenSet, Mapping, Optional, Protocol
+from collections.abc import Mapping
+from typing import Any, Protocol
 
 
 class CredentialPort(Protocol):
@@ -15,7 +16,7 @@ class DependencyPort(Protocol):
     """Read-only runtime dependency lookup exposed to external adapters."""
 
     @property
-    def available(self) -> FrozenSet[str]:
+    def available(self) -> frozenset[str]:
         """Return dependency names visible to this adapter."""
         ...
 
@@ -31,9 +32,9 @@ class TransportPort(Protocol):
         self,
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
+        headers: Mapping[str, str] | None = None,
         *,
-        credential: Optional[str] = None,
+        credential: str | None = None,
     ) -> Any:
         """Fetch and decode one JSON response.
 
@@ -45,9 +46,9 @@ class TransportPort(Protocol):
     def get_text(
         self,
         url: str,
-        headers: Optional[Mapping[str, str]] = None,
+        headers: Mapping[str, str] | None = None,
         *,
-        credential: Optional[str] = None,
+        credential: str | None = None,
     ) -> str:
         """Fetch one text response through the same policy boundary."""
         ...

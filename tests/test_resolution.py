@@ -1,4 +1,5 @@
-from typing import Mapping, Tuple, cast
+from collections.abc import Mapping
+from typing import cast
 
 import pytest
 
@@ -31,10 +32,10 @@ def test_resolution_is_independent_of_rule_registration_order() -> None:
         media_type="image/tiff",
     )
 
-    def lower_priority(item: ResourceCandidate) -> Tuple[int, str]:
+    def lower_priority(item: ResourceCandidate) -> tuple[int, str]:
         return (10, "file")
 
-    def higher_priority(item: ResourceCandidate) -> Tuple[int, str]:
+    def higher_priority(item: ResourceCandidate) -> tuple[int, str]:
         return (20, "remote-dataset")
 
     forward = Resolver(rules=(lower_priority, higher_priority)).resolve(

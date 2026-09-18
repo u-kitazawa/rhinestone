@@ -1,9 +1,10 @@
 """Immutable canonical values shared by knowledge adapters."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from types import MappingProxyType
-from typing import Any, Literal, Mapping, Optional, cast
+from typing import Any, Literal, cast
 
 from ...errors import KnowledgeValidationError
 
@@ -90,10 +91,10 @@ class TimeSemantic:
     """
 
     kind: TimeKind
-    year: Optional[int] = None
-    as_of: Optional[date] = None
-    era: Optional[str] = None
-    era_year: Optional[int] = None
+    year: int | None = None
+    as_of: date | None = None
+    era: str | None = None
+    era_year: int | None = None
     raw: str = ""
 
     def __post_init__(self) -> None:

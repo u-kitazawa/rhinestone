@@ -1,7 +1,8 @@
 """Registry for injectable shared knowledge adapters."""
 
+from collections.abc import Iterable
 from dataclasses import replace
-from typing import Dict, Iterable, Optional, Tuple, cast
+from typing import cast
 
 from ...errors import (
     AdapterRegistrationError,
@@ -46,10 +47,10 @@ class KnowledgeAdapterRegistry:
     def __init__(
         self,
         definitions: Iterable[KnowledgeAdapterDefinition] = (),
-        context: Optional[KnowledgeAdapterContext] = None,
+        context: KnowledgeAdapterContext | None = None,
     ) -> None:
-        self._definitions: Dict[KnowledgeKind, KnowledgeAdapterDefinition] = {}
-        self._instances: Dict[KnowledgeKind, KnowledgeAdapter] = {}
+        self._definitions: dict[KnowledgeKind, KnowledgeAdapterDefinition] = {}
+        self._instances: dict[KnowledgeKind, KnowledgeAdapter] = {}
         self._context = context
         for definition in definitions:
             if definition.kind in self._definitions:
@@ -60,7 +61,7 @@ class KnowledgeAdapterRegistry:
             self._definitions[definition.kind] = definition
 
     @property
-    def available(self) -> Tuple[KnowledgeKind, ...]:
+    def available(self) -> tuple[KnowledgeKind, ...]:
         """Return configured knowledge kinds in registration order."""
         return tuple(self._definitions)
 
@@ -99,9 +100,7 @@ class KnowledgeAdapterRegistry:
             )
         return identity
 
-    def resolve_time(
-        self, value: str, *, kind: Optional[TimeKind] = None
-    ) -> TimeSemantic:
+    def resolve_time(self, value: str, *, kind: TimeKind | None = None) -> TimeSemantic:
         """Resolve and validate one time expression and optional semantic kind."""
         semantic = self.time().resolve_time(value, kind=kind)
         if not isinstance(cast(object, semantic), TimeSemantic):

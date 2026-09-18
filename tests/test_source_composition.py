@@ -1,6 +1,7 @@
 import gc
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 from weakref import ref
 
 import pytest
@@ -53,7 +54,7 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
         return document
 
     monkeypatch.setattr(_http, "get_text", get_document)
-    dependency_calls: List[str] = []
+    dependency_calls: list[str] = []
     app = configure(
         sources=(
             Provider(
@@ -85,7 +86,7 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
 def test_configured_dcat_rejects_tampered_catalog_uri_before_fetch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    document_calls: List[str] = []
+    document_calls: list[str] = []
 
     def get_document(uri: str) -> str:
         document_calls.append(uri)
@@ -128,7 +129,7 @@ def test_dcat_search_loads_source_runtime_on_demand(
         return document
 
     monkeypatch.setattr(_http, "get_text", get_document)
-    dependency_calls: List[str] = []
+    dependency_calls: list[str] = []
     app = configure(
         sources=(
             Provider(
@@ -152,7 +153,7 @@ def test_dcat_search_loads_source_runtime_on_demand(
 def test_dcat_missing_runtime_is_not_reported_as_provider_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    document_calls: List[str] = []
+    document_calls: list[str] = []
 
     def get_document(uri: str) -> str:
         document_calls.append(uri)
@@ -256,12 +257,12 @@ def test_configured_json_transport_supports_adapter_headers(
 ) -> None:
     endpoint = "https://catalog.example"
     search_url = endpoint + "/api/3/action/package_search"
-    seen: Dict[str, Any] = {}
+    seen: dict[str, Any] = {}
 
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Any:
         seen["headers"] = headers
         return fixture_json("ckan/package_search.json")

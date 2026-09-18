@@ -1,8 +1,9 @@
 """Deterministic conversion from Source candidates to Resource access plans."""
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from pathlib import PurePosixPath
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, cast
+from typing import Any, cast
 
 from .errors import (
     AmbiguousResourceError,
@@ -20,14 +21,14 @@ from .models import (
 )
 from .representations import canonical_format
 
-ResolutionRule = Callable[[ResourceCandidate], Optional[Tuple[int, str]]]
+ResolutionRule = Callable[[ResourceCandidate], tuple[int, str] | None]
 
 
 class Resolver:
     """Choose exactly one candidate and construct its explicit AccessPlan."""
 
     def __init__(self, rules: Iterable[ResolutionRule] = ()) -> None:
-        self._rules = tuple(rules)
+        self._resolution_rules = tuple(rules)
 
     def resolve(self, source: Source) -> Resource:
         """Resolve a normalized Source into one Resource.
@@ -36,27 +37,27 @@ class Resolver:
         excluded from selection. Exactly one remaining candidate is required;
         representation and access kind must be explicit enough to build a plan.
         """
-        candidates: List[ResourceCandidate] = []
-        for item in source.candidates:
-            matches = item.attributes.get("matches_config", True)
+        matching_candidates: list[ResourceCandidate] = []
+        for candidate in source.candidates:
+            matches = candidate.attributes.get("matches_config", True)
             if not isinstance(matches, bool):
                 raise UnsupportedAccessError(
                     "Resource candidate attribute 'matches_config' must be a "
                     f"boolean; got {type(matches).__name__}"
                 )
             if matches:
-                candidates.append(item)
-        if not candidates:
+                matching_candidates.append(candidate)
+        if not matching_candidates:
             raise ResourceNotFoundError(
                 "No resource matches the requested selection; verify the "
                 "provider-specific identifiers and Config settings"
             )
-        if len(candidates) != 1:
+        if len(matching_candidates) != 1:
             raise AmbiguousResourceError(
                 "Expected exactly one resource candidate after selection; "
-                f"got {len(candidates)}; add an explicit resource selector"
+                f"got {len(matching_candidates)}; add an explicit resource selector"
             )
-        candidate = candidates[0]
+        candidate = matching_candidates[0]
         format_name = canonical_format(candidate.format)
         if format_name != candidate.format:
             candidate = replace(candidate, format=format_name)
@@ -85,8 +86,8 @@ class Resolver:
                     f"or service-query; got {type(explicit).__name__}"
                 )
             return self._make_plan(explicit, candidate)
-        matches: List[Tuple[int, str]] = []
-        for rule in self._rules:
+        matches: list[tuple[int, str]] = []
+        for rule in self._resolution_rules:
             result = rule(candidate)
             if result is not None:
                 matches.append(result)

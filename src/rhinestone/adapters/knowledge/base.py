@@ -1,7 +1,8 @@
 """Contracts for shared knowledge adapters."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, FrozenSet, Literal, Protocol, Tuple, Union
+from typing import Any, Literal, Protocol
 
 from ...security import DestinationPolicy
 from ..ports import CredentialPort, DependencyPort
@@ -26,14 +27,14 @@ class TimeKnowledgeAdapter(Protocol):
         ...
 
 
-KnowledgeAdapter = Union[IdentityKnowledgeAdapter, TimeKnowledgeAdapter]
+KnowledgeAdapter = IdentityKnowledgeAdapter | TimeKnowledgeAdapter
 
 
 class KnowledgePort(Protocol):
     """Read-only shared knowledge service exposed to source adapters."""
 
     @property
-    def available(self) -> Tuple[KnowledgeKind, ...]:
+    def available(self) -> tuple[KnowledgeKind, ...]:
         """Return configured knowledge kinds."""
         ...
 
@@ -71,7 +72,7 @@ class KnowledgeAdapterDefinition:
     adapter_type: str
     factory: KnowledgeAdapterFactory
     kind: KnowledgeKind
-    dependencies: FrozenSet[str] = frozenset()
+    dependencies: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         if self.kind not in {"identity", "time"}:

@@ -1,6 +1,6 @@
 """Discovery adapter for the Japanese cross-CKAN search service."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ....errors import (
     ConfigValidationError,
@@ -26,8 +26,8 @@ class SearchCkanJpAdapter(ProviderAdapter):
     def __init__(
         self,
         get_json: JsonTransport,
-        endpoint: Optional[str] = DEFAULT_ENDPOINT,
-        destination_policy: Optional[DestinationPolicy] = None,
+        endpoint: str | None = DEFAULT_ENDPOINT,
+        destination_policy: DestinationPolicy | None = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -41,14 +41,14 @@ class SearchCkanJpAdapter(ProviderAdapter):
             "search-ckan-jp is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
         """Search the official search.ckan.jp endpoint using text criteria."""
         if query.text is None:
             raise ConfigValidationError(
                 "search-ckan-jp requires a text condition for discovery"
             )
         endpoint = self._endpoint_from({}, DEFAULT_ENDPOINT)
-        params: Dict[str, Any] = {"q": query.text}
+        params: dict[str, Any] = {"q": query.text}
         if query.limit is not None:
             params["rows"] = query.limit
         response = self._request(f"{endpoint}/package_search", params)
@@ -56,7 +56,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
             raise ProviderResponseError("search.ckan.jp search was not successful")
         result = self._object(response.get("result"), "search.ckan.jp result")
         packages = self._objects(result.get("results"), "search.ckan.jp results")
-        found: List[SearchResult] = []
+        found: list[SearchResult] = []
         for package in packages:
             found.extend(self._package_results(package, endpoint, params))
         return tuple(found[: query.limit])
@@ -65,8 +65,8 @@ class SearchCkanJpAdapter(ProviderAdapter):
         self,
         package: JsonObject,
         endpoint: str,
-        params: Dict[str, Any],
-    ) -> Tuple[SearchResult, ...]:
+        params: dict[str, Any],
+    ) -> tuple[SearchResult, ...]:
         package_id = optional_string(package.get("xckan_original_id"))
         if package_id is None:
             package_id = optional_string(package.get("id"))
@@ -78,7 +78,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         license_name = optional_string(package.get("license_title"))
         site_url = optional_string(package.get("xckan_site_url"))
         resources = self._objects(package.get("resources"), "search.ckan.jp resources")
-        found: List[SearchResult] = []
+        found: list[SearchResult] = []
         for resource in resources:
             resource_id = optional_string(resource.get("id"))
             uri = optional_string(resource.get("url"))
@@ -107,7 +107,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 adapter=self.adapter_type,
                 raw={"catalog": package, "resource": resource},
             )
-            target_settings: Dict[str, Any] = {
+            target_settings: dict[str, Any] = {
                 "uri": uri,
                 "format": format_name,
                 "metadata": {

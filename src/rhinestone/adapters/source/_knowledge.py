@@ -1,7 +1,8 @@
 """Internal helpers for declarative provider knowledge (not an extension API)."""
 
+from collections.abc import Mapping
 from pathlib import PurePosixPath
-from typing import Any, Mapping, Optional, Tuple, cast
+from typing import Any, cast
 
 from ...errors import ConfigValidationError
 from ...models import Metadata, Provenance, ResourceCandidate, Source
@@ -15,7 +16,7 @@ def string(settings: Mapping[str, Any], name: str) -> str:
     return value
 
 
-def entry_point(settings: Mapping[str, Any]) -> Optional[str]:
+def entry_point(settings: Mapping[str, Any]) -> str | None:
     value = settings.get("entry_point")
     if value is None:
         if settings.get("archive") == "zip":
@@ -32,12 +33,12 @@ def source(
     provider: str,
     identifier: str,
     raw: Mapping[str, Any],
-    candidates: Tuple[ResourceCandidate, ...],
-    title: Optional[str] = None,
-    description: Optional[str] = None,
-    license_name: Optional[str] = None,
-    endpoint: Optional[str] = None,
-    capabilities: Tuple[str, ...] = (),
+    candidates: tuple[ResourceCandidate, ...],
+    title: str | None = None,
+    description: str | None = None,
+    license_name: str | None = None,
+    endpoint: str | None = None,
+    capabilities: tuple[str, ...] = (),
 ) -> Source:
     return Source(
         metadata=Metadata(
@@ -79,6 +80,6 @@ def resolve_knowledge(
         }:
             raise ConfigValidationError("time_kind must be a supported time kind")
         resolved["time"] = registry.resolve_time(
-            value, kind=cast(Optional[TimeKind], time_kind)
+            value, kind=cast(TimeKind | None, time_kind)
         ).as_mapping()
     return resolved

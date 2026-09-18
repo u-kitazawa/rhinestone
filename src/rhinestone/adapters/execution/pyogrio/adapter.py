@@ -1,6 +1,6 @@
 """Pyogrio execution adapter."""
 
-from typing import Any, Dict, FrozenSet
+from typing import Any
 
 from ....errors import ResourceAccessError
 from ....models import Resource
@@ -20,7 +20,7 @@ class PyogrioAdapter(ExecutionAdapter):
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
 
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
         """Return whether pyogrio and the Resource's vector format are compatible."""
         return (
             canonical_format(resource.format) in self._formats
@@ -36,7 +36,7 @@ class PyogrioAdapter(ExecutionAdapter):
     ) -> Any:
         """Read the selected vector Resource with ``runtime.read_dataframe``."""
         attributes = resource_attributes(resource)
-        options: Dict[str, Any] = {}
+        options: dict[str, Any] = {}
         encoding = attributes.get("encoding")
         if isinstance(encoding, str):
             options["encoding"] = encoding

@@ -1,6 +1,7 @@
 """CKAN Action API source adapter."""
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
@@ -28,16 +29,16 @@ class CkanAdapter(ProviderAdapter):
     def __init__(
         self,
         get_json: JsonTransport,
-        endpoint: Optional[str] = None,
-        api_token: Optional[str] = None,
-        api_key: Optional[str] = None,
+        endpoint: str | None = None,
+        api_token: str | None = None,
+        api_key: str | None = None,
         api_key_header: str = "X-CKAN-API-Key",
-        credential: Optional[str] = None,
-        credential_header: Optional[str] = None,
-        credential_scheme: Optional[str] = None,
-        credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
-        provider_id: Optional[str] = None,
+        credential: str | None = None,
+        credential_header: str | None = None,
+        credential_scheme: str | None = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
+        provider_id: str | None = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -115,7 +116,7 @@ class CkanAdapter(ProviderAdapter):
             raw_metadata={"resource": resource, "package": package},
         )
 
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
         """Search CKAN packages and return their resource-level results."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
@@ -123,7 +124,7 @@ class CkanAdapter(ProviderAdapter):
             raise ConfigValidationError(
                 f"Unsupported CKAN search conditions: {', '.join(sorted(unsupported))}"
             )
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if query.text is not None:
             params["q"] = query.text
         if query.limit is not None:
@@ -132,7 +133,7 @@ class CkanAdapter(ProviderAdapter):
             self._action(endpoint, "package_search", params), "CKAN search result"
         )
         packages = self._objects(result.get("results"), "CKAN search results")
-        found: List[SearchResult] = []
+        found: list[SearchResult] = []
         for package in packages:
             resources = self._objects(package.get("resources"), "CKAN resources")
             for resource in resources:

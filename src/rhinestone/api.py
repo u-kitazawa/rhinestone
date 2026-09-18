@@ -1,16 +1,10 @@
 """Public composition API."""
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime
 from typing import (
     Any,
-    Callable,
-    FrozenSet,
-    Iterable,
-    Mapping,
-    Optional,
-    Tuple,
-    Union,
     cast,
 )
 
@@ -79,31 +73,37 @@ class _ConfiguredSourceAdapter:
     """Bind one public source id to one built-in adapter instance."""
 
     def __init__(
-        self, source_id: str, adapter: ProviderAdapter, adapter_type: str | None = None
+        self,
+        source_id: str,
+        source_adapter: ProviderAdapter,
+        adapter_type: str | None = None,
     ) -> None:
         self.source_id = source_id
-        self.adapter_type = adapter_type or adapter.adapter_type
-        self.searchable = callable(getattr(adapter, "search", None))
-        empty_conditions: FrozenSet[str] = frozenset()
+        self.adapter_type = adapter_type or source_adapter.adapter_type
+        self.searchable = callable(getattr(source_adapter, "search", None))
+        empty_conditions: frozenset[str] = frozenset()
         self.search_conditions = cast(
-            FrozenSet[str], getattr(adapter, "search_conditions", empty_conditions)
+            frozenset[str],
+            getattr(source_adapter, "search_conditions", empty_conditions),
         )
         self.required_search_conditions = cast(
-            FrozenSet[str],
-            getattr(adapter, "required_search_conditions", empty_conditions),
+            frozenset[str],
+            getattr(source_adapter, "required_search_conditions", empty_conditions),
         )
-        self._adapter = adapter
+        self._source_adapter = source_adapter
 
     def load(self, config: Config) -> Source:
-        source = self._adapter.load(Config(self.adapter_type, config.settings))
+        source = self._source_adapter.load(Config(self.adapter_type, config.settings))
         return replace(
             source,
             provenance=replace(source.provenance, provider=self.source_id),
         )
 
-    def search(self, query: SearchQuery) -> Tuple[Result, ...]:
-        search_method = getattr(self._adapter, "search")
-        search = cast(Callable[[SearchQuery], Tuple[Result, ...]], search_method)
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+        search_method = getattr(self._source_adapter, "search")
+        search_results = cast(
+            Callable[[SearchQuery], tuple[Result, ...]], search_method
+        )
         return tuple(
             replace(
                 result,
@@ -119,7 +119,7 @@ class _ConfiguredSourceAdapter:
                     else result.provenance
                 ),
             )
-            for result in search(query)
+            for result in search_results(query)
         )
 
 
@@ -128,28 +128,28 @@ class _SourceTransport:
 
     def __init__(
         self,
-        policy: DestinationPolicy,
-        provider_id: str,
-        service: str,
-        credential: Optional[str] = None,
+        destination_policy: DestinationPolicy,
+        source_id: str,
+        adapter_type: str,
+        credential_name: str | None = None,
     ) -> None:
-        self._policy = policy
-        self._provider_id = provider_id
-        self._service = service
-        self._credential = credential
+        self._destination_policy = destination_policy
+        self._source_id = source_id
+        self._adapter_type = adapter_type
+        self._credential_name = credential_name
 
     def get_json(
         self,
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
+        headers: Mapping[str, str] | None = None,
         *,
-        credential: Optional[str] = None,
+        credential: str | None = None,
     ) -> Any:
-        logical_credential = self._credential if credential is None else credential
-        self._authorize(url, headers, logical_credential)
+        credential_name = self._credential_name if credential is None else credential
+        self._authorize(url, headers, credential_name)
         request_headers = headers
-        if headers is not None and (logical_credential is not None or headers):
+        if headers is not None and (credential_name is not None or headers):
             request_headers = _NoRedirectHeaders(headers)
         try:
             if request_headers is None:
@@ -163,12 +163,12 @@ class _SourceTransport:
     def get_text(
         self,
         url: str,
-        headers: Optional[Mapping[str, str]] = None,
+        headers: Mapping[str, str] | None = None,
         *,
-        credential: Optional[str] = None,
+        credential: str | None = None,
     ) -> str:
-        logical_credential = self._credential if credential is None else credential
-        self._authorize(url, headers, logical_credential)
+        credential_name = self._credential_name if credential is None else credential
+        self._authorize(url, headers, credential_name)
         try:
             if headers is None:
                 return _http.get_text(url)
@@ -181,15 +181,15 @@ class _SourceTransport:
     def _authorize(
         self,
         url: str,
-        headers: Optional[Mapping[str, str]],
-        credential: Optional[str],
+        headers: Mapping[str, str] | None,
+        credential_name: str | None,
     ) -> None:
-        self._policy.authorize(
+        self._destination_policy.authorize(
             url,
-            credentialed=credential is not None or bool(headers),
-            provider=self._provider_id,
-            service=self._service,
-            credential=credential,
+            credentialed=credential_name is not None or bool(headers),
+            provider=self._source_id,
+            service=self._adapter_type,
+            credential=credential_name,
         )
 
 
@@ -208,9 +208,9 @@ def _source_transport(
     )
     return _SourceTransport(
         destination_policy,
-        provider.id,
-        provider.adapter_type,
-        credential,
+        source_id=provider.id,
+        adapter_type=provider.adapter_type,
+        credential_name=credential,
     )
 
 
@@ -231,9 +231,9 @@ class Rhinestone:
         self,
         *,
         sources: Iterable[Provider] = (),
-        catalog: Optional[Catalog] = None,
-        dependencies: Optional[Mapping[str, DependencyValue]] = None,
-        credentials: Optional[Mapping[str, Callable[[], str]]] = None,
+        catalog: Catalog | None = None,
+        dependencies: Mapping[str, DependencyValue] | None = None,
+        credentials: Mapping[str, Callable[[], str]] | None = None,
         network_policy: NetworkPolicyLevel = "credentialed",
         adapters: Iterable[AdapterDefinition] = (),
     ) -> None:
@@ -246,11 +246,11 @@ class Rhinestone:
         (
             custom_source_definitions,
             custom_execution_definitions,
-            knowledge_definitions,
+            custom_knowledge_definitions,
         ) = _split_definitions(adapters)
         source_definitions = _source_definitions(custom_source_definitions)
         execution_definitions = _execution_definitions(custom_execution_definitions)
-        knowledge_definitions = _knowledge_definitions(knowledge_definitions)
+        knowledge_definitions = _knowledge_definitions(custom_knowledge_definitions)
         execution_runtime_names = frozenset(
             definition.name for definition in execution_definitions
         )
@@ -328,11 +328,15 @@ class Rhinestone:
                 )
             )
 
-        source_adapters: Tuple[Any, ...] = tuple(configured_sources)
+        source_adapters: tuple[Any, ...] = tuple(configured_sources)
 
-        def bind(adapter: Any) -> Any:
-            binder = getattr(adapter, "bind_credentials", None)
-            return binder(credential_registry) if callable(binder) else adapter
+        def bind_credentials(adapter: Any) -> Any:
+            credential_binder = getattr(adapter, "bind_credentials", None)
+            return (
+                credential_binder(credential_registry)
+                if callable(credential_binder)
+                else adapter
+            )
 
         configured_executions: list[Any] = []
         for definition in execution_definitions:
@@ -351,7 +355,8 @@ class Rhinestone:
                 )
             configured_executions.append(execution)
         adapter_registry = AdapterRegistry(
-            source_adapters, (bind(adapter) for adapter in configured_executions)
+            source_adapters,
+            (bind_credentials(adapter) for adapter in configured_executions),
         )
         self._pipeline = AccessPipeline(
             adapter_registry=adapter_registry,
@@ -364,7 +369,7 @@ class Rhinestone:
         )
         self._search = SearchCoordinator(source_adapters)
 
-    def resolve(self, value: Union[Config, Result]) -> Resource:
+    def resolve(self, value: Config | Result) -> Resource:
         """Resolve a Config or search Result into one concrete Resource.
 
         ``Result`` metadata and provenance are preserved when discovery and
@@ -395,9 +400,7 @@ class Rhinestone:
             ),
         )
 
-    def open(
-        self, value: Union[Config, Result, Resource], library: LibraryName
-    ) -> object:
+    def open(self, value: Config | Result | Resource, library: LibraryName) -> object:
         """Resolve and open a value through an explicitly named runtime.
 
         Args:
@@ -420,12 +423,12 @@ class Rhinestone:
 
     def search(
         self,
-        query: Optional[Union[SearchQuery, str]] = None,
+        query: SearchQuery | str | None = None,
         *,
-        text: Optional[str] = None,
-        bbox: Optional[Tuple[float, float, float, float]] = None,
-        time: Optional[Tuple[Optional[datetime], Optional[datetime]]] = None,
-        limit: Optional[int] = None,
+        text: str | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+        time: tuple[datetime | None, datetime | None] | None = None,
+        limit: int | None = None,
     ) -> SearchResults:
         """Search all configured searchable sources in configuration order.
 
@@ -465,9 +468,9 @@ class Rhinestone:
 def configure(
     *,
     sources: Iterable[Provider] = (),
-    catalog: Optional[Catalog] = None,
-    dependencies: Optional[Mapping[str, DependencyValue]] = None,
-    credentials: Optional[Mapping[str, Callable[[], str]]] = None,
+    catalog: Catalog | None = None,
+    dependencies: Mapping[str, DependencyValue] | None = None,
+    credentials: Mapping[str, Callable[[], str]] | None = None,
     network_policy: NetworkPolicyLevel = "credentialed",
     adapters: Iterable[AdapterDefinition] = (),
 ) -> Rhinestone:
@@ -506,23 +509,23 @@ def configure(
 
 
 def _build_builtin_source_adapter(
-    source: Provider,
+    provider: Provider,
     dependencies: DependencyRegistry,
     credentials: CredentialRegistry,
-    destination_policy: Optional[DestinationPolicy] = None,
-    knowledge: Optional[KnowledgeAdapterRegistry] = None,
-    transport: Optional[TransportPort] = None,
+    destination_policy: DestinationPolicy | None = None,
+    knowledge: KnowledgeAdapterRegistry | None = None,
+    transport: TransportPort | None = None,
 ) -> ProviderAdapter:
-    adapter_type = source.adapter_type
-    settings = dict(source.settings)
+    adapter_type = provider.adapter_type
+    settings = dict(provider.settings)
     knowledge = knowledge or KnowledgeAdapterRegistry()
     destination_policy = destination_policy or DestinationPolicy.unrestricted()
-    transport = transport or _source_transport(source, destination_policy)
+    transport = transport or _source_transport(provider, destination_policy)
 
     def json_transport(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Any:
         return transport.get_json(url, params, headers)
 
@@ -536,7 +539,7 @@ def _build_builtin_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
-            provider_id=source.id,
+            provider_id=provider.id,
             **settings,
         )
     if adapter_type == "stac":
@@ -549,7 +552,7 @@ def _build_builtin_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
-            provider_id=source.id,
+            provider_id=provider.id,
             **settings,
         )
     if adapter_type == "ogc-features":
@@ -568,7 +571,7 @@ def _build_builtin_source_adapter(
             get_json=json_transport,
             credentials=credentials,
             destination_policy=destination_policy,
-            provider_id=source.id,
+            provider_id=provider.id,
             **settings,
         )
     if adapter_type == "plateau":
@@ -582,7 +585,7 @@ def _build_builtin_source_adapter(
             credentials=credentials,
             destination_policy=destination_policy,
             knowledge=knowledge,
-            provider_id=source.id,
+            provider_id=provider.id,
             **settings,
         )
     if adapter_type == "static":
@@ -607,7 +610,7 @@ def _build_builtin_source_adapter(
     if adapter_type == "estat-gis":
         _reject_options(adapter_type, settings, ("distributions",))
         distributions = settings.get("distributions")
-        if not isinstance(distributions, (list, tuple)):
+        if not isinstance(distributions, list | tuple):
             raise ConfigValidationError(
                 "estat-gis source requires distributions: provide an explicit "
                 "machine-readable distribution index"
@@ -649,7 +652,7 @@ def _build_builtin_source_adapter(
 
 
 def _reject_options(
-    adapter_type: str, settings: Mapping[str, Any], allowed: Tuple[str, ...]
+    adapter_type: str, settings: Mapping[str, Any], allowed: tuple[str, ...]
 ) -> None:
     unknown = sorted(set(settings) - set(allowed))
     if unknown:
@@ -661,34 +664,38 @@ def _reject_options(
 
 def _split_definitions(
     definitions: Iterable[AdapterDefinition],
-) -> Tuple[
-    Tuple[SourceAdapterDefinition, ...],
-    Tuple[ExecutionAdapterDefinition, ...],
-    Tuple[KnowledgeAdapterDefinition, ...],
+) -> tuple[
+    tuple[SourceAdapterDefinition, ...],
+    tuple[ExecutionAdapterDefinition, ...],
+    tuple[KnowledgeAdapterDefinition, ...],
 ]:
-    sources: list[SourceAdapterDefinition] = []
-    executions: list[ExecutionAdapterDefinition] = []
-    knowledge: list[KnowledgeAdapterDefinition] = []
+    source_definitions: list[SourceAdapterDefinition] = []
+    execution_definitions: list[ExecutionAdapterDefinition] = []
+    knowledge_definitions: list[KnowledgeAdapterDefinition] = []
     for definition in definitions:
         candidate = cast(Any, definition)
         if isinstance(candidate, SourceAdapterDefinition):
-            sources.append(candidate)
+            source_definitions.append(candidate)
         elif isinstance(candidate, ExecutionAdapterDefinition):
-            executions.append(candidate)
+            execution_definitions.append(candidate)
         elif isinstance(candidate, KnowledgeAdapterDefinition):
-            knowledge.append(candidate)
+            knowledge_definitions.append(candidate)
         else:
             raise AdapterRegistrationError(
                 "Unknown adapter definition; expected a SourceAdapterDefinition, "
                 "ExecutionAdapterDefinition, or KnowledgeAdapterDefinition"
             )
-    return tuple(sources), tuple(executions), tuple(knowledge)
+    return (
+        tuple(source_definitions),
+        tuple(execution_definitions),
+        tuple(knowledge_definitions),
+    )
 
 
 def _source_definitions(
-    custom: Iterable[SourceAdapterDefinition],
+    custom_definitions: Iterable[SourceAdapterDefinition],
 ) -> Mapping[str, SourceAdapterDefinition]:
-    def builtin(adapter_type: str) -> SourceAdapterDefinition:
+    def built_in_definition(adapter_type: str) -> SourceAdapterDefinition:
         return SourceAdapterDefinition(
             adapter_type,
             lambda provider, context: _build_builtin_source_adapter(
@@ -709,7 +716,7 @@ def _source_definitions(
             "direct", lambda provider, context: DirectAdapter()
         ),
         **{
-            adapter_type: builtin(adapter_type)
+            adapter_type: built_in_definition(adapter_type)
             for adapter_type in (
                 "ckan",
                 "stac",
@@ -725,7 +732,7 @@ def _source_definitions(
         },
     }
     custom_types: set[str] = set()
-    for definition in custom:
+    for definition in custom_definitions:
         if definition.adapter_type in custom_types:
             raise AdapterRegistrationError(
                 f"Source adapter {definition.adapter_type!r} is registered more "
@@ -767,9 +774,9 @@ def _source_context(
 
 
 def _execution_definitions(
-    custom: Iterable[ExecutionAdapterDefinition],
-) -> Tuple[ExecutionAdapterDefinition, ...]:
-    preinstalled = (
+    custom_definitions: Iterable[ExecutionAdapterDefinition],
+) -> tuple[ExecutionAdapterDefinition, ...]:
+    built_in_definitions = (
         ExecutionAdapterDefinition(
             "gdal", lambda context: GdalAdapter(context.destination_policy)
         ),
@@ -789,9 +796,9 @@ def _execution_definitions(
             ),
         ),
     )
-    names = {definition.name for definition in preinstalled}
-    definitions = list(preinstalled)
-    for definition in custom:
+    names = {definition.name for definition in built_in_definitions}
+    definitions = list(built_in_definitions)
+    for definition in custom_definitions:
         if definition.name in names:
             raise AdapterRegistrationError(
                 f"Execution adapter {definition.name!r} is registered more than "
@@ -803,12 +810,12 @@ def _execution_definitions(
 
 
 def _knowledge_definitions(
-    custom: Iterable[KnowledgeAdapterDefinition],
-) -> Tuple[KnowledgeAdapterDefinition, ...]:
+    custom_definitions: Iterable[KnowledgeAdapterDefinition],
+) -> tuple[KnowledgeAdapterDefinition, ...]:
     """Return built-in knowledge definitions plus user replacements."""
-    custom_definitions = tuple(custom)
+    custom_definitions_tuple = tuple(custom_definitions)
     custom_by_kind: dict[str, KnowledgeAdapterDefinition] = {}
-    for definition in custom_definitions:
+    for definition in custom_definitions_tuple:
         if definition.kind in custom_by_kind:
             raise AdapterRegistrationError(
                 f"Knowledge adapter kind {definition.kind!r} is registered more "
@@ -816,21 +823,22 @@ def _knowledge_definitions(
             )
         custom_by_kind[definition.kind] = definition
 
-    preinstalled = (
+    built_in_definitions = (
         KnowledgeAdapterDefinition(
             "standard-time",
             lambda _context: StandardTimeAdapter(),
             "time",
         ),
     )
-    preinstalled_kinds = frozenset(definition.kind for definition in preinstalled)
+    built_in_kinds = frozenset(definition.kind for definition in built_in_definitions)
     definitions = [
-        custom_by_kind.get(definition.kind, definition) for definition in preinstalled
+        custom_by_kind.get(definition.kind, definition)
+        for definition in built_in_definitions
     ]
     definitions.extend(
         definition
-        for definition in custom_definitions
-        if definition.kind not in preinstalled_kinds
+        for definition in custom_definitions_tuple
+        if definition.kind not in built_in_kinds
     )
     return tuple(definitions)
 
@@ -839,7 +847,7 @@ def _build_source_adapter(
     source: Provider,
     definitions: Mapping[str, SourceAdapterDefinition] | DependencyRegistry,
     context: SourceAdapterContext | CredentialRegistry,
-    destination_policy: Optional[DestinationPolicy] = None,
+    destination_policy: DestinationPolicy | None = None,
 ) -> Any:
     # Keep the old private composition helper usable for downstream tests and
     # integrations while the public path uses Definition + Context.

@@ -1,6 +1,7 @@
 """Validation of the catalog knowledge used by the ODPT adapter."""
 
-from typing import Any, Dict, FrozenSet, Mapping, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ....errors import ConfigValidationError
 
@@ -11,10 +12,10 @@ def required_string(value: Any, name: str) -> str:
     return value
 
 
-def string_mapping(value: Any, name: str) -> Dict[str, str]:
+def string_mapping(value: Any, name: str) -> dict[str, str]:
     if not isinstance(value, Mapping) or not value:
         raise ConfigValidationError(f"{name} must be a non-empty object")
-    result: Dict[str, str] = {}
+    result: dict[str, str] = {}
     values = cast(Mapping[Any, Any], value)
     for key, item in values.items():
         if not isinstance(key, str) or not key.strip() or not isinstance(item, str):
@@ -25,18 +26,18 @@ def string_mapping(value: Any, name: str) -> Dict[str, str]:
     return result
 
 
-def filter_mapping(value: Any) -> Dict[str, FrozenSet[str]]:
+def filter_mapping(value: Any) -> dict[str, frozenset[str]]:
     if not isinstance(value, Mapping) or not value:
         raise ConfigValidationError("filter_fields must be a non-empty object")
-    result: Dict[str, FrozenSet[str]] = {}
+    result: dict[str, frozenset[str]] = {}
     values = cast(Mapping[Any, Any], value)
     for key, raw_fields in values.items():
         if not isinstance(key, str) or not key.strip():
             raise ConfigValidationError("filter_fields keys must be non-empty strings")
-        if not isinstance(raw_fields, (list, tuple, set, frozenset)):
+        if not isinstance(raw_fields, list | tuple | set | frozenset):
             raise ConfigValidationError("filter_fields values must be arrays")
         fields = cast(Any, raw_fields)
         if any(not isinstance(field, str) or not field.strip() for field in fields):
             raise ConfigValidationError("filter_fields values must contain strings")
-        result[key] = frozenset(cast(Tuple[str, ...], tuple(fields)))
+        result[key] = frozenset(cast(tuple[str, ...], tuple(fields)))
     return result

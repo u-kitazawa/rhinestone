@@ -1,6 +1,7 @@
 """OGC API Features 1.0 source adapter."""
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from collections.abc import Mapping
+from typing import Any
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
@@ -27,17 +28,17 @@ class OgcFeaturesAdapter(ProviderAdapter):
     def __init__(
         self,
         get_json: JsonTransport,
-        endpoint: Optional[str] = None,
-        collection_id: Optional[str] = None,
-        api_token: Optional[str] = None,
-        api_key: Optional[str] = None,
+        endpoint: str | None = None,
+        collection_id: str | None = None,
+        api_token: str | None = None,
+        api_key: str | None = None,
         api_key_header: str = "X-API-Key",
-        credential: Optional[str] = None,
-        credential_header: Optional[str] = None,
-        credential_scheme: Optional[str] = None,
-        credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
-        provider_id: Optional[str] = None,
+        credential: str | None = None,
+        credential_header: str | None = None,
+        credential_scheme: str | None = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
+        provider_id: str | None = None,
     ) -> None:
         super().__init__(
             get_json=get_json,
@@ -94,7 +95,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
             raw_metadata=collection,
         )
 
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
         """Search one configured OGC collection using standard parameters."""
         endpoint = self._endpoint_from({}, self._endpoint)
         if not self._collection_id:
@@ -109,7 +110,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
         items_url = f"{endpoint}/collections/{collection_path}/items"
         response = self._request(items_url, params)
         features = self._objects(response.get("features"), "OGC features")
-        found: List[SearchResult] = []
+        found: list[SearchResult] = []
         for feature in features:
             feature_id = self._required_string(feature, "id")
             properties = self._object(feature.get("properties"), "OGC properties")
@@ -142,8 +143,8 @@ class OgcFeaturesAdapter(ProviderAdapter):
         return tuple(found)
 
     @staticmethod
-    def _query_parameters(query: SearchQuery) -> Dict[str, Any]:
-        params: Dict[str, Any] = {}
+    def _query_parameters(query: SearchQuery) -> dict[str, Any]:
+        params: dict[str, Any] = {}
         if query.bbox is not None:
             params["bbox"] = ",".join(str(value) for value in query.bbox)
         if query.time is not None:
@@ -172,5 +173,5 @@ def _feature_title(properties: Mapping[str, Any], fallback: str) -> str:
     return fallback
 
 
-def _optional_string(value: Any) -> Optional[str]:
+def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None

@@ -1,7 +1,8 @@
 """Built-in standard-library HTTP transport."""
 
 import json
-from typing import Any, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
@@ -37,7 +38,7 @@ class JsonDocument(dict[str, Any]):
 def get_json(
     url: str,
     params: Mapping[str, Any],
-    headers: Optional[Mapping[str, str]] = None,
+    headers: Mapping[str, str] | None = None,
 ) -> Any:
     """Fetch and decode JSON over HTTP using the standard library."""
     request = _request(url, params, headers)
@@ -66,7 +67,7 @@ def get_json(
         return decoded
 
 
-def get_text(url: str, headers: Optional[Mapping[str, str]] = None) -> str:
+def get_text(url: str, headers: Mapping[str, str] | None = None) -> str:
     """Fetch a text document without following HTTP redirects."""
     request = Request(
         url,
@@ -127,14 +128,14 @@ class _NoRedirectHandler(HTTPRedirectHandler):
         msg: str,
         headers: Any,
         newurl: str,
-    ) -> Optional[Request]:
+    ) -> Request | None:
         return None
 
 
 def _request(
     url: str,
     params: Mapping[str, Any],
-    headers: Optional[Mapping[str, str]] = None,
+    headers: Mapping[str, str] | None = None,
 ) -> Request:
     request_url = _append_query(url, params)
     return Request(

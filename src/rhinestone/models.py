@@ -1,22 +1,14 @@
 """Domain models, including the small public vocabulary."""
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from types import MappingProxyType
 from typing import (
     Any,
-    Callable,
-    FrozenSet,
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    Optional,
     Protocol,
-    Set,
-    Tuple,
     TypedDict,
-    Union,
     cast,
     overload,
 )
@@ -40,7 +32,7 @@ class RuntimeFactory:
     factory: Callable[[], Any]
 
 
-DependencyValue = Union[object, RuntimeFactory]
+DependencyValue = object | RuntimeFactory
 """An injected Runtime object or an explicit lazy RuntimeFactory."""
 
 Runtime = DependencyValue
@@ -80,11 +72,11 @@ def _freeze(value: Any) -> Any:
         mapping = cast(Mapping[Any, Any], value)
         return MappingProxyType({key: _freeze(item) for key, item in mapping.items()})
     if isinstance(value, list):
-        return tuple(_freeze(item) for item in cast(List[Any], value))
+        return tuple(_freeze(item) for item in cast(list[Any], value))
     if isinstance(value, tuple):
-        return tuple(_freeze(item) for item in cast(Tuple[Any, ...], value))
+        return tuple(_freeze(item) for item in cast(tuple[Any, ...], value))
     if isinstance(value, set):
-        return frozenset(_freeze(item) for item in cast(Set[Any], value))
+        return frozenset(_freeze(item) for item in cast(set[Any], value))
     return value
 
 
@@ -152,11 +144,11 @@ class Metadata:
     remain available in the immutable ``raw`` mapping.
     """
 
-    title: Optional[str] = None
-    description: Optional[str] = None
-    publisher: Optional[str] = None
-    license: Optional[str] = None
-    updated_at: Optional[datetime] = None
+    title: str | None = None
+    description: str | None = None
+    publisher: str | None = None
+    license: str | None = None
+    updated_at: datetime | None = None
     raw: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
@@ -172,15 +164,15 @@ class Provenance:
     """
 
     provider: str
-    dataset_identifier: Optional[str] = None
-    resource_identifier: Optional[str] = None
-    api_endpoint: Optional[str] = None
-    original_url: Optional[str] = None
+    dataset_identifier: str | None = None
+    resource_identifier: str | None = None
+    api_endpoint: str | None = None
+    original_url: str | None = None
     query_parameters: Mapping[str, Any] = field(default_factory=_empty_mapping)
-    retrieved_at: Optional[datetime] = None
-    checksum: Optional[str] = None
-    adapter: Optional[str] = None
-    adapter_version: Optional[str] = None
+    retrieved_at: datetime | None = None
+    checksum: str | None = None
+    adapter: str | None = None
+    adapter_version: str | None = None
     raw: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
@@ -227,8 +219,8 @@ class ResourceCandidate:
     """
 
     uri: str
-    format: Optional[str]
-    media_type: Optional[str]
+    format: str | None
+    media_type: str | None
     attributes: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
@@ -265,8 +257,8 @@ class Source:
     """
 
     metadata: Metadata
-    candidates: Tuple[ResourceCandidate, ...]
-    capabilities: FrozenSet[str]
+    candidates: tuple[ResourceCandidate, ...]
+    capabilities: frozenset[str]
     provenance: Provenance
     raw_metadata: Mapping[str, Any]
 
@@ -296,7 +288,7 @@ class AccessPlan:
 class FileAccessPlan(AccessPlan):
     """Access plan for a downloadable file, optionally contained in an archive."""
 
-    archive: Optional[str] = None
+    archive: str | None = None
     kind: str = field(default="file", init=False)
 
 
@@ -324,17 +316,17 @@ class Resource:
     """
 
     uri: str
-    format: Optional[str]
-    media_type: Optional[str]
+    format: str | None
+    media_type: str | None
     metadata: Metadata
     provenance: Provenance
     access_plan: AccessPlan
     source: Source
-    local_path: Optional[str] = None
-    _opener: Optional[Callable[[LibraryName], object]] = field(
+    local_path: str | None = None
+    _opener: Callable[[LibraryName], object] | None = field(
         default=None, repr=False, compare=False
     )
-    discovery: Optional[DiscoveryRecord] = None
+    discovery: DiscoveryRecord | None = None
 
     @overload
     def open(self, library: Literal["rasterio"]) -> _RasterioDatasetReader: ...
@@ -380,10 +372,10 @@ class SearchQuery:
     are reported through ``SearchResults.diagnostics``.
     """
 
-    text: Optional[str] = None
-    bbox: Optional[Tuple[float, float, float, float]] = None
-    time: Optional[Tuple[Optional[datetime], Optional[datetime]]] = None
-    limit: Optional[int] = None
+    text: str | None = None
+    bbox: tuple[float, float, float, float] | None = None
+    time: tuple[datetime | None, datetime | None] | None = None
+    limit: int | None = None
 
     def __post_init__(self) -> None:
         raw_text = cast(object, self.text)
@@ -404,9 +396,9 @@ class SearchQuery:
                     "bbox must be a tuple of four numbers (SearchQuery.bbox); "
                     f"got {type(raw_bbox).__name__}"
                 )
-            bbox_values = cast(Tuple[Any, ...], raw_bbox)
+            bbox_values = cast(tuple[Any, ...], raw_bbox)
             if len(bbox_values) != 4 or any(
-                isinstance(value, bool) or not isinstance(value, (int, float))
+                isinstance(value, bool) or not isinstance(value, int | float)
                 for value in bbox_values
             ):
                 raise ConfigValidationError(
@@ -421,7 +413,7 @@ class SearchQuery:
                     "(SearchQuery.time); "
                     f"values; got {type(raw_time).__name__}"
                 )
-            time_values = cast(Tuple[Any, ...], raw_time)
+            time_values = cast(tuple[Any, ...], raw_time)
             if len(time_values) != 2 or any(
                 value is not None and not isinstance(value, datetime)
                 for value in time_values
@@ -433,7 +425,7 @@ class SearchQuery:
                 )
 
     @property
-    def supplied_conditions(self) -> FrozenSet[str]:
+    def supplied_conditions(self) -> frozenset[str]:
         """Return the names of criteria explicitly supplied by the caller."""
 
         return frozenset(
@@ -464,10 +456,10 @@ class SearchDiagnostic:
     """
 
     source_id: str
-    skipped_conditions: FrozenSet[str]
+    skipped_conditions: frozenset[str]
     reason: str = "unsupported"
-    missing_conditions: FrozenSet[str] = frozenset()
-    failure_type: Optional[str] = None
+    missing_conditions: frozenset[str] = frozenset()
+    failure_type: str | None = None
 
     def __post_init__(self) -> None:
         if not self.source_id:
@@ -492,12 +484,12 @@ class Result:
     """
 
     title: str
-    description: Optional[str]
+    description: str | None
     discovered_by: str
     target: Config
     metadata: Metadata
     provenance: Provenance
-    _resolver: Optional[Callable[[], Resource]] = field(
+    _resolver: Callable[[], Resource] | None = field(
         default=None, repr=False, compare=False
     )
     raw_metadata: Mapping[str, Any] = field(default_factory=_empty_mapping)

@@ -2,8 +2,9 @@
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Mapping
 from importlib import resources
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, cast
 from urllib.parse import quote
 
 from jsonschema import Draft202012Validator, ValidationError
@@ -21,7 +22,7 @@ from ...security import DestinationPolicy
 JsonObject = Mapping[str, Any]
 JsonGetter = Callable[[str, Mapping[str, Any]], Any]
 AuthenticatedJsonGetter = Callable[[str, Mapping[str, Any], Mapping[str, str]], Any]
-JsonTransport = Union[JsonGetter, AuthenticatedJsonGetter]
+JsonTransport = JsonGetter | AuthenticatedJsonGetter
 
 
 class _CredentialHeaders(dict[str, str]):
@@ -30,7 +31,12 @@ class _CredentialHeaders(dict[str, str]):
     _rhinestone_no_redirects = True
 
 
-__all__ = ["AuthenticatedJsonGetter", "JsonGetter", "JsonObject", "ProviderAdapter"]
+__all__ = [
+    "AuthenticatedJsonGetter",
+    "JsonGetter",
+    "JsonObject",
+    "ProviderAdapter",
+]
 
 
 class ProviderAdapter(ABC):
@@ -47,17 +53,17 @@ class ProviderAdapter(ABC):
     def __init__(
         self,
         get_json: JsonTransport,
-        endpoint: Optional[str] = None,
-        api_token: Optional[str] = None,
-        api_key: Optional[str] = None,
+        endpoint: str | None = None,
+        api_token: str | None = None,
+        api_key: str | None = None,
         api_key_header: str = "X-API-Key",
         token_scheme: str = "Bearer",
-        credential: Optional[str] = None,
-        credential_header: Optional[str] = None,
-        credential_scheme: Optional[str] = None,
-        credentials: Optional[CredentialRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
-        provider_id: Optional[str] = None,
+        credential: str | None = None,
+        credential_header: str | None = None,
+        credential_scheme: str | None = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
+        provider_id: str | None = None,
     ) -> None:
         self._get_json = get_json
         self._endpoint = self._normalize_endpoint(endpoint) if endpoint else None
@@ -81,7 +87,7 @@ class ProviderAdapter(ABC):
             raise ConfigValidationError("api_token must be non-empty")
         if api_key is not None and (not api_key or not api_key_header):
             raise ConfigValidationError("api_key and api_key_header must be non-empty")
-        self._headers: Dict[str, str] = {}
+        self._headers: dict[str, str] = {}
         self._credential_header = (
             "Authorization" if credential_header is None else credential_header
         )
@@ -127,7 +133,7 @@ class ProviderAdapter(ABC):
                 ) from None
         return config.settings
 
-    def config_schema(self) -> Optional[Mapping[str, Any]]:
+    def config_schema(self) -> Mapping[str, Any] | None:
         """Return this built-in adapter's JSON Schema, if it provides one."""
         module_name = type(self).__module__
         try:
@@ -138,7 +144,7 @@ class ProviderAdapter(ABC):
         return cast(Mapping[str, Any], json.loads(text))
 
     def _endpoint_from(
-        self, settings: Mapping[str, Any], default: Optional[str] = None
+        self, settings: Mapping[str, Any], default: str | None = None
     ) -> str:
         if self._endpoint is not None:
             configured = settings.get("endpoint")
@@ -192,7 +198,7 @@ class ProviderAdapter(ABC):
 
     def _request_with_uri(
         self, url: str, params: Mapping[str, Any]
-    ) -> Tuple[JsonObject, str]:
+    ) -> tuple[JsonObject, str]:
         credentialed = self._credential_name is not None or bool(self._headers)
         self._destination_policy.authorize(
             url,
@@ -201,7 +207,7 @@ class ProviderAdapter(ABC):
             service=self.adapter_type,
             credential=self._credential_name,
         )
-        headers: Dict[str, str] = dict(self._headers)
+        headers: dict[str, str] = dict(self._headers)
         if self._credential_name is not None:
             headers[self._credential_header] = (
                 self._credential_prefix + self._credentials.get(self._credential_name)
@@ -237,7 +243,7 @@ class ProviderAdapter(ABC):
         return cast(JsonObject, value)
 
     @staticmethod
-    def _objects(value: Any, context: str) -> Tuple[JsonObject, ...]:
+    def _objects(value: Any, context: str) -> tuple[JsonObject, ...]:
         if isinstance(value, Mapping):
             return (cast(JsonObject, value),)
         if not isinstance(value, list):
@@ -245,7 +251,7 @@ class ProviderAdapter(ABC):
                 f"{context} must be an object or array; provider response shape "
                 "is invalid"
             )
-        values = cast(List[Any], value)
+        values = cast(list[Any], value)
         return tuple(ProviderAdapter._object(item, context) for item in values)
 
 
@@ -254,6 +260,6 @@ def _json_value(value: Any) -> Any:
         mapping = cast(Mapping[Any, Any], value)
         return {key: _json_value(item) for key, item in mapping.items()}
     if isinstance(value, tuple):
-        items = cast(Tuple[Any, ...], value)
+        items = cast(tuple[Any, ...], value)
         return [_json_value(item) for item in items]
     return value

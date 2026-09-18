@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Mapping, Tuple
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 
@@ -12,8 +13,8 @@ from tests.provider_support import fixture_json
 
 class HeaderRecordingClient:
     def __init__(self, responses: Mapping[str, Mapping[str, Any]]) -> None:
-        self.responses: Dict[str, Mapping[str, Any]] = dict(responses)
-        self.calls: List[Tuple[str, Mapping[str, Any], Mapping[str, str]]] = []
+        self.responses: dict[str, Mapping[str, Any]] = dict(responses)
+        self.calls: list[tuple[str, Mapping[str, Any], Mapping[str, str]]] = []
 
     def __call__(
         self,
@@ -116,7 +117,7 @@ def test_two_argument_json_callback_remains_supported_without_auth() -> None:
     """既存利用者の2引数transport callbackを認証なしでは壊さないために必要である。"""
     endpoint = "https://catalog.example"
     url = endpoint + "/api/3/action/package_search"
-    calls: List[Tuple[str, Mapping[str, Any]]] = []
+    calls: list[tuple[str, Mapping[str, Any]]] = []
 
     def get_json(url: str, params: Mapping[str, Any]) -> Mapping[str, Any]:
         calls.append((url, params))

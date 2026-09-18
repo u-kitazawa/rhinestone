@@ -1,5 +1,5 @@
 from dataclasses import replace
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 
 import pytest
 
@@ -26,7 +26,7 @@ from rhinestone.security import DestinationPolicy
 def make_resource(
     uri: str,
     format_name: str,
-    attributes: Optional[Dict[str, Any]] = None,
+    attributes: dict[str, Any] | None = None,
     remote: bool = False,
 ) -> Resource:
     candidate = ResourceCandidate(
@@ -77,12 +77,12 @@ class BasicExecutionAdapter(ExecutionAdapter):
 
 class FakeGdal:
     def __init__(self) -> None:
-        self.calls: List[Tuple[str, Tuple[str, ...]]] = []
+        self.calls: list[tuple[str, tuple[str, ...]]] = []
 
     def OpenEx(
         self,
         uri: str,
-        open_options: Tuple[str, ...] = (),
+        open_options: tuple[str, ...] = (),
     ) -> object:
         self.calls.append((uri, open_options))
         return {"runtime": "gdal", "uri": uri}
@@ -142,8 +142,8 @@ def test_gdal_rejects_invalid_tile_options(tile: object) -> None:
 
 class FakeRasterio:
     def __init__(self) -> None:
-        self.calls: List[str] = []
-        self.drivers: List[str | None] = []
+        self.calls: list[str] = []
+        self.drivers: list[str | None] = []
 
     def open(self, uri: str, driver: str | None = None) -> object:
         self.calls.append(uri)
@@ -163,7 +163,7 @@ def test_rasterio_opens_cog_uri_directly() -> None:
 
 class FakePyogrio:
     def __init__(self) -> None:
-        self.calls: List[Tuple[str, Dict[str, Any]]] = []
+        self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def read_dataframe(self, uri: str, **options: Any) -> object:
         self.calls.append((uri, options))
@@ -231,7 +231,7 @@ def test_gdal_and_pyogrio_failures_are_classified() -> None:
     failure = OSError("broken")
 
     class BrokenGdal:
-        def OpenEx(self, uri: str, open_options: Tuple[str, ...] = ()) -> object:
+        def OpenEx(self, uri: str, open_options: tuple[str, ...] = ()) -> object:
             raise failure
 
     class BrokenPyogrio:

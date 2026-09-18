@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import Any, FrozenSet
+from typing import Any
 
 import pytest
 
@@ -51,7 +51,7 @@ class CustomExecution:
     name = "custom-runtime"
     priority = 100
 
-    def supports(self, resource: Resource, dependencies: FrozenSet[str]) -> bool:
+    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
         return resource.format == "custom" and "custom-runtime" in dependencies
 
     def open(
@@ -114,7 +114,7 @@ def test_source_definition_can_declare_a_lazy_source_dependency() -> None:
 
 
 def test_source_dependencies_are_scoped_to_each_definition() -> None:
-    seen: dict[str, FrozenSet[str]] = {}
+    seen: dict[str, frozenset[str]] = {}
 
     def factory(provider: Provider, context: Any) -> Any:
         seen[provider.id] = context.dependencies.available

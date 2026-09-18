@@ -1,6 +1,7 @@
 """Translate XYZ tile knowledge into a GDAL WMS definition."""
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 

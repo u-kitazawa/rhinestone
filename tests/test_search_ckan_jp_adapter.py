@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 
@@ -19,14 +20,14 @@ from .provider_support import fixture_json
 class RecordingJsonClient:
     def __init__(self, responses: Mapping[str, Any]) -> None:
         self.responses = dict(responses)
-        self.calls: List[Tuple[str, Dict[str, Any]]] = []
+        self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def __call__(
         self,
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         self.calls.append((url, dict(params)))
         return self.responses[url]
 

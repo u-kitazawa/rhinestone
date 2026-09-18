@@ -1,7 +1,8 @@
 """Explicit local access to downloaded GSI fundamental vector data."""
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 from ....errors import ResourceNotFoundError
 from ....models import Config, ResourceCandidate, Source

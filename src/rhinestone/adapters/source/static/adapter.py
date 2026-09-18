@@ -1,6 +1,7 @@
 """Source adapter for repository-managed static service definitions."""
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ....errors import (
     ConfigValidationError,
@@ -28,29 +29,29 @@ class StaticAdapter(ProviderAdapter):
 
     def __init__(self, items: Mapping[str, Mapping[str, Any]]) -> None:
         super().__init__(get_json=lambda url, params: None)
-        self._items = self._validate_items(items)
+        self._resource_definitions = self._validate_items(items)
 
     def load(self, config: Config) -> Source:
         """Resolve one repository-managed item by its explicit identifier."""
         settings = self._config_settings(config)
         identifier = string(settings, "id")
         try:
-            item = self._items[identifier]
+            item = self._resource_definitions[identifier]
         except KeyError:
             raise ResourceNotFoundError(
                 f"Static source item {identifier!r} does not exist"
             ) from None
-        return self._source(identifier, item)
+        return self._build_source(identifier, item)
 
-    def search(self, query: SearchQuery) -> Tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
         """Search static item identifiers and metadata by text and limit."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError(
                 "Unsupported static source search condition"
             )
 
-        results: List[SearchResult] = []
-        for identifier in sorted(self._items):
+        results: list[SearchResult] = []
+        for identifier in sorted(self._resource_definitions):
             source = self.load(Config(self.adapter_type, {"id": identifier}))
             title = source.metadata.title or identifier
             description = source.metadata.description
@@ -75,14 +76,14 @@ class StaticAdapter(ProviderAdapter):
         return tuple(results[: query.limit])
 
     @classmethod
-    def _validate_items(cls, items: Any) -> Dict[str, Mapping[str, Any]]:
+    def _validate_items(cls, items: Any) -> dict[str, Mapping[str, Any]]:
         if not isinstance(items, Mapping) or not items:
             raise ConfigValidationError(
                 "static source items must be a non-empty object"
             )
 
         item_values = cast(Mapping[Any, Any], items)
-        validated: Dict[str, Mapping[str, Any]] = {}
+        validated: dict[str, Mapping[str, Any]] = {}
         for raw_identifier, raw_item in item_values.items():
             if not isinstance(raw_identifier, str) or not raw_identifier.strip():
                 raise ConfigValidationError(
@@ -101,7 +102,7 @@ class StaticAdapter(ProviderAdapter):
                     f"static source item {identifier!r} metadata must be an object"
                 )
             candidates_value = item.get("candidates")
-            if not isinstance(candidates_value, (list, tuple)) or not candidates_value:
+            if not isinstance(candidates_value, list | tuple) or not candidates_value:
                 raise ConfigValidationError(
                     f"static source item {identifier!r} must define candidates"
                 )
@@ -109,7 +110,7 @@ class StaticAdapter(ProviderAdapter):
                 cls._validate_candidate(identifier, candidate)
 
             capabilities_value = item.get("capabilities", ())
-            if not isinstance(capabilities_value, (list, tuple)):
+            if not isinstance(capabilities_value, list | tuple):
                 raise ConfigValidationError(
                     f"static source item {identifier!r} capabilities must be an array"
                 )
@@ -153,7 +154,7 @@ class StaticAdapter(ProviderAdapter):
                 f"static source item {identifier!r} candidate attributes must be an object"
             )
 
-    def _source(self, identifier: str, item: Mapping[str, Any]) -> Source:
+    def _build_source(self, identifier: str, item: Mapping[str, Any]) -> Source:
         metadata_values = cast(Mapping[str, Any], item.get("metadata", {}))
         metadata_raw_value: Any = metadata_values.get("raw", metadata_values)
         if not isinstance(metadata_raw_value, Mapping):
@@ -162,7 +163,7 @@ class StaticAdapter(ProviderAdapter):
             )
         metadata_raw = cast(Mapping[str, Any], metadata_raw_value)
 
-        candidates: List[ResourceCandidate] = []
+        candidates: list[ResourceCandidate] = []
         for candidate_value in item["candidates"]:
             candidate = cast(Mapping[str, Any], candidate_value)
             candidates.append(
@@ -175,7 +176,7 @@ class StaticAdapter(ProviderAdapter):
             )
 
         capabilities = frozenset(
-            cast(Tuple[str, ...], tuple(item.get("capabilities", ())))
+            cast(tuple[str, ...], tuple(item.get("capabilities", ())))
         )
         provenance_values = cast(Mapping[str, Any], item.get("provenance", {}))
         query_parameters_value: Any = provenance_values.get("query_parameters", {})
@@ -216,5 +217,5 @@ class StaticAdapter(ProviderAdapter):
         )
 
 
-def _optional_string(value: Any) -> Optional[str]:
+def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None

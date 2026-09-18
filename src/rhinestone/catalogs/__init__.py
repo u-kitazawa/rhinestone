@@ -1,9 +1,10 @@
 """Repository-managed Source Catalog loading."""
 
 import json
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, Iterable, Iterator, List, Mapping, Tuple, cast
+from typing import Any, cast
 
 from ..errors import ConfigValidationError
 from ..models import Provider
@@ -47,7 +48,7 @@ class Catalog:
     obtain a new Catalog; an existing Catalog is never modified.
     """
 
-    providers: Tuple[Provider, ...]
+    providers: tuple[Provider, ...]
 
     def __init__(self, providers: Iterable[Provider] = ()) -> None:
         object.__setattr__(self, "providers", tuple(providers))
@@ -84,7 +85,7 @@ class CatalogSource:
 
 def load_source_catalog(
     name: str = "sources.json",
-) -> Tuple[CatalogSource, ...]:
+) -> tuple[CatalogSource, ...]:
     """Load and validate built-in Source catalog entries in catalog order."""
     document = load_catalog_resource(name)
     if not isinstance(document, Mapping):
@@ -99,7 +100,7 @@ def load_source_catalog(
         )
 
     source_entries = cast(Mapping[Any, Any], raw_sources)
-    entries: List[CatalogSource] = []
+    entries: list[CatalogSource] = []
     for raw_id, raw_definition in source_entries.items():
         if not isinstance(raw_id, str) or not raw_id.strip():
             raise ConfigValidationError("Source catalog ids must be non-empty strings")
@@ -143,7 +144,7 @@ def load_source_catalog(
 
 def load_source_definitions(
     name: str = "sources.json",
-) -> Tuple[Provider, ...]:
+) -> tuple[Provider, ...]:
     """Load built-in Source definitions in catalog order."""
     return tuple(entry.definition for entry in load_source_catalog(name))
 

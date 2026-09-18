@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from types import SimpleNamespace
-from typing import Any, Dict, Mapping, Tuple, cast
+from typing import Any, cast
 from xml.etree.ElementTree import fromstring
 
 import pytest
@@ -80,7 +81,7 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
 
 
 def test_static_adapter_rejects_invalid_catalog() -> None:
-    invalid_items: Tuple[object, ...] = (
+    invalid_items: tuple[object, ...] = (
         {},
         [],
         {"": item()},
@@ -121,7 +122,7 @@ def test_static_adapter_rejects_invalid_metadata_and_query_parameters() -> None:
 
 
 def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
-    captured: Dict[str, Any] = {}
+    captured: dict[str, Any] = {}
 
     def open_ex(uri: str, **kwargs: Any) -> str:
         captured["uri"] = uri
