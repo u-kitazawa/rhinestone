@@ -3,7 +3,7 @@ import pytest
 from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.errors import ProviderResponseError
-from rhinestone.models import Config, SearchQuery
+from rhinestone.models import Config, FileAccessPlan, SearchQuery
 from rhinestone.resolution import Resolver
 from tests.provider_support import RecordingJsonClient, fixture_json
 
@@ -107,6 +107,36 @@ def test_ckan_uses_media_type_when_format_is_missing() -> None:
     )
 
     assert source.candidates[0].format == "geojson"
+
+
+def test_ckan_records_zip_media_type_as_explicit_archive_evidence() -> None:
+    endpoint = "https://catalog.example"
+    resource_url = endpoint + "/api/3/action/resource_show"
+    package_url = endpoint + "/api/3/action/package_show"
+    client = RecordingJsonClient(
+        {
+            resource_url: {
+                "success": True,
+                "result": {
+                    "id": "resource-1",
+                    "package_id": "dataset-1",
+                    "format": "Shapefile",
+                    "mimetype": "application/zip; charset=binary",
+                    "url": "https://files.example/rivers.zip",
+                },
+            },
+            package_url: {"success": True, "result": {"id": "dataset-1"}},
+        }
+    )
+
+    source = CkanAdapter(get_json=client).load(
+        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+    )
+    resource = Resolver().resolve(source)
+
+    assert source.candidates[0].attributes["archive"] == "zip"
+    assert isinstance(resource.access_plan, FileAccessPlan)
+    assert resource.access_plan.archive == "zip"
 
 
 def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None:

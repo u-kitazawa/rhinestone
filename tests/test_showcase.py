@@ -110,7 +110,8 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
         'dependencies={"pyogrio": pyogrio}',
         "PYOGRIO_VECTOR_FORMATS",
         "item.format in PYOGRIO_VECTOR_FORMATS",
-        "item.access_plan.archive is None",
+        "ZIP Shapefile",
+        "GDAL VSI URI",
         'resource.open("pyogrio")',
         "import folium",
         "folium.GeoJson",
@@ -118,6 +119,7 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
         "GSI_STANDARD_TILES",
     ):
         assert marker in source
+    assert "item.access_plan.archive is None" not in source
 
 
 def test_ckan_showcase_keeps_no_stale_execution_output() -> None:
