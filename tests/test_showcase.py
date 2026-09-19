@@ -151,9 +151,14 @@ def test_stac_showcase_has_the_complete_explicit_flow() -> None:
         '"asset_key": asset_key',
         'dependencies={"rasterio": rasterio}',
         'resource.open("rasterio")',
-        "out_shape=(dataset.count, preview_height, preview_width)",
+        "indexes=display_indexes",
+        "out_shape=(len(display_indexes), preview_height, preview_width)",
         "Resampling.bilinear",
         'resource.format != "cog"',
+        "resource.provenance.provider",
+        "resource.provenance.dataset_identifier",
+        'image = preview.transpose(1, 2, 0).astype("float32")',
+        "(band - low) / (high - low)",
         "plt.imshow",
     ):
         assert marker in source
@@ -164,7 +169,7 @@ def test_stac_showcase_pins_setup_and_keeps_no_stale_output() -> None:
     notebook = load_notebook(RASTER_NOTEBOOK)
     source = notebook_source(notebook)
 
-    assert "@d6990086dfd895c1bd4c263ab601745951b49f0e" in source
+    assert "@1d892cc318e5e979824110e06bd39044f00593d7" in source
     assert "@develop" not in source
     assert "rasterio==1.5.1" in source
     assert "access_token" not in serialized.casefold()
