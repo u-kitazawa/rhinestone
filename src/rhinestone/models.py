@@ -3,6 +3,7 @@
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from math import isfinite
 from types import MappingProxyType
 from typing import (
     Any,
@@ -502,13 +503,19 @@ class SearchExecution:
     def __post_init__(self) -> None:
         if not self.source_id:
             raise ConfigValidationError("search execution source_id must be non-empty")
-        if self.elapsed_ms < 0:
+        raw_elapsed_ms = cast(object, self.elapsed_ms)
+        if (
+            isinstance(raw_elapsed_ms, bool)
+            or not isinstance(raw_elapsed_ms, int | float)
+            or not isfinite(raw_elapsed_ms)
+            or raw_elapsed_ms < 0
+        ):
             raise ConfigValidationError(
-                "search execution elapsed_ms must be non-negative"
+                "search execution elapsed_ms must be a finite non-negative number"
             )
-        if self.result_count < 0:
+        if type(self.result_count) is not int or self.result_count < 0:
             raise ConfigValidationError(
-                "search execution result_count must be non-negative"
+                "search execution result_count must be a non-negative integer"
             )
 
 

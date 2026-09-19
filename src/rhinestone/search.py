@@ -171,17 +171,11 @@ class SearchCoordinator:
                 and not query.supplied_conditions & supported_conditions
             ):
                 continue
+            started = perf_counter()
+            provider_results: tuple[Any, ...] = ()
             try:
-                started = perf_counter()
                 provider_results = tuple(
                     adapter.search(query.project(supported_conditions))
-                )
-                executions.append(
-                    SearchExecution(
-                        source_id=adapter.source_id,
-                        elapsed_ms=(perf_counter() - started) * 1000,
-                        result_count=len(provider_results),
-                    )
                 )
                 grouped_results[adapter.source_id] = provider_results
             except ProviderMetadataError:
@@ -209,6 +203,14 @@ class SearchCoordinator:
                         skipped_conditions=frozenset(),
                         reason="provider_failure",
                         failure_type="credential",
+                    )
+                )
+            finally:
+                executions.append(
+                    SearchExecution(
+                        source_id=adapter.source_id,
+                        elapsed_ms=(perf_counter() - started) * 1000,
+                        result_count=len(provider_results),
                     )
                 )
         return SearchResults.from_grouped(grouped_results, diagnostics, executions)

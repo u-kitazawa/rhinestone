@@ -163,6 +163,10 @@ def test_expected_provider_failure_isolated_from_other_sources() -> None:
     assert results.diagnostics[0].source_id == "unavailable"
     assert results.diagnostics[0].reason == "provider_failure"
     assert results.diagnostics[0].failure_type == "metadata"
+    assert [(item.source_id, item.result_count) for item in results.executions] == [
+        ("unavailable", 0),
+        ("healthy", 1),
+    ]
 
 
 def test_all_expected_provider_failures_return_empty_results_and_diagnostics() -> None:

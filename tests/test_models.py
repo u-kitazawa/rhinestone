@@ -39,10 +39,15 @@ def test_search_execution_accepts_non_negative_provider_measurements(
         ("", 0.0, 0),
         ("provider", -0.1, 0),
         ("provider", 0.0, -1),
+        ("provider", float("nan"), 0),
+        ("provider", float("inf"), 0),
+        ("provider", True, 0),
+        ("provider", 0.0, 1.5),
+        ("provider", 0.0, True),
     ],
 )
 def test_search_execution_rejects_invalid_measurements(
-    arguments: tuple[str, float, int],
+    arguments: tuple[Any, Any, Any],
 ) -> None:
     with pytest.raises(ConfigValidationError):
         SearchExecution(*arguments)

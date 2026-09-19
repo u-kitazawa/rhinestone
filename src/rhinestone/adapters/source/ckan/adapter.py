@@ -170,7 +170,7 @@ class CkanAdapter(ProviderAdapter):
                     )
                     if query.limit is not None and len(found) == query.limit:
                         return tuple(found)
-            if query.limit is None or len(packages) < query.limit:
+            if query.limit is None:
                 return tuple(found)
             total = result.get("count")
             if type(total) is not int or total < 0:
@@ -179,6 +179,10 @@ class CkanAdapter(ProviderAdapter):
                 )
             if start + len(packages) >= total:
                 return tuple(found)
+            if not packages:
+                raise ProviderResponseError(
+                    "CKAN search result is empty before its declared count"
+                )
             start += len(packages)
 
     def _candidate(self, resource: JsonObject) -> ResourceCandidate:
