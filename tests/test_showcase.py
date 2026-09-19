@@ -157,7 +157,9 @@ def test_stac_showcase_has_the_complete_explicit_flow() -> None:
         'resource.format != "cog"',
         "resource.provenance.provider",
         "resource.provenance.dataset_identifier",
-        'image = preview.transpose(1, 2, 0).astype("float32")',
+        "image = preview.transpose(1, 2, 0)",
+        'if preview.dtype != "uint8"',
+        'image = image.astype("float32")',
         "(band - low) / (high - low)",
         "plt.imshow",
     ):
