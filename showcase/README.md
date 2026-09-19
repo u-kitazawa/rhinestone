@@ -27,8 +27,8 @@ G 空間情報センターの公開 CKAN を検索し、明示的に GeoJSON と
 地図で確認できます。
 
 ```text
-configure -> search -> GeoJSON Result -> resolve -> Resource -> AccessPlan
-    -> pyogrio -> GeoDataFrame -> Folium map
+configure(pyogrio) -> search -> resolve -> GeoJSON Resource -> AccessPlan
+    -> open -> GeoDataFrame -> Folium map
 ```
 
 この Notebook は live Provider を利用します。検索結果、配布 URL、公開状態は提供元によって変わるため、

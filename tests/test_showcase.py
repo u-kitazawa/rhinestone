@@ -106,7 +106,8 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     for marker in (
         "sources.GEOSPATIAL_JP",
         'app.search(text="河川"',
-        "app_with_pyogrio.resolve(selected)",
+        'dependencies={"pyogrio": pyogrio}',
+        'item.format == "geojson"',
         'resource.open("pyogrio")',
         "import folium",
         "folium.GeoJson",
