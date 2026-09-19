@@ -179,6 +179,23 @@ def test_pyogrio_receives_explicit_encoding() -> None:
     assert runtime.calls == [("/data/rivers.shp", {"encoding": "cp932"})]
 
 
+def test_pyogrio_selects_additional_explicit_vector_formats() -> None:
+    """The shared explicit vector registry, not a four-format whitelist, selects pyogrio."""
+    runtime = FakePyogrio()
+    resource = make_resource("/data/boundaries.gml", "gml")
+
+    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"})) is True
+    assert PyogrioAdapter().open(resource, runtime) == {"runtime": "pyogrio"}
+    assert runtime.calls == [("/data/boundaries.gml", {})]
+
+
+def test_pyogrio_rejects_explicit_non_vector_formats() -> None:
+    """An explicit format alone must not route a table through the vector runtime."""
+    resource = make_resource("/data/records.csv", "csv")
+
+    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"})) is False
+
+
 def test_execution_adapter_preserves_runtime_failure_as_cause() -> None:
     """OSSアクセス失敗をResourceAccessErrorへ分類しつつ元の例外を診断可能にするために必要である。"""
     runtime_error = OSError("cannot open dataset")
@@ -246,6 +263,22 @@ def test_gdal_and_pyogrio_failures_are_classified() -> None:
         PyogrioAdapter().open(resource, BrokenPyogrio())
     assert gdal_error.value.__cause__ is failure
     assert pyogrio_error.value.__cause__ is failure
+
+
+def test_pyogrio_driver_or_geometry_failures_are_resource_access_errors() -> None:
+    """Selection and an environment-specific pyogrio read failure stay distinct."""
+    failure = ValueError("GML driver is unavailable")
+
+    class UnsupportedGmlPyogrio:
+        def read_dataframe(self, uri: str, **options: Any) -> object:
+            raise failure
+
+    resource = make_resource("/data/boundaries.gml", "gml")
+
+    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"})) is True
+    with pytest.raises(ResourceAccessError) as captured:
+        PyogrioAdapter().open(resource, UnsupportedGmlPyogrio())
+    assert captured.value.__cause__ is failure
 
 
 def test_execution_uses_empty_attributes_when_candidate_is_not_retained() -> None:

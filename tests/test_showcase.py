@@ -12,7 +12,7 @@ import pytest
 ROOT = Path(__file__).parents[1]
 SHOWCASE = ROOT / "showcase"
 OFFLINE_NOTEBOOK = SHOWCASE / "01_search_and_resource.ipynb"
-MAP_NOTEBOOK = SHOWCASE / "01_ckan_search_to_map.ipynb"
+MAP_NOTEBOOK = SHOWCASE / "02_ckan_search_to_map.ipynb"
 
 
 def load_notebook(path: Path) -> dict[str, Any]:
@@ -106,8 +106,10 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     for marker in (
         "sources.GEOSPATIAL_JP",
         'app.search(text="河川"',
-        "widgets.Dropdown",
-        "app.resolve(selected)",
+        'dependencies={"pyogrio": pyogrio}',
+        "PYOGRIO_VECTOR_FORMATS",
+        "item.format in PYOGRIO_VECTOR_FORMATS",
+        "item.access_plan.archive is None",
         'resource.open("pyogrio")',
         "import folium",
         "folium.GeoJson",
@@ -117,7 +119,7 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
         assert marker in source
 
 
-def test_ckan_showcase_commits_safe_interactive_map_output() -> None:
+def test_ckan_showcase_keeps_no_stale_execution_output() -> None:
     serialized = MAP_NOTEBOOK.read_text(encoding="utf-8")
     notebook = load_notebook(MAP_NOTEBOOK)
 
@@ -125,14 +127,11 @@ def test_ckan_showcase_commits_safe_interactive_map_output() -> None:
     assert "access_token" not in serialized.casefold()
     assert "authorization" not in serialized.casefold()
     assert "Access blocked" not in serialized
-    for cell in notebook_cells(notebook):
-        if cell.get("cell_type") != "code":
-            continue
-        for output in cell.get("outputs", []):
-            data = output.get("data", {})
-            if output.get("output_type") == "execute_result" and "text/html" in data:
-                return
-    raise AssertionError("Showcase notebook must commit its interactive map output")
+    assert all(
+        cell.get("outputs", []) == []
+        for cell in notebook_cells(notebook)
+        if cell.get("cell_type") == "code"
+    )
 
 
 def test_showcase_notebook_code_cells_compile() -> None:
@@ -150,5 +149,8 @@ def test_showcase_readme_lists_both_notebooks_and_live_boundaries() -> None:
     assert OFFLINE_NOTEBOOK.name in readme
     assert MAP_NOTEBOOK.name in readme
     assert "colab.research.google.com" in readme
+    assert (
+        "codex/showcase-interactive-map/showcase/02_ckan_search_to_map.ipynb" in readme
+    )
     assert "live Provider" in readme
     assert "ライブ Provider への疎通は通常 CI の必須条件にしません" in readme

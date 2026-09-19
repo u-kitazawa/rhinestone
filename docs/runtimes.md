@@ -82,7 +82,10 @@ GDAL の Python bindings は system GDAL のライブラリと開発ヘッダー
 
 ### pyogrio
 
-pyogrio は Shapefile、GeoJSON、GeoPackage、FlatGeobuf を `Resource.open("pyogrio")` で読み込むための Execution Runtime です。現在の Adapter は `pyogrio.read_dataframe()` を呼び出すため、GeoPandas も実行時に必要です。
+pyogrio は Rhinestone の representation registry で `vector` と明示された Shapefile、
+GeoJSON、GeoPackage、FlatGeobuf、GML、KML、CityGML を `Resource.open("pyogrio")` で
+読み込むための Execution Runtime です。現在の Adapter は `pyogrio.read_dataframe()` を
+呼び出すため、GeoPandas も実行時に必要です。
 
 ```console
 python -m pip install pyogrio geopandas
@@ -97,7 +100,11 @@ app = configure(dependencies={"pyogrio": pyogrio})
 frame = app.open(resource, "pyogrio")
 ```
 
-Rhinestone は URI と Source が確定した `encoding` だけを `read_dataframe()` へ渡します。archive URI の組み立て、GeoDataFrame 以外への変換、空間演算は行いません。GDAL の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。
+Rhinestone は URI と Source が確定した `format` / `encoding` だけを使い、URI suffix や
+archive 内容から形式を推測しません。archive URI の組み立て、GeoDataFrame 以外への変換、
+空間演算は行いません。選択できても環境の pyogrio/GDAL が read driver を持たない場合や
+geometry / field type を読めない場合、`open()` は `ResourceAccessError` になります。GDAL
+の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。
 
 ### RDFLib
 
