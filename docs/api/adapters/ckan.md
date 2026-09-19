@@ -6,7 +6,7 @@
 
 ## 設定と検索
 
-`Config.settings` は `resource_id` が必須です。組み込み Source の endpoint は `sources.GEOSPATIAL_JP` の Catalog 定義から渡されます。検索では `text` と `limit` を使えます。HTTP通信にはRhinestoneの組み込みtransportを使用します。
+`Config.settings` は `resource_id` が必須です。組み込み Source の endpoint は `sources.GEOSPATIAL_JP` の Catalog 定義から渡されます。検索では `text` と `limit` を使えます。`limit` は package 数ではなく展開後の Resource 数であり、先頭 page に十分な Resource がなければ Action API の `start` で次 page を取得します。`limit=None` は provider の既定 page だけを取得します。HTTP通信にはRhinestoneの組み込みtransportを使用します。
 
 配布 URL は API response から取得し、推測しません。
 CKANが広告する `format` はExecution Adapterと共有するcanonical名へ小文字で正規化し、

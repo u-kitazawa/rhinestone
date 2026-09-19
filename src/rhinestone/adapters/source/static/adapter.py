@@ -60,7 +60,10 @@ class StaticAdapter(ProviderAdapter):
                 for value in (identifier, title, description)
                 if isinstance(value, str)
             )
-            if query.text and query.text.casefold() not in haystack.casefold():
+            normalized_haystack = haystack.casefold()
+            if any(
+                term.casefold() not in normalized_haystack for term in query.text_terms
+            ):
                 continue
             results.append(
                 SearchResult(

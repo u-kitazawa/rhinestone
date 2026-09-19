@@ -94,6 +94,138 @@ def test_search_ckan_jp_limits_flattened_resources_and_preserves_unlimited_resul
     ]
 
 
+def test_search_ckan_jp_pages_packages_until_the_resource_limit_is_met() -> None:
+    endpoint = "https://search.ckan.jp/backend/api"
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url == endpoint + "/package_search"
+        calls.append(dict(params))
+        package: dict[str, Any]
+        if params.get("start") is None:
+            package = {"id": "empty", "resources": []}
+        else:
+            package = {
+                "id": "next",
+                "title": "Next page",
+                "resources": [
+                    {
+                        "id": "resource-1",
+                        "url": "https://data.example/next.csv",
+                        "format": "CSV",
+                    }
+                ],
+            }
+        return {"success": True, "result": {"count": 2, "results": [package]}}
+
+    results = SearchCkanJpAdapter(endpoint=endpoint, get_json=get_json).search(
+        SearchQuery(text="river", limit=1)
+    )
+
+    assert [result.provenance.resource_identifier for result in results] == [
+        "resource-1"
+    ]
+    assert calls == [
+        {"q": "river", "rows": 1},
+        {"q": "river", "rows": 1, "start": 1},
+    ]
+
+
+def test_search_ckan_jp_continues_after_a_server_capped_partial_package_page() -> None:
+    endpoint = "https://search.ckan.jp/backend/api"
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url == endpoint + "/package_search"
+        calls.append(dict(params))
+        start = params.get("start", 0)
+        package: dict[str, Any] = {
+            "id": f"package-{start}",
+            "title": f"Package {start}",
+            "resources": [],
+        }
+        if start:
+            package["resources"] = [
+                {
+                    "id": f"resource-{start}",
+                    "url": f"https://data.example/{start}.csv",
+                    "format": "CSV",
+                }
+            ]
+        return {"success": True, "result": {"count": 3, "results": [package]}}
+
+    results = SearchCkanJpAdapter(endpoint=endpoint, get_json=get_json).search(
+        SearchQuery(text="river", limit=2)
+    )
+
+    assert [result.provenance.resource_identifier for result in results] == [
+        "resource-1",
+        "resource-2",
+    ]
+    assert [call.get("start", 0) for call in calls] == [0, 1, 2]
+
+
+def test_search_ckan_jp_zero_limit_skips_requests_and_stops_at_known_last_page() -> (
+    None
+):
+    adapter = SearchCkanJpAdapter(
+        endpoint="https://search.ckan.jp/backend/api",
+        get_json=lambda url, params: pytest.fail("zero limit must not request"),
+    )
+    assert adapter.search(SearchQuery(text="river", limit=0)) == ()
+
+    client = RecordingJsonClient(
+        {
+            "https://search.ckan.jp/backend/api/package_search": {
+                "success": True,
+                "result": {"count": 1, "results": [{"id": "empty", "resources": []}]},
+            }
+        }
+    )
+    assert (
+        SearchCkanJpAdapter(
+            endpoint="https://search.ckan.jp/backend/api", get_json=client
+        ).search(SearchQuery(text="river", limit=1))
+        == ()
+    )
+    assert len(client.calls) == 1
+
+
+def test_search_ckan_jp_rejects_an_invalid_count_before_paging() -> None:
+    client = RecordingJsonClient(
+        {
+            "https://search.ckan.jp/backend/api/package_search": {
+                "success": True,
+                "result": {
+                    "count": "unknown",
+                    "results": [{"id": "empty", "resources": []}],
+                },
+            }
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match="count"):
+        SearchCkanJpAdapter(
+            endpoint="https://search.ckan.jp/backend/api", get_json=client
+        ).search(SearchQuery(text="river", limit=1))
+
+
+def test_search_ckan_jp_rejects_an_empty_page_before_its_declared_count() -> None:
+    client = RecordingJsonClient(
+        {
+            "https://search.ckan.jp/backend/api/package_search": {
+                "success": True,
+                "result": {"count": 1, "results": []},
+            }
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match="empty"):
+        SearchCkanJpAdapter(
+            endpoint="https://search.ckan.jp/backend/api", get_json=client
+        ).search(SearchQuery(text="river", limit=1))
+
+
 def test_search_ckan_jp_is_discovery_only() -> None:
     adapter = SearchCkanJpAdapter(get_json=lambda url, params: {})
 

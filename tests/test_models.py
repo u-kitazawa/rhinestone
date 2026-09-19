@@ -13,10 +13,44 @@ from rhinestone.models import (
     Resource,
     ResourceCandidate,
     SearchDiagnostic,
+    SearchExecution,
     SearchQuery,
     SearchResult,
     Source,
 )
+
+
+@pytest.mark.parametrize(
+    "execution",
+    [
+        SearchExecution("provider", 0.0, 0),
+        SearchExecution("provider", 1.5, 2),
+    ],
+)
+def test_search_execution_accepts_non_negative_provider_measurements(
+    execution: SearchExecution,
+) -> None:
+    assert execution.source_id == "provider"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ("", 0.0, 0),
+        ("provider", -0.1, 0),
+        ("provider", 0.0, -1),
+        ("provider", float("nan"), 0),
+        ("provider", float("inf"), 0),
+        ("provider", True, 0),
+        ("provider", 0.0, 1.5),
+        ("provider", 0.0, True),
+    ],
+)
+def test_search_execution_rejects_invalid_measurements(
+    arguments: tuple[Any, Any, Any],
+) -> None:
+    with pytest.raises(ConfigValidationError):
+        SearchExecution(*arguments)
 
 
 def test_config_is_immutable_and_copies_nested_settings() -> None:

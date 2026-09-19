@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import Any
+
 import pytest
 
 from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
@@ -150,6 +153,124 @@ def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None
     assert results[0].to_config() == Config("ckan", {"resource_id": "resource-1"})
     assert "endpoint" not in results[0].target.settings
     assert results[0].metadata.raw["id"] == "dataset-1"
+
+
+def test_ckan_search_pages_packages_until_the_resource_limit_is_met() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url == search_url
+        calls.append(dict(params))
+        packages: list[dict[str, Any]]
+        if params.get("start") is None:
+            packages = [{"id": "empty", "resources": []}]
+        else:
+            packages = [
+                {
+                    "id": "next",
+                    "title": "Next page",
+                    "resources": [{"id": "resource-1"}],
+                }
+            ]
+        return {"success": True, "result": {"count": 2, "results": packages}}
+
+    results = CkanAdapter(endpoint=endpoint, get_json=get_json).search(
+        SearchQuery(text="river", limit=1)
+    )
+
+    assert [result.provenance.resource_identifier for result in results] == [
+        "resource-1"
+    ]
+    assert calls == [
+        {"q": "river", "rows": 1},
+        {"q": "river", "rows": 1, "start": 1},
+    ]
+
+
+def test_ckan_search_continues_after_a_server_capped_partial_package_page() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url == search_url
+        calls.append(dict(params))
+        start = params.get("start", 0)
+        package: dict[str, Any] = {"id": f"package-{start}", "resources": []}
+        if start:
+            package["resources"] = [{"id": f"resource-{start}"}]
+        return {"success": True, "result": {"count": 3, "results": [package]}}
+
+    results = CkanAdapter(endpoint=endpoint, get_json=get_json).search(
+        SearchQuery(text="river", limit=2)
+    )
+
+    assert [result.provenance.resource_identifier for result in results] == [
+        "resource-1",
+        "resource-2",
+    ]
+    assert [call.get("start", 0) for call in calls] == [0, 1, 2]
+
+
+def test_ckan_search_zero_limit_skips_requests_and_stops_at_known_last_page() -> None:
+    adapter = CkanAdapter(
+        endpoint="https://catalog.example",
+        get_json=lambda url, params: pytest.fail("zero limit must not request"),
+    )
+    assert adapter.search(SearchQuery(limit=0)) == ()
+
+    client = RecordingJsonClient(
+        {
+            "https://catalog.example/api/3/action/package_search": {
+                "success": True,
+                "result": {"count": 1, "results": [{"id": "empty", "resources": []}]},
+            }
+        }
+    )
+    assert (
+        CkanAdapter(endpoint="https://catalog.example", get_json=client).search(
+            SearchQuery(limit=1)
+        )
+        == ()
+    )
+    assert len(client.calls) == 1
+
+
+def test_ckan_search_rejects_an_invalid_count_before_paging() -> None:
+    client = RecordingJsonClient(
+        {
+            "https://catalog.example/api/3/action/package_search": {
+                "success": True,
+                "result": {
+                    "count": "unknown",
+                    "results": [{"id": "empty", "resources": []}],
+                },
+            }
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match="count"):
+        CkanAdapter(endpoint="https://catalog.example", get_json=client).search(
+            SearchQuery(limit=1)
+        )
+
+
+def test_ckan_search_rejects_an_empty_page_before_its_declared_count() -> None:
+    client = RecordingJsonClient(
+        {
+            "https://catalog.example/api/3/action/package_search": {
+                "success": True,
+                "result": {"count": 1, "results": []},
+            }
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match="empty"):
+        CkanAdapter(endpoint="https://catalog.example", get_json=client).search(
+            SearchQuery(limit=1)
+        )
 
 
 def test_ckan_unsuccessful_action_response_is_rejected() -> None:

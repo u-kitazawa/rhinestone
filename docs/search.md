@@ -17,7 +17,23 @@ results = app.search(text="人口", limit=10)
 
 不正な値はProviderへリクエストする前に`ConfigValidationError`になります。
 
+`text` は provider 固有の検索構文を増やさない単一の文字列です。Static、DCAT、e-Stat GIS
+のローカル照合では、空白区切りの各語が identifier、title、description などの検索対象に
+すべて含まれる場合だけ一致します（大文字・小文字は区別しません）。CKAN、search.ckan.jp、
+MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一致、部分一致の意味は各 API の
+仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
+
+形式、地域コード、collection、asset、provider 固有の詳細検索は共通引数にしていません。
+これらは Resource 形式、対象粒度、対応 API が Adapter 間で揃わず、曖昧な共通条件にすると
+「適用できなかった条件」を一致と誤認するためです。明示的な Config または provider 側の
+公式検索機能を利用してください。
+
 `search-ckan-jp` では、`limit` はCKANへのpackage取得数（`rows`）に使われるだけでなく、packageをsupported resourceへ展開した後の結果列にも適用されます。そのため、1つのpackageに複数のresourceがある場合、flattened結果全体が`limit`件に達した時点で後続resourceやpackageの結果が省略されます。`limit=None`ならこの展開後の制限はありません。
+
+CKAN と search.ckan.jp は `limit` を Resource 数として満たすまで package 検索を次ページへ
+進めます。最初の package ページに実行可能な Resource がない場合でも、応答の `count` が
+あれば `start` を使って後続ページを取得します。`limit=None` は provider の既定 page だけを
+取得し、全件走査を暗黙には行いません。
 
 `mlit-dpf` は `text`、`bbox`、`limit` に対応します。明示的なtarget ruleが成立する結果は
 CKAN、PLATEAU、STAC、OGC等の構成済みSourceへ委譲され、それ以外は明示representationと
@@ -92,3 +108,13 @@ Providerの通信・metadata取得・response解釈に失敗した場合は、�
 検索結果は`app.resolve(result)`で直接Resourceへ解決できます。`app.search()`が返したResultでは
 `result.resolve()`も同じResourceを返し、発見元と解決先が異なる場合も両側のmetadata、raw metadata、
 provenanceを保持します。`result.to_config()`は内部パイプラインを調査する高度なAPIです。
+
+## 実行時間と対応表
+
+`results.executions` は実行した Provider ごとの `source_id`、`elapsed_ms`、`result_count` を
+構成順で返します。計測値は Adapter 呼び出し時間であり、provider 間の relevance ranking には
+使用しません。fixture / fake transport による性能回帰テストや、アプリケーション側の計測に
+利用できます。
+
+各 Adapter の条件、絞り込み段階、ページング、既知の境界は
+[検索能力の対照表](search-capabilities.md)を参照してください。
