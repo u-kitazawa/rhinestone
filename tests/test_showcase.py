@@ -149,8 +149,6 @@ def test_showcase_readme_lists_both_notebooks_and_live_boundaries() -> None:
     assert OFFLINE_NOTEBOOK.name in readme
     assert MAP_NOTEBOOK.name in readme
     assert "colab.research.google.com" in readme
-    assert (
-        "codex/showcase-interactive-map/showcase/02_ckan_search_to_map.ipynb" in readme
-    )
+    assert "blob/develop/showcase/02_ckan_search_to_map.ipynb" in readme
     assert "live Provider" in readme
     assert "ライブ Provider への疎通は通常 CI の必須条件にしません" in readme
