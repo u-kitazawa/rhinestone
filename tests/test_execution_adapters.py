@@ -179,10 +179,52 @@ def test_pyogrio_receives_explicit_encoding() -> None:
     assert runtime.calls == [("/data/rivers.shp", {"encoding": "cp932"})]
 
 
+def test_pyogrio_translates_selected_remote_zip_shapefile() -> None:
+    """ZIPとmemberが確定したResourceをpyogrioへそのまま開ける形で渡す。"""
+    resource = make_resource(
+        "https://files.example/rivers.zip",
+        "shapefile",
+        {
+            "archive": "zip",
+            "encoding": "cp932",
+            "access_options": {"entry_point": "data/rivers.shp"},
+        },
+    )
+    resource = replace(
+        resource,
+        access_plan=FileAccessPlan(
+            uri=resource.uri,
+            archive="zip",
+            options={"entry_point": "data/rivers.shp"},
+        ),
+    )
+    runtime = FakePyogrio()
+
+    assert PyogrioAdapter().open(resource, runtime) == {"runtime": "pyogrio"}
+    assert runtime.calls == [
+        (
+            "/vsizip//vsicurl/https://files.example/rivers.zip/data/rivers.shp",
+            {"encoding": "cp932"},
+        )
+    ]
+
+
+def test_pyogrio_translates_selected_local_zip_shapefile() -> None:
+    resource = make_resource("/data/rivers.zip", "shapefile", {"archive": "zip"})
+    runtime = FakePyogrio()
+
+    PyogrioAdapter().open(resource, runtime)
+
+    assert runtime.calls == [("/vsizip//data/rivers.zip", {})]
+
+
 def test_pyogrio_selects_additional_explicit_vector_formats() -> None:
     """The shared explicit vector registry, not a four-format whitelist, selects pyogrio."""
     runtime = FakePyogrio()
-    resource = make_resource("/data/boundaries.gml", "gml")
+    resource = replace(
+        make_resource("/data/boundaries.gml", "gml"),
+        access_plan=RemoteDatasetPlan(uri="/data/boundaries.gml"),
+    )
 
     assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"})) is True
     assert PyogrioAdapter().open(resource, runtime) == {"runtime": "pyogrio"}

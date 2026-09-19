@@ -101,8 +101,9 @@ frame = app.open(resource, "pyogrio")
 ```
 
 Rhinestone は URI と Source が確定した `format` / `encoding` だけを使い、URI suffix や
-archive 内容から形式を推測しません。archive URI の組み立て、GeoDataFrame 以外への変換、
-空間演算は行いません。選択できても環境の pyogrio/GDAL が read driver を持たない場合や
+archive 内容から形式・memberを推測しません。明示された ZIP AccessPlan は GDAL VSI URIに
+変換するため、ZIP Shapefileも同じ `resource.open("pyogrio")` で読めます。GeoDataFrame
+以外への変換、空間演算は行いません。選択できても環境の pyogrio/GDAL が read driver を持たない場合や
 geometry / field type を読めない場合、`open()` は `ResourceAccessError` になります。GDAL
 の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。
 

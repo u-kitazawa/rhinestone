@@ -10,7 +10,7 @@
 | Notebook | 内容 | 外部通信 | 追加 Runtime |
 | --- | --- | --- | --- |
 | [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Result` を `Resource` へ解決して来歴と AccessPlan を確認 | 不要 | 不要 |
-| [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から明示的な直接読込可能ベクター配布物を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
+| [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から明示的なベクター配布物（ZIP Shapefile を含む）を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
 | [03 STAC COG Preview](03_stac_cog_preview.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_stac_cog_preview.ipynb) | 明示した STAC Item / asset を COG Resource へ解決し、Rasterio で縮小プレビューを表示 | 必要 | Rasterio、Matplotlib |
 
 各 Notebook の Colab リンクから、そのまま Google Colab で開けます。ローカルでは
@@ -22,7 +22,7 @@ setup cell が公開パッケージを導入します。
 [GitHub で Notebook を読む](02_ckan_search_to_map.ipynb) ·
 [Colab で開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_ckan_search_to_map.ipynb)
 
-G 空間情報センターの公開 CKAN を検索し、明示的に広告された直接読込可能なベクター配布物を Rhinestone で解決してから、
+G 空間情報センターの公開 CKAN を検索し、明示的に広告されたベクター配布物（ZIP Shapefile を含む）を Rhinestone で解決してから、
 利用者所有の pyogrio / GeoPandas で開き、Folium の操作できるベクターレイヤーとして
 地理院タイル上に表示します。選択したデータの範囲へ自動で移動するため、検索結果が何を表すかを
 地図で確認できます。
@@ -33,8 +33,9 @@ configure(pyogrio) -> search -> resolve -> vector Resource -> AccessPlan
 ```
 
 この Notebook は live Provider を利用します。検索結果、配布 URL、公開状態は提供元によって変わるため、
-通常 CI での完全実行は要求しません。検索結果に直接読込可能なベクター候補がないときは、URL・形式・archive 内部を
-推測せず、明示的に停止します。
+通常 CI での完全実行は要求しません。検索結果に明示的なベクター候補がないときは、URL・形式・archive memberを
+推測せず、明示的に停止します。ZIP を開く場合は、確定済みの `archive` と任意の `entry_point` を pyogrio 用の
+GDAL VSI URI に翻訳します。
 
 ## 03 — STAC の COG を縮小表示する
 
@@ -61,7 +62,7 @@ Item、asset URL、media type は Provider 側で変わり得ます。Notebook �
   ではありません。
 - `uri` は外部データの所在地を示しますが、最初の Notebook はデータ本体を取得せず、`open()` も実行しません。
 - CKAN Notebook では、Rhinestone は検索、選択した配布物の解決、`Resource` と `AccessPlan` の決定、
-  および登録済み Runtime への委譲までを担います。表示、地理院タイルの取得、操作できる地図レイヤー、
+  および登録済み Runtime への委譲までを担います。明示済み ZIP AccessPlan は VSI URI に翻訳します。表示、地理院タイルの取得、操作できる地図レイヤー、
   解析、形式変換は pyogrio、GeoPandas、Folium など downstream library の責務です。背景タイルは追加の
   ネットワーク接続と[地理院タイルの利用条件](https://maps.gsi.go.jp/development/ichiran.html#std)に従います。
 - STAC Notebook では、Rhinestone は明示された Item / asset の検証、COG Resource と AccessPlan の決定、
