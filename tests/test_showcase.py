@@ -13,6 +13,7 @@ ROOT = Path(__file__).parents[1]
 SHOWCASE = ROOT / "showcase"
 OFFLINE_NOTEBOOK = SHOWCASE / "01_search_and_resource.ipynb"
 MAP_NOTEBOOK = SHOWCASE / "02_ckan_search_to_map.ipynb"
+RASTER_NOTEBOOK = SHOWCASE / "03_stac_cog_preview.ipynb"
 
 
 def load_notebook(path: Path) -> dict[str, Any]:
@@ -134,8 +135,47 @@ def test_ckan_showcase_keeps_no_stale_execution_output() -> None:
     )
 
 
+def test_stac_showcase_has_the_complete_explicit_flow() -> None:
+    notebook = load_notebook(RASTER_NOTEBOOK)
+
+    assert notebook["nbformat"] == 4
+    assert notebook["metadata"]["colab"]["name"] == RASTER_NOTEBOOK.name
+    source = notebook_source(notebook)
+    for marker in (
+        "Provider(",
+        'adapter_type="stac"',
+        '"collection_id": collection_id',
+        '"item_id": item_id',
+        '"asset_key": asset_key',
+        'dependencies={"rasterio": rasterio}',
+        'resource.open("rasterio")',
+        "out_shape=(dataset.count, preview_height, preview_width)",
+        "Resampling.bilinear",
+        'resource.format != "cog"',
+        "plt.imshow",
+    ):
+        assert marker in source
+
+
+def test_stac_showcase_pins_setup_and_keeps_no_stale_output() -> None:
+    serialized = RASTER_NOTEBOOK.read_text(encoding="utf-8")
+    notebook = load_notebook(RASTER_NOTEBOOK)
+    source = notebook_source(notebook)
+
+    assert "@d6990086dfd895c1bd4c263ab601745951b49f0e" in source
+    assert "@develop" not in source
+    assert "rasterio==1.5.1" in source
+    assert "access_token" not in serialized.casefold()
+    assert "authorization" not in serialized.casefold()
+    assert all(
+        cell.get("outputs", []) == []
+        for cell in notebook_cells(notebook)
+        if cell.get("cell_type") == "code"
+    )
+
+
 def test_showcase_notebook_code_cells_compile() -> None:
-    for notebook_path in (OFFLINE_NOTEBOOK, MAP_NOTEBOOK):
+    for notebook_path in (OFFLINE_NOTEBOOK, MAP_NOTEBOOK, RASTER_NOTEBOOK):
         for index, cell in enumerate(notebook_cells(load_notebook(notebook_path))):
             if cell.get("cell_type") != "code":
                 continue
@@ -143,12 +183,14 @@ def test_showcase_notebook_code_cells_compile() -> None:
             compile(source, f"{notebook_path} cell {index}", "exec")
 
 
-def test_showcase_readme_lists_both_notebooks_and_live_boundaries() -> None:
+def test_showcase_readme_lists_notebooks_and_live_boundaries() -> None:
     readme = (SHOWCASE / "README.md").read_text(encoding="utf-8")
 
     assert OFFLINE_NOTEBOOK.name in readme
     assert MAP_NOTEBOOK.name in readme
+    assert RASTER_NOTEBOOK.name in readme
     assert "colab.research.google.com" in readme
     assert "blob/develop/showcase/02_ckan_search_to_map.ipynb" in readme
+    assert "blob/develop/showcase/03_stac_cog_preview.ipynb" in readme
     assert "live Provider" in readme
     assert "ライブ Provider への疎通は通常 CI の必須条件にしません" in readme
