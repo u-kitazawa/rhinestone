@@ -14,8 +14,8 @@ export RHINESTONE_CKAN_RESULT_INDEX="0"
 
 G空間情報センターの公開CKAN APIへ接続するため、ネットワーク接続が必要です。検索結果から、
 Rhinestone の representation registry で `vector` と明示された形式として提供されている
-distributionを選べる検索語を指定してください。ZIP archiveしかないdistributionは、この
-pyogrioの例では選択しません。
+distributionを選べる検索語を指定してください。ZIP Shapefile を選ぶ場合も、
+`archive="zip"`（必要なら ZIP 内の `entry_point`）が Source で明示されていれば同じ例で開けます。
 
 ## 検索、distribution選択、pyogrioへの受け渡し
 
@@ -80,11 +80,6 @@ selected = supported[
     int(os.environ.get("RHINESTONE_CKAN_RESULT_INDEX", "0"))
 ]
 resource = app.resolve(selected)
-if resource.access_plan.archive is not None:
-    raise RuntimeError(
-        "The selected Resource is an archive; this example will not construct an "
-        "archive URI or infer an archive member."
-    )
 frame = resource.open("pyogrio")
 
 print("resource:", resource.uri)
@@ -96,7 +91,8 @@ print("columns:", list(frame.columns))
 CKANのpackage検索はdataset単位の結果をdistributionごとに展開します。`Result`の
 provenanceにあるresource IDと検索metadata内の `resources` を照合して、providerが広告した
 形式だけを選んでいます。その後の `app.resolve(selected)`で配布URLを取得し、
-`resource.open("pyogrio")`が選択済みURIをpyogrioへ渡します。
+`resource.open("pyogrio")`が選択済みURIをpyogrioへ渡します。ZIP の場合は、選択済みの
+`archive` と任意の `entry_point` から GDAL VSI URI を組み立てます。
 `import pyogrio`だけではRuntimeは登録されないため、利用者が所有する実体を
 `configure(dependencies={"pyogrio": pyogrio})`へ明示的に渡しています。導入方法と
 責任境界は[pyogrio Runtime](../runtimes.md#pyogrio)を参照してください。
@@ -110,7 +106,7 @@ provenanceにあるresource IDと検索metadata内の `resources` を照合し�
 - 変更される値: dataset、resource ID、配布URL、形式、公開状態
 - Rhinestoneの責務: CKAN検索、dataset内のdistribution選択、公式配布URLの解決、pyogrioへの委譲
 - pyogrio / GeoPandasの責務: ベクターデータの読み込みとDataFrame操作
-- 非対応: HTMLページの解析、URLや形式の推測、ZIP archive URIの自動構築、空間演算
+- 非対応: HTMLページの解析、URL・形式・ZIP memberの推測、空間演算
 
 ZIP内のCityGMLなど、archive memberの指定とGDALが必要なケースは[PLATEAU Adapter](../api/adapters/plateau.md)
 と[GDALのRuntime説明](../runtimes.md)を参照してください。CKANの対応範囲は

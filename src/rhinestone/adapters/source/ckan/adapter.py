@@ -14,7 +14,11 @@ from ....models import (
     Source,
 )
 from ....registry import CredentialRegistry
-from ....representations import canonical_format, format_from_media_type
+from ....representations import (
+    canonical_format,
+    container_from_media_type,
+    format_from_media_type,
+)
 from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .format import optional_string
@@ -163,10 +167,14 @@ class CkanAdapter(ProviderAdapter):
     def _candidate(self, resource: JsonObject) -> ResourceCandidate:
         uri = self._required_string(resource, "url")
         media_type = optional_string(resource.get("mimetype"))
+        attributes = dict(resource)
+        archive = container_from_media_type(media_type)
+        if archive is not None:
+            attributes["archive"] = archive
         return ResourceCandidate(
             uri=uri,
             format=canonical_format(resource.get("format"))
             or format_from_media_type(media_type),
             media_type=media_type,
-            attributes=resource,
+            attributes=attributes,
         )
