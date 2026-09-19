@@ -11,6 +11,7 @@
 | --- | --- | --- | --- |
 | [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Result` を `Resource` へ解決して来歴と AccessPlan を確認 | 不要 | 不要 |
 | [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から明示的な直接読込可能ベクター配布物を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
+| [03 STAC COG Preview](03_stac_cog_preview.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_stac_cog_preview.ipynb) | 明示した STAC Item / asset を COG Resource へ解決し、Rasterio で縮小プレビューを表示 | 必要 | Rasterio、Matplotlib |
 
 各 Notebook の Colab リンクから、そのまま Google Colab で開けます。ローカルでは
 リポジトリの開発環境を準備して Jupyter 互換環境から開いてください。Colab だけは Notebook 内の
@@ -35,6 +36,23 @@ configure(pyogrio) -> search -> resolve -> vector Resource -> AccessPlan
 通常 CI での完全実行は要求しません。検索結果に直接読込可能なベクター候補がないときは、URL・形式・archive 内部を
 推測せず、明示的に停止します。
 
+## 03 — STAC の COG を縮小表示する
+
+[GitHub で Notebook を読む](03_stac_cog_preview.ipynb) ·
+[Colab で開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_stac_cog_preview.ipynb)
+
+利用する公開 STAC API、collection、Item、asset key を明示し、Rhinestone で COG Resource と
+AccessPlan を解決します。選択済み URI は利用者所有の Rasterio Runtime へ渡し、画像全体を
+原寸で取得せず、最大 512 × 512 の縮小データだけを読み込んで Matplotlib で表示します。
+
+```text
+configure(rasterio) -> explicit STAC Item / asset -> resolve -> COG Resource
+    -> AccessPlan -> open -> Rasterio dataset -> bounded preview
+```
+
+Item、asset URL、media type は Provider 側で変わり得ます。Notebook は URL suffix や先頭 asset を
+推測せず、4つの入力が不足している場合や、指定 asset が COG として広告されていない場合は停止します。
+
 ## 再現性と境界
 
 - `01_search_and_resource.ipynb` は、組み込みの静的 GSI 定義だけを使います。外部サービスの状態、
@@ -46,6 +64,9 @@ configure(pyogrio) -> search -> resolve -> vector Resource -> AccessPlan
   および登録済み Runtime への委譲までを担います。表示、地理院タイルの取得、操作できる地図レイヤー、
   解析、形式変換は pyogrio、GeoPandas、Folium など downstream library の責務です。背景タイルは追加の
   ネットワーク接続と[地理院タイルの利用条件](https://maps.gsi.go.jp/development/ichiran.html#std)に従います。
+- STAC Notebook では、Rhinestone は明示された Item / asset の検証、COG Resource と AccessPlan の決定、
+  Rasterio への委譲までを担います。画像読込、縮小、band 選択、可視化は Rasterio / Matplotlib の責務です。
+  公開 STAC の値は固定せず、利用する catalog で確認した値を環境変数または入力セルへ設定します。
 - 保存出力には秘密情報や大きなデータを含めません。Notebook の構文、metadata、再実行結果、出力サイズは
   テストで検証します。ライブ Provider への疎通は通常 CI の必須条件にしません。
 
