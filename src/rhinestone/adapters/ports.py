@@ -53,5 +53,16 @@ class TransportPort(Protocol):
         """Fetch one text response through the same policy boundary."""
         ...
 
+    def post_json(
+        self,
+        url: str,
+        body: Mapping[str, Any],
+        headers: Mapping[str, str] | None = None,
+        *,
+        credential: str | None = None,
+    ) -> Any:
+        """POST and decode one JSON document through the policy boundary."""
+        ...
+
 
 __all__ = ["CredentialPort", "DependencyPort", "TransportPort"]

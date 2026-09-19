@@ -22,6 +22,7 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "plateau",
         "gsi",
         "odpt",
+        "mlit-dpf",
         "search-ckan-jp",
     )
     catalog_entries = load_source_catalog()
@@ -31,6 +32,7 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "PLATEAU",
         "GSI",
         "ODPT",
+        "MLIT_DPF",
         "SEARCH_CKAN_JP",
     )
     assert definitions == sources.ALL
@@ -42,13 +44,15 @@ def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
     assert sources.PLATEAU is sources.ALL[1]
     assert sources.GSI is sources.ALL[2]
     assert sources.ODPT is sources.ALL[3]
-    assert sources.SEARCH_CKAN_JP is sources.ALL[4]
+    assert sources.MLIT_DPF is sources.ALL[4]
+    assert sources.SEARCH_CKAN_JP is sources.ALL[5]
     assert set(sources.__all__) == {
         "ALL",
         "GEOSPATIAL_JP",
         "PLATEAU",
         "GSI",
         "ODPT",
+        "MLIT_DPF",
         "SEARCH_CKAN_JP",
     }
     assert {
@@ -56,6 +60,7 @@ def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
         "PLATEAU",
         "GSI",
         "ODPT",
+        "MLIT_DPF",
         "SEARCH_CKAN_JP",
     } <= set(dir(sources))
     with pytest.raises(AttributeError):

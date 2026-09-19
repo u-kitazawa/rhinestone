@@ -177,6 +177,16 @@
       },
       "name": "ODPT"
     },
+    "mlit-dpf": {
+      "adapter_type": "mlit-dpf",
+      "settings": {
+        "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+        "credential": "mlit-dpf",
+        "target_rules": [],
+        "representations": {}
+      },
+      "name": "MLIT_DPF"
+    },
     "search-ckan-jp": {
       "adapter_type": "search-ckan-jp",
       "settings": {
