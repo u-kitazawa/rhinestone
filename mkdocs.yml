@@ -14,6 +14,7 @@ nav:
           - STAC画像をRasterioで開く: tutorials/stac-rasterio.md
           - CKANのベクター配布物をpyogrioで読む: tutorials/ckan-pyogrio.md
       - データを検索する: search.md
+      - 検索能力の対照表: search-capabilities.md
       - Resourceを解決して開く: resolve-and-open.md
       - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:

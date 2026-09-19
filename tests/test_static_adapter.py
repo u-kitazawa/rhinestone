@@ -69,6 +69,25 @@ def test_static_adapter_search_is_deterministic_and_returns_configs() -> None:
     assert adapter.search(SearchQuery(text="absent")) == ()
 
 
+def test_static_adapter_matches_each_whitespace_delimited_text_term() -> None:
+    adapter = StaticAdapter(
+        {
+            "rivers": {
+                "metadata": {"title": "River observations", "description": "Tokyo"},
+                "candidates": [{"uri": "https://example.test/rivers.csv"}],
+            },
+            "roads": {
+                "metadata": {"title": "Road observations", "description": "Tokyo"},
+                "candidates": [{"uri": "https://example.test/roads.csv"}],
+            },
+        }
+    )
+
+    assert [
+        result.title for result in adapter.search(SearchQuery(text="river tokyo"))
+    ] == ["River observations"]
+
+
 def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
     adapter = StaticAdapter({"one": item()})
 

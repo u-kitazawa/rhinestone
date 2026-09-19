@@ -162,7 +162,7 @@ class EstatGisAdapter(ProviderAdapter):
                 "e-Stat GIS search supports only text and limit"
             )
         results: list[SearchResult] = []
-        needle = query.text.casefold() if query.text else None
+        terms = tuple(term.casefold() for term in query.text_terms)
         for item in self._distributions:
             if query.limit is not None and len(results) >= query.limit:
                 break
@@ -171,7 +171,7 @@ class EstatGisAdapter(ProviderAdapter):
                 for field in ("distribution_id", "title", "dataset_id", "level")
                 if isinstance(item.get(field), str)
             ).casefold()
-            if needle and needle not in haystack:
+            if any(term not in haystack for term in terms):
                 continue
             distribution_id = cast(str, item["distribution_id"])
             raw_item = self._raw_distribution(item)
