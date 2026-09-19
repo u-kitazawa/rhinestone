@@ -13,8 +13,9 @@ export RHINESTONE_CKAN_RESULT_INDEX="0"
 ```
 
 G空間情報センターの公開CKAN APIへ接続するため、ネットワーク接続が必要です。検索結果から、
-GeoJSON、GeoPackage、またはFlatGeobufとして提供されているdistributionを選べる検索語を
-指定してください。ZIP archiveしかないdistributionは、このpyogrioの例では選択しません。
+Rhinestone の representation registry で `vector` と明示された形式として提供されている
+distributionを選べる検索語を指定してください。ZIP archiveしかないdistributionは、この
+pyogrioの例では選択しません。
 
 ## 検索、distribution選択、pyogrioへの受け渡し
 
@@ -49,6 +50,15 @@ app = configure(
     sources=(sources.GEOSPATIAL_JP,),
     dependencies={"pyogrio": pyogrio},
 )
+PYOGRIO_VECTOR_FORMATS = {
+    "shapefile",
+    "geojson",
+    "gpkg",
+    "flatgeobuf",
+    "gml",
+    "kml",
+    "citygml",
+}
 results = app.search(
     text=os.environ.get("RHINESTONE_CKAN_QUERY", "河川"),
     limit=20,
@@ -56,7 +66,7 @@ results = app.search(
 supported = [
     result
     for result in results
-    if vector_format(result) in {"geojson", "gpkg", "flatgeobuf"}
+    if vector_format(result) in PYOGRIO_VECTOR_FORMATS
 ]
 if not supported:
     raise RuntimeError("The CKAN search returned no direct vector distribution")
@@ -70,6 +80,11 @@ selected = supported[
     int(os.environ.get("RHINESTONE_CKAN_RESULT_INDEX", "0"))
 ]
 resource = app.resolve(selected)
+if resource.access_plan.archive is not None:
+    raise RuntimeError(
+        "The selected Resource is an archive; this example will not construct an "
+        "archive URI or infer an archive member."
+    )
 frame = resource.open("pyogrio")
 
 print("resource:", resource.uri)
@@ -85,6 +100,8 @@ provenanceにあるresource IDと検索metadata内の `resources` を照合し�
 `import pyogrio`だけではRuntimeは登録されないため、利用者が所有する実体を
 `configure(dependencies={"pyogrio": pyogrio})`へ明示的に渡しています。導入方法と
 責任境界は[pyogrio Runtime](../runtimes.md#pyogrio)を参照してください。
+選択できても、利用者のpyogrio/GDAL環境に対応 read driver がない場合や、geometry / field typeを
+読めない場合は `ResourceAccessError` になります。
 
 ## この例の境界
 

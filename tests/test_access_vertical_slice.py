@@ -48,7 +48,7 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
     app = configure(dependencies={"pyogrio": RuntimeFactory(FakePyogrio)})
     config = Config(
         source_id="direct",
-        settings={"uri": "/data/rivers.shp", "format": "shapefile"},
+        settings={"uri": "/data/boundaries.gml", "format": "gml"},
     )
 
     assert app.open(config, library="pyogrio") == "pyogrio-data"

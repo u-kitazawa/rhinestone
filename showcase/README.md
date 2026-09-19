@@ -10,7 +10,7 @@
 | Notebook | 内容 | 外部通信 | 追加 Runtime |
 | --- | --- | --- | --- |
 | [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Result` を `Resource` へ解決して来歴と AccessPlan を確認 | 不要 | 不要 |
-| [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/codex/showcase-interactive-map/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から GeoJSON を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
+| [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/codex/showcase-interactive-map/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から明示的な直接読込可能ベクター配布物を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
 
 各 Notebook の Colab リンクから、そのまま Google Colab で開けます。ローカルでは
 リポジトリの開発環境を準備して Jupyter 互換環境から開いてください。Colab だけは Notebook 内の
@@ -21,18 +21,18 @@ setup cell が公開パッケージを導入します。
 [GitHub で Notebook を読む](02_ckan_search_to_map.ipynb) ·
 [Colab で開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/codex/showcase-interactive-map/showcase/02_ckan_search_to_map.ipynb)
 
-G 空間情報センターの公開 CKAN を検索し、明示的に GeoJSON と広告された配布物を Rhinestone で解決してから、
-利用者所有の pyogrio / GeoPandas で GeoJSON を開き、Folium の操作できるベクターレイヤーとして
+G 空間情報センターの公開 CKAN を検索し、明示的に広告された直接読込可能なベクター配布物を Rhinestone で解決してから、
+利用者所有の pyogrio / GeoPandas で開き、Folium の操作できるベクターレイヤーとして
 地理院タイル上に表示します。選択したデータの範囲へ自動で移動するため、検索結果が何を表すかを
 地図で確認できます。
 
 ```text
-configure(pyogrio) -> search -> resolve -> GeoJSON Resource -> AccessPlan
+configure(pyogrio) -> search -> resolve -> vector Resource -> AccessPlan
     -> open -> GeoDataFrame -> Folium map
 ```
 
 この Notebook は live Provider を利用します。検索結果、配布 URL、公開状態は提供元によって変わるため、
-通常 CI での完全実行は要求しません。検索結果に GeoJSON 候補がないときは、URL・形式・archive 内部を
+通常 CI での完全実行は要求しません。検索結果に直接読込可能なベクター候補がないときは、URL・形式・archive 内部を
 推測せず、明示的に停止します。
 
 ## 再現性と境界
