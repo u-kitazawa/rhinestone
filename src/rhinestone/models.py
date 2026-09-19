@@ -444,6 +444,17 @@ class SearchQuery:
             limit=self.limit if "limit" in supported else None,
         )
 
+    @property
+    def text_terms(self) -> tuple[str, ...]:
+        """Return non-empty whitespace-delimited terms in ``text``.
+
+        Local catalog adapters use these terms with AND semantics.  Remote
+        adapters receive ``text`` verbatim because their server-side query
+        language remains provider-defined.
+        """
+
+        return () if self.text is None else tuple(self.text.split())
+
 
 @dataclass(frozen=True)
 class SearchDiagnostic:
@@ -473,6 +484,32 @@ class SearchDiagnostic:
         object.__setattr__(
             self, "missing_conditions", frozenset(self.missing_conditions)
         )
+
+
+@dataclass(frozen=True)
+class SearchExecution:
+    """One provider search execution measured by the coordinator.
+
+    ``elapsed_ms`` covers the adapter call only.  It is intended for comparing
+    configured providers in tests or application telemetry, not for ranking
+    results across providers.
+    """
+
+    source_id: str
+    elapsed_ms: float
+    result_count: int
+
+    def __post_init__(self) -> None:
+        if not self.source_id:
+            raise ConfigValidationError("search execution source_id must be non-empty")
+        if self.elapsed_ms < 0:
+            raise ConfigValidationError(
+                "search execution elapsed_ms must be non-negative"
+            )
+        if self.result_count < 0:
+            raise ConfigValidationError(
+                "search execution result_count must be non-negative"
+            )
 
 
 @dataclass(frozen=True)
@@ -543,6 +580,7 @@ __all__ = [
     "Runtime",
     "RuntimeFactory",
     "SearchDiagnostic",
+    "SearchExecution",
     "SearchQuery",
     "SearchResult",
     "ServiceQueryPlan",

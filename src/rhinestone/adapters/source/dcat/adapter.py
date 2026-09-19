@@ -180,11 +180,8 @@ class DcatAdapter(ProviderAdapter):
             description = self._value(
                 rdf_runtime, catalog_graph, dataset, _DCT + "description"
             )
-            if (
-                query.text
-                and query.text.casefold()
-                not in (title + " " + (description or "")).casefold()
-            ):
+            haystack = (title + " " + (description or "")).casefold()
+            if any(term.casefold() not in haystack for term in query.text_terms):
                 continue
             item = source(
                 self.adapter_type,

@@ -3,6 +3,7 @@
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
+from time import perf_counter
 from typing import (
     Any,
     cast,
@@ -14,7 +15,7 @@ from .errors import (
     ProviderMetadataError,
     ProviderResponseError,
 )
-from .models import Resource, Result, SearchDiagnostic, SearchQuery
+from .models import Resource, Result, SearchDiagnostic, SearchExecution, SearchQuery
 
 
 class SearchResults(Sequence[Result]):
@@ -30,6 +31,7 @@ class SearchResults(Sequence[Result]):
         self,
         grouped: Mapping[str, tuple[Result, ...]],
         diagnostics: Iterable[SearchDiagnostic] = (),
+        executions: Iterable[SearchExecution] = (),
     ) -> None:
         self._results_by_source = OrderedDict(
             (source_id, tuple(results)) for source_id, results in grouped.items()
@@ -38,20 +40,28 @@ class SearchResults(Sequence[Result]):
             result for results in self._results_by_source.values() for result in results
         )
         self._diagnostics = tuple(diagnostics)
+        self._executions = tuple(executions)
 
     @classmethod
     def from_grouped(
         cls,
         grouped: Mapping[str, tuple[Result, ...]],
         diagnostics: Iterable[SearchDiagnostic] = (),
+        executions: Iterable[SearchExecution] = (),
     ) -> "SearchResults":
         """Build immutable results from source-grouped Result tuples."""
-        return cls(grouped, diagnostics)
+        return cls(grouped, diagnostics, executions)
 
     @property
     def diagnostics(self) -> tuple[SearchDiagnostic, ...]:
         """Return source-scoped diagnostics for the executed search."""
         return self._diagnostics
+
+    @property
+    def executions(self) -> tuple[SearchExecution, ...]:
+        """Return provider search timings in configured execution order."""
+
+        return self._executions
 
     @overload
     def __getitem__(self, index: int) -> Result: ...
@@ -105,7 +115,7 @@ class SearchResults(Sequence[Result]):
             )
             for source_id, results in self._results_by_source.items()
         )
-        return SearchResults(grouped, self._diagnostics)
+        return SearchResults(grouped, self._diagnostics, self._executions)
 
 
 class SearchCoordinator:
@@ -131,6 +141,7 @@ class SearchCoordinator:
         ]
         grouped_results: OrderedDict[str, tuple[Any, ...]] = OrderedDict()
         diagnostics: list[SearchDiagnostic] = []
+        executions: list[SearchExecution] = []
         for adapter in searchable_adapters:
             supported_conditions = frozenset(adapter.search_conditions)
             unsupported_conditions = query.supplied_conditions - supported_conditions
@@ -161,9 +172,18 @@ class SearchCoordinator:
             ):
                 continue
             try:
-                grouped_results[adapter.source_id] = tuple(
+                started = perf_counter()
+                provider_results = tuple(
                     adapter.search(query.project(supported_conditions))
                 )
+                executions.append(
+                    SearchExecution(
+                        source_id=adapter.source_id,
+                        elapsed_ms=(perf_counter() - started) * 1000,
+                        result_count=len(provider_results),
+                    )
+                )
+                grouped_results[adapter.source_id] = provider_results
             except ProviderMetadataError:
                 diagnostics.append(
                     SearchDiagnostic(
@@ -191,4 +211,4 @@ class SearchCoordinator:
                         failure_type="credential",
                     )
                 )
-        return SearchResults.from_grouped(grouped_results, diagnostics)
+        return SearchResults.from_grouped(grouped_results, diagnostics, executions)

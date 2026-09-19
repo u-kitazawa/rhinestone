@@ -140,6 +140,18 @@ def test_single_provider_sequence_preserves_provider_order() -> None:
     assert results[0] is provider_results[0]
 
 
+def test_search_executions_report_provider_timing_and_result_count() -> None:
+    provider = OrderedSearchableAdapter("provider", (object(), object()))
+
+    results = SearchCoordinator((provider,)).search(SearchQuery(text="river"))
+
+    assert len(results.executions) == 1
+    execution = results.executions[0]
+    assert execution.source_id == "provider"
+    assert execution.result_count == 2
+    assert execution.elapsed_ms >= 0
+
+
 def test_expected_provider_failure_isolated_from_other_sources() -> None:
     failing = FailingSearchableAdapter("unavailable", ProviderMetadataError("secret"))
     healthy = OrderedSearchableAdapter("healthy", (object(),))

@@ -47,19 +47,38 @@ class SearchCkanJpAdapter(ProviderAdapter):
             raise ConfigValidationError(
                 "search-ckan-jp requires a text condition for discovery"
             )
+        if query.limit == 0:
+            return ()
         endpoint = self._endpoint_from({}, DEFAULT_ENDPOINT)
         params: dict[str, Any] = {"q": query.text}
         if query.limit is not None:
             params["rows"] = query.limit
-        response = self._request(f"{endpoint}/package_search", params)
-        if response.get("success") is not True:
-            raise ProviderResponseError("search.ckan.jp search was not successful")
-        result = self._object(response.get("result"), "search.ckan.jp result")
-        packages = self._objects(result.get("results"), "search.ckan.jp results")
         found: list[SearchResult] = []
-        for package in packages:
-            found.extend(self._package_results(package, endpoint, params))
-        return tuple(found[: query.limit])
+        start = 0
+        while True:
+            page_params = dict(params)
+            if start:
+                page_params["start"] = start
+            response = self._request(f"{endpoint}/package_search", page_params)
+            if response.get("success") is not True:
+                raise ProviderResponseError("search.ckan.jp search was not successful")
+            result = self._object(response.get("result"), "search.ckan.jp result")
+            packages = self._objects(result.get("results"), "search.ckan.jp results")
+            for package in packages:
+                for item in self._package_results(package, endpoint, page_params):
+                    found.append(item)
+                    if query.limit is not None and len(found) == query.limit:
+                        return tuple(found)
+            if query.limit is None or len(packages) < query.limit:
+                return tuple(found)
+            total = result.get("count")
+            if type(total) is not int or total < 0:
+                raise ProviderResponseError(
+                    "search.ckan.jp result count must be an integer"
+                )
+            if start + len(packages) >= total:
+                return tuple(found)
+            start += len(packages)
 
     def _package_results(
         self,

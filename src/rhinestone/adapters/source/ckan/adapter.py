@@ -124,41 +124,62 @@ class CkanAdapter(ProviderAdapter):
             raise ConfigValidationError(
                 f"Unsupported CKAN search conditions: {', '.join(sorted(unsupported))}"
             )
+        if query.limit == 0:
+            return ()
         params: dict[str, Any] = {}
         if query.text is not None:
             params["q"] = query.text
         if query.limit is not None:
             params["rows"] = query.limit
-        result = self._object(
-            self._action(endpoint, "package_search", params), "CKAN search result"
-        )
-        packages = self._objects(result.get("results"), "CKAN search results")
         found: list[SearchResult] = []
-        for package in packages:
-            resources = self._objects(package.get("resources"), "CKAN resources")
-            for resource in resources:
-                resource_id = self._required_string(resource, "id")
-                found.append(
-                    SearchResult(
-                        title=optional_string(package.get("title")) or resource_id,
-                        description=optional_string(package.get("notes")),
-                        discovered_by=self.adapter_type,
-                        target=Config(self.adapter_type, {"resource_id": resource_id}),
-                        metadata=Metadata(
-                            title=optional_string(package.get("title")), raw=package
-                        ),
-                        provenance=Provenance(
-                            provider="ckan",
-                            dataset_identifier=optional_string(package.get("id")),
-                            resource_identifier=resource_id,
-                            api_endpoint=endpoint,
-                            adapter="ckan",
-                            raw=package,
-                        ),
-                        raw_metadata={"package": package, "resource": resource},
+        start = 0
+        while True:
+            page_params = dict(params)
+            if start:
+                page_params["start"] = start
+            result = self._object(
+                self._action(endpoint, "package_search", page_params),
+                "CKAN search result",
+            )
+            packages = self._objects(result.get("results"), "CKAN search results")
+            for package in packages:
+                resources = self._objects(package.get("resources"), "CKAN resources")
+                for resource in resources:
+                    resource_id = self._required_string(resource, "id")
+                    found.append(
+                        SearchResult(
+                            title=optional_string(package.get("title")) or resource_id,
+                            description=optional_string(package.get("notes")),
+                            discovered_by=self.adapter_type,
+                            target=Config(
+                                self.adapter_type, {"resource_id": resource_id}
+                            ),
+                            metadata=Metadata(
+                                title=optional_string(package.get("title")), raw=package
+                            ),
+                            provenance=Provenance(
+                                provider="ckan",
+                                dataset_identifier=optional_string(package.get("id")),
+                                resource_identifier=resource_id,
+                                api_endpoint=endpoint,
+                                adapter="ckan",
+                                raw=package,
+                            ),
+                            raw_metadata={"package": package, "resource": resource},
+                        )
                     )
+                    if query.limit is not None and len(found) == query.limit:
+                        return tuple(found)
+            if query.limit is None or len(packages) < query.limit:
+                return tuple(found)
+            total = result.get("count")
+            if type(total) is not int or total < 0:
+                raise ProviderResponseError(
+                    "CKAN search result count must be an integer"
                 )
-        return tuple(found)
+            if start + len(packages) >= total:
+                return tuple(found)
+            start += len(packages)
 
     def _candidate(self, resource: JsonObject) -> ResourceCandidate:
         uri = self._required_string(resource, "url")
