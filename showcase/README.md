@@ -12,6 +12,7 @@
 | [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Result` を `Resource` へ解決して来歴と AccessPlan を確認 | 不要 | 不要 |
 | [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から明示的なベクター配布物（ZIP Shapefile を含む）を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
 | [03 STAC COG Preview](03_stac_cog_preview.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_stac_cog_preview.ipynb) | 明示した STAC Item / asset を COG Resource へ解決し、Rasterio で縮小プレビューを表示 | 必要 | Rasterio、Matplotlib |
+| [04 Discovery Lineage](04_discovery_lineage.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_discovery_lineage.ipynb) | search.ckan.jp の発見 record と `direct` target の解決 record を分離して確認 | 必要 | 不要 |
 
 各 Notebook の Colab リンクから、そのまま Google Colab で開けます。ローカルでは
 リポジトリの開発環境を準備して Jupyter 互換環境から開いてください。Colab だけは Notebook 内の
@@ -54,6 +55,23 @@ configure(rasterio) -> explicit STAC Item / asset -> resolve -> COG Resource
 Item、asset URL、media type は Provider 側で変わり得ます。Notebook は URL suffix や先頭 asset を
 推測せず、4つの入力が不足している場合や、指定 asset が COG として広告されていない場合は停止します。
 
+## 04 — Discovery source と resolution target
+
+[GitHub で Notebook を読む](04_discovery_lineage.ipynb) ·
+[Colab で開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_discovery_lineage.ipynb)
+
+search.ckan.jp の横断検索で得た `Result` が、発見元とは異なる `direct` target へ解決される流れを示します。
+発見側と解決側の metadata / provenance / raw record を flat merge せず、`Resource.discovery` と
+`Resource` 本体へ分離して保持することを確認します。データ本体は開きません。
+
+```text
+search.ckan.jp -> Result(discovered_by=search-ckan-jp)
+    -> Config(source_id=direct) -> Resource + DiscoveryRecord
+```
+
+この Notebook は live Provider を利用します。検索結果が変化して cross-source result が得られない場合は、
+URLや識別子を推測せず明示的に停止します。通常 CI では構文、契約marker、秘密情報非混入、空の実行出力を検査します。
+
 ## 再現性と境界
 
 - `01_search_and_resource.ipynb` は、組み込みの静的 GSI 定義だけを使います。外部サービスの状態、
@@ -65,6 +83,7 @@ Item、asset URL、media type は Provider 側で変わり得ます。Notebook �
   および登録済み Runtime への委譲までを担います。明示済み ZIP AccessPlan は VSI URI に翻訳します。表示、地理院タイルの取得、操作できる地図レイヤー、
   解析、形式変換は pyogrio、GeoPandas、Folium など downstream library の責務です。背景タイルは追加の
   ネットワーク接続と[地理院タイルの利用条件](https://maps.gsi.go.jp/development/ichiran.html#std)に従います。
+- Discovery lineage Notebook では、Rhinestone は発見側 record を `Resource.discovery`、解決側 record を `Resource` 本体として分離して保持します。表示や解析は行わず、live Provider の完全実行は通常 CI の必須条件にしません。
 - STAC Notebook では、Rhinestone は明示された Item / asset の検証、COG Resource と AccessPlan の決定、
   Rasterio への委譲までを担います。画像読込、縮小、band 選択、可視化は Rasterio / Matplotlib の責務です。
   公開 STAC の値は固定せず、利用する catalog で確認した値を環境変数または入力セルへ設定します。
@@ -77,3 +96,4 @@ Item、asset URL、media type は Provider 側で変わり得ます。Notebook �
 `metadata.raw["usage_url"]` と `usage_notes` を確認し、実データ利用時は提供元の最新条件に従ってください。
 CKAN Notebook の公開データと地理院タイルにも各提供元の利用条件が適用されます。Notebook のコード自体は
 リポジトリと同じ MIT License です。
+
