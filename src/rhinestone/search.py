@@ -13,6 +13,7 @@ from typing import (
 from .errors import (
     CredentialUnavailableError,
     KnowledgeResolutionError,
+    KnowledgeValidationError,
     ProviderMetadataError,
     ProviderResponseError,
 )
@@ -152,7 +153,7 @@ class SearchCoordinator:
                         "area knowledge adapter is not configured"
                     )
                 resolved_area = self._knowledge.resolve_area(query.area)
-            except KnowledgeResolutionError:
+            except (KnowledgeResolutionError, KnowledgeValidationError):
                 return SearchResults.from_grouped(
                     grouped_results,
                     (
@@ -189,9 +190,7 @@ class SearchCoordinator:
                 else:
                     projected_query = replace(query, area=None)
 
-            unsupported_conditions = (
-                query.supplied_conditions - supported_conditions
-            )
+            unsupported_conditions = query.supplied_conditions - supported_conditions
             if area_handled:
                 unsupported_conditions -= {"area"}
             required_conditions = frozenset(
