@@ -28,9 +28,7 @@ results = app.search(text="河川", area="神奈川県", limit=10)
 fallbackを持つSourceでは正式区域名を`text`へ追加します。それ以外では`area`を
 `unsupported` diagnosticとして残すため、地理条件が無言で失われることはありません。
 
-初期スナップショットは2024年1月1日時点の神奈川県（コード`14`）を対象とし、
-国土数値情報の行政区域データを出典として`src/rhinestone/adapters/knowledge/japan_administrative_areas.json`に区域情報を保管しています。現在は神奈川県のみ収録しており、市区町村や他の都道府県は未収録です。曖昧一致や
-外部geocoderは使用しません。未知の区域はProviderへアクセスせず、全Sourceに
+区域スナップショットは47都道府県を収録し、市区町村は未収録です。`src/rhinestone/adapters/knowledge/japan_administrative_areas.json`に保存しています。2025年1月1日時点の国土交通省「国土数値情報（行政区域データ）」を、oxonが簡素化・小面積ポリゴン（5万m²未満）を省略した境界データからbboxを算出しています（出典：国土交通省、加工：oxon、bbox算出：Rhinestone）。原本の境界と一致せず、小島など省略された地域は検索範囲に含まれない場合があります。厳密な行政界全体を必要とする用途には利用しないでください。曖昧一致や外部geocoderは使用しません。未知の区域はProviderへアクセスせず、全Sourceに
 `reason="area_resolution_failed"`を返します。
 
 `text` は provider 固有の検索構文を増やさない単一の文字列です。Static、DCAT、e-Stat GIS
