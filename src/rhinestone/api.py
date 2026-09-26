@@ -21,10 +21,10 @@ from .adapters.execution import (
 )
 from .adapters.knowledge import (
     KnowledgeAdapterContext,
-    StaticAdministrativeAreaAdapter,
     KnowledgeAdapterDefinition,
     KnowledgeAdapterRegistry,
     StandardTimeAdapter,
+    StaticAdministrativeAreaAdapter,
 )
 from .adapters.knowledge._japan_administrative_areas import (
     JAPAN_ADMINISTRATIVE_AREAS,
