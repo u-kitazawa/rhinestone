@@ -125,8 +125,8 @@ class AdapterRegistrationError(RhinestoneError):
 class KnowledgeAdapterUnavailableError(RhinestoneError):
     """A required shared-knowledge adapter is not configured.
 
-    Register an adapter for the requested knowledge kind, such as ``time`` or
-    ``identity``, before resolving provider-specific values that require it.
+    Register an adapter for the requested knowledge kind, such as ``area``,
+    ``time``, or ``identity``, before resolving values that require it.
     """
 
 
@@ -141,8 +141,9 @@ class KnowledgeResolutionError(RhinestoneError):
 class KnowledgeValidationError(RhinestoneError):
     """A canonical shared-knowledge value is structurally invalid.
 
-    Adapter implementations must return a complete ``MunicipalityIdentity`` or
-    ``TimeSemantic`` value that satisfies the model's invariants.
+    Adapter implementations must return a complete ``AdministrativeArea``,
+    ``MunicipalityIdentity``, or ``TimeSemantic`` value that satisfies the
+    model's invariants.
     """
 
 
