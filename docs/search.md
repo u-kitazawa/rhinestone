@@ -29,7 +29,7 @@ fallbackを持つSourceでは正式区域名を`text`へ追加します。それ
 `unsupported` diagnosticとして残すため、地理条件が無言で失われることはありません。
 
 初期スナップショットは2024年1月1日時点の神奈川県（コード`14`）を対象とし、
-国土数値情報の行政区域データを出典として区域情報と分離管理しています。曖昧一致や
+国土数値情報の行政区域データを出典として`src/rhinestone/adapters/knowledge/japan_administrative_areas.json`に区域情報を保管しています。現在は神奈川県のみ収録しており、市区町村や他の都道府県は未収録です。曖昧一致や
 外部geocoderは使用しません。未知の区域はProviderへアクセスせず、全Sourceに
 `reason="area_resolution_failed"`を返します。
 
