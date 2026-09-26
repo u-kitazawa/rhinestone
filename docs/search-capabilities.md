@@ -1,8 +1,10 @@
 # 検索能力の対照表
 
-この表は現行の `SearchQuery(text, bbox, time, limit)` が各 Source Adapter でどこまで
+この表は現行の `SearchQuery(text, area, bbox, time, limit)` が各 Source Adapter でどこまで
 適用されるかを示します。検索結果はすべて既存の `Result` であり、`resolve()` への経路、
 discovery provenance、provider ごとの順序は変わりません。
+
+`area`は検索前に行政区域Knowledge Adapterで解決されます。STAC、OGC API Features、MLIT DPFにはbboxとして、CKAN、PLATEAU、search.ckan.jp、DCAT、Staticには正式区域名のtextとして投影されます。e-Stat GISでは未対応diagnosticになります。未知区域は全Providerの呼び出し前に失敗します。
 
 | Adapter | 対応条件と適用段階 | ページング / `limit` | 非対応・境界 |
 | --- | --- | --- | --- |

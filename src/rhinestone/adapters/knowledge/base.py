@@ -6,9 +6,17 @@ from typing import Any, Literal, Protocol
 
 from ...security import DestinationPolicy
 from ..ports import CredentialPort, DependencyPort
-from .models import MunicipalityIdentity, TimeKind, TimeSemantic
+from .models import AdministrativeArea, MunicipalityIdentity, TimeKind, TimeSemantic
 
-KnowledgeKind = Literal["identity", "time"]
+KnowledgeKind = Literal["area", "identity", "time"]
+
+
+class AreaKnowledgeAdapter(Protocol):
+    """Resolve an explicit administrative-area expression."""
+
+    def resolve_area(self, value: str) -> AdministrativeArea:
+        """Resolve an area name, alias, or code to canonical spatial data."""
+        ...
 
 
 class IdentityKnowledgeAdapter(Protocol):
@@ -27,7 +35,9 @@ class TimeKnowledgeAdapter(Protocol):
         ...
 
 
-KnowledgeAdapter = IdentityKnowledgeAdapter | TimeKnowledgeAdapter
+KnowledgeAdapter = (
+    AreaKnowledgeAdapter | IdentityKnowledgeAdapter | TimeKnowledgeAdapter
+)
 
 
 class KnowledgePort(Protocol):
@@ -40,6 +50,10 @@ class KnowledgePort(Protocol):
 
     def adapter_type(self, kind: KnowledgeKind) -> str:
         """Return the configured adapter type for one knowledge kind."""
+        ...
+
+    def resolve_area(self, value: str) -> AdministrativeArea:
+        """Resolve one explicit administrative-area expression."""
         ...
 
     def resolve_municipality(self, value: str) -> MunicipalityIdentity:
@@ -75,8 +89,10 @@ class KnowledgeAdapterDefinition:
     dependencies: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
-        if self.kind not in {"identity", "time"}:
-            raise ValueError("knowledge adapter kind must be 'identity' or 'time'")
+        if self.kind not in {"area", "identity", "time"}:
+            raise ValueError(
+                "knowledge adapter kind must be 'area', 'identity', or 'time'"
+            )
         if not self.adapter_type.strip():
             raise ValueError("knowledge adapter type must be a non-empty string")
         if not callable(self.factory):
@@ -85,6 +101,7 @@ class KnowledgeAdapterDefinition:
 
 
 __all__ = [
+    "AreaKnowledgeAdapter",
     "IdentityKnowledgeAdapter",
     "KnowledgeAdapter",
     "KnowledgeAdapterContext",

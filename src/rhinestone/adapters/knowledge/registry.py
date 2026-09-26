@@ -12,6 +12,7 @@ from ...errors import (
 )
 from ..ports import DependencyPort
 from .base import (
+    AreaKnowledgeAdapter,
     IdentityKnowledgeAdapter,
     KnowledgeAdapter,
     KnowledgeAdapterContext,
@@ -19,7 +20,7 @@ from .base import (
     KnowledgeKind,
     TimeKnowledgeAdapter,
 )
-from .models import MunicipalityIdentity, TimeKind, TimeSemantic
+from .models import AdministrativeArea, MunicipalityIdentity, TimeKind, TimeSemantic
 
 
 class _ScopedDependencyPort:
@@ -69,6 +70,16 @@ class KnowledgeAdapterRegistry:
         """Return the configured adapter type for one knowledge kind."""
         return self._definition(kind).adapter_type
 
+    def area(self) -> AreaKnowledgeAdapter:
+        """Return the configured administrative-area adapter."""
+        adapter = self._get("area")
+        if not callable(getattr(adapter, "resolve_area", None)):
+            raise KnowledgeResolutionError(
+                "area knowledge adapter does not implement resolve_area; "
+                "implement the AreaKnowledgeAdapter contract"
+            )
+        return cast(AreaKnowledgeAdapter, adapter)
+
     def identity(self) -> IdentityKnowledgeAdapter:
         """Return the configured adapter for municipality identity resolution."""
         adapter = self._get("identity")
@@ -89,6 +100,16 @@ class KnowledgeAdapterRegistry:
                 "implement the TimeKnowledgeAdapter contract"
             )
         return cast(TimeKnowledgeAdapter, adapter)
+
+    def resolve_area(self, value: str) -> AdministrativeArea:
+        """Resolve and validate one administrative-area expression."""
+        area = self.area().resolve_area(value)
+        if not isinstance(cast(object, area), AdministrativeArea):
+            raise KnowledgeResolutionError(
+                "area knowledge adapter returned an invalid value; expected "
+                "AdministrativeArea"
+            )
+        return area
 
     def resolve_municipality(self, value: str) -> MunicipalityIdentity:
         """Resolve and validate one municipality identity value."""
