@@ -188,7 +188,7 @@ def test_area_registry_rejects_invalid_adapter_shape_and_result() -> None:
         (
             KnowledgeAdapterDefinition(
                 "invalid-area",
-                lambda _context: object(),
+                lambda _context: cast(Any, object()),
                 "area",
             ),
         ),
@@ -205,7 +205,7 @@ def test_area_registry_rejects_invalid_adapter_shape_and_result() -> None:
         (
             KnowledgeAdapterDefinition(
                 "invalid-area",
-                lambda _context: InvalidResult(),
+                lambda _context: cast(Any, InvalidResult()),
                 "area",
             ),
         ),
