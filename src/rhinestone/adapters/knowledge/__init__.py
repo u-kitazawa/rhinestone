@@ -1,6 +1,8 @@
 """Shared knowledge adapters."""
 
+from .area import StaticAdministrativeAreaAdapter
 from .base import (
+    AreaKnowledgeAdapter,
     IdentityKnowledgeAdapter,
     KnowledgeAdapter,
     KnowledgeAdapterContext,
@@ -10,7 +12,7 @@ from .base import (
     KnowledgePort,
     TimeKnowledgeAdapter,
 )
-from .models import MunicipalityIdentity, TimeKind, TimeSemantic
+from .models import AdministrativeArea, MunicipalityIdentity, TimeKind, TimeSemantic
 from .municipality import (
     STANDARD_AREA_CODE,
     AreaCode,
@@ -29,6 +31,8 @@ from .space import (
 from .time import StandardTimeAdapter
 
 __all__ = [
+    "AdministrativeArea",
+    "AreaKnowledgeAdapter",
     "IdentityKnowledgeAdapter",
     "KnowledgeAdapter",
     "KnowledgeAdapterContext",
@@ -47,6 +51,7 @@ __all__ = [
     "MunicipalityRecord",
     "STANDARD_AREA_CODE",
     "StandardTimeAdapter",
+    "StaticAdministrativeAreaAdapter",
     "StaticMunicipalityAdapter",
     "TimeKind",
     "TimeKnowledgeAdapter",
