@@ -368,12 +368,15 @@ class Resource:
 class SearchQuery:
     """Immutable search criteria projected to each source's capabilities.
 
-    ``bbox`` is ``(west, south, east, north)``. ``time`` is a ``(start, end)``
-    pair where either endpoint may be ``None``. Unsupported supplied criteria
+    ``area`` is an administrative-area name, alias, or code resolved before
+    provider dispatch. ``bbox`` remains ``(west, south, east, north)`` and is
+    mutually exclusive with ``area``. ``time`` is a ``(start, end)`` pair where
+    either endpoint may be ``None``. Unsupported supplied criteria
     are reported through ``SearchResults.diagnostics``.
     """
 
     text: str | None = None
+    area: str | None = None
     bbox: tuple[float, float, float, float] | None = None
     time: tuple[datetime | None, datetime | None] | None = None
     limit: int | None = None
@@ -384,6 +387,18 @@ class SearchQuery:
             raise ConfigValidationError(
                 "text must be a string or None (SearchQuery.text); "
                 f"got {type(raw_text).__name__}"
+            )
+        raw_area = cast(object, self.area)
+        if raw_area is not None and (
+            not isinstance(raw_area, str) or not raw_area.strip()
+        ):
+            raise ConfigValidationError(
+                "area must be a non-empty string or None (SearchQuery.area)"
+            )
+        if self.area is not None and self.bbox is not None:
+            raise ConfigValidationError(
+                "area and bbox cannot be supplied together; choose a named area "
+                "or an explicit bounding box"
             )
         if self.limit is not None and (type(self.limit) is not int or self.limit < 0):
             raise ConfigValidationError(
@@ -431,7 +446,7 @@ class SearchQuery:
 
         return frozenset(
             name
-            for name in ("text", "bbox", "time", "limit")
+            for name in ("text", "area", "bbox", "time", "limit")
             if getattr(self, name) is not None
         )
 
@@ -440,6 +455,7 @@ class SearchQuery:
         supported = frozenset(supported_conditions)
         return SearchQuery(
             text=self.text if "text" in supported else None,
+            area=self.area if "area" in supported else None,
             bbox=self.bbox if "bbox" in supported else None,
             time=self.time if "time" in supported else None,
             limit=self.limit if "limit" in supported else None,
