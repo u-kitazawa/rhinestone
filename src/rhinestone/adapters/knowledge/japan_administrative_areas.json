@@ -1,5 +1,174 @@
 [
   {
+    "canonical_name": "北海道",
+    "code": "01",
+    "aliases": [],
+    "bbox": [
+      139.33464,
+      41.352775,
+      148.892752,
+      45.555627
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "青森県",
+    "code": "02",
+    "aliases": [],
+    "bbox": [
+      139.86088,
+      40.217949,
+      141.682701,
+      41.555843
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "岩手県",
+    "code": "03",
+    "aliases": [],
+    "bbox": [
+      140.65327,
+      38.747687,
+      142.071707,
+      40.45023
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "宮城県",
+    "code": "04",
+    "aliases": [],
+    "bbox": [
+      140.275076,
+      37.77353,
+      141.674977,
+      38.999848
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "秋田県",
+    "code": "05",
+    "aliases": [],
+    "bbox": [
+      139.693229,
+      38.873159,
+      140.995344,
+      40.510278
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "山形県",
+    "code": "06",
+    "aliases": [],
+    "bbox": [
+      139.520351,
+      37.733971,
+      140.646379,
+      39.208494
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "福島県",
+    "code": "07",
+    "aliases": [],
+    "bbox": [
+      139.16485,
+      36.791563,
+      141.041921,
+      37.976598
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "茨城県",
+    "code": "08",
+    "aliases": [],
+    "bbox": [
+      139.688001,
+      35.739506,
+      140.851932,
+      36.945233
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "栃木県",
+    "code": "09",
+    "aliases": [],
+    "bbox": [
+      139.32656,
+      36.199603,
+      140.292186,
+      37.154894
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "群馬県",
+    "code": "10",
+    "aliases": [],
+    "bbox": [
+      138.397055,
+      35.985378,
+      139.669704,
+      37.058533
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "埼玉県",
+    "code": "11",
+    "aliases": [],
+    "bbox": [
+      138.711564,
+      35.753301,
+      139.899139,
+      36.283285
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "千葉県",
+    "code": "12",
+    "aliases": [],
+    "bbox": [
+      139.753469,
+      34.90279,
+      140.870824,
+      36.104156
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "東京都",
+    "code": "13",
+    "aliases": [],
+    "bbox": [
+      138.9429,
+      24.224799,
+      153.986554,
+      35.897436
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
     "canonical_name": "神奈川県",
     "code": "14",
     "aliases": [
@@ -7,12 +176,441 @@
       "Kanagawa"
     ],
     "bbox": [
-      138.915784,
-      35.128768,
-      139.798226,
-      35.675618
+      138.916523,
+      35.132332,
+      139.791729,
+      35.672459
     ],
-    "snapshot_date": "2024-01-01",
-    "source_url": "https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2024.html"
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "新潟県",
+    "code": "15",
+    "aliases": [],
+    "bbox": [
+      137.634844,
+      36.736587,
+      139.90009,
+      38.552835
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "富山県",
+    "code": "16",
+    "aliases": [],
+    "bbox": [
+      136.768669,
+      36.274258,
+      137.762454,
+      36.979821
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "石川県",
+    "code": "17",
+    "aliases": [],
+    "bbox": [
+      136.243973,
+      36.067133,
+      137.360377,
+      37.855285
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "福井県",
+    "code": "18",
+    "aliases": [],
+    "bbox": [
+      135.4498,
+      35.343818,
+      136.832354,
+      36.295356
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "山梨県",
+    "code": "19",
+    "aliases": [],
+    "bbox": [
+      138.180927,
+      35.168442,
+      139.133839,
+      35.971381
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "長野県",
+    "code": "20",
+    "aliases": [],
+    "bbox": [
+      137.32592,
+      35.198567,
+      138.739248,
+      37.030335
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "岐阜県",
+    "code": "21",
+    "aliases": [],
+    "bbox": [
+      136.276529,
+      35.134665,
+      137.653142,
+      36.464849
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "静岡県",
+    "code": "22",
+    "aliases": [],
+    "bbox": [
+      137.474085,
+      34.573744,
+      139.176613,
+      35.645985
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "愛知県",
+    "code": "23",
+    "aliases": [],
+    "bbox": [
+      136.671239,
+      34.578409,
+      137.838259,
+      35.424457
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "三重県",
+    "code": "24",
+    "aliases": [],
+    "bbox": [
+      135.853065,
+      33.723233,
+      136.987529,
+      35.257499
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "滋賀県",
+    "code": "25",
+    "aliases": [],
+    "bbox": [
+      135.763952,
+      34.790707,
+      136.455111,
+      35.703599
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "京都府",
+    "code": "26",
+    "aliases": [],
+    "bbox": [
+      134.854052,
+      34.706011,
+      136.055529,
+      35.778963
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "大阪府",
+    "code": "27",
+    "aliases": [],
+    "bbox": [
+      135.092755,
+      34.272388,
+      135.746605,
+      35.05078
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "兵庫県",
+    "code": "28",
+    "aliases": [],
+    "bbox": [
+      134.253551,
+      34.156856,
+      135.467147,
+      35.670329
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "奈良県",
+    "code": "29",
+    "aliases": [],
+    "bbox": [
+      135.539863,
+      33.859761,
+      136.229121,
+      34.781274
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "和歌山県",
+    "code": "30",
+    "aliases": [],
+    "bbox": [
+      135.004593,
+      33.435368,
+      136.013349,
+      34.384471
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "鳥取県",
+    "code": "31",
+    "aliases": [],
+    "bbox": [
+      133.136196,
+      35.057678,
+      134.515305,
+      35.614541
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "島根県",
+    "code": "32",
+    "aliases": [],
+    "bbox": [
+      131.667975,
+      34.302716,
+      133.385237,
+      37.244154
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "岡山県",
+    "code": "33",
+    "aliases": [],
+    "bbox": [
+      133.266895,
+      34.298557,
+      134.413122,
+      35.352846
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "広島県",
+    "code": "34",
+    "aliases": [],
+    "bbox": [
+      132.036545,
+      34.037673,
+      133.470547,
+      35.105046
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "山口県",
+    "code": "35",
+    "aliases": [],
+    "bbox": [
+      130.775422,
+      33.712887,
+      132.491377,
+      34.798721
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "徳島県",
+    "code": "36",
+    "aliases": [],
+    "bbox": [
+      133.660892,
+      33.540147,
+      134.819833,
+      34.251696
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "香川県",
+    "code": "37",
+    "aliases": [],
+    "bbox": [
+      133.446665,
+      34.012315,
+      134.440212,
+      34.564412
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "愛媛県",
+    "code": "38",
+    "aliases": [],
+    "bbox": [
+      132.027872,
+      32.902138,
+      133.692616,
+      34.3016
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "高知県",
+    "code": "39",
+    "aliases": [],
+    "bbox": [
+      132.480802,
+      32.702519,
+      134.314385,
+      33.882989
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "福岡県",
+    "code": "40",
+    "aliases": [],
+    "bbox": [
+      130.033054,
+      33.00002,
+      131.19045,
+      34.249768
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "佐賀県",
+    "code": "41",
+    "aliases": [],
+    "bbox": [
+      129.740289,
+      32.952245,
+      130.541947,
+      33.617642
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "長崎県",
+    "code": "42",
+    "aliases": [],
+    "bbox": [
+      128.343833,
+      31.98671,
+      130.378692,
+      34.707939
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "熊本県",
+    "code": "43",
+    "aliases": [],
+    "bbox": [
+      129.96509,
+      32.094939,
+      131.329584,
+      33.195176
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "大分県",
+    "code": "44",
+    "aliases": [],
+    "bbox": [
+      130.824731,
+      32.714386,
+      132.084666,
+      33.740172
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "宮崎県",
+    "code": "45",
+    "aliases": [],
+    "bbox": [
+      130.703419,
+      31.360974,
+      131.885648,
+      32.837221
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "鹿児島県",
+    "code": "46",
+    "aliases": [],
+    "bbox": [
+      128.395637,
+      27.018957,
+      131.205421,
+      32.306324
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
+  },
+  {
+    "canonical_name": "沖縄県",
+    "code": "47",
+    "aliases": [],
+    "bbox": [
+      122.940156,
+      24.045872,
+      131.332079,
+      27.88519
+    ],
+    "snapshot_date": "2025-01-01",
+    "source_url": "https://github.com/K-Oxon/Japan-map-for-BI/blob/d032cabeb62af6580e32ef3526fe6c946fb559e0/data/administrative_area/prefecture/ja_prefecture_area.topojson"
   }
 ]
