@@ -7,7 +7,7 @@ from rhinestone.adapters.knowledge import (
     BoundingBox,
     StaticAdministrativeAreaAdapter,
 )
-from rhinestone.errors import KnowledgeResolutionError
+from rhinestone.errors import ConfigValidationError, KnowledgeResolutionError
 from rhinestone.models import SearchQuery
 from rhinestone.search import SearchCoordinator
 
@@ -119,5 +119,5 @@ def test_unknown_area_fails_closed_before_provider_calls() -> None:
 
 
 def test_area_and_bbox_cannot_be_supplied_together() -> None:
-    with pytest.raises(ValueError, match="area and bbox"):
+    with pytest.raises(ConfigValidationError, match="area and bbox"):
         SearchQuery(area="神奈川県", bbox=(139.0, 35.0, 140.0, 36.0))
