@@ -3,6 +3,7 @@ from typing import Any, cast
 
 import pytest
 
+from rhinestone import configure
 from rhinestone.adapters.knowledge import (
     AdministrativeArea,
     BoundingBox,
@@ -10,16 +11,14 @@ from rhinestone.adapters.knowledge import (
     KnowledgeAdapterRegistry,
     StaticAdministrativeAreaAdapter,
 )
-from rhinestone import configure
 from rhinestone.errors import (
     ConfigValidationError,
     KnowledgeResolutionError,
     KnowledgeValidationError,
 )
-from tests.test_knowledge import knowledge_context
 from rhinestone.models import SearchQuery
 from rhinestone.search import SearchCoordinator
-
+from tests.test_knowledge import knowledge_context
 
 AREA = AdministrativeArea(
     canonical_name="神奈川県",
