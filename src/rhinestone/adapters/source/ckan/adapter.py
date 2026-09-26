@@ -34,6 +34,7 @@ class CkanAdapter(ProviderAdapter):
         self,
         get_json: JsonTransport,
         endpoint: str | None = None,
+        spatial_search: bool = False,
         api_token: str | None = None,
         api_key: str | None = None,
         api_key_header: str = "X-CKAN-API-Key",
@@ -44,6 +45,14 @@ class CkanAdapter(ProviderAdapter):
         destination_policy: DestinationPolicy | None = None,
         provider_id: str | None = None,
     ) -> None:
+        if type(spatial_search) is not bool:
+            raise ConfigValidationError("CKAN spatial_search must be a boolean")
+        self.search_conditions = (
+            frozenset({"text", "bbox", "limit"})
+            if spatial_search
+            else type(self).search_conditions
+        )
+        self.area_text_fallback = not spatial_search
         super().__init__(
             get_json=get_json,
             endpoint=endpoint,
@@ -133,6 +142,8 @@ class CkanAdapter(ProviderAdapter):
         params: dict[str, Any] = {}
         if query.text is not None:
             params["q"] = query.text
+        if query.bbox is not None:
+            params["ext_bbox"] = ",".join(str(value) for value in query.bbox)
         if query.limit is not None:
             params["rows"] = query.limit
         found: list[SearchResult] = []
