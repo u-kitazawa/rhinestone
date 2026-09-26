@@ -63,7 +63,7 @@ def test_spatial_ckan_projects_area_to_bbox(monkeypatch: pytest.MonkeyPatch) -> 
     assert calls == [
         {
             "q": "river",
-            "ext_bbox": "138.915784,35.128768,139.798226,35.675618",
+            "ext_bbox": "138.91582,35.1285,139.83493,35.67231",
             "rows": 1,
         }
     ]
