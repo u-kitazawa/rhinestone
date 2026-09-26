@@ -50,9 +50,7 @@ def test_bundled_prefectures_and_municipalities_resolve() -> None:
     island = adapter.resolve_area("01696")
 
     assert tokyo.canonical_name == "東京都"
-    assert tokyo.bbox.as_tuple() == (
-        136.06979, 20.42276, 153.9866, 35.89842
-    )
+    assert tokyo.bbox.as_tuple() == (136.06979, 20.42276, 153.9866, 35.89842)
     assert kanagawa.code == "14"
     assert kanagawa.snapshot_date == "2025-01-01"
     assert yokohama.canonical_name == "神奈川県横浜市"
