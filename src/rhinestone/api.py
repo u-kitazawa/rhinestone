@@ -95,6 +95,7 @@ class _ConfiguredSourceAdapter:
         default_area_text_fallback = self.adapter_type in {
             "ckan",
             "dcat",
+            "plateau",
             "search-ckan-jp",
             "static",
         }
