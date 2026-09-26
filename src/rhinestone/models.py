@@ -477,8 +477,8 @@ class SearchQuery:
 class SearchDiagnostic:
     """Explain how one source participated in a federated search.
 
-    ``reason`` is normally ``unsupported``, ``missing_required``, or
-    ``provider_failure``. For provider failures, ``failure_type`` distinguishes
+    ``reason`` is normally ``unsupported``, ``missing_required``,
+    ``area_resolution_failed``, or ``provider_failure``. For provider failures, ``failure_type`` distinguishes
     metadata retrieval, response interpretation, and unavailable credentials
     without exposing raw exceptions in search results.
     """
