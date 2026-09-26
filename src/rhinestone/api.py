@@ -21,9 +21,13 @@ from .adapters.execution import (
 )
 from .adapters.knowledge import (
     KnowledgeAdapterContext,
+    StaticAdministrativeAreaAdapter,
     KnowledgeAdapterDefinition,
     KnowledgeAdapterRegistry,
     StandardTimeAdapter,
+)
+from .adapters.knowledge._japan_administrative_areas import (
+    JAPAN_ADMINISTRATIVE_AREAS,
 )
 from .adapters.ports import TransportPort
 from .adapters.source import (
@@ -87,6 +91,19 @@ class _ConfiguredSourceAdapter:
         self.required_search_conditions = cast(
             frozenset[str],
             getattr(source_adapter, "required_search_conditions", empty_conditions),
+        )
+        default_area_text_fallback = self.adapter_type in {
+            "ckan",
+            "dcat",
+            "search-ckan-jp",
+            "static",
+        }
+        self.area_text_fallback = bool(
+            getattr(
+                source_adapter,
+                "area_text_fallback",
+                default_area_text_fallback,
+            )
         )
         self._source_adapter = source_adapter
 
@@ -385,7 +402,7 @@ class Rhinestone:
             dependencies=execution_dependency_registry,
             destination_policy=destination_policy,
         )
-        self._search = SearchCoordinator(source_adapters)
+        self._search = SearchCoordinator(source_adapters, knowledge_registry)
 
     def resolve(self, value: Config | Result) -> Resource:
         """Resolve a Config or search Result into one concrete Resource.
@@ -444,6 +461,7 @@ class Rhinestone:
         query: SearchQuery | str | None = None,
         *,
         text: str | None = None,
+        area: str | None = None,
         bbox: tuple[float, float, float, float] | None = None,
         time: tuple[datetime | None, datetime | None] | None = None,
         limit: int | None = None,
@@ -453,6 +471,7 @@ class Rhinestone:
         Args:
             query: A ``SearchQuery`` or shorthand text query.
             text: Free-text search condition.
+            area: Administrative-area name, alias, or code.
             bbox: ``(west, south, east, north)`` geographic bounding box.
             time: ``(start, end)`` datetime interval; either endpoint may be
                 ``None``.
@@ -469,13 +488,19 @@ class Rhinestone:
             TypeError: If both ``query`` and shorthand search parameters are
                 supplied.
         """
-        supplied_parameters = (text, bbox, time, limit)
+        supplied_parameters = (text, area, bbox, time, limit)
         if query is not None and any(
             parameter is not None for parameter in supplied_parameters
         ):
             raise TypeError("pass either query or search parameters, not both")
         if query is None:
-            normalized_query = SearchQuery(text=text, bbox=bbox, time=time, limit=limit)
+            normalized_query = SearchQuery(
+                text=text,
+                area=area,
+                bbox=bbox,
+                time=time,
+                limit=limit,
+            )
         elif isinstance(query, str):
             normalized_query = SearchQuery(text=query)
         else:
@@ -892,6 +917,13 @@ def _knowledge_definitions(
         custom_by_kind[definition.kind] = definition
 
     built_in_definitions = (
+        KnowledgeAdapterDefinition(
+            "japan-administrative-area",
+            lambda _context: StaticAdministrativeAreaAdapter(
+                JAPAN_ADMINISTRATIVE_AREAS
+            ),
+            "area",
+        ),
         KnowledgeAdapterDefinition(
             "standard-time",
             lambda _context: StandardTimeAdapter(),
