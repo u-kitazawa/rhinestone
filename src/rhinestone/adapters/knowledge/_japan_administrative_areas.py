@@ -16,16 +16,19 @@ _rows = cast(
     ),
 )
 
-JAPAN_ADMINISTRATIVE_AREAS = tuple(
-    AdministrativeArea(
+
+def _area(row: dict[str, object]) -> AdministrativeArea:
+    bounds = cast(list[float], row["bbox"])
+    return AdministrativeArea(
         canonical_name=cast(str, row["canonical_name"]),
         code=cast(str, row["code"]),
         aliases=tuple(cast(list[str], row["aliases"])),
-        bbox=BoundingBox(*cast(tuple[float, float, float, float], tuple(cast(list[float], row["bbox"])))),
+        bbox=BoundingBox(bounds[0], bounds[1], bounds[2], bounds[3]),
         snapshot_date=cast(str, row["snapshot_date"]),
         source_url=cast(str, row["source_url"]),
     )
-    for row in _rows
-)
+
+
+JAPAN_ADMINISTRATIVE_AREAS = tuple(_area(row) for row in _rows)
 
 __all__ = ["JAPAN_ADMINISTRATIVE_AREAS"]
