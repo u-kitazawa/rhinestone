@@ -1,21 +1,34 @@
-"""Bundled Japanese administrative-area snapshot.
+"""Bundled Japanese administrative-area snapshot loaded from JSON."""
 
-Data is intentionally isolated from resolution logic so that a later snapshot
-can be reviewed and replaced without changing adapter behavior.
-"""
+import json
+from importlib.resources import files
+from typing import cast
 
 from .models import AdministrativeArea
 from .space import BoundingBox
 
-JAPAN_ADMINISTRATIVE_AREAS = (
-    AdministrativeArea(
-        canonical_name="神奈川県",
-        code="14",
-        aliases=("神奈川", "Kanagawa"),
-        bbox=BoundingBox(138.915784, 35.128768, 139.798226, 35.675618),
-        snapshot_date="2024-01-01",
-        source_url="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2024.html",
+_rows = cast(
+    list[dict[str, object]],
+    json.loads(
+        files("rhinestone.adapters.knowledge")
+        .joinpath("japan_administrative_areas.json")
+        .read_text(encoding="utf-8")
     ),
 )
+
+
+def _area(row: dict[str, object]) -> AdministrativeArea:
+    bounds = cast(list[float], row["bbox"])
+    return AdministrativeArea(
+        canonical_name=cast(str, row["canonical_name"]),
+        code=cast(str, row["code"]),
+        aliases=tuple(cast(list[str], row["aliases"])),
+        bbox=BoundingBox(bounds[0], bounds[1], bounds[2], bounds[3]),
+        snapshot_date=cast(str, row["snapshot_date"]),
+        source_url=cast(str, row["source_url"]),
+    )
+
+
+JAPAN_ADMINISTRATIVE_AREAS = tuple(_area(row) for row in _rows)
 
 __all__ = ["JAPAN_ADMINISTRATIVE_AREAS"]
