@@ -178,9 +178,8 @@ class SearchCoordinator:
                         bbox=resolved_area.bbox.as_tuple(),
                     )
                     area_handled = True
-                elif (
-                    "text" in supported_conditions
-                    and bool(getattr(adapter, "area_text_fallback", False))
+                elif "text" in supported_conditions and bool(
+                    getattr(adapter, "area_text_fallback", False)
                 ):
                     text = resolved_area.canonical_name
                     if query.text:
