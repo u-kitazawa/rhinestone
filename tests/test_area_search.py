@@ -63,6 +63,15 @@ def test_static_area_adapter_resolves_exact_name_alias_and_code() -> None:
     assert adapter.resolve_area("神奈川県") is AREA
     assert adapter.resolve_area(" 神奈川 ") is AREA
     assert adapter.resolve_area("14") is AREA
+    assert AREA.as_mapping() == {
+        "canonical_name": "神奈川県",
+        "code": "14",
+        "aliases": ("神奈川",),
+        "bbox": (138.9, 35.1, 139.8, 35.7),
+        "crs": "OGC:CRS84",
+        "snapshot_date": "2024-01-01",
+        "source_url": "https://example.test/areas",
+    }
 
 
 def test_static_area_adapter_rejects_unknown_area() -> None:
