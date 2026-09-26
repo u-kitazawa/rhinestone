@@ -8,14 +8,30 @@
 results = app.search(text="人口", limit=10)
 ```
 
-`text`、`bbox`、`time`、`limit`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
+`text`、`area`、`bbox`、`time`、`limit`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
 
 - `text`: `str`または`None`
+- `area`: 行政区域の正式名、別名、または全国地方公共団体コード
 - `limit`: `bool`を除く0以上の整数
 - `bbox`: 数値4要素のtuple
 - `time`: `datetime`または`None`を2要素で保持するtuple
 
-不正な値はProviderへリクエストする前に`ConfigValidationError`になります。
+不正な値はProviderへリクエストする前に`ConfigValidationError`になります。`area`と`bbox`は
+同時に指定できません。`bbox`の既存の4数値tuple契約は変更されません。
+
+```python
+results = app.search(text="河川", area="神奈川県", limit=10)
+```
+
+`area`は検索前に組み込みKnowledge AdapterがCRS84のbboxへ解決します。bbox対応Sourceには
+そのbboxを渡し、CKAN、PLATEAU、DCAT、search.ckan.jp、Staticのように明示的なtext
+fallbackを持つSourceでは正式区域名を`text`へ追加します。それ以外では`area`を
+`unsupported` diagnosticとして残すため、地理条件が無言で失われることはありません。
+
+初期スナップショットは2024年1月1日時点の神奈川県（コード`14`）を対象とし、
+国土数値情報の行政区域データを出典として区域情報と分離管理しています。曖昧一致や
+外部geocoderは使用しません。未知の区域はProviderへアクセスせず、全Sourceに
+`reason="area_resolution_failed"`を返します。
 
 `text` は provider 固有の検索構文を増やさない単一の文字列です。Static、DCAT、e-Stat GIS
 のローカル照合では、空白区切りの各語が identifier、title、description などの検索対象に
@@ -101,7 +117,7 @@ for diagnostic in results.diagnostics:
     )
 ```
 
-指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。Sourceに必須条件がある場合、その条件が指定されていないSourceも検索せずスキップします。`diagnostic.reason`は通常`unsupported`または`missing_required`で、後者では`missing_conditions`に不足条件が入ります。
+指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。Sourceに必須条件がある場合、その条件が指定されていないSourceも検索せずスキップします。`diagnostic.reason`は通常`unsupported`または`missing_required`で、後者では`missing_conditions`に不足条件が入ります。地名を解決できなかった場合は`area_resolution_failed`です。
 
 Providerの通信・metadata取得・response解釈に失敗した場合は、失敗したSourceだけを隔離し、他のSourceの検索結果を返します。この場合は`reason="provider_failure"`となり、`failure_type`に`metadata`または`response`が入ります。検索に必要なCredentialが未登録の場合も同様に隔離し、`failure_type="credential"`を返します。これにより、APIキーを設定していない組み込みSourceがあっても、他のSourceの横断検索は継続します。Provider障害の診断には例外メッセージやtracebackを含めません。全Sourceがこの種の障害になった場合も、空の`SearchResults`と診断を返します。一方、検索クエリの検証失敗、Credential factoryの故障、予期しないプログラムエラーはProvider障害として握りつぶしません。
 
