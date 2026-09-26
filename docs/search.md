@@ -39,7 +39,7 @@ fallbackを持つSourceでは正式区域名を`text`へ追加します。それ
 MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一致、部分一致の意味は各 API の
 仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
 
-形式、地域コード、collection、asset、provider 固有の詳細検索は共通引数にしていません。
+形式、collection、asset、provider 固有の詳細検索は共通引数にしていません。
 これらは Resource 形式、対象粒度、対応 API が Adapter 間で揃わず、曖昧な共通条件にすると
 「適用できなかった条件」を一致と誤認するためです。明示的な Config または provider 側の
 公式検索機能を利用してください。
