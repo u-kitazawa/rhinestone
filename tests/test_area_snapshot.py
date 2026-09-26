@@ -7,10 +7,10 @@ from typing import Any, cast
 import pytest
 
 from rhinestone.adapters.knowledge import StaticAdministrativeAreaAdapter
-from rhinestone.errors import KnowledgeResolutionError
 from rhinestone.adapters.knowledge._japan_administrative_areas import (
     JAPAN_ADMINISTRATIVE_AREAS,
 )
+from rhinestone.errors import KnowledgeResolutionError
 
 
 def test_bundled_areas_match_json_snapshot() -> None:
