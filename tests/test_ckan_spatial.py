@@ -55,7 +55,6 @@ def test_spatial_ckan_projects_area_to_bbox(monkeypatch: pytest.MonkeyPatch) -> 
                 {"endpoint": "https://example.test", "spatial_search": True},
             ),
         ),
-        network_policy="unrestricted",
     )
     results = app.search(text="river", area="神奈川県", limit=1)
 
