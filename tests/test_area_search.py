@@ -37,7 +37,7 @@ class AreaKnowledge:
 
 class Searchable:
     searchable = True
-    required_search_conditions = frozenset()
+    required_search_conditions: frozenset[str] = frozenset()
 
     def __init__(
         self,
