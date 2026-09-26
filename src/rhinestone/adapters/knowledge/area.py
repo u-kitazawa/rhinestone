@@ -1,6 +1,7 @@
 """Administrative-area knowledge adapters."""
 
 from collections.abc import Iterable
+from typing import cast
 
 from ...errors import KnowledgeResolutionError, KnowledgeValidationError
 from .models import AdministrativeArea
@@ -23,7 +24,8 @@ class StaticAdministrativeAreaAdapter:
 
     def resolve_area(self, value: str) -> AdministrativeArea:
         """Resolve one exact area expression or fail closed."""
-        if not isinstance(value, str) or not value.strip():
+        raw_value = cast(object, value)
+        if not isinstance(raw_value, str) or not raw_value.strip():
             raise KnowledgeValidationError("area value must be a non-empty string")
         matches = self._index.get(value.strip().casefold(), ())
         if not matches:
