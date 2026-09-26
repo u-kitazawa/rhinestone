@@ -94,7 +94,7 @@ results = app.search(text="河川", limit=10)
 result = results[0]
 ```
 
-`text`、`bbox`、`time`、`limit`をキーワードで指定できます。`SearchQuery`を直接渡す場合は
+`text`、`area`、`bbox`、`time`、`limit`をキーワードで指定できます。`area`は行政区域名・別名・コードを受け取り、bbox対応SourceにはCRS84 bbox、明示的なtext fallbackを持つSourceには正式区域名として投影されます。`area`と`bbox`は同時指定できず、未知区域はProvider呼び出し前に`area_resolution_failed` diagnosticになります。`SearchQuery`を直接渡す場合は
 `rhinestone.models`からimportします。
 
 `SearchResults`のiterationと整数indexingは、構成したProvider順にgroupを連結し、
