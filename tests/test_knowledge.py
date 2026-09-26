@@ -540,7 +540,7 @@ def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
     )
     app.resolve(Config("custom", {}))
     assert len(seen) == 1
-    assert seen[0].available == ("time",)
+    assert seen[0].available == ("area", "time")
 
 
 def test_public_builtin_source_receives_knowledge_adapters() -> None:

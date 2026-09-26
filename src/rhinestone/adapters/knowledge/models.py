@@ -7,9 +7,54 @@ from types import MappingProxyType
 from typing import Any, Literal, cast
 
 from ...errors import KnowledgeValidationError
+from .space import BoundingBox
 
 TimeKind = Literal["calendar_year", "fiscal_year", "survey_year", "as_of_date"]
 MunicipalityLevel = Literal["prefecture", "municipality"]
+
+
+@dataclass(frozen=True)
+class AdministrativeArea:
+    """A canonical administrative area and its reviewable spatial snapshot."""
+
+    canonical_name: str
+    code: str
+    bbox: BoundingBox
+    snapshot_date: str
+    source_url: str
+    aliases: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for field_name in ("canonical_name", "code", "snapshot_date", "source_url"):
+            value = cast(object, getattr(self, field_name))
+            if not isinstance(value, str) or not value.strip():
+                raise KnowledgeValidationError(
+                    f"administrative area {field_name} must be a non-empty string"
+                )
+        if not isinstance(cast(object, self.bbox), BoundingBox):
+            raise KnowledgeValidationError(
+                "administrative area bbox must be a BoundingBox"
+            )
+        aliases = cast(object, self.aliases)
+        if not isinstance(aliases, tuple) or any(
+            not isinstance(alias, str) or not alias.strip()
+            for alias in cast(tuple[object, ...], aliases)
+        ):
+            raise KnowledgeValidationError(
+                "administrative area aliases must be non-empty strings"
+            )
+
+    def as_mapping(self) -> Mapping[str, object]:
+        """Return a JSON-compatible value with source provenance."""
+        return {
+            "canonical_name": self.canonical_name,
+            "code": self.code,
+            "aliases": self.aliases,
+            "bbox": self.bbox.as_tuple(),
+            "crs": self.bbox.crs.as_string(),
+            "snapshot_date": self.snapshot_date,
+            "source_url": self.source_url,
+        }
 
 
 def _empty_provider_identifiers() -> Mapping[str, str]:
@@ -146,4 +191,9 @@ class TimeSemantic:
         return result
 
 
-__all__ = ["MunicipalityIdentity", "TimeKind", "TimeSemantic"]
+__all__ = [
+    "AdministrativeArea",
+    "MunicipalityIdentity",
+    "TimeKind",
+    "TimeSemantic",
+]
