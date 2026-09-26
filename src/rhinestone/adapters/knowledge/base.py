@@ -35,7 +35,9 @@ class TimeKnowledgeAdapter(Protocol):
         ...
 
 
-KnowledgeAdapter = AreaKnowledgeAdapter | IdentityKnowledgeAdapter | TimeKnowledgeAdapter
+KnowledgeAdapter = (
+    AreaKnowledgeAdapter | IdentityKnowledgeAdapter | TimeKnowledgeAdapter
+)
 
 
 class KnowledgePort(Protocol):
