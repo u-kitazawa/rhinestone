@@ -1,0 +1,18 @@
+[
+  {
+    "canonical_name": "神奈川県",
+    "code": "14",
+    "aliases": [
+      "神奈川",
+      "Kanagawa"
+    ],
+    "bbox": [
+      138.915784,
+      35.128768,
+      139.798226,
+      35.675618
+    ],
+    "snapshot_date": "2024-01-01",
+    "source_url": "https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2024.html"
+  }
+]
