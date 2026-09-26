@@ -12,6 +12,7 @@ from typing import (
 
 from .errors import (
     CredentialUnavailableError,
+    KnowledgeResolutionError,
     ProviderMetadataError,
     ProviderResponseError,
 )
@@ -121,8 +122,9 @@ class SearchResults(Sequence[Result]):
 class SearchCoordinator:
     """Search capable adapters in configuration order without cross-source ranking."""
 
-    def __init__(self, adapters: Iterable[Any]) -> None:
+    def __init__(self, adapters: Iterable[Any], knowledge: Any | None = None) -> None:
         self._adapters = tuple(adapters)
+        self._knowledge = knowledge
 
     def search(self, query: SearchQuery) -> SearchResults:
         """Search capable adapters and isolate expected provider failures.
@@ -142,14 +144,61 @@ class SearchCoordinator:
         grouped_results: OrderedDict[str, tuple[Any, ...]] = OrderedDict()
         diagnostics: list[SearchDiagnostic] = []
         executions: list[SearchExecution] = []
+        resolved_area: Any | None = None
+        if query.area is not None:
+            try:
+                if self._knowledge is None:
+                    raise KnowledgeResolutionError(
+                        "area knowledge adapter is not configured"
+                    )
+                resolved_area = self._knowledge.resolve_area(query.area)
+            except KnowledgeResolutionError:
+                return SearchResults.from_grouped(
+                    grouped_results,
+                    (
+                        SearchDiagnostic(
+                            source_id=adapter.source_id,
+                            skipped_conditions=frozenset({"area"}),
+                            reason="area_resolution_failed",
+                        )
+                        for adapter in searchable_adapters
+                    ),
+                )
+
         for adapter in searchable_adapters:
             supported_conditions = frozenset(adapter.search_conditions)
-            unsupported_conditions = query.supplied_conditions - supported_conditions
+            projected_query = query
+            area_handled = False
+            if resolved_area is not None:
+                if "bbox" in supported_conditions:
+                    projected_query = replace(
+                        query,
+                        area=None,
+                        bbox=resolved_area.bbox.as_tuple(),
+                    )
+                    area_handled = True
+                elif (
+                    "text" in supported_conditions
+                    and bool(getattr(adapter, "area_text_fallback", False))
+                ):
+                    text = resolved_area.canonical_name
+                    if query.text:
+                        text = f"{query.text} {text}"
+                    projected_query = replace(query, area=None, text=text)
+                    area_handled = True
+                else:
+                    projected_query = replace(query, area=None)
+
+            unsupported_conditions = (
+                query.supplied_conditions - supported_conditions
+            )
+            if area_handled:
+                unsupported_conditions -= {"area"}
             required_conditions = frozenset(
                 cast(Iterable[str], getattr(adapter, "required_search_conditions", ()))
             )
             missing_required_conditions = (
-                required_conditions - query.supplied_conditions
+                required_conditions - projected_query.supplied_conditions
             )
             if unsupported_conditions or missing_required_conditions:
                 diagnostics.append(
@@ -168,14 +217,14 @@ class SearchCoordinator:
                 continue
             if (
                 query.supplied_conditions
-                and not query.supplied_conditions & supported_conditions
+                and not projected_query.supplied_conditions & supported_conditions
             ):
                 continue
             started = perf_counter()
             provider_results: tuple[Any, ...] = ()
             try:
                 provider_results = tuple(
-                    adapter.search(query.project(supported_conditions))
+                    adapter.search(projected_query.project(supported_conditions))
                 )
                 grouped_results[adapter.source_id] = provider_results
             except ProviderMetadataError:
