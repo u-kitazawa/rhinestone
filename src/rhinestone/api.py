@@ -577,7 +577,13 @@ def _build_builtin_source_adapter(
         _reject_options(
             adapter_type,
             settings,
-            ("endpoint", "credential", "credential_header", "credential_scheme"),
+            (
+                "endpoint",
+                "spatial_search",
+                "credential",
+                "credential_header",
+                "credential_scheme",
+            ),
         )
         return CkanAdapter(
             get_json=json_transport,

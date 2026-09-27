@@ -24,7 +24,7 @@ results = app.search(text="河川", area="神奈川県", limit=10)
 ```
 
 `area`は検索前に組み込みKnowledge AdapterがCRS84のbboxへ解決します。bbox対応Sourceには
-そのbboxを渡し、CKAN、PLATEAU、DCAT、search.ckan.jp、Staticのように明示的なtext
+そのbboxを渡し、通常のCKAN、PLATEAU、DCAT、search.ckan.jp、Staticのように明示的なtext
 fallbackを持つSourceでは正式区域名を`text`へ追加します。それ以外では`area`を
 `unsupported` diagnosticとして残すため、地理条件が無言で失われることはありません。
 
@@ -42,6 +42,26 @@ bbox算出：Rhinestone）。原本の形状を直接集計したものではな
 曖昧一致や外部geocoderは使用しません。
 未知の区域はProviderへアクセスせず、全Sourceに
 `reason="area_resolution_failed"`を返します。
+
+CKANに`ckanext-spatial`の`spatial_query`が導入されていることを確認できた場合だけ、
+次のようにbbox検索を有効化できます。CKANサイトに拡張がない場合、`ext_bbox`が無視
+される可能性があるため既定は無効です。
+
+```python
+from rhinestone import Provider, configure
+
+app = configure(sources=(
+    Provider("spatial-catalog", "ckan", {
+        "endpoint": "https://example.org",
+        "spatial_search": True,
+    }),
+))
+results = app.search(text="河川", area="神奈川県")
+```
+
+有効時は`area`をbboxへ解決し、`package_search`の`ext_bbox=west,south,east,north`
+に送ります。明示した`text`も`q`へ渡します。bboxは区域の矩形範囲であり、
+行政区域ポリゴンとの厳密な一致ではありません。
 
 `text` は provider 固有の検索構文を増やさない単一の文字列です。Static、DCAT、e-Stat GIS
 のローカル照合では、空白区切りの各語が identifier、title、description などの検索対象に

@@ -4,11 +4,11 @@
 適用されるかを示します。検索結果はすべて既存の `Result` であり、`resolve()` への経路、
 discovery provenance、provider ごとの順序は変わりません。
 
-`area`は検索前に行政区域Knowledge Adapterで解決されます。STAC、OGC API Features、MLIT DPFにはbboxとして、CKAN、PLATEAU、search.ckan.jp、DCAT、Staticには正式区域名のtextとして投影されます。e-Stat GISでは未対応diagnosticになります。未知区域は全Providerの呼び出し前に失敗します。
+`area`は検索前に行政区域Knowledge Adapterで解決されます。STAC、OGC API Features、MLIT DPFと、空間検索を明示的に有効化したCKANにはbboxとして、通常のCKAN、PLATEAU、search.ckan.jp、DCAT、Staticには正式区域名のtextとして投影されます。e-Stat GISでは未対応diagnosticになります。未知区域は全Providerの呼び出し前に失敗します。
 
 | Adapter | 対応条件と適用段階 | ページング / `limit` | 非対応・境界 |
 | --- | --- | --- | --- |
-| CKAN | `text` を Action API の `q`、`limit` を `rows` に渡し、package を Resource へ展開する | `limit` は展開後 Resource 数。先頭 page で足りなければ `start` で続きの package を取得する。`limit=None` は provider の既定 page | `q` の AND / phrase / partial match は CKAN 実装の意味。bbox / time / format は共通条件ではない。次 page が必要なのに `count` が不正なら response error |
+| CKAN | `text` を Action API の `q`、`limit` を `rows` に渡す。`spatial_search=True`で`ckanext-spatial`を導入済みのサイトに限り、`bbox`を`ext_bbox`へ渡す。package を Resource へ展開する | `limit` は展開後 Resource 数。先頭 page で足りなければ `start` で続きの package を取得する。`limit=None` は provider の既定 page | 既定ではbbox非対応で`area`は正式区域名のtextに変換。空間検索が有効なら`area`をbboxに変換。`ext_bbox`を無視するサイトでは地理条件を保証できないため、対応確認済みのサイトのみ有効化する。time / format は未対応 |
 | PLATEAU | CKAN と同じ検索能力。検索結果の解決時は PLATEAU の明示選択規則を使う | CKAN と同じ | 組み込み `geospatial-jp` と同じ CKAN endpoint を使う。両方を構成すると同じ catalog の結果が別 provider group に現れ得るため、必要な方だけを構成する |
 | search.ckan.jp | `text` を Backend API の `q` に渡し、package から形式が明示された直接配布 Resource だけを返す | `limit` は展開後 Resource 数。`count` を根拠に `start` で後続 package を取得する | `text` は必須。形式不明、landing page のみ、credential 埋込み URL は結果にしない。次 page が必要なのに `count` が不正なら response error。検索サービスの構文は provider 依存 |
 | MLIT DPF | `text`（phraseMatch を含む）、`bbox`、`limit` を GraphQL 検索へ渡す | `limit` は GraphQL レコード取得数と展開後 Resource 数の上限 | `time` は未対応 diagnostic。明示 target rule または representation がない record は安全に欠落する。詳細 metadata を推測して補完しない |
