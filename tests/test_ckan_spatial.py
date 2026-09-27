@@ -18,7 +18,9 @@ def test_spatial_ckan_sends_bbox_with_text_and_limit() -> None:
         calls.append((url, dict(params)))
         return {"success": True, "result": {"results": [], "count": 0}}
 
-    adapter = CkanAdapter(get_json, endpoint="https://example.test", spatial_search=True)
+    adapter = CkanAdapter(
+        get_json, endpoint="https://example.test", spatial_search=True
+    )
 
     assert adapter.search_conditions == frozenset({"text", "bbox", "limit"})
     assert adapter.area_text_fallback is False
