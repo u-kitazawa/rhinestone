@@ -24,9 +24,12 @@ def test_spatial_ckan_sends_bbox_with_text_and_limit() -> None:
 
     assert adapter.search_conditions == frozenset({"text", "bbox", "limit"})
     assert adapter.area_text_fallback is False
-    assert adapter.search(
-        SearchQuery(text="river", bbox=(139.0, 35.0, 140.0, 36.0), limit=2)
-    ) == ()
+    assert (
+        adapter.search(
+            SearchQuery(text="river", bbox=(139.0, 35.0, 140.0, 36.0), limit=2)
+        )
+        == ()
+    )
     assert calls == [
         (
             "https://example.test/api/3/action/package_search",
