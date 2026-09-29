@@ -13,7 +13,6 @@ app = configure(
     sources=(Provider("catalog", "dcat", {"catalog_uri": catalog_uri}),),
     dependencies={
         "rdflib": RuntimeFactory(lambda: rdflib),
-        "pyogrio": RuntimeFactory(lambda: pyogrio),
     },
 )
 resource = app.resolve(
