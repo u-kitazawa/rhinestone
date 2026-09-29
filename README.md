@@ -41,8 +41,6 @@ python -m pip install rhinestone
 ## 基本的な使い方
 
 ```python
-import os
-
 import rhinestone as rs
 
 results = rs.search(text="河川")
@@ -75,6 +73,11 @@ app = configure(catalog=catalog)
 GDAL、Rasterio、pyogrio、RDFLibなど、データを開いたり解釈したりする外部ライブラリは利用者が用意します。API keyやtokenは設定値に直接書かず、認証情報として分離します。
 
 ```python
+import os
+
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN
+
 app = configure(
     catalog=BUILTIN,
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
@@ -85,7 +88,7 @@ HTTP通信はRhinestoneに組み込まれています。
 
 ## APIの段階
 
-通常の利用では、トップレベルの`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
+通常の利用では、トップレベルの`search`を使います。高度な構成では`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
 `Result`、`SearchResults`、`Resource`、`sources`を使います。`Source`、`AccessPlan`、
 `Metadata`、`Provenance`、Runtime、Adapter、Registryなどを扱う拡張コードは、用途別の
 サブモジュールからimportします。詳しくは[APIリファレンス](docs/api.md)の
