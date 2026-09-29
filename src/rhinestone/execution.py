@@ -16,7 +16,6 @@ class ExecutionAdapterSelector:
     def select(
         self,
         resource: Any,
-        dependencies: frozenset[str],
         requested: LibraryName | None = None,
     ) -> Any:
         """Select an adapter for a Resource and optional explicit library name.
@@ -26,9 +25,7 @@ class ExecutionAdapterSelector:
         choice among compatible adapters.
         """
         compatible = [
-            adapter
-            for adapter in self._adapters
-            if adapter.supports(resource, dependencies)
+            adapter for adapter in self._adapters if adapter.supports(resource)
         ]
         if requested is not None:
             compatible = [
@@ -37,13 +34,12 @@ class ExecutionAdapterSelector:
             if not compatible:
                 raise ExecutionAdapterUnavailableError(
                     f"Execution adapter {requested!r} is unavailable or "
-                    "incompatible with the selected resource or injected "
-                    "runtime"
+                    "incompatible with the selected resource"
                 )
         if not compatible:
             raise ExecutionAdapterUnavailableError(
                 "No execution adapter supports the selected resource with the "
-                "currently injected runtimes"
+                "registered adapters"
             )
         return max(
             compatible,

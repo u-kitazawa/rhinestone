@@ -1,5 +1,4 @@
 from rhinestone import Config, configure
-from rhinestone.models import RuntimeFactory
 
 
 class FakeGdal:
@@ -14,12 +13,7 @@ class FakeGdal:
 def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> None:
     """Specの全アクセス順序とruntime callbackの遅延評価を垂直スライスで保証するために必要である。"""
     runtime = FakeGdal()
-    dependency_calls: list[str] = []
-    app = configure(
-        dependencies={
-            "gdal": RuntimeFactory(lambda: dependency_calls.append("gdal") or runtime)
-        }
-    )
+    app = configure()
     config = Config(
         source_id="direct",
         settings={
@@ -30,11 +24,9 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
         },
     )
 
-    assert dependency_calls == []
-    data = app.open(config, library="gdal")
+    data = app.open(config, library="gdal", runtime=runtime)
 
     assert data is not None
-    assert dependency_calls == ["gdal"]
     assert runtime.calls[0][0].startswith("/vsizip//vsicurl/")
 
 
@@ -45,10 +37,10 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
         def read_dataframe(self, uri: str, **options: object) -> str:
             return "pyogrio-data"
 
-    app = configure(dependencies={"pyogrio": RuntimeFactory(FakePyogrio)})
+    app = configure()
     config = Config(
         source_id="direct",
         settings={"uri": "/data/boundaries.gml", "format": "gml"},
     )
 
-    assert app.open(config, library="pyogrio") == "pyogrio-data"
+    assert app.open(config, library="pyogrio", runtime=FakePyogrio()) == "pyogrio-data"

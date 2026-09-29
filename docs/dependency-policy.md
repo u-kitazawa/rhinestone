@@ -10,16 +10,16 @@ Rhinestoneは、配信元・プロトコル固有の解釈を必要な範囲で�
 | HTTP通信 | 組み込みで提供する | 提供元メタデータ、JSONサービス |
 | Source Adapter | 提供元／通信仕様の解釈を担当する。専用ライブラリは意味の委譲が必要な場合だけ採用する | STAC、DCAT |
 | Execution Adapter | 解決済みResourceを専門ライブラリの呼び出しへ翻訳する | GDAL、Rasterio、pyogrio |
-| Runtime | 利用者が実体または明示的な`RuntimeFactory`として供給する | `gdal`、`rasterio`、`pyogrio`、`rdflib` |
+| Runtime | Sourceは構成時、Executionは`open()`時に利用者が供給する | `gdal`、`rasterio`、`pyogrio`、`rdflib` |
 
 CoreはGDAL、Rasterio、pyogrio、RDFLibなどを直接importしません。HTTP通信も公開APIでtransportを注入させず、Rhinestoneの組み込みtransportを使います。
 
 Runtimeの導入例と、実際にAdapterを実行して確認したバージョンは[Runtimeの導入ガイド](runtimes.md)に記載します。そこにある`tested`は検証済み範囲であり、`pyproject.toml`のdependency constraint、`uv.lock`の再現範囲、または将来の互換性保証を意味しません。
 
-公開APIではSource RuntimeとExecution Runtimeを単一の`dependencies`引数で受け取り、Composition Rootが内部Registryへ分離して注入します。bare callableはRuntime実体として扱い、遅延評価するfactoryだけを `RuntimeFactory` で明示します。`configure()`はどちらの `RuntimeFactory` も評価しません。
+`configure(dependencies=...)`はSource Runtimeだけを受け付けます。遅延評価には`RuntimeFactory`を明示します。Execution Runtimeは`open(..., runtime=...)`で実体を渡します。
 
 - Source Runtimeはprovider / protocol metadataの解釈に必要で、対象Sourceの`search()`または`resolve()`で初めて必要になった時に評価します。現行例はDCATの`rdflib`です。
-- Execution Runtimeは解決済みResourceをnative objectとして開くために必要で、`Resource.open()`で初めて評価します。現行例は`gdal`、`rasterio`、`pyogrio`です。
+- Execution Runtimeは解決済みResourceを開く時に明示的に渡します。現行例は`gdal`、`rasterio`、`pyogrio`です。
 
 ## Sourceごとの判断
 

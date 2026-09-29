@@ -19,12 +19,9 @@ class RasterioAdapter(ExecutionAdapter):
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
 
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+    def supports(self, resource: Resource) -> bool:
         """Return whether Rasterio and the Resource's raster format are compatible."""
-        return (
-            canonical_format(resource.format) in self._formats
-            and self.name in dependencies
-        )
+        return canonical_format(resource.format) in self._formats
 
     def open(
         self,

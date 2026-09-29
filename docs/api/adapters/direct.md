@@ -25,5 +25,5 @@ resource = app.resolve(
 )
 ```
 
-実在するデータを開くには、対応するruntime dependencyも登録します。手順は
+実在するデータを開くには、対応するRuntimeを`open(..., runtime=...)`で渡します。手順は
 [Resource を解決して開く](../../resolve-and-open.md)を参照してください。

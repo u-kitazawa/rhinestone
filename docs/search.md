@@ -117,7 +117,7 @@ Resultは次の情報を持ちます。
 
 国交DPFも同じDiscovery境界を使います。`discovered_by` は構成したDPF Source ID、`target` は
 委譲先Sourceまたは `direct` です。解決後もDPF由来情報は `resource.discovery` に分離して残り、
-Runtimeは `app.open(result, "gdal")` や `resource.open("rasterio")` のように明示します。
+Runtimeは `app.open(result, "gdal", runtime=gdal)` や `resource.open("rasterio", runtime=rasterio)` のように明示します。
 
 ## 結果の順序
 

@@ -18,6 +18,7 @@ from rhinestone import (
 from rhinestone.errors import (
     AdapterRegistrationError,
     ConfigValidationError,
+    ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
 from rhinestone.models import Metadata, Provenance, RuntimeFactory, SearchQuery
@@ -79,41 +80,25 @@ def direct_config() -> Config:
 
 
 def test_direct_and_execution_adapters_are_built_in() -> None:
-    calls: list[str] = []
     runtime = FakeRasterio("opened")
-    app = configure(
-        dependencies={
-            "rasterio": RuntimeFactory(lambda: calls.append("load") or runtime)
-        }
-    )
+    app = configure()
 
     resource = app.resolve(direct_config())
 
-    assert calls == []
-    assert resource.open("rasterio") == "opened:https://example.test/dataset.tif"
-    assert calls == ["load"]
+    assert (
+        resource.open("rasterio", runtime=runtime)
+        == "opened:https://example.test/dataset.tif"
+    )
 
 
 def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
-    selected: list[str] = []
-
-    class FakeGdal:
-        def OpenEx(self, uri: str, **options: object) -> str:
-            selected.append("gdal")
-            return "gdal-data"
-
     rasterio = FakeRasterio("rasterio")
-    app = configure(
-        dependencies={
-            "gdal": RuntimeFactory(FakeGdal),
-            "rasterio": RuntimeFactory(lambda: rasterio),
-        }
-    )
+    app = configure()
 
     resource = app.resolve(direct_config())
 
-    assert resource.open("rasterio").startswith("rasterio:")
-    assert selected == []
+    assert resource.open("rasterio", runtime=rasterio).startswith("rasterio:")
+    assert rasterio.calls == ["https://example.test/dataset.tif"]
 
 
 def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
@@ -141,7 +126,6 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
     runtime = FakeRasterio("opened")
     app = configure(
         sources=(Provider("imagery", "stac", {"endpoint": endpoint}),),
-        dependencies={"rasterio": runtime},
     )
     resource = app.resolve(
         Config(
@@ -157,7 +141,7 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
 
     assert resource.uri == resolved_uri
     assert resource.provenance.original_url == resolved_uri
-    assert resource.open("rasterio") == "opened:" + resolved_uri
+    assert resource.open("rasterio", runtime=runtime) == "opened:" + resolved_uri
     assert runtime.calls == [resolved_uri]
 
 
@@ -190,9 +174,7 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
 
     configure(
         sources=sources.ALL,
-        dependencies={
-            "rasterio": RuntimeFactory(lambda: dependency_calls.append(True))
-        },
+        dependencies={"rdflib": RuntimeFactory(lambda: dependency_calls.append(True))},
         credentials={"odpt": lambda: credential_calls.append(True) or "secret"},
     )
 
@@ -471,25 +453,48 @@ def test_unknown_built_in_adapter_type_is_rejected() -> None:
         configure(sources=(Provider("custom", "unknown"),))
 
 
-def test_configured_contexts_do_not_share_runtime_instances() -> None:
+def test_open_calls_use_the_supplied_runtime_instance() -> None:
     first_runtime = FakeRasterio("first")
     second_runtime = FakeRasterio("second")
-    first = configure(dependencies={"rasterio": RuntimeFactory(lambda: first_runtime)})
-    second = configure(
-        dependencies={"rasterio": RuntimeFactory(lambda: second_runtime)}
+    first = configure()
+    second = configure()
+
+    assert (
+        first.resolve(direct_config())
+        .open("rasterio", runtime=first_runtime)
+        .startswith("first:")
+    )
+    assert (
+        second.resolve(direct_config())
+        .open("rasterio", runtime=second_runtime)
+        .startswith("second:")
     )
 
-    assert first.resolve(direct_config()).open("rasterio").startswith("first:")
-    assert second.resolve(direct_config()).open("rasterio").startswith("second:")
 
-
-def test_concrete_dependency_object_is_accepted() -> None:
+def test_concrete_runtime_object_is_accepted_at_open() -> None:
     runtime = FakeRasterio("direct")
-    app = configure(dependencies={"rasterio": runtime})
+    app = configure()
 
     resource = app.resolve(direct_config())
 
-    assert resource.open("rasterio") == "direct:https://example.test/dataset.tif"
+    assert (
+        resource.open("rasterio", runtime=runtime)
+        == "direct:https://example.test/dataset.tif"
+    )
+
+
+@pytest.mark.parametrize("name", ("gdal", "rasterio", "pyogrio", "json-service"))
+def test_configure_rejects_execution_runtime_dependencies(name: str) -> None:
+    with pytest.raises(ConfigValidationError, match="Execution runtime names"):
+        configure(dependencies={name: object()})
+
+
+def test_open_requires_an_execution_runtime_object() -> None:
+    resource = configure().resolve(direct_config())
+    with pytest.raises(ExecutionAdapterUnavailableError, match="must be supplied"):
+        resource.open("rasterio")
+    with pytest.raises(ExecutionAdapterUnavailableError, match="must be supplied"):
+        resource.open("rasterio", runtime=RuntimeFactory(lambda: object()))
 
 
 def test_callable_dependency_object_is_accepted_without_invoking_it() -> None:
@@ -500,16 +505,16 @@ def test_callable_dependency_object_is_accepted_without_invoking_it() -> None:
             raise AssertionError("Runtime object must not be invoked")
 
     runtime = CallableRasterio("callable")
-    app = configure(dependencies={"rasterio": runtime})
+    app = configure()
 
     assert (
-        app.resolve(direct_config()).open("rasterio")
+        app.resolve(direct_config()).open("rasterio", runtime=runtime)
         == "callable:https://example.test/dataset.tif"
     )
 
 
 def test_resource_open_requires_a_library_name() -> None:
-    app = configure(dependencies={"rasterio": FakeRasterio("runtime")})
+    app = configure()
     resource = app.resolve(direct_config())
 
     with pytest.raises(TypeError):
@@ -540,15 +545,19 @@ def test_catalog_and_provider_selection_conflicts_are_rejected() -> None:
 
 
 def test_search_parameters_and_open_shortcuts_are_supported() -> None:
-    app = configure(dependencies={"rasterio": FakeRasterio("runtime")})
+    runtime = FakeRasterio("runtime")
+    app = configure()
 
     with pytest.raises(TypeError, match="either query or search parameters"):
         app.search("dataset", text="dataset")
 
     resource = app.resolve(direct_config())
-    assert app.open(resource, "rasterio") == "runtime:https://example.test/dataset.tif"
     assert (
-        app.open(direct_config(), "rasterio")
+        app.open(resource, "rasterio", runtime=runtime)
+        == "runtime:https://example.test/dataset.tif"
+    )
+    assert (
+        app.open(direct_config(), "rasterio", runtime=runtime)
         == "runtime:https://example.test/dataset.tif"
     )
 
@@ -560,4 +569,7 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
         metadata=Metadata(),
         provenance=Provenance(provider="direct"),
     )
-    assert app.open(result, "rasterio") == "runtime:https://example.test/dataset.tif"
+    assert (
+        app.open(result, "rasterio", runtime=runtime)
+        == "runtime:https://example.test/dataset.tif"
+    )

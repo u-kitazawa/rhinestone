@@ -44,7 +44,6 @@ dpf = Provider(
 app = configure(
     sources=(dpf, Provider("plateau", "plateau", {"endpoint": "https://example.test/ckan"})),
     credentials={"mlit-dpf": lambda: load_api_key()},
-    dependencies={"pyogrio": pyogrio},
 )
 ```
 
@@ -70,11 +69,11 @@ metadataに安全な `DPF:downloadURLs` がある結果を `direct` Configへ変
 results = app.search(text="道路", bbox=(139.5, 35.5, 140.0, 36.0), limit=10)
 result = results[0]
 resource = app.resolve(result)
-data = resource.open("pyogrio")
+data = resource.open("pyogrio", runtime=pyogrio)
 ```
 
 DPFは発見元であり、実行Runtimeを選びません。ネイティブ委譲でもDirect fallbackでも、利用者が
-`app.open(result, "gdal")`、`resource.open("pyogrio")` などでRuntimeを明示します。指定した
+`app.open(result, "gdal", runtime=gdal)`、`resource.open("pyogrio", runtime=pyogrio)` などでRuntimeを明示します。指定した
 RuntimeがResource形式と非互換なら、別のRuntimeへ暗黙に切り替えず
 `ExecutionAdapterUnavailableError` になります。
 

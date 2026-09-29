@@ -27,7 +27,7 @@ resource = app.resolve(
         },
     )
 )
-frame = resource.open("pyogrio")
+frame = resource.open("pyogrio", runtime=pyogrio)
 print("URI:", resource.uri)
 print("provenance:", resource.provenance)
 print("rows:", len(frame))

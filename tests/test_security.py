@@ -19,7 +19,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
 )
-from rhinestone.models import RuntimeFactory, SearchQuery
+from rhinestone.models import SearchQuery
 from rhinestone.registry import CredentialRegistry
 from rhinestone.security import DestinationPolicy, DestinationRule
 from tests.provider_support import fixture_json
@@ -131,9 +131,6 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
 
     app = configure(
         sources=(sources.ODPT,),
-        dependencies={
-            "json-service": RuntimeFactory(lambda: SimpleNamespace(get=get_json))
-        },
         credentials={
             "odpt": lambda: factory_calls.append(True) or "secret",
         },
@@ -163,7 +160,9 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
     assert factory_calls == []
 
 
-def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> None:
+def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     endpoint = "https://private-odpt.example/api/v4"
     calls: list[str] = []
 
@@ -175,11 +174,12 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> N
             json=lambda: cast(list[Mapping[str, Any]], []),
         )
 
+    monkeypatch.setattr(_http, "JsonServiceRuntime", lambda: SimpleNamespace(get=get))
+
     settings = dict(sources.ODPT.settings)
     settings["endpoint"] = endpoint
     app = configure(
         sources=(Provider("private-odpt", "odpt", settings),),
-        dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
         credentials={"key": lambda: "secret"},
     )
 
@@ -542,10 +542,11 @@ def test_configure_supports_none_network_policy() -> None:
         "direct",
         {"uri": "https://unlisted.example/data.tif", "format": "geotiff"},
     )
-    unrestricted = configure(
-        network_policy="none", dependencies={"rasterio": Rasterio()}
+    unrestricted = configure(network_policy="none")
+    assert (
+        unrestricted.open(config, "rasterio", runtime=Rasterio())
+        == "https://unlisted.example/data.tif"
     )
-    assert unrestricted.open(config, "rasterio") == "https://unlisted.example/data.tif"
 
 
 def test_configure_rejects_invalid_network_policy() -> None:

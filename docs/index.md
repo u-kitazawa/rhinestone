@@ -24,20 +24,19 @@ from rhinestone.models import SearchQuery
 
 app = configure(
     sources=(sources.GSI,),
-    dependencies={"gdal": gdal},
 )
 results = app.search(SearchQuery(text="標準地図", limit=1))
 result = results[0]
 resource = app.resolve(result)
 
-dataset = resource.open("gdal")
+dataset = resource.open("gdal", runtime=gdal)
 print("URI:", resource.uri)
 print("raster size:", dataset.RasterXSize, dataset.RasterYSize)
 ```
 
 この例は、組み込み一覧全体の順序や外部検索結果に依存しません。`sources.GSI`は国土地理院の
 静的な地図定義で、`標準地図`という検索語から対象を一つ選びます。GDALは利用者が用意する
-外部ライブラリなので、`configure(dependencies=...)`へ明示的に渡します。詳細は[外部ライブラリの導入](runtimes.md)
+外部ライブラリなので、`resource.open("gdal", runtime=gdal)`で明示的に渡します。詳細は[外部ライブラリの導入](runtimes.md)
 を参照してください。
 
 ## 用語を簡単に説明すると

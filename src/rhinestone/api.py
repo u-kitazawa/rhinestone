@@ -60,7 +60,6 @@ from .models import (
     Provider,
     Resource,
     Result,
-    RuntimeFactory,
     SearchQuery,
     Source,
 )
@@ -251,7 +250,7 @@ def _source_transport(
 class Rhinestone:
     """An isolated application context for discovery, resolution, and access.
 
-    Each instance owns its configured Providers, injected runtimes, credential
+    Each instance owns its configured Providers, Source runtimes, credential
     factories, network policy, and adapter registry. It is safe to create
     separate instances with different credentials or runtime objects in the
     same process.
@@ -287,20 +286,19 @@ class Rhinestone:
         source_definitions = _source_definitions(custom_source_definitions)
         execution_definitions = _execution_definitions(custom_execution_definitions)
         knowledge_definitions = _knowledge_definitions(custom_knowledge_definitions)
+        runtime_dependencies = dict(dependencies or {})
         execution_runtime_names = frozenset(
             definition.name for definition in execution_definitions
         )
-        runtime_dependencies = dict(dependencies or {})
-        source_dependency_registry = DependencyRegistry(runtime_dependencies)
-        execution_dependencies = {
-            name: value
-            for name, value in runtime_dependencies.items()
-            if name in execution_runtime_names
-        }
-        execution_dependencies.setdefault(
-            "json-service", RuntimeFactory(lambda: _http.JsonServiceRuntime())
+        invalid_dependencies = execution_runtime_names.intersection(
+            runtime_dependencies
         )
-        execution_dependency_registry = DependencyRegistry(execution_dependencies)
+        if invalid_dependencies:
+            raise ConfigValidationError(
+                "Execution runtime names are not valid configure dependencies: "
+                + ", ".join(sorted(invalid_dependencies))
+            )
+        source_dependency_registry = DependencyRegistry(runtime_dependencies)
         credential_registry = CredentialRegistry(credentials or {})
         destination_policy = DestinationPolicy.from_catalog(
             selected_sources, level=network_policy
@@ -379,7 +377,6 @@ class Rhinestone:
             execution = definition.factory(
                 ExecutionAdapterContext(
                     credentials=credential_registry,
-                    dependencies=execution_dependency_registry,
                     destination_policy=destination_policy,
                 )
             )
@@ -400,7 +397,6 @@ class Rhinestone:
             execution_selector=ExecutionAdapterSelector(
                 adapter_registry.execution_adapters
             ),
-            dependencies=execution_dependency_registry,
             destination_policy=destination_policy,
         )
         self._search = SearchCoordinator(source_adapters, knowledge_registry)
@@ -436,7 +432,13 @@ class Rhinestone:
             ),
         )
 
-    def open(self, value: Config | Result | Resource, library: LibraryName) -> object:
+    def open(
+        self,
+        value: Config | Result | Resource,
+        library: LibraryName,
+        *,
+        runtime: object | None = None,
+    ) -> object:
         """Resolve and open a value through an explicitly named runtime.
 
         Args:
@@ -444,6 +446,7 @@ class Rhinestone:
                 direct ``Config``.
             library: Execution adapter name such as ``"rasterio"`` or
                 ``"pyogrio"``.
+            runtime: User-owned runtime object for external adapters.
 
         Raises:
             ExecutionAdapterUnavailableError: If the named adapter or injected
@@ -452,10 +455,10 @@ class Rhinestone:
             DestinationNotAllowedError: If network policy rejects the URI.
         """
         if isinstance(value, Resource):
-            return self._pipeline.open_resource(value, library)
+            return self._pipeline.open_resource(value, library, runtime=runtime)
         if isinstance(value, Config):
-            return self._pipeline.open(value, library=library)
-        return self.resolve(value).open(library)
+            return self._pipeline.open(value, library=library, runtime=runtime)
+        return self.resolve(value).open(library, runtime=runtime)
 
     def search(
         self,
@@ -524,8 +527,8 @@ def configure(
         sources: Provider definitions to enable when ``catalog`` is omitted.
         catalog: Immutable Provider collection; mutually exclusive with
             ``sources``.
-        dependencies: User-owned runtime objects or ``RuntimeFactory`` values,
-            keyed by runtime name. Factories are evaluated lazily.
+        dependencies: User-owned Source runtime objects or ``RuntimeFactory``
+            values, keyed by runtime name. Execution runtime names are rejected.
         credentials: Lazy factories keyed by logical credential name. Secrets
             are not retained in public models.
         network_policy: ``"credentialed"`` (default) authorizes requests from

@@ -310,7 +310,7 @@ def test_search_ckan_jp_canonicalizes_geopackage_for_direct_resolution() -> None
 
     resource = Resolver().resolve(DirectAdapter().load(result.target))
     assert resource.format == "gpkg"
-    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"}))
+    assert PyogrioAdapter().supports(resource)
 
 
 def test_search_ckan_jp_rejects_unsuccessful_response() -> None:

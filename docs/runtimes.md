@@ -1,7 +1,6 @@
 # 外部ライブラリ（Runtime）の導入ガイド
 
-Rhinestone Coreは、外部ライブラリをインストール・選択・更新しません。利用者が用途に合うライブラリを用意し、
-`configure(dependencies=...)`へ実体または明示的な`RuntimeFactory`として渡します。
+Rhinestone Coreは、外部ライブラリをインストール・選択・更新しません。利用者が用途に合うライブラリを用意します。Source Runtimeは`configure(dependencies=...)`へ、Execution Runtimeは`open(..., runtime=...)`へ渡します。
 
 この責務分離により、Runtimeの依存関係、ネイティブライブラリ、ライセンス、更新時期は利用者の環境で管理できます。Rhinestoneが保証するのは、対応表に記載したAdapterが、供給されたRuntimeの公開APIを呼び出すことです。
 
@@ -14,7 +13,7 @@ Runtime が必要になる段階は二つあります。
 | Source Runtime | Source の `search()` または `resolve()` | `rdflib`（DCAT の RDF 解釈） |
 | Execution Runtime | 解決済み Resource の `open()` | `gdal`、`rasterio`、`pyogrio` |
 
-`configure()` と `resolve()` は Execution Runtime の `RuntimeFactory` を評価しません。対象の段階までfactoryは呼び出されません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
+Execution Runtimeは構成時に登録しません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
 
 bare valueはcallableでもRuntime実体として扱います。遅延factoryを使う場合だけ明示的に
 `RuntimeFactory` で包むため、callable façadeやMockを誤って呼び出しません。
@@ -27,7 +26,7 @@ from rhinestone.models import RuntimeFactory
 
 app = configure(
     dependencies={
-        "rasterio": RuntimeFactory(lambda: importlib.import_module("rasterio"))
+        "rdflib": RuntimeFactory(lambda: importlib.import_module("rdflib"))
     }
 )
 ```
@@ -43,7 +42,7 @@ HTTP metadata の取得と JSON service の通信は Rhinestone に組み込ま�
 
 ### Rasterio
 
-Rasterio は COG と GeoTIFF を `Resource.open("rasterio")` で開くための Execution Runtime です。
+Rasterio は COG と GeoTIFF を `Resource.open("rasterio", runtime=rasterio)` で開くための Execution Runtime です。
 
 ```console
 python -m pip install rasterio
@@ -54,15 +53,15 @@ import rasterio
 
 from rhinestone import configure
 
-app = configure(dependencies={"rasterio": rasterio})
-dataset = app.open(resource, "rasterio")
+app = configure()
+dataset = app.open(resource, "rasterio", runtime=rasterio)
 ```
 
 `resource` は `app.resolve(result)` などで取得した、format が `cog` または `geotiff` の Resource です。Rhinestone は URI を `rasterio.open()` へそのまま渡し、archive の展開や形式変換を行いません。導入時の wheel、GDAL、PROJ などの組み合わせは [Rasterio の installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) を確認してください。
 
 ### GDAL
 
-GDAL は Shapefile、GML、CityGML、GeoTIFF、COG、NetCDF、WMS、GSI XYZ tile などを `Resource.open("gdal")` で開くための Execution Runtime です。
+GDAL は Shapefile、GML、CityGML、GeoTIFF、COG、NetCDF、WMS、GSI XYZ tile などを `Resource.open("gdal", runtime=gdal)` で開くための Execution Runtime です。
 
 ```console
 # 例。native library と Python bindings の組み合わせを環境に合わせる
@@ -74,8 +73,8 @@ from osgeo import gdal
 
 from rhinestone import configure
 
-app = configure(dependencies={"gdal": gdal})
-dataset = app.open(resource, "gdal")
+app = configure()
+dataset = app.open(resource, "gdal", runtime=gdal)
 ```
 
 GDAL の Python bindings は system GDAL のライブラリと開発ヘッダーを必要とする場合があります。`pip install GDAL` だけで導入できない環境では、[GDAL の Python bindings guide](https://gdal.org/en/stable/api/python_bindings.html) や OS / conda-forge の手順に従ってください。Rhinestone は GDAL の導入や `/vsicurl/` の利用可否を解決しません。
@@ -83,7 +82,7 @@ GDAL の Python bindings は system GDAL のライブラリと開発ヘッダー
 ### pyogrio
 
 pyogrio は Rhinestone の representation registry で `vector` と明示された Shapefile、
-GeoJSON、GeoPackage、FlatGeobuf、GML、KML、CityGML を `Resource.open("pyogrio")` で
+GeoJSON、GeoPackage、FlatGeobuf、GML、KML、CityGML を `Resource.open("pyogrio", runtime=pyogrio)` で
 読み込むための Execution Runtime です。現在の Adapter は `pyogrio.read_dataframe()` を
 呼び出すため、GeoPandas も実行時に必要です。
 
@@ -96,13 +95,13 @@ import pyogrio
 
 from rhinestone import configure
 
-app = configure(dependencies={"pyogrio": pyogrio})
-frame = app.open(resource, "pyogrio")
+app = configure()
+frame = app.open(resource, "pyogrio", runtime=pyogrio)
 ```
 
 Rhinestone は URI と Source が確定した `format` / `encoding` だけを使い、URI suffix や
 archive 内容から形式・memberを推測しません。明示された ZIP AccessPlan は GDAL VSI URIに
-変換するため、ZIP Shapefileも同じ `resource.open("pyogrio")` で読めます。GeoDataFrame
+変換するため、ZIP Shapefileも同じ `resource.open("pyogrio", runtime=pyogrio)` で読めます。GeoDataFrame
 以外への変換、空間演算は行いません。選択できても環境の pyogrio/GDAL が read driver を持たない場合や
 geometry / field type を読めない場合、`open()` は `ResourceAccessError` になります。GDAL
 の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。

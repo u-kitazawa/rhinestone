@@ -29,7 +29,7 @@ class PyogrioAdapter(ExecutionAdapter):
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
 
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+    def supports(self, resource: Resource) -> bool:
         """Return whether pyogrio can be tried for an explicit vector format.
 
         Runtime driver availability is environment-specific.  This selection
@@ -37,10 +37,7 @@ class PyogrioAdapter(ExecutionAdapter):
         a missing driver or an unsupported geometry/field type is reported by
         :meth:`open` as :class:`~rhinestone.errors.ResourceAccessError`.
         """
-        return (
-            canonical_format(resource.format) in self._formats
-            and self.name in dependencies
-        )
+        return canonical_format(resource.format) in self._formats
 
     def open(
         self,

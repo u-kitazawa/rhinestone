@@ -24,22 +24,20 @@ import rasterio
 
 app = configure(
     catalog=BUILTIN,
-    dependencies={"rasterio": rasterio},
 )
 resource = app.resolve(result)
-with resource.open("rasterio") as dataset:
+with resource.open("rasterio", runtime=rasterio) as dataset:
     ...
 ```
 
 またはアプリケーションに解決とopenをまとめて依頼できます。
 
 ```python
-dataset = app.open(result, "rasterio")
+dataset = app.open(result, "rasterio", runtime=rasterio)
 ```
 
 RhinestoneはGIS I/O、形式変換、空間演算、解析を行いません。選択済みResourceを利用者が所有するRuntimeへ渡します。
-このExecution Runtimeは`configure()`や`resolve()`では評価されず、`Resource.open()`で
-初めて必要になります。
+Execution Runtimeは`configure()`に登録せず、`open()`の呼び出しごとに渡します。
 
 ## 高度な直接解決
 

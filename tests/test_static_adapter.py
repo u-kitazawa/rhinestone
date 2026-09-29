@@ -16,7 +16,7 @@ from rhinestone.errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import Provider, RuntimeFactory, SearchQuery, Source
+from rhinestone.models import Provider, SearchQuery, Source
 
 
 def item(identifier: str = "one") -> Mapping[str, Any]:
@@ -149,14 +149,13 @@ def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
 
     app = configure(
         sources=(sources.GSI,),
-        dependencies={"gdal": RuntimeFactory(lambda: SimpleNamespace(OpenEx=open_ex))},
     )
     resource = app.resolve(Config("gsi", {"id": "std"}))
 
     assert resource.access_plan.kind == "remote-dataset"
     assert resource.format == "png"
     assert resource.metadata.raw["attribution"] == "国土地理院"
-    assert resource.open("gdal") == "dataset"
+    assert resource.open("gdal", runtime=SimpleNamespace(OpenEx=open_ex)) == "dataset"
     xml = fromstring(captured["uri"])
     assert xml.findtext("DataWindow/YOrigin") == "top"
     assert "${z}/${x}/${y}.png" in cast(str, xml.findtext("Service/ServerUrl"))

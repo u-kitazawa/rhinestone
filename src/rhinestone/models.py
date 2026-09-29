@@ -1,5 +1,7 @@
 """Domain models, including the small public vocabulary."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -34,7 +36,7 @@ class RuntimeFactory:
 
 
 DependencyValue = object | RuntimeFactory
-"""An injected Runtime object or an explicit lazy RuntimeFactory."""
+"""An injected Source Runtime object or an explicit lazy RuntimeFactory."""
 
 Runtime = DependencyValue
 """A Runtime object or an explicit lazy RuntimeFactory."""
@@ -53,16 +55,7 @@ class _GeoDataFrame(Protocol):
 
 
 class Dependencies(TypedDict, total=False):
-    """IDE-discoverable names for supported Source and Execution runtimes."""
-
-    gdal: DependencyValue
-    """Execution Runtime used for raster, vector, and tile access."""
-
-    rasterio: DependencyValue
-    """Execution Runtime used for COG and GeoTIFF access."""
-
-    pyogrio: DependencyValue
-    """Execution Runtime used for vector data access."""
+    """IDE-discoverable names for Source runtimes."""
 
     rdflib: DependencyValue
     """Source Runtime used when searching or resolving a DCAT catalog."""
@@ -313,7 +306,7 @@ class Resource:
 
     A Resource contains the URI, normalized representation, provenance, and
     explicit access plan selected by the Resolver. Use :meth:`open` with a
-    named execution runtime, or pass it to ``Rhinestone.open``.
+    named adapter and an explicit runtime, or pass it to ``Rhinestone.open``.
     """
 
     uri: str
@@ -324,32 +317,40 @@ class Resource:
     access_plan: AccessPlan
     source: Source
     local_path: str | None = None
-    _opener: Callable[[LibraryName], object] | None = field(
+    _opener: Callable[[Resource, LibraryName, object | None], object] | None = field(
         default=None, repr=False, compare=False
     )
     discovery: DiscoveryRecord | None = None
 
     @overload
-    def open(self, library: Literal["rasterio"]) -> _RasterioDatasetReader: ...
+    def open(
+        self, library: Literal["rasterio"], *, runtime: object
+    ) -> _RasterioDatasetReader: ...
 
     @overload
-    def open(self, library: Literal["gdal"]) -> _GdalDataset: ...
+    def open(self, library: Literal["gdal"], *, runtime: object) -> _GdalDataset: ...
 
     @overload
-    def open(self, library: Literal["pyogrio"]) -> _GeoDataFrame: ...
+    def open(
+        self, library: Literal["pyogrio"], *, runtime: object
+    ) -> _GeoDataFrame: ...
 
     @overload
-    def open(self, library: Literal["json-service"]) -> object: ...
+    def open(
+        self, library: Literal["json-service"], *, runtime: object | None = None
+    ) -> object: ...
 
     @overload
-    def open(self, library: str) -> object: ...
+    def open(self, library: str, *, runtime: object | None = None) -> object: ...
 
-    def open(self, library: LibraryName) -> object:
+    def open(self, library: LibraryName, *, runtime: object | None = None) -> object:
         """Open this resource through the explicitly selected runtime.
 
         Args:
             library: Registered execution adapter name, such as ``"gdal"``,
                 ``"rasterio"``, ``"pyogrio"``, or ``"json-service"``.
+            runtime: User-owned runtime object required by external adapters.
+                The core-owned ``json-service`` adapter supplies its own runtime.
 
         Raises:
             ExecutionAdapterUnavailableError: If the resource is detached, the
@@ -361,7 +362,7 @@ class Resource:
                 "Resource is not bound to an execution context; use "
                 "app.resolve(config_or_result) before calling Resource.open"
             )
-        return self._opener(library)
+        return self._opener(self, library, runtime)
 
 
 @dataclass(frozen=True)
@@ -450,7 +451,7 @@ class SearchQuery:
             if getattr(self, name) is not None
         )
 
-    def project(self, supported_conditions: Iterable[str]) -> "SearchQuery":
+    def project(self, supported_conditions: Iterable[str]) -> SearchQuery:
         """Return a query containing only source-supported criteria."""
         supported = frozenset(supported_conditions)
         return SearchQuery(

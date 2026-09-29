@@ -25,15 +25,12 @@ class GdalAdapter(ExecutionAdapter):
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
 
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+    def supports(self, resource: Resource) -> bool:
         """Return whether GDAL and the Resource's format are compatible."""
         tile = resource.access_plan.options.get("tile")
-        return self.name in dependencies and (
-            canonical_format(resource.format) in self._formats
-            or (
-                isinstance(tile, Mapping)
-                and cast(Mapping[str, Any], tile).get("scheme") == "xyz"
-            )
+        return canonical_format(resource.format) in self._formats or (
+            isinstance(tile, Mapping)
+            and cast(Mapping[str, Any], tile).get("scheme") == "xyz"
         )
 
     def open(
