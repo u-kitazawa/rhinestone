@@ -5,7 +5,7 @@ Rhinestoneは、日本の公的・地理空間データを探し、使えるデ�
 まずは次の流れだけ覚えれば使い始められます。
 
 ```text
-configure -> search -> resolve -> open
+search -> resolve -> open
 ```
 
 検索結果を選び、開くまでの最小例は[はじめに](docs/getting-started.md)にあります。
@@ -43,18 +43,16 @@ python -m pip install rhinestone
 ```python
 import os
 
-from rhinestone import configure
-from rhinestone.catalogs import BUILTIN
+import rhinestone as rs
 
-app = configure(catalog=BUILTIN)
-results = app.search(text="河川")
-resource = app.resolve(results[0])
+results = rs.search(text="河川")
+resource = results[0].resolve()
 
 print(resource.uri)
 print(resource.metadata)
 ```
 
-`BUILTIN`はRhinestoneが用意する提供元の一覧です。`search()`はその中のデータ候補を返し、検索結果は`app.resolve(result)`で使えるデータ情報へ解決できます。
+`rs.search()`はRhinestoneが用意する提供元からデータ候補を返し、検索結果は`result.resolve()`で使えるデータ情報へ解決できます。
 複数の提供元を使う場合、結果の順番は設定した順番であり、提供元をまたいだ関連度順ではありません。詳細は[検索結果の順序](docs/search.md#結果の順序)を参照してください。
 
 検索を使わず、既知のProviderを選んで構成することもできます。

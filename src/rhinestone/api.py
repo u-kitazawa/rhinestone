@@ -3,6 +3,7 @@
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime
+from functools import lru_cache
 from typing import Any, cast
 
 from . import _http
@@ -552,6 +553,39 @@ def configure(
         credentials=credentials,
         network_policy=network_policy,
         adapters=adapters,
+    )
+
+
+@lru_cache(maxsize=1)
+def _default_application() -> Rhinestone:
+    """Build the immutable standard application on first use."""
+    from .catalogs import BUILTIN
+
+    return Rhinestone(catalog=BUILTIN)
+
+
+def search(
+    query: SearchQuery | str | None = None,
+    *,
+    text: str | None = None,
+    area: str | None = None,
+    bbox: tuple[float, float, float, float] | None = None,
+    time: tuple[datetime | None, datetime | None] | None = None,
+    limit: int | None = None,
+) -> SearchResults:
+    """Search the built-in catalog without explicit application setup.
+
+    The standard application is created lazily and cannot be modified through
+    :func:`configure`. Results retain that application context, so callers can
+    continue with ``result.resolve()``.
+    """
+    return _default_application().search(
+        query,
+        text=text,
+        area=area,
+        bbox=bbox,
+        time=time,
+        limit=limit,
     )
 
 
