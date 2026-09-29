@@ -63,7 +63,7 @@ class ExampleSource:
 class ExampleExecution:
     name = "example-runtime"
     priority = 100
-    def supports(self, resource, dependencies): ...
+    def supports(self, resource): ...
     def open(self, resource, runtime, *, destination_policy=None): ...
 
 app = configure(
@@ -78,12 +78,12 @@ app = configure(
             lambda context: ExampleExecution(),
         ),
     ),
-    dependencies={"example-runtime": example_runtime},
 )
 ```
 
 Source factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
-`SourceAdapterContext`として渡します。Execution factoryには`ExecutionAdapterContext`を渡します。
+`SourceAdapterContext`として渡します。Execution factoryの`ExecutionAdapterContext`には
+DestinationPolicyを渡します。Execution Runtimeは`open(..., runtime=...)`へ渡します。
 
 共有知識をSource Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
 追加設定なしで西暦・年度・元号を利用できます。自治体辞書など独自の公式データを使う場合は、
