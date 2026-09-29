@@ -32,8 +32,8 @@ class ExecutionAdapter(Protocol):
     name: str
     priority: int
 
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
-        """Return whether this adapter can open ``resource`` with dependencies."""
+    def supports(self, resource: Resource) -> bool:
+        """Return whether this adapter supports the selected resource."""
         ...
 
     def open(
@@ -68,13 +68,12 @@ class SourceAdapterContext:
 class ExecutionAdapterContext:
     """Framework services injected into an Execution Adapter factory.
 
-    Execution adapters receive credential lookup, scoped runtime dependencies,
-    and the destination policy. They select no Resource; selection belongs to
+    Execution adapters receive credential lookup and the destination policy.
+    They select no Resource; selection belongs to
     the Resolver and execution selector.
     """
 
     credentials: CredentialPort
-    dependencies: DependencyPort
     destination_policy: DestinationPolicy
 
 

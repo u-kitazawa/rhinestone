@@ -24,7 +24,7 @@ class ExecutionAdapter(ABC):
         )
 
     @abstractmethod
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+    def supports(self, resource: Resource) -> bool:
         """Whether this adapter can open the already selected resource."""
 
     @abstractmethod

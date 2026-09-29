@@ -45,7 +45,6 @@ app = configure(
             settings={"endpoint": endpoint},
         ),
     ),
-    dependencies={"rasterio": rasterio},
 )
 resource = app.resolve(
     Config(
@@ -58,7 +57,7 @@ resource = app.resolve(
     )
 )
 
-with resource.open("rasterio") as dataset:
+with resource.open("rasterio", runtime=rasterio) as dataset:
     print("resource:", resource.uri)
     print("format:", resource.format)
     print("width x height:", dataset.width, "x", dataset.height)
@@ -67,7 +66,7 @@ with resource.open("rasterio") as dataset:
 
 `app.resolve()`は指定したItemを取得し、明示したasset keyのURLとmedia typeを検証します。
 `.tif` のようなファイル名からCOGであることは推測しません。
-`resource.open("rasterio")`は、検証済みの選択済みURIをRasterioへ渡します。
+`resource.open("rasterio", runtime=rasterio)`は、検証済みの選択済みURIをRasterioへ渡します。
 
 ## 検索時の制約
 

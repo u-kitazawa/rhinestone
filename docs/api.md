@@ -60,7 +60,6 @@ from rhinestone.catalogs import BUILTIN
 
 app = configure(
     catalog=BUILTIN,
-    dependencies={"rasterio": rasterio},
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
     network_policy="credentialed",
 )
@@ -70,15 +69,13 @@ app = configure(
 | --- | --- |
 | `catalog` | 利用するProviderのCatalog |
 | `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
-| `dependencies` | 利用者が所有するSource / Execution Runtime実体、または明示的な`RuntimeFactory`。公開引数は共通だが内部では利用段階ごとに分離される |
+| `dependencies` | 検索・解決用のSource Runtime実体または`RuntimeFactory`。Execution Runtimeは受け付けない |
 | `credentials` | 認証情報を取得するfactory |
 | `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
 | `adapters` | `SourceAdapterDefinition`／`ExecutionAdapterDefinition`／`KnowledgeAdapterDefinition` の iterable。組み込みは自動登録され、独自定義だけを指定する |
 
 通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
-遅延Runtimeは `RuntimeFactory(factory)` として指定します。bare valueはcallableでもRuntime
-実体として扱われます。`RuntimeFactory`は`configure()`では評価されません。Source Runtimeは検索・解決時、
-Execution Runtimeは`Resource.open()`時に、それぞれ初めて必要になった段階で評価されます。
+Source Runtimeの遅延読み込みには`RuntimeFactory(factory)`を指定します。Execution Runtimeは`open(..., runtime=...)`で実体を渡します。
 
 Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
 などの HTTP Source へ Credential factory を遅延注入できます。secret 自体は
@@ -133,7 +130,7 @@ resource = app.resolve(result)
 解決済みの具体的なデータです。`uri`、`format`、`media_type`、`metadata`、`provenance`を持ち、Runtimeを明示して開きます。cross-source解決では、発見側の`metadata`、`raw_metadata`、`provenance`が`discovery`に入り、target側の記録と分離されます。
 
 ```python
-data = resource.open("rasterio")
+data = resource.open("rasterio", runtime=rasterio)
 ```
 
 ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作成した後の値です。
@@ -216,7 +213,7 @@ Execution Adapter がどの format を実行できるかは、各 Adapter の ca
 Resourceを渡すか、Result/Configを渡して解決とopenを一度に行えます。
 
 ```python
-data = app.open(result, "rasterio")
+data = app.open(result, "rasterio", runtime=rasterio)
 ```
 
 ## `Runtime`（外部ライブラリ）

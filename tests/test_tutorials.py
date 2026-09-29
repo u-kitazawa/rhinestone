@@ -47,7 +47,7 @@ def test_documentation_index_example_opens_a_compatible_resource(
     assert "raster size: 256 256\n" in output
 
 
-def test_ckan_pyogrio_tutorial_registers_runtime() -> None:
+def test_ckan_pyogrio_tutorial_passes_runtime_at_open() -> None:
     source = tutorial_python("ckan-pyogrio.md")
     tree = ast.parse(source)
     configure_calls = [
@@ -59,18 +59,25 @@ def test_ckan_pyogrio_tutorial_registers_runtime() -> None:
     ]
 
     assert len(configure_calls) == 1
-    dependencies = next(
-        keyword.value
-        for keyword in configure_calls[0].keywords
-        if keyword.arg == "dependencies"
+    assert not any(
+        keyword.arg == "dependencies" for keyword in configure_calls[0].keywords
     )
-    assert isinstance(dependencies, ast.Dict)
-    assert len(dependencies.keys) == 1
-    key = dependencies.keys[0]
-    assert isinstance(key, ast.Constant)
-    assert key.value == "pyogrio"
-    assert isinstance(dependencies.values[0], ast.Name)
-    assert dependencies.values[0].id == "pyogrio"
+    open_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "open"
+    ]
+    assert any(
+        any(
+            keyword.arg == "runtime"
+            and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "pyogrio"
+            for keyword in call.keywords
+        )
+        for call in open_calls
+    )
 
 
 def test_stac_rasterio_tutorial_selects_an_explicit_asset(

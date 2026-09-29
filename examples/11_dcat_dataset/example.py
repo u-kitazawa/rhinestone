@@ -13,7 +13,6 @@ app = configure(
     sources=(Provider("catalog", "dcat", {"catalog_uri": catalog_uri}),),
     dependencies={
         "rdflib": RuntimeFactory(lambda: rdflib),
-        "pyogrio": RuntimeFactory(lambda: pyogrio),
     },
 )
 resource = app.resolve(
@@ -27,7 +26,7 @@ resource = app.resolve(
         },
     )
 )
-frame = resource.open("pyogrio")
+frame = resource.open("pyogrio", runtime=pyogrio)
 print("URI:", resource.uri)
 print("provenance:", resource.provenance)
 print("rows:", len(frame))

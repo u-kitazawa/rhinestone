@@ -3,10 +3,15 @@
 from dataclasses import replace
 from typing import Any
 
-from .errors import ProviderMetadataError, RhinestoneError
+from . import _http
+from .errors import (
+    ExecutionAdapterUnavailableError,
+    ProviderMetadataError,
+    RhinestoneError,
+)
 from .execution import ExecutionAdapterSelector
-from .models import Config, LibraryName, Resource
-from .registry import AdapterRegistry, DependencyRegistry
+from .models import Config, LibraryName, Resource, RuntimeFactory
+from .registry import AdapterRegistry
 from .resolution import Resolver
 from .security import DestinationPolicy
 
@@ -19,13 +24,11 @@ class AccessPipeline:
         adapter_registry: AdapterRegistry,
         resolver: Resolver,
         execution_selector: ExecutionAdapterSelector | None = None,
-        dependencies: DependencyRegistry | None = None,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
         self._adapter_registry = adapter_registry
         self._resolver = resolver
         self._execution_adapter_selector = execution_selector
-        self._dependency_registry = dependencies
         self._destination_policy = (
             destination_policy or DestinationPolicy.unrestricted()
         )
@@ -43,22 +46,20 @@ class AccessPipeline:
                 "loaded; inspect the endpoint and provider availability"
             ) from error
         resource = self._resolver.resolve(source)
-        if (
-            self._execution_adapter_selector is None
-            or self._dependency_registry is None
-        ):
+        if self._execution_adapter_selector is None:
             return resource
         selector = self._execution_adapter_selector
-        dependencies = self._dependency_registry
         destination_policy = self._destination_policy
 
-        def open_resource(library: LibraryName) -> object:
+        def open_resource(
+            value: Resource, library: LibraryName, runtime: object | None
+        ) -> object:
             return AccessPipeline._open_resource(
-                resource,
+                value,
                 library,
                 selector,
-                dependencies,
                 destination_policy,
+                runtime,
             )
 
         return replace(
@@ -66,16 +67,17 @@ class AccessPipeline:
             _opener=open_resource,
         )
 
-    def open(self, config: Config, library: LibraryName) -> object:
+    def open(
+        self, config: Config, library: LibraryName, *, runtime: object | None = None
+    ) -> object:
         """Resolve ``config`` and open its Resource through ``library``."""
-        return self.resolve(config).open(library)
+        return self.resolve(config).open(library, runtime=runtime)
 
-    def open_resource(self, resource: Resource, library: LibraryName) -> object:
+    def open_resource(
+        self, resource: Resource, library: LibraryName, *, runtime: object | None = None
+    ) -> object:
         """Open an existing Resource using this pipeline's policy and runtimes."""
-        if (
-            self._execution_adapter_selector is None
-            or self._dependency_registry is None
-        ):
+        if self._execution_adapter_selector is None:
             raise ProviderMetadataError(
                 "Execution pipeline is not configured; construct the public "
                 "application with configure() before opening a Resource"
@@ -84,8 +86,8 @@ class AccessPipeline:
             resource,
             library,
             self._execution_adapter_selector,
-            self._dependency_registry,
             self._destination_policy,
+            runtime,
         )
 
     @staticmethod
@@ -93,12 +95,11 @@ class AccessPipeline:
         resource: Resource,
         library: LibraryName,
         selector: ExecutionAdapterSelector,
-        dependencies: DependencyRegistry,
         destination_policy: DestinationPolicy,
+        runtime: object | None,
     ) -> Any:
         selected = selector.select(
             resource,
-            dependencies.available,
             requested=library,
         )
         authorize = getattr(selected, "authorize", None)
@@ -106,7 +107,16 @@ class AccessPipeline:
             authorize(resource, destination_policy=destination_policy)
         else:
             destination_policy.authorize(resource.uri)
-        runtime = dependencies.get(selected.name)
+        if selected.name == "json-service":
+            if runtime is not None:
+                raise ExecutionAdapterUnavailableError(
+                    "json-service uses the core-owned runtime; omit runtime"
+                )
+            runtime = _http.JsonServiceRuntime()
+        elif runtime is None or isinstance(runtime, RuntimeFactory):
+            raise ExecutionAdapterUnavailableError(
+                f"Execution runtime for {selected.name!r} must be supplied as an object"
+            )
         return selected.open(
             resource,
             runtime,

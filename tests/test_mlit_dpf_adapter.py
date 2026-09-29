@@ -317,7 +317,6 @@ def test_direct_result_resolves_with_discovery_and_requires_explicit_runtime(
             ),
         ),
         credentials={"mlit-dpf": lambda: "secret-value"},
-        dependencies={"pyogrio": PyogrioRuntime()},
     )
 
     result = app.search(text="道路", limit=1)[0]
@@ -327,7 +326,9 @@ def test_direct_result_resolves_with_discovery_and_requires_explicit_runtime(
     assert resource.discovery is not None
     assert resource.discovery.source_id == "dpf"
     assert resource.discovery.provenance.provider == "dpf"
-    assert resource.open("pyogrio") == ("opened:https://downloads.example/roads.gpkg")
+    assert resource.open("pyogrio", runtime=PyogrioRuntime()) == (
+        "opened:https://downloads.example/roads.gpkg"
+    )
     with pytest.raises(ExecutionAdapterUnavailableError):
         app.open(result, "rasterio")
     assert "secret-value" not in repr(result)

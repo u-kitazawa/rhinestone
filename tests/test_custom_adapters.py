@@ -51,8 +51,8 @@ class CustomExecution:
     name = "custom-runtime"
     priority = 100
 
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
-        return resource.format == "custom" and "custom-runtime" in dependencies
+    def supports(self, resource: Resource) -> bool:
+        return resource.format == "custom"
 
     def open(
         self,
@@ -77,7 +77,6 @@ def test_custom_source_and_execution_share_the_public_pipeline() -> None:
                 "custom-runtime", lambda context: CustomExecution()
             ),
         ),
-        dependencies={"custom-runtime": runtime},
     )
 
     resource = app.resolve(Config("custom", {"title": "Example"}))
@@ -85,7 +84,9 @@ def test_custom_source_and_execution_share_the_public_pipeline() -> None:
     assert resource.metadata.title == "Example"
     assert resource.provenance.provider == "custom"
     assert resource.source.raw_metadata["provider"] == "custom"
-    assert app.open(Config("custom", {"title": "Example"}), "custom-runtime") == (
+    assert app.open(
+        Config("custom", {"title": "Example"}), "custom-runtime", runtime=runtime
+    ) == (
         "opened",
         "https://data.example/item.bin",
     )

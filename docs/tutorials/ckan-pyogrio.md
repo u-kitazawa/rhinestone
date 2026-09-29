@@ -48,7 +48,6 @@ def vector_format(result: Any) -> Optional[str]:
 
 app = configure(
     sources=(sources.GEOSPATIAL_JP,),
-    dependencies={"pyogrio": pyogrio},
 )
 PYOGRIO_VECTOR_FORMATS = {
     "shapefile",
@@ -80,7 +79,7 @@ selected = supported[
     int(os.environ.get("RHINESTONE_CKAN_RESULT_INDEX", "0"))
 ]
 resource = app.resolve(selected)
-frame = resource.open("pyogrio")
+frame = resource.open("pyogrio", runtime=pyogrio)
 
 print("resource:", resource.uri)
 print("format:", resource.format)
@@ -91,10 +90,9 @@ print("columns:", list(frame.columns))
 CKANのpackage検索はdataset単位の結果をdistributionごとに展開します。`Result`の
 provenanceにあるresource IDと検索metadata内の `resources` を照合して、providerが広告した
 形式だけを選んでいます。その後の `app.resolve(selected)`で配布URLを取得し、
-`resource.open("pyogrio")`が選択済みURIをpyogrioへ渡します。ZIP の場合は、選択済みの
+`resource.open("pyogrio", runtime=pyogrio)`が選択済みURIをpyogrioへ渡します。ZIP の場合は、選択済みの
 `archive` と任意の `entry_point` から GDAL VSI URI を組み立てます。
-`import pyogrio`だけではRuntimeは登録されないため、利用者が所有する実体を
-`configure(dependencies={"pyogrio": pyogrio})`へ明示的に渡しています。導入方法と
+利用者が所有する実体は`resource.open("pyogrio", runtime=pyogrio)`へ明示的に渡します。導入方法と
 責任境界は[pyogrio Runtime](../runtimes.md#pyogrio)を参照してください。
 選択できても、利用者のpyogrio/GDAL環境に対応 read driver がない場合や、geometry / field typeを
 読めない場合は `ResourceAccessError` になります。

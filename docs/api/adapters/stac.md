@@ -31,7 +31,6 @@ app = configure(
             settings={"endpoint": "https://stac.example/api"},
         ),
     ),
-    dependencies={"rasterio": rasterio},
 )
 resource = app.resolve(
     Config("imagery", {
@@ -40,7 +39,7 @@ resource = app.resolve(
         "asset_key": "asset-key",
     })
 )
-with resource.open("rasterio") as dataset:
+with resource.open("rasterio", runtime=rasterio) as dataset:
     print(dataset.width, dataset.height)
 ```
 

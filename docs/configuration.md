@@ -63,7 +63,7 @@ class ExampleSource:
 class ExampleExecution:
     name = "example-runtime"
     priority = 100
-    def supports(self, resource, dependencies): ...
+    def supports(self, resource): ...
     def open(self, resource, runtime, *, destination_policy=None): ...
 
 app = configure(
@@ -78,12 +78,12 @@ app = configure(
             lambda context: ExampleExecution(),
         ),
     ),
-    dependencies={"example-runtime": example_runtime},
 )
 ```
 
 Source factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
-`SourceAdapterContext`として渡します。Execution factoryには`ExecutionAdapterContext`を渡します。
+`SourceAdapterContext`として渡します。Execution factoryの`ExecutionAdapterContext`には
+DestinationPolicyを渡します。Execution Runtimeは`open(..., runtime=...)`へ渡します。
 
 共有知識をSource Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
 追加設定なしで西暦・年度・元号を利用できます。自治体辞書など独自の公式データを使う場合は、
@@ -108,17 +108,12 @@ Metadata/Provenanceやcanonical valueを扱いますが、Credential、Runtime�
 
 ## 外部ライブラリ（Runtime）
 
-外部Runtimeは利用者が所有し、実体または明示的な `RuntimeFactory` として渡します。
-公開APIではどちらも単一の`dependencies`引数へ渡しますが、内部では利用段階に応じて
-Source RuntimeとExecution Runtimeへ分離されます。
+外部Runtimeは利用者が所有します。Source Runtimeは`dependencies`へ実体または`RuntimeFactory`として渡し、Execution Runtime実体は`open(..., runtime=...)`へ渡します。
 
 ```python
 app = configure(
     catalog=BUILTIN,
     dependencies={
-        "gdal": gdal,
-        "rasterio": rasterio,
-        "pyogrio": pyogrio,
         "rdflib": rdflib,
     },
 )
@@ -137,7 +132,7 @@ from rhinestone.models import RuntimeFactory
 
 app = configure(
     dependencies={
-        "rasterio": RuntimeFactory(lambda: importlib.import_module("rasterio")),
+        "rdflib": RuntimeFactory(lambda: importlib.import_module("rdflib")),
     },
 )
 ```
@@ -147,8 +142,7 @@ app = configure(
 | Source Runtime | provider / protocol metadataの解釈 | 対象Sourceの`search()`または`resolve()`で初めて必要になった時 | `rdflib` |
 | Execution Runtime | 解決済みResourceを開く | `Resource.open()`で初めて必要になった時 | `gdal`、`rasterio`、`pyogrio` |
 
-`configure()`は `RuntimeFactory` を評価しません。Source Runtimeは解決済みResourceや
-AccessPlanへ保持されず、Execution RuntimeだけがResourceのopen経路から参照されます。
+`configure()`は Source Runtimeの`RuntimeFactory`を評価しません。Resourceは実行コンテキストを引き継ぎますが、Execution Runtime実体は保持しません。
 
 ## 認証情報（Credential）
 

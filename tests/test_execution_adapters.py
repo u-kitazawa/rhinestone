@@ -62,7 +62,7 @@ class BasicExecutionAdapter(ExecutionAdapter):
     name = "basic"
     priority = 0
 
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+    def supports(self, resource: Resource) -> bool:
         return True
 
     def open(
@@ -106,7 +106,7 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
         )
     ]
     assert data["runtime"] == "gdal"
-    assert GdalAdapter().supports(resource, frozenset({"gdal"})) is True
+    assert GdalAdapter().supports(resource) is True
 
 
 def test_gdal_translates_uppercase_https_remote_zip() -> None:
@@ -226,7 +226,7 @@ def test_pyogrio_selects_additional_explicit_vector_formats() -> None:
         access_plan=RemoteDatasetPlan(uri="/data/boundaries.gml"),
     )
 
-    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"})) is True
+    assert PyogrioAdapter().supports(resource) is True
     assert PyogrioAdapter().open(resource, runtime) == {"runtime": "pyogrio"}
     assert runtime.calls == [("/data/boundaries.gml", {})]
 
@@ -235,7 +235,7 @@ def test_pyogrio_rejects_explicit_non_vector_formats() -> None:
     """An explicit format alone must not route a table through the vector runtime."""
     resource = make_resource("/data/records.csv", "csv")
 
-    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"})) is False
+    assert PyogrioAdapter().supports(resource) is False
 
 
 def test_execution_adapter_preserves_runtime_failure_as_cause() -> None:
@@ -273,16 +273,16 @@ def test_gdal_handles_local_archive_and_resources_without_options() -> None:
     ]
 
 
-def test_execution_support_requires_both_format_and_dependency() -> None:
-    """format対応だけで未供給runtimeを選ばず、無関係formatにもfallbackしないために必要である。"""
+def test_execution_support_depends_on_resource_format() -> None:
+    """実行Runtimeの有無と形式への対応を分離する。"""
     raster = make_resource("/data/a.tif", "cog", remote=True)
     vector = make_resource("/data/a.shp", "shapefile")
 
-    assert RasterioAdapter().supports(raster, frozenset()) is False
-    assert RasterioAdapter().supports(vector, frozenset({"rasterio"})) is False
-    assert PyogrioAdapter().supports(vector, frozenset()) is False
-    assert PyogrioAdapter().supports(raster, frozenset({"pyogrio"})) is False
-    assert GdalAdapter().supports(vector, frozenset()) is False
+    assert RasterioAdapter().supports(raster) is True
+    assert RasterioAdapter().supports(vector) is False
+    assert PyogrioAdapter().supports(vector) is True
+    assert PyogrioAdapter().supports(raster) is False
+    assert GdalAdapter().supports(vector) is True
 
 
 def test_gdal_and_pyogrio_failures_are_classified() -> None:
@@ -317,7 +317,7 @@ def test_pyogrio_driver_or_geometry_failures_are_resource_access_errors() -> Non
 
     resource = make_resource("/data/boundaries.gml", "gml")
 
-    assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"})) is True
+    assert PyogrioAdapter().supports(resource) is True
     with pytest.raises(ResourceAccessError) as captured:
         PyogrioAdapter().open(resource, UnsupportedGmlPyogrio())
     assert captured.value.__cause__ is failure

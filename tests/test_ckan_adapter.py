@@ -83,7 +83,7 @@ def test_ckan_canonicalizes_formats_without_losing_provider_metadata(
     if expected is not None:
         resource = Resolver().resolve(source)
         assert resource.format == expected
-        assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"}))
+        assert PyogrioAdapter().supports(resource)
 
 
 def test_ckan_uses_media_type_when_format_is_missing() -> None:

@@ -8,7 +8,7 @@ Rhinestone の representation registry で `vector` と明示された Shapefile
 GeoPackage、FlatGeobuf、GML、KML、CityGML に対応します。runtime は
 `read_dataframe(uri, **options)` を提供する必要があります。確定済みの `encoding` は
 option として渡されます。`archive="zip"` の FileAccessPlan は GDAL VSI URI に変換するため、
-ZIP Shapefile も通常どおり `resource.open("pyogrio")` で読み込めます。remote ZIP は
+ZIP Shapefile も通常どおり `resource.open("pyogrio", runtime=pyogrio)` で読み込めます。remote ZIP は
 `/vsizip//vsicurl/` を使用し、明示された `entry_point` があればその member を指定します。
 
 この選択は Source Adapter が明示した `Resource.format` だけに基づきます。URL suffix や

@@ -5,11 +5,9 @@ import os
 from osgeo import gdal
 
 from rhinestone import Config, configure, sources
-from rhinestone.models import RuntimeFactory
 
 app = configure(
     sources=(sources.PLATEAU,),
-    dependencies={"gdal": RuntimeFactory(lambda: gdal)},
 )
 resource = app.resolve(
     Config(
@@ -21,7 +19,7 @@ resource = app.resolve(
         },
     )
 )
-dataset = resource.open("gdal")
+dataset = resource.open("gdal", runtime=gdal)
 print("URI:", resource.uri)
 print("provenance:", resource.provenance)
 print("layer count:", dataset.GetLayerCount())

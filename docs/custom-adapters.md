@@ -170,11 +170,8 @@ class ExampleExecution:
     name = "example-runtime"
     priority = 100
 
-    def supports(self, resource, dependencies):
-        return (
-            resource.format == "geojson"
-            and self.name in dependencies
-        )
+    def supports(self, resource):
+        return resource.format == "geojson"
 
     def open(self, resource, runtime, *, destination_policy=None):
         return runtime.read(resource.uri)
@@ -186,20 +183,19 @@ app = configure(
         "example-runtime",
         lambda context: ExampleExecution(),
     ),),
-    dependencies={"example-runtime": example_runtime},
 )
 
-data = app.open(resource, "example-runtime")
+data = app.open(resource, "example-runtime", runtime=example_runtime)
 ```
 
-`supports()` は Resource の形式・AccessPlan・利用可能な依存だけを見て、実際の Resource
+`supports()` は Resource の形式・AccessPlanだけを見て、実際の Resource
 選択を行いません。`priority` が大きい Adapter が自動選択され、`app.open(..., name)` で
 明示選択もできます。Definition の `name` と生成された Adapter の `name` は一致させます。
 
 `open()` がネットワークへアクセスする場合は、Runtime を解決する前に
 `destination_policy.authorize(resource.uri)` を適用するか、必要に応じて既存の
 Execution Adapter 基底クラスの `authorize()` を利用してください。Core に GDAL、Rasterio、
-pyogrio などを依存させず、Runtime は常に `dependencies` から注入します。
+pyogrio などを依存させず、Execution Runtime は `open()` で注入します。
 
 ## 登録時の制約とエラー
 

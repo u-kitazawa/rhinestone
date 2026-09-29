@@ -41,11 +41,10 @@ class JsonServiceAdapter(ExecutionAdapter):
             self._destination_policy,
         )
 
-    def supports(self, resource: Resource, dependencies: frozenset[str]) -> bool:
+    def supports(self, resource: Resource) -> bool:
         """Return whether this service and JSON response shape are compatible."""
         return (
-            self.name in dependencies
-            and isinstance(resource.access_plan, ServiceQueryPlan)
+            isinstance(resource.access_plan, ServiceQueryPlan)
             and resource.media_type == "application/json"
             and resource.access_plan.options.get("service") == self._service
         )

@@ -104,15 +104,16 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     assert "kernelspec" in notebook["metadata"]
     assert any(cell.get("cell_type") == "markdown" for cell in notebook_cells(notebook))
     source = notebook_source(notebook)
+    assert "@2364508f02f010f3fcc96c4677d133951524fa85" in source
+    assert "@develop" not in source
     for marker in (
         "sources.GEOSPATIAL_JP",
         'app.search(text="河川"',
-        'dependencies={"pyogrio": pyogrio}',
+        'resource.open("pyogrio", runtime=pyogrio)',
         "PYOGRIO_VECTOR_FORMATS",
         "item.format in PYOGRIO_VECTOR_FORMATS",
         "ZIP Shapefile",
         "GDAL VSI URI",
-        'resource.open("pyogrio")',
         "import folium",
         "folium.GeoJson",
         "map_view.fit_bounds",
@@ -149,8 +150,7 @@ def test_stac_showcase_has_the_complete_explicit_flow() -> None:
         '"collection_id": collection_id',
         '"item_id": item_id',
         '"asset_key": asset_key',
-        'dependencies={"rasterio": rasterio}',
-        'resource.open("rasterio")',
+        'resource.open("rasterio", runtime=rasterio)',
         "indexes=display_indexes",
         "out_shape=(len(display_indexes), preview_height, preview_width)",
         "Resampling.bilinear",
@@ -171,7 +171,7 @@ def test_stac_showcase_pins_setup_and_keeps_no_stale_output() -> None:
     notebook = load_notebook(RASTER_NOTEBOOK)
     source = notebook_source(notebook)
 
-    assert "@1d892cc318e5e979824110e06bd39044f00593d7" in source
+    assert "@2364508f02f010f3fcc96c4677d133951524fa85" in source
     assert "@develop" not in source
     assert "rasterio==1.5.1" in source
     assert "access_token" not in serialized.casefold()
