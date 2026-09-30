@@ -66,6 +66,7 @@ from .models import (
 )
 from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
+from .representations import Format, FormatPreset
 from .resolution import Resolver
 from .search import SearchCoordinator, SearchResults
 from .security import DestinationPolicy, NetworkPolicyLevel
@@ -469,6 +470,7 @@ class Rhinestone:
         area: str | None = None,
         bbox: tuple[float, float, float, float] | None = None,
         time: tuple[datetime | None, datetime | None] | None = None,
+        format: tuple[Format | FormatPreset, ...] | None = None,
         limit: int | None = None,
     ) -> SearchResults:
         """Search all configured searchable sources in configuration order.
@@ -493,7 +495,7 @@ class Rhinestone:
             TypeError: If both ``query`` and shorthand search parameters are
                 supplied.
         """
-        supplied_parameters = (text, area, bbox, time, limit)
+        supplied_parameters = (text, area, bbox, time, format, limit)
         if query is not None and any(
             parameter is not None for parameter in supplied_parameters
         ):
@@ -504,6 +506,7 @@ class Rhinestone:
                 area=area,
                 bbox=bbox,
                 time=time,
+                format=format,
                 limit=limit,
             )
         elif isinstance(query, str):
@@ -571,6 +574,7 @@ def search(
     area: str | None = None,
     bbox: tuple[float, float, float, float] | None = None,
     time: tuple[datetime | None, datetime | None] | None = None,
+    format: tuple[Format | FormatPreset, ...] | None = None,
     limit: int | None = None,
 ) -> SearchResults:
     """Search the built-in catalog without explicit application setup.
@@ -585,6 +589,7 @@ def search(
         area=area,
         bbox=bbox,
         time=time,
+        format=format,
         limit=limit,
     )
 

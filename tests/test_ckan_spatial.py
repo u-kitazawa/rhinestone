@@ -22,7 +22,7 @@ def test_spatial_ckan_sends_bbox_with_text_and_limit() -> None:
         get_json, endpoint="https://example.test", spatial_search=True
     )
 
-    assert adapter.search_conditions == frozenset({"text", "bbox", "limit"})
+    assert adapter.search_conditions == frozenset({"text", "bbox", "format", "limit"})
     assert adapter.area_text_fallback is False
     assert (
         adapter.search(
@@ -79,7 +79,7 @@ def test_default_ckan_keeps_text_fallback_and_rejects_bbox() -> None:
         return {"success": True, "result": {"results": [], "count": 0}}
 
     adapter = CkanAdapter(get_json, endpoint="https://example.test")
-    assert adapter.search_conditions == frozenset({"text", "limit"})
+    assert adapter.search_conditions == frozenset({"text", "format", "limit"})
     assert adapter.area_text_fallback is True
     with pytest.raises(ConfigValidationError, match="bbox"):
         adapter.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))

@@ -8,13 +8,14 @@
 results = app.search(text="人口", limit=10)
 ```
 
-`text`、`area`、`bbox`、`time`、`limit`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
+`text`、`area`、`bbox`、`time`、`format`、`limit`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
 
 - `text`: `str`または`None`
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
 - `limit`: `bool`を除く0以上の整数
 - `bbox`: 数値4要素のtuple
 - `time`: `datetime`または`None`を2要素で保持するtuple
+- `format`: `Format`または`FormatPreset`を1つ以上保持するtuple（OR条件）
 
 不正な値はProviderへリクエストする前に`ConfigValidationError`になります。`area`と`bbox`は
 同時に指定できません。`bbox`の既存の4数値tuple契約は変更されません。
@@ -69,10 +70,21 @@ results = app.search(text="河川", area="神奈川県")
 MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一致、部分一致の意味は各 API の
 仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
 
-形式、collection、asset、provider 固有の詳細検索は共通引数にしていません。
-これらは Resource 形式、対象粒度、対応 API が Adapter 間で揃わず、曖昧な共通条件にすると
-「適用できなかった条件」を一致と誤認するためです。明示的な Config または provider 側の
-公式検索機能を利用してください。
+形式はcanonical vocabularyの`Format`またはRuntime向け集合の`FormatPreset`で検索できます。
+複数指定はOR条件です。Providerが形式検索を宣言する場合は条件を渡し、それ以外は明示された
+候補形式をRhinestoneが検索後に絞り込みます。post-filter時の`limit`は絞り込み後に適用します。
+URI suffixから形式を推測しません。形式不明の結果を含めるには`Format.UNKNOWN`を明示します。
+
+```python
+from rhinestone import Format, FormatPreset
+
+vectors = app.search(format=(FormatPreset.PYOGRIO,), limit=10)
+files = app.search(format=(Format.GEOJSON, Format.CSV))
+unknown = app.search(format=(Format.UNKNOWN,))
+```
+
+Presetは検索候補集合であり、Runtimeでのopen成功を保証しません。最終判定は解決後のExecution
+Adapterが行います。collection、asset、provider固有の詳細検索は共通引数にしていません。
 
 `search-ckan-jp` では、`limit` はCKANへのpackage取得数（`rows`）に使われるだけでなく、packageをsupported resourceへ展開した後の結果列にも適用されます。そのため、1つのpackageに複数のresourceがある場合、flattened結果全体が`limit`件に達した時点で後続resourceやpackageの結果が省略されます。`limit=None`ならこの展開後の制限はありません。
 

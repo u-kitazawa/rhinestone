@@ -48,6 +48,8 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
         "SearchResult",
         "SearchResults",
         "Resource",
+        "Format",
+        "FormatPreset",
         "sources",
     ]
     removed = (

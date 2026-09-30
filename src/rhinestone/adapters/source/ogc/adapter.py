@@ -137,6 +137,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
                         adapter="ogc-features",
                         raw=feature,
                     ),
+                    formats=frozenset({"ogc-api-features"}),
                     raw_metadata=feature,
                 )
             )

@@ -20,7 +20,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
     """Discover executable direct resources from search.ckan.jp metadata."""
 
     adapter_type = "search-ckan-jp"
-    search_conditions = frozenset({"text", "limit"})
+    search_conditions = frozenset({"text", "format", "limit"})
     required_search_conditions = frozenset({"text"})
 
     def __init__(
@@ -66,6 +66,10 @@ class SearchCkanJpAdapter(ProviderAdapter):
             packages = self._objects(result.get("results"), "search.ckan.jp results")
             for package in packages:
                 for item in self._package_results(package, endpoint, page_params):
+                    if query.format is not None and not self._matches_query_formats(
+                        item.formats, query
+                    ):
+                        continue
                     found.append(item)
                     if query.limit is not None and len(found) == query.limit:
                         return tuple(found)
@@ -152,7 +156,13 @@ class SearchCkanJpAdapter(ProviderAdapter):
                     target=Config("direct", target_settings),
                     metadata=metadata,
                     provenance=provenance,
+                    formats=frozenset({format_name}),
                     raw_metadata={"catalog": package, "resource": resource},
                 )
             )
         return tuple(found)
+
+    @staticmethod
+    def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:
+        requested = {value.value for value in query.expanded_formats}
+        return bool(formats & requested) or (not formats and "unknown" in requested)
