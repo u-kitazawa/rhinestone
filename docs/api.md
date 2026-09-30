@@ -4,6 +4,22 @@
 用語は[用語と概念](concepts.md)、Adapterを追加する場合は[Source Adapter](api/source-adapters.md)と
 [Execution Adapter](api/execution-adapters.md)を参照してください。履歴資料の`architecture/`は現行APIの規範ではありません。
 
+## `search()`（標準構成で検索する）
+
+通常利用では、アプリケーションを初期化せず組み込みCatalogを検索できます。標準構成は
+最初の呼び出し時に遅延生成され、`configure()`で作成した独立コンテキストから変更されません。
+
+```python
+import rhinestone as rs
+
+results = rs.search(text="河川", bbox=(139.5, 35.5, 140.0, 36.0), limit=10)
+resource = results[0].resolve()
+```
+
+`text`、`area`、`bbox`、`time`、`limit`の意味と診断は`Rhinestone.search()`と同じです。
+独自Provider、Credential、Source Runtime、NetworkPolicy、Adapterが必要な場合は
+`configure()`で独立したアプリケーションを作成します。
+
 ## `Catalog`（提供元の一覧）
 
 データ提供元の設定をまとめた、変更されない一覧です。組み込みCatalogは`rhinestone.catalogs.BUILTIN`です。
@@ -74,7 +90,7 @@ app = configure(
 | `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
 | `adapters` | `SourceAdapterDefinition`／`ExecutionAdapterDefinition`／`KnowledgeAdapterDefinition` の iterable。組み込みは自動登録され、独自定義だけを指定する |
 
-通常のコードでは`catalog`を使ってください。`sources`はCatalogを使わない互換・高度な指定として利用できます。
+独自構成が必要なコードでは`catalog`を使ってください。`sources`はCatalogを使わない高度な指定として利用できます。
 Source Runtimeの遅延読み込みには`RuntimeFactory(factory)`を指定します。Execution Runtimeは`open(..., runtime=...)`で実体を渡します。
 
 Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
@@ -177,7 +193,7 @@ except ProviderMetadataError:
 
 ## 拡張・Adapter向けAPI
 
-通常利用のトップレベルAPIは、`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
+通常利用のトップレベルAPIは、`search`、`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
 `Result`、`SearchResult`、`SearchResults`、`Resource`、`sources`に限定しています。
 Provider固有のSourceを実装したり、実行Adapter・Knowledge Adapterを追加したりする場合は、
 次のサブモジュールを正式な拡張surfaceとして利用してください。

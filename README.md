@@ -5,7 +5,7 @@ Rhinestoneは、日本の公的・地理空間データを探し、使えるデ�
 まずは次の流れだけ覚えれば使い始められます。
 
 ```text
-configure -> search -> resolve -> open
+search -> resolve -> open
 ```
 
 検索結果を選び、開くまでの最小例は[はじめに](docs/getting-started.md)にあります。
@@ -41,20 +41,16 @@ python -m pip install rhinestone
 ## 基本的な使い方
 
 ```python
-import os
+import rhinestone as rs
 
-from rhinestone import configure
-from rhinestone.catalogs import BUILTIN
-
-app = configure(catalog=BUILTIN)
-results = app.search(text="河川")
-resource = app.resolve(results[0])
+results = rs.search(text="河川")
+resource = results[0].resolve()
 
 print(resource.uri)
 print(resource.metadata)
 ```
 
-`BUILTIN`はRhinestoneが用意する提供元の一覧です。`search()`はその中のデータ候補を返し、検索結果は`app.resolve(result)`で使えるデータ情報へ解決できます。
+`rs.search()`はRhinestoneが用意する提供元からデータ候補を返し、検索結果は`result.resolve()`で使えるデータ情報へ解決できます。
 複数の提供元を使う場合、結果の順番は設定した順番であり、提供元をまたいだ関連度順ではありません。詳細は[検索結果の順序](docs/search.md#結果の順序)を参照してください。
 
 検索を使わず、既知のProviderを選んで構成することもできます。
@@ -77,6 +73,11 @@ app = configure(catalog=catalog)
 GDAL、Rasterio、pyogrio、RDFLibなど、データを開いたり解釈したりする外部ライブラリは利用者が用意します。API keyやtokenは設定値に直接書かず、認証情報として分離します。
 
 ```python
+import os
+
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN
+
 app = configure(
     catalog=BUILTIN,
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
@@ -87,7 +88,7 @@ HTTP通信はRhinestoneに組み込まれています。
 
 ## APIの段階
 
-通常の利用では、トップレベルの`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
+通常の利用では、トップレベルの`search`を使います。高度な構成では`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
 `Result`、`SearchResults`、`Resource`、`sources`を使います。`Source`、`AccessPlan`、
 `Metadata`、`Provenance`、Runtime、Adapter、Registryなどを扱う拡張コードは、用途別の
 サブモジュールからimportします。詳しくは[APIリファレンス](docs/api.md)の

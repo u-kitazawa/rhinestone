@@ -10,33 +10,26 @@ pip install rhinestone
 
 HTTP通信は組み込みです。データを開くときだけ、GDAL、Rasterio、pyogrioなど必要な外部ライブラリを用意します。
 
-## 2. 組み込みの提供元を使う
+## 2. 検索して解決する
 
 ```python
-from rhinestone import configure
-from rhinestone.catalogs import BUILTIN
+import rhinestone as rs
 
-app = configure(catalog=BUILTIN)
-```
-
-## 3. 検索して解決する
-
-`search()`は、設定した提供元の中にあるデータ候補を返します。提供元そのものを探すAPIではありません。
-
-```python
-results = app.search(text="河川", limit=5)
+results = rs.search(text="河川", limit=5)
 result = results[0]
-resource = app.resolve(result)
+resource = result.resolve()
 
 print(resource.uri)
 print(resource.format)
 print(resource.provenance)
 ```
 
+`search()`は、組み込みの提供元にあるデータ候補を返します。提供元そのものを探すAPIではありません。
+
 検索結果の解決に`Config`を組み立てる必要はありません。複数の提供元を設定した場合、
 `results[0]`は設定順で最初の提供元の先頭結果です。関連度1位を意味しません。詳しくは[データを検索する](search.md)を参照してください。
 
-## 4. 提供元を限定する
+## 3. 提供元を限定する
 
 ```python
 from rhinestone import Catalog, configure
@@ -46,7 +39,7 @@ catalog = Catalog(BUILTIN.providers[:2])
 app = configure(catalog=catalog)
 ```
 
-## 5. URIが分かっている場合
+## 4. URIが分かっている場合
 
 URIと形式がすでに分かっている場合は、`direct`の`Config`で直接指定できます。通常は検索結果から
 `app.resolve(result)`を使う方が簡単です。

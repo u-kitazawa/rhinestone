@@ -39,6 +39,7 @@ class FakeRasterio:
 def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
     assert rhinestone.__all__ == [
         "configure",
+        "search",
         "Rhinestone",
         "Catalog",
         "Provider",
