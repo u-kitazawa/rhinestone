@@ -73,6 +73,11 @@ class StaticAdapter(ProviderAdapter):
                     target=Config(self.adapter_type, {"id": identifier}),
                     metadata=source.metadata,
                     provenance=source.provenance,
+                    formats=frozenset(
+                        candidate.format
+                        for candidate in source.candidates
+                        if candidate.format is not None
+                    ),
                     raw_metadata=source.raw_metadata,
                 )
             )

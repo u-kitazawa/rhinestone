@@ -112,6 +112,11 @@ class StacAdapter(ProviderAdapter):
             collection_id = self._required_string(item, "collection")
             properties = self._object(item.get("properties"), "STAC properties")
             asset_key = self._single_data_asset_key(item)
+            asset = self._asset(item, asset_key)
+            candidate = self._candidate(asset, asset_key, f"{endpoint}/search")
+            formats: frozenset[str] = (
+                frozenset({candidate.format}) if candidate.format else frozenset()
+            )
             title = _optional_string(properties.get("title")) or item_id
             found.append(
                 SearchResult(
@@ -136,6 +141,7 @@ class StacAdapter(ProviderAdapter):
                         adapter="stac",
                         raw=item,
                     ),
+                    formats=formats,
                     raw_metadata=item,
                 )
             )

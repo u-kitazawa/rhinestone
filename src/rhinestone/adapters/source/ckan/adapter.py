@@ -28,7 +28,7 @@ class CkanAdapter(ProviderAdapter):
     """Interpret CKAN Action API package and resource responses."""
 
     adapter_type = "ckan"
-    search_conditions = frozenset({"text", "limit"})
+    search_conditions = frozenset({"text", "format", "limit"})
 
     def __init__(
         self,
@@ -48,7 +48,7 @@ class CkanAdapter(ProviderAdapter):
         if type(spatial_search) is not bool:
             raise ConfigValidationError("CKAN spatial_search must be a boolean")
         self.search_conditions = (
-            frozenset({"text", "bbox", "limit"})
+            frozenset({"text", "bbox", "format", "limit"})
             if spatial_search
             else type(self).search_conditions
         )
@@ -161,6 +161,17 @@ class CkanAdapter(ProviderAdapter):
                 resources = self._objects(package.get("resources"), "CKAN resources")
                 for resource in resources:
                     resource_id = self._required_string(resource, "id")
+                    media_type = optional_string(resource.get("mimetype"))
+                    format_name = canonical_format(resource.get("format")) or (
+                        format_from_media_type(media_type)
+                    )
+                    formats: frozenset[str] = (
+                        frozenset({format_name}) if format_name else frozenset()
+                    )
+                    if query.format is not None and not self._matches_query_formats(
+                        formats, query
+                    ):
+                        continue
                     found.append(
                         SearchResult(
                             title=optional_string(package.get("title")) or resource_id,
@@ -180,6 +191,7 @@ class CkanAdapter(ProviderAdapter):
                                 adapter="ckan",
                                 raw=package,
                             ),
+                            formats=formats,
                             raw_metadata={"package": package, "resource": resource},
                         )
                     )
@@ -214,3 +226,8 @@ class CkanAdapter(ProviderAdapter):
             media_type=media_type,
             attributes=attributes,
         )
+
+    @staticmethod
+    def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:
+        requested = {value.value for value in query.expanded_formats}
+        return bool(formats & requested) or (not formats and "unknown" in requested)

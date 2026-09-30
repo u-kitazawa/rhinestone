@@ -572,6 +572,7 @@ class Result:
     target: Config
     metadata: Metadata
     provenance: Provenance
+    formats: frozenset[str] = field(default_factory=frozenset)
     _resolver: Callable[[], Resource] | None = field(
         default=None, repr=False, compare=False
     )
@@ -584,6 +585,7 @@ class Result:
                 "source that discovered this result"
             )
         object.__setattr__(self, "raw_metadata", _freeze(self.raw_metadata))
+        object.__setattr__(self, "formats", frozenset(self.formats))
 
     def to_config(self) -> Config:
         """Return the immutable target configuration for resolution."""

@@ -22,29 +22,15 @@ from .representations import Format, canonical_format
 
 
 def _result_formats(result: Result) -> frozenset[Format]:
-    """Collect explicit canonical formats without inferring from URI suffixes."""
+    """Return formats declared for the selected resource only."""
     found: set[Format] = set()
-
-    def visit(value: Any, key: str | None = None) -> None:
-        if key == "format" and isinstance(value, str):
-            normalized = canonical_format(value)
-            if normalized is not None:
-                try:
-                    found.add(Format(normalized))
-                except ValueError:
-                    pass
-            return
-        if isinstance(value, Mapping):
-            mapping = cast(Mapping[Any, Any], value)
-            for child_key, child in mapping.items():
-                visit(child, str(child_key))
-        elif isinstance(value, tuple | list):
-            sequence = cast(tuple[Any, ...] | list[Any], value)
-            for child in sequence:
-                visit(child)
-
-    visit(result.target.settings)
-    visit(result.raw_metadata)
+    for value in result.formats:
+        normalized = canonical_format(value)
+        if normalized is not None:
+            try:
+                found.add(Format(normalized))
+            except ValueError:
+                pass
     return frozenset(found)
 
 
