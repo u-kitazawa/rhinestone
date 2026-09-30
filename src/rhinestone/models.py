@@ -18,6 +18,7 @@ from typing import (
 
 from ._uri import is_valid_http_authority
 from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
+from .representations.types import Format, FormatPreset, expand_formats
 
 LibraryName = str
 """Execution runtime name accepted by the public open API."""
@@ -380,6 +381,7 @@ class SearchQuery:
     area: str | None = None
     bbox: tuple[float, float, float, float] | None = None
     time: tuple[datetime | None, datetime | None] | None = None
+    format: tuple[Format | FormatPreset, ...] | None = None
     limit: int | None = None
 
     def __post_init__(self) -> None:
@@ -440,6 +442,20 @@ class SearchQuery:
                     "(SearchQuery.time); "
                     "got a tuple with an invalid length or element type"
                 )
+        raw_format = cast(object, self.format)
+        if raw_format is not None:
+            format_values = (
+                cast(tuple[Any, ...], raw_format)
+                if isinstance(raw_format, tuple)
+                else ()
+            )
+            if not format_values or any(
+                not isinstance(value, Format | FormatPreset) for value in format_values
+            ):
+                raise ConfigValidationError(
+                    "format must be a non-empty tuple of Format or FormatPreset values "
+                    "(SearchQuery.format)"
+                )
 
     @property
     def supplied_conditions(self) -> frozenset[str]:
@@ -447,7 +463,7 @@ class SearchQuery:
 
         return frozenset(
             name
-            for name in ("text", "area", "bbox", "time", "limit")
+            for name in ("text", "area", "bbox", "time", "format", "limit")
             if getattr(self, name) is not None
         )
 
@@ -459,8 +475,14 @@ class SearchQuery:
             area=self.area if "area" in supported else None,
             bbox=self.bbox if "bbox" in supported else None,
             time=self.time if "time" in supported else None,
+            format=self.format if "format" in supported else None,
             limit=self.limit if "limit" in supported else None,
         )
+
+    @property
+    def expanded_formats(self) -> frozenset[Format]:
+        """Return concrete canonical formats with presets expanded."""
+        return expand_formats(self.format or ())
 
     @property
     def text_terms(self) -> tuple[str, ...]:

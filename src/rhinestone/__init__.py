@@ -5,6 +5,7 @@ from . import sources
 from .api import Rhinestone, configure
 from .catalogs import Catalog
 from .models import Config, Provider, Resource, Result, SearchResult
+from .representations import Format, FormatPreset
 from .search import SearchResults
 
 search = _api.search
@@ -20,5 +21,7 @@ __all__ = [
     "SearchResult",
     "SearchResults",
     "Resource",
+    "Format",
+    "FormatPreset",
     "sources",
 ]

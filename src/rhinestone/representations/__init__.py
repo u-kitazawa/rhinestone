@@ -12,6 +12,7 @@ from .normalization import (
     container_from_media_type,
     format_from_media_type,
 )
+from .types import FORMAT_PRESETS, Format, FormatPreset, expand_formats
 
 __all__ = [
     "CANONICAL_FORMATS",
@@ -22,4 +23,8 @@ __all__ = [
     "canonical_format",
     "container_from_media_type",
     "format_from_media_type",
+    "FORMAT_PRESETS",
+    "Format",
+    "FormatPreset",
+    "expand_formats",
 ]

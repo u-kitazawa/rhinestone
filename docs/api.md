@@ -16,7 +16,7 @@ results = rs.search(text="河川", bbox=(139.5, 35.5, 140.0, 36.0), limit=10)
 resource = results[0].resolve()
 ```
 
-`text`、`area`、`bbox`、`time`、`limit`の意味と診断は`Rhinestone.search()`と同じです。
+`text`、`area`、`bbox`、`time`、`format`、`limit`の意味と診断は`Rhinestone.search()`と同じです。
 独自Provider、Credential、Source Runtime、NetworkPolicy、Adapterが必要な場合は
 `configure()`で独立したアプリケーションを作成します。
 
@@ -194,6 +194,7 @@ except ProviderMetadataError:
 ## 拡張・Adapter向けAPI
 
 通常利用のトップレベルAPIは、`search`、`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
+`Format`、`FormatPreset`、
 `Result`、`SearchResult`、`SearchResults`、`Resource`、`sources`に限定しています。
 Provider固有のSourceを実装したり、実行Adapter・Knowledge Adapterを追加したりする場合は、
 次のサブモジュールを正式な拡張surfaceとして利用してください。

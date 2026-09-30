@@ -18,6 +18,42 @@ from .errors import (
     ProviderResponseError,
 )
 from .models import Resource, Result, SearchDiagnostic, SearchExecution, SearchQuery
+from .representations import Format, canonical_format
+
+
+def _result_formats(result: Result) -> frozenset[Format]:
+    """Collect explicit canonical formats without inferring from URI suffixes."""
+    found: set[Format] = set()
+
+    def visit(value: Any, key: str | None = None) -> None:
+        if key == "format" and isinstance(value, str):
+            normalized = canonical_format(value)
+            if normalized is not None:
+                try:
+                    found.add(Format(normalized))
+                except ValueError:
+                    pass
+            return
+        if isinstance(value, Mapping):
+            mapping = cast(Mapping[Any, Any], value)
+            for child_key, child in mapping.items():
+                visit(child, str(child_key))
+        elif isinstance(value, tuple | list):
+            sequence = cast(tuple[Any, ...] | list[Any], value)
+            for child in sequence:
+                visit(child)
+
+    visit(result.target.settings)
+    visit(result.raw_metadata)
+    return frozenset(found)
+
+
+def _matches_format(result: Result, query: SearchQuery) -> bool:
+    requested = query.expanded_formats
+    available = _result_formats(result)
+    if available & requested:
+        return True
+    return not available and Format.UNKNOWN in requested
 
 
 class SearchResults(Sequence[Result]):
@@ -167,7 +203,14 @@ class SearchCoordinator:
                 )
 
         for adapter in searchable_adapters:
-            supported_conditions = frozenset(adapter.search_conditions)
+            supported_conditions = frozenset(
+                cast(Iterable[str], adapter.search_conditions)
+            )
+            native_format_search = "format" in supported_conditions
+            format_conditions: frozenset[str] = (
+                frozenset({"format"}) if query.format is not None else frozenset()
+            )
+            effective_conditions = supported_conditions | format_conditions
             projected_query = query
             area_handled = False
             if resolved_area is not None:
@@ -189,7 +232,7 @@ class SearchCoordinator:
                 else:
                     projected_query = replace(query, area=None)
 
-            unsupported_conditions = query.supplied_conditions - supported_conditions
+            unsupported_conditions = query.supplied_conditions - effective_conditions
             if area_handled:
                 unsupported_conditions -= {"area"}
             required_conditions = frozenset(
@@ -215,15 +258,24 @@ class SearchCoordinator:
                 continue
             if (
                 query.supplied_conditions
-                and not projected_query.supplied_conditions & supported_conditions
+                and not projected_query.supplied_conditions & effective_conditions
             ):
                 continue
             started = perf_counter()
             provider_results: tuple[Any, ...] = ()
             try:
-                provider_results = tuple(
-                    adapter.search(projected_query.project(supported_conditions))
-                )
+                adapter_query = projected_query.project(supported_conditions)
+                if query.format is not None and not native_format_search:
+                    adapter_query = replace(adapter_query, limit=None)
+                provider_results = tuple(adapter.search(adapter_query))
+                if query.format is not None and not native_format_search:
+                    provider_results = tuple(
+                        result
+                        for result in provider_results
+                        if _matches_format(result, query)
+                    )
+                    if query.limit is not None:
+                        provider_results = provider_results[: query.limit]
                 grouped_results[adapter.source_id] = provider_results
             except ProviderMetadataError:
                 diagnostics.append(
