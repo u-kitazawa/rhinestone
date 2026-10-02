@@ -12,7 +12,6 @@ from rhinestone.adapters.contracts import (
     ExecutionAdapterDefinition,
     SourceAdapterDefinition,
 )
-from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import AdapterRegistrationError
 from rhinestone.models import (
@@ -199,13 +198,6 @@ def test_custom_provider_credentials_are_authorized_by_default_policy() -> None:
 def test_unregistered_source_type_fails_during_context_composition() -> None:
     with pytest.raises(AdapterRegistrationError, match="unknown-source"):
         configure(catalog=Catalog((Provider("unknown", "unknown-source"),)))
-
-    with pytest.raises(AdapterRegistrationError, match="unknown-source"):
-        _build_source_adapter(  # pyright: ignore[reportPrivateUsage]
-            Provider("unknown", "unknown-source"),
-            {},
-            object(),  # type: ignore[arg-type]
-        )
 
 
 def test_builtin_and_custom_duplicate_types_are_rejected() -> None:
