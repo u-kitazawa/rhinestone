@@ -17,7 +17,14 @@ from .errors import (
     ProviderMetadataError,
     ProviderResponseError,
 )
-from .models import Resource, Result, SearchDiagnostic, SearchExecution, SearchQuery
+from .models import (
+    ProviderSearchResults,
+    Resource,
+    Result,
+    SearchDiagnostic,
+    SearchExecution,
+    SearchQuery,
+)
 from .representations import Format, canonical_format
 
 
@@ -253,7 +260,10 @@ class SearchCoordinator:
                 adapter_query = projected_query.project(supported_conditions)
                 if query.format is not None and not native_format_search:
                     adapter_query = replace(adapter_query, limit=None)
-                provider_results = tuple(adapter.search(adapter_query))
+                adapter_results = adapter.search(adapter_query)
+                provider_results = tuple(adapter_results)
+                if isinstance(adapter_results, ProviderSearchResults):
+                    diagnostics.extend(adapter_results.diagnostics)
                 if query.format is not None and not native_format_search:
                     provider_results = tuple(
                         result

@@ -161,6 +161,8 @@ iteration順は変わりません。Provider固有のrankingを扱う場合は�
 
 各Sourceは対応する条件だけを受け取ります。例えば`text`に対応するCKANと`bbox`に対応するSTACを構成している場合、両方を指定しても検索全体は失敗せず、各Sourceへ理解できる条件だけが渡されます。
 
+STAC検索では、`data` roleのassetが0件または複数件のItemを暗黙選択せず、Item単位でスキップします。`SearchResults.diagnostics`の`reason="item_skipped"`、`resource_identifier`、`detail`から対象Itemと理由を確認できます。
+
 適用されなかった条件は`results.diagnostics`で確認できます。
 
 ```python
