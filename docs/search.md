@@ -49,14 +49,15 @@ CKANに`ckanext-spatial`の`spatial_query`が導入されていることを確�
 される可能性があるため既定は無効です。
 
 ```python
+from rhinestone.catalogs import Catalog
 from rhinestone import Provider, configure
 
-app = configure(sources=(
+app = configure(catalog=Catalog((
     Provider("spatial-catalog", "ckan", {
         "endpoint": "https://example.org",
         "spatial_search": True,
     }),
-))
+)))
 results = app.search(text="河川", area="神奈川県")
 ```
 
@@ -147,7 +148,7 @@ Runtimeは `app.open(result, "gdal", runtime=gdal)` や `resource.open("rasterio
 ## 結果の順序
 
 単一Providerでは、iterationと整数indexingはProviderが返した順序をそのまま使います。
-複数Providerでは、`catalog`または`sources`へ構成したProvider順にgroupを連結し、
+複数Providerでは、`catalog`へ構成したProvider順にgroupを連結し、
 各group内ではProviderが返した順序を保ちます。したがって`results[0]`は最初に構成した
 Providerの先頭結果であり、Providerを横断した「最も関連度が高い結果」ではありません。
 

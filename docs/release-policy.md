@@ -24,7 +24,7 @@ Resolver、Registry、Adapterの内部実装は、公開ドキュメントで明
 ### 変更の扱い
 
 - 破壊的変更は`0.1.x`でも許容しますが、GitHub Release notesの`Removed / Breaking changes`または`Changed`に利用者への影響と移行方法を記載します。
-- deprecation periodは`0.1.x`の必須条件にしません。deprecated APIを導入する場合は`Deprecated`に対象、代替手段、削除予定または判断条件を記載します。
+- 過去のAPIを維持するための別名・wrapper・旧引数は残しません。変更時に旧APIを削除し、現行APIへ統一します。廃止猶予期間は設けません。
 - セキュリティ修正や設計上の緊急対応で段階的な廃止ができない場合も、変更の影響と必要な対応をRelease notesに記載します。
 - 内部実装の変更は、公開APIの挙動や利用者の設定・依存関係に影響しない限り、Release notesへの個別記載を必須にしません。
 
@@ -104,3 +104,46 @@ Adapter／Knowledge Adapter契約、`DestinationPolicy`、format定義・正規�
 `Provider`が通常利用における提供元定義の正式名です。`SourceDefinition`を使っていた設定例は
 `Provider`へ置き換えてください。0.1.xでもbreaking changeを許容する方針に基づき、0.2まで
 旧トップレベルimportを残す段階的廃止は行いません。
+
+
+後方互換用のAPIも削除しました。旧名や旧引数を受け付けるwrapperは提供しません。
+
+| 削除したAPI・利用方法 | 現行の利用方法 |
+| --- | --- |
+| `rhinestone.sources` と `sources.ALL` | `rhinestone.catalogs.BUILTIN`。Providerは `Provider.id` で選びます |
+| `SourceDefinition`（`rhinestone.models`を含む） | `Provider` |
+| `SearchResult`（`rhinestone.models`を含む） | `Result` |
+| `configure(sources=...)` / `Rhinestone(sources=...)` | `catalog=Catalog(providers)` |
+| `CatalogSource.definition` | `CatalogSource.provider` |
+| `rhinestone.adapters.source.ckan.canonical_format` / `ckan.format.canonical_format` | `rhinestone.representations.canonical_format` |
+| Adapterの `api_token` / `api_key` | `credential` に論理名を指定し、`credentials` に `CredentialRegistry` を渡します |
+| Adapterの `api_key_header` / `token_scheme` | `credential_header` / `credential_scheme` |
+| `tuple(bbox)` やBoundingBoxの反復 | `bbox.as_tuple()` |
+
+組み込みProviderを選ぶ例です。一覧の並び順には依存しません。
+
+```python
+from rhinestone import Catalog, configure
+from rhinestone.catalogs import BUILTIN
+
+app = configure(
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "gsi"),
+)
+```
+
+Adapterを直接構成する場合も、secretを直接渡す引数を使わず、認証情報をRegistryへ登録します。
+`configure()` では `credentials={"catalog-key": lambda: token}` のようにfactoryのmappingを渡します。
+
+```python
+from rhinestone.adapters.source.ckan import CkanAdapter
+from rhinestone.registry import CredentialRegistry
+
+adapter = CkanAdapter(
+    get_json=get_json,
+    endpoint="https://catalog.example",
+    credential="catalog-key",
+    credential_header="X-CKAN-API-Key",
+    credential_scheme="",
+    credentials=CredentialRegistry({"catalog-key": lambda: token}),
+)
+```

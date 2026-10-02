@@ -83,13 +83,12 @@ app = configure(
 | 引数 | 説明 |
 | --- | --- |
 | `catalog` | 利用するProviderのCatalog |
-| `sources` | `catalog`を使わない場合のProvider iterable。互換・高度な指定 |
 | `dependencies` | 検索・解決用のSource Runtime実体または`RuntimeFactory`。Execution Runtimeは受け付けない |
 | `credentials` | 認証情報を取得するfactory |
 | `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
 | `adapters` | `SourceAdapterDefinition`／`ExecutionAdapterDefinition`／`KnowledgeAdapterDefinition` の iterable。組み込みは自動登録され、独自定義だけを指定する |
 
-独自構成が必要なコードでは`catalog`を使ってください。`sources`はCatalogを使わない高度な指定として利用できます。
+独自構成が必要なコードでは`catalog`を使ってください。
 Source Runtimeの遅延読み込みには`RuntimeFactory(factory)`を指定します。Execution Runtimeは`open(..., runtime=...)`で実体を渡します。
 
 Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
@@ -238,7 +237,7 @@ except ProviderMetadataError:
 
 通常利用のトップレベルAPIは、`search`、`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
 `Format`、`FormatPreset`、
-`Result`、`SearchResult`、`SearchResults`、`Resource`、`sources`に限定しています。
+`Result`、`SearchResults`、`Resource`に限定しています。
 Provider固有のSourceを実装したり、実行Adapter・Knowledge Adapterを追加したりする場合は、
 次のサブモジュールを正式な拡張surfaceとして利用してください。
 
@@ -287,6 +286,6 @@ from rhinestone.models import RuntimeFactory
 ## 高度なモデル
 
 `Source`、`ResourceCandidate`、`AccessPlan`、`FileAccessPlan`、`RemoteDatasetPlan`、
-`ServiceQueryPlan`、`SearchQuery`、`SearchDiagnostic`、`SearchResult`は、
+`ServiceQueryPlan`、`SearchQuery`、`SearchDiagnostic`は、
 `rhinestone.models`経由で利用する拡張・Adapter向けモデルです。`Config`、`Provider`、
 `Result`、`Resource`は通常利用と拡張の両方で使う中核モデルです。

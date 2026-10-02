@@ -19,7 +19,7 @@ from rhinestone.catalogs import BUILTIN
 app = configure(catalog=BUILTIN)
 ```
 
-`BUILTIN`はリポジトリ管理のCatalogです。`rhinestone.sources`は組み込みProviderを名前で参照するための互換facadeであり、通常の中心概念ではありません。
+`BUILTIN`はリポジトリ管理のCatalogです。ProviderはこのCatalogから取得します。
 
 ### Provider（提供元）
 
@@ -38,7 +38,7 @@ resource = app.resolve(result)
 
 `result.discovered_by`や`result.target`は高度な情報です。提供元をまたいで検索する場合に、検索した場所と実際のデータの場所が異なることを表します。
 
-`SearchQuery`、`SearchResult`、`to_config()`は高度な内部パイプラインを扱うための名前です。通常の利用では検索パラメータと`Result`だけを使います。
+`SearchQuery`、`to_config()`は高度な内部パイプラインを扱うための名前です。通常の利用では検索パラメータと`Result`だけを使います。
 
 ### Resource（利用するデータ）
 

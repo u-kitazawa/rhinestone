@@ -5,9 +5,10 @@ import os
 from osgeo import gdal
 
 from rhinestone import Config, Provider, configure
+from rhinestone.catalogs import Catalog
 
 app = configure(
-    sources=(Provider("gsi-fundamental", "gsi-fundamental"),),
+    catalog=Catalog((Provider("gsi-fundamental", "gsi-fundamental"),)),
 )
 resource = app.resolve(
     Config(

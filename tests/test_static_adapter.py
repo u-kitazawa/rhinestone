@@ -8,9 +8,9 @@ import pytest
 from rhinestone import (
     Config,
     configure,
-    sources,
 )
 from rhinestone.adapters import StaticAdapter
+from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     ResourceNotFoundError,
@@ -148,7 +148,7 @@ def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
         return "dataset"
 
     app = configure(
-        sources=(sources.GSI,),
+        catalog=Catalog((BUILTIN[2],)),
     )
     resource = app.resolve(Config("gsi", {"id": "std"}))
 
@@ -163,7 +163,7 @@ def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
 
 def test_static_source_composes_through_public_api() -> None:
     source = Provider("catalog", "static", {"items": {"one": item()}})
-    app = configure(sources=(source,))
+    app = configure(catalog=Catalog((source,)))
 
     resource = app.resolve(Config("catalog", {"id": "one"}))
 
@@ -174,7 +174,7 @@ def test_static_source_composes_through_public_api() -> None:
 
 def test_static_source_requires_items_in_composition() -> None:
     with pytest.raises(ConfigValidationError, match="requires items"):
-        configure(sources=(Provider("catalog", "static"),))
+        configure(catalog=Catalog((Provider("catalog", "static"),)))
 
 
 def test_static_adapter_validates_capabilities_and_provenance_objects() -> None:

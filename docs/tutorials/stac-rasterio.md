@@ -26,6 +26,7 @@ asset keyはURLやファイル名から推測せず、Itemの `assets` に実在
 ## Itemとassetの選択、Rasterioへの受け渡し
 
 ```python
+from rhinestone.catalogs import Catalog
 import os
 
 import rasterio
@@ -38,13 +39,13 @@ collection_id = os.environ["RHINESTONE_STAC_COLLECTION_ID"]
 item_id = os.environ["RHINESTONE_STAC_ITEM_ID"]
 asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
 app = configure(
-    sources=(
+    catalog=Catalog((
         Provider(
             id="imagery",
             adapter_type="stac",
             settings={"endpoint": endpoint},
         ),
-    ),
+    )),
 )
 resource = app.resolve(
     Config(

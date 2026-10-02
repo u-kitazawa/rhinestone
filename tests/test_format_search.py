@@ -4,42 +4,48 @@ from typing import Any
 from rhinestone import Format, FormatPreset, Provider, configure
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.adapters.source.search_ckan_jp import SearchCkanJpAdapter
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery
 
 
 def _app():
     return configure(
-        sources=(
-            Provider(
-                "formats",
-                "static",
-                {
-                    "items": {
-                        "vector": {
-                            "metadata": {"title": "Vector"},
-                            "candidates": [
-                                {
-                                    "uri": "https://example.test/a.geojson",
-                                    "format": "GeoJSON",
-                                }
-                            ],
-                        },
-                        "table": {
-                            "metadata": {"title": "Table"},
-                            "candidates": [
-                                {"uri": "https://example.test/a.csv", "format": "csv"}
-                            ],
-                        },
-                        "unknown": {
-                            "metadata": {"title": "Unknown"},
-                            "candidates": [
-                                {"uri": "https://example.test/a", "format": None}
-                            ],
-                        },
-                    }
-                },
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "formats",
+                    "static",
+                    {
+                        "items": {
+                            "vector": {
+                                "metadata": {"title": "Vector"},
+                                "candidates": [
+                                    {
+                                        "uri": "https://example.test/a.geojson",
+                                        "format": "GeoJSON",
+                                    }
+                                ],
+                            },
+                            "table": {
+                                "metadata": {"title": "Table"},
+                                "candidates": [
+                                    {
+                                        "uri": "https://example.test/a.csv",
+                                        "format": "csv",
+                                    }
+                                ],
+                            },
+                            "unknown": {
+                                "metadata": {"title": "Unknown"},
+                                "candidates": [
+                                    {"uri": "https://example.test/a", "format": None}
+                                ],
+                            },
+                        }
+                    },
+                ),
+            )
         )
     )
 

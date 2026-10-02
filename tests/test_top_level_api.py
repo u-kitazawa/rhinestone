@@ -75,26 +75,28 @@ def test_top_level_result_resolves_with_its_standard_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     application = configure(
-        sources=(
-            Provider(
-                "gsi",
-                "static",
-                {
-                    "items": {
-                        "standard": {
-                            "metadata": {"title": "Standard map"},
-                            "candidates": [
-                                {
-                                    "uri": "https://example.test/{z}/{x}/{y}.png",
-                                    "format": "xyz-tiles",
-                                    "media_type": "image/png",
-                                }
-                            ],
-                            "capabilities": ["remote-dataset", "search"],
-                        },
-                    }
-                },
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "gsi",
+                    "static",
+                    {
+                        "items": {
+                            "standard": {
+                                "metadata": {"title": "Standard map"},
+                                "candidates": [
+                                    {
+                                        "uri": "https://example.test/{z}/{x}/{y}.png",
+                                        "format": "xyz-tiles",
+                                        "media_type": "image/png",
+                                    }
+                                ],
+                                "capabilities": ["remote-dataset", "search"],
+                            },
+                        }
+                    },
+                ),
+            )
         )
     )
     monkeypatch.setattr(api, "_default_application", lambda: application)
@@ -109,30 +111,32 @@ def test_top_level_result_resolves_with_its_standard_context(
 def test_configure_does_not_replace_the_standard_application(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    standard = configure(sources=())
+    standard = configure(catalog=Catalog(()))
     monkeypatch.setattr(api, "_default_application", lambda: standard)
 
     custom = configure(
-        sources=(
-            Provider(
-                "custom",
-                "static",
-                {
-                    "items": {
-                        "custom": {
-                            "metadata": {"title": "Custom"},
-                            "candidates": [
-                                {
-                                    "uri": "https://example.test/custom.csv",
-                                    "format": "csv",
-                                    "media_type": "text/csv",
-                                }
-                            ],
-                            "capabilities": ["remote-dataset", "search"],
+        catalog=Catalog(
+            (
+                Provider(
+                    "custom",
+                    "static",
+                    {
+                        "items": {
+                            "custom": {
+                                "metadata": {"title": "Custom"},
+                                "candidates": [
+                                    {
+                                        "uri": "https://example.test/custom.csv",
+                                        "format": "csv",
+                                        "media_type": "text/csv",
+                                    }
+                                ],
+                                "capabilities": ["remote-dataset", "search"],
+                            }
                         }
-                    }
-                },
-            ),
+                    },
+                ),
+            )
         )
     )
 

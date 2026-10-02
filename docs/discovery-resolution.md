@@ -43,12 +43,12 @@ discover
 
 今回の実装では、runtime-boundな`Resource`全体をそのままJSONやIntakeへ変換する公開APIは追加しません。portableな境界は次のdomain情報です。
 
-- `SearchResult.target`（解決先`Config`）
+- `Result.target`（解決先`Config`）
 - `Metadata`
 - `Provenance`
 - `AccessPlan`のprovider非依存な値
 
-Credential、runtime instance、`Resource._opener`はこの境界に含めません。`SearchResult`はtarget Configへ変換して別Sourceへ解決でき、解決後の`Resource`はtarget Sourceの`metadata` / `provenance` / `source.raw_metadata`を保持します。cross-sourceの場合は、発見側の`metadata` / `provenance` / `raw_metadata`を`Resource.discovery`へ別 record として保持し、target側の記録を上書きしません。JSON schemaやIntake exportは、複数Sourceで情報損失と利用価値を確認してから追加します。
+Credential、runtime instance、`Resource._opener`はこの境界に含めません。`Result`はtarget Configへ変換して別Sourceへ解決でき、解決後の`Resource`はtarget Sourceの`metadata` / `provenance` / `source.raw_metadata`を保持します。cross-sourceの場合は、発見側の`metadata` / `provenance` / `raw_metadata`を`Resource.discovery`へ別 record として保持し、target側の記録を上書きしません。JSON schemaやIntake exportは、複数Sourceで情報損失と利用価値を確認してから追加します。
 
 ## 直列化／Intake出力の評価
 
@@ -83,4 +83,4 @@ STAC、CKANの現在のResourceを、JSON round-tripとIntakeの`driver / args /
 4. STAC、CKAN、PLATEAUの少なくとも3種で、保持する情報と意図的に捨てる情報をfixtureで比較できる。
 5. Intake exportでは、既存driverへ有意味に委譲でき、Rhinestone固有のresolution情報をmetadataへ退避するだけにならない。
 
-それまでは、`SearchResult.target`を別contextで再解決する既存経路と、解決済みResourceから専門runtimeへ直接渡す経路を維持します。Intakeとの相互運用はURLの再包装ではなく、具体的なdriver integrationが実証されたSourceから個別に再評価します。
+それまでは、`Result.target`を別contextで再解決する既存経路と、解決済みResourceから専門runtimeへ直接渡す経路を維持します。Intakeとの相互運用はURLの再包装ではなく、具体的なdriver integrationが実証されたSourceから個別に再評価します。

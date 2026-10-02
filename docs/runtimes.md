@@ -115,16 +115,17 @@ python -m pip install rdflib
 ```
 
 ```python
+from rhinestone.catalogs import Catalog
 import rdflib
 
 from rhinestone import Provider, configure
 
 app = configure(
-    sources=(Provider(
+    catalog=Catalog((Provider(
         id="my-dcat",
         adapter_type="dcat",
         settings={"catalog_uri": "https://example.test/catalog.ttl"},
-    ),),
+    ),)),
     dependencies={"rdflib": rdflib},
 )
 results = app.search(text="dataset")

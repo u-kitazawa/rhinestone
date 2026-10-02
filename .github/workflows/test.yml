@@ -28,4 +28,4 @@ jobs:
           python -m venv "$wheel_venv"
           "$wheel_venv/bin/python" -m pip install --upgrade pip
           "$wheel_venv/bin/python" -m pip install dist/*.whl
-          "$wheel_venv/bin/python" -c "from rhinestone import sources; assert sources.GSI.settings['items']['std']['metadata']['raw']['url'].endswith('/std/{z}/{x}/{y}.png')"
+          "$wheel_venv/bin/python" -c "from rhinestone.catalogs import BUILTIN; gsi = next(provider for provider in BUILTIN if provider.id == 'gsi'); assert gsi.settings['items']['std']['metadata']['raw']['url'].endswith('/std/{z}/{x}/{y}.png')"

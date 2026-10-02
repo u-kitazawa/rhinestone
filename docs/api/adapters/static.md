@@ -16,5 +16,5 @@ Config("gsi", {"id": "std"})
 定義はHTTP通信、runtime dependency、credentialを使わず、同じ設定から常に同じ
 `Source` と `AccessPlan` を生成します。検索条件は `text` と `limit` です。
 
-標準の国土地理院タイル定義は `sources.GSI` に含まれます。定義にはURL、形式、
+標準の国土地理院タイル定義は `BUILTIN`内の`gsi` Provider に含まれます。定義にはURL、形式、
 ズーム範囲、帰属表示、利用条件URL、仕様確認日を含みます。

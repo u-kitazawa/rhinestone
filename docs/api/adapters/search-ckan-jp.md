@@ -7,7 +7,7 @@
 
 ## 設定と検索
 
-組み込みCatalogの `sources.SEARCH_CKAN_JP` に検索先が定義されています。検索には `text`
+組み込みCatalogの `BUILTIN内のsearch-ckan-jp Provider` に検索先が定義されています。検索には `text`
 が必須で、`format`と`limit`を指定できます。形式はBackend APIへ送らず、Adapter内で
 対象Resourceごとに照合します。`limit` はBackend APIへの package 件数だけでなく、
 形式照合後の最終結果にも適用されます。先頭 page に十分な
@@ -15,9 +15,11 @@ Resource がなければ、response の `count` を根拠に `start` で次 page
 `limit=None` では provider の既定 page を超えて走査しません。
 
 ```python
-from rhinestone import configure, sources
+from rhinestone.catalogs import BUILTIN
+from rhinestone.catalogs import Catalog
+from rhinestone import configure
 
-app = configure(sources=(sources.SEARCH_CKAN_JP,))
+app = configure(catalog=Catalog(provider for provider in BUILTIN if provider.id == "search-ckan-jp"))
 results = app.search(text="河川", limit=10)
 ```
 

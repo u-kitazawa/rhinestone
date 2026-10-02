@@ -9,6 +9,7 @@ from rhinestone.adapters.source.mlit_dpf import MlitDpfAdapter
 from rhinestone.api import (
     _validate_mlit_dpf_targets,  # pyright: ignore[reportPrivateUsage]
 )
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     ExecutionAdapterUnavailableError,
@@ -263,17 +264,19 @@ def test_load_is_explicitly_unsupported() -> None:
 
 def test_time_is_reported_as_unsupported_search_diagnostic() -> None:
     app = configure(
-        sources=(
-            Provider(
-                "dpf",
-                "mlit-dpf",
-                {
-                    "endpoint": "https://data-platform.mlit.go.jp/api/v1",
-                    "credential": "mlit-dpf",
-                    "target_rules": [],
-                    "representations": {},
-                },
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {
+                        "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+                        "credential": "mlit-dpf",
+                        "target_rules": [],
+                        "representations": {},
+                    },
+                ),
+            )
         ),
         credentials={"mlit-dpf": lambda: "secret"},
     )
@@ -304,17 +307,19 @@ def test_direct_result_resolves_with_discovery_and_requires_explicit_runtime(
 
     monkeypatch.setattr(_http, "post_json", post_json)
     app = configure(
-        sources=(
-            Provider(
-                "dpf",
-                "mlit-dpf",
-                {
-                    "endpoint": "https://data-platform.mlit.go.jp/api/v1",
-                    "credential": "mlit-dpf",
-                    "target_rules": [],
-                    "representations": {"dataset-1": {"format": "gpkg"}},
-                },
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {
+                        "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+                        "credential": "mlit-dpf",
+                        "target_rules": [],
+                        "representations": {"dataset-1": {"format": "gpkg"}},
+                    },
+                ),
+            )
         ),
         credentials={"mlit-dpf": lambda: "secret-value"},
     )
@@ -343,107 +348,117 @@ def test_configure_rejects_unknown_and_self_delegation_targets() -> None:
     }
     with pytest.raises(ConfigValidationError, match="unconfigured source"):
         configure(
-            sources=(
-                Provider(
-                    "dpf",
-                    "mlit-dpf",
-                    {
-                        **settings,
-                        "target_rules": [
-                            {
-                                "catalog_id": "c",
-                                "source_id": "missing",
-                                "settings": {"id": {"record": "id"}},
-                            }
-                        ],
-                    },
-                ),
+            catalog=Catalog(
+                (
+                    Provider(
+                        "dpf",
+                        "mlit-dpf",
+                        {
+                            **settings,
+                            "target_rules": [
+                                {
+                                    "catalog_id": "c",
+                                    "source_id": "missing",
+                                    "settings": {"id": {"record": "id"}},
+                                }
+                            ],
+                        },
+                    ),
+                )
             )
         )
     with pytest.raises(ConfigValidationError, match="itself"):
         configure(
-            sources=(
-                Provider(
-                    "dpf",
-                    "mlit-dpf",
-                    {
-                        **settings,
-                        "target_rules": [
-                            {
-                                "catalog_id": "c",
-                                "source_id": "dpf",
-                                "settings": {"id": {"record": "id"}},
-                            }
-                        ],
-                    },
-                ),
+            catalog=Catalog(
+                (
+                    Provider(
+                        "dpf",
+                        "mlit-dpf",
+                        {
+                            **settings,
+                            "target_rules": [
+                                {
+                                    "catalog_id": "c",
+                                    "source_id": "dpf",
+                                    "settings": {"id": {"record": "id"}},
+                                }
+                            ],
+                        },
+                    ),
+                )
             )
         )
     with pytest.raises(ConfigValidationError, match="must not target direct"):
         configure(
-            sources=(
-                Provider(
-                    "dpf",
-                    "mlit-dpf",
-                    {
-                        **settings,
-                        "target_rules": [
-                            {
-                                "catalog_id": "c",
-                                "source_id": "direct",
-                                "settings": {"uri": {"record": "id"}},
-                            }
-                        ],
-                    },
-                ),
+            catalog=Catalog(
+                (
+                    Provider(
+                        "dpf",
+                        "mlit-dpf",
+                        {
+                            **settings,
+                            "target_rules": [
+                                {
+                                    "catalog_id": "c",
+                                    "source_id": "direct",
+                                    "settings": {"uri": {"record": "id"}},
+                                }
+                            ],
+                        },
+                    ),
+                )
             )
         )
     with pytest.raises(ConfigValidationError, match="discovery-only Provider"):
         configure(
-            sources=(
-                Provider(
-                    "dpf-a",
-                    "mlit-dpf",
-                    {
-                        **settings,
-                        "target_rules": [
-                            {
-                                "catalog_id": "c",
-                                "source_id": "dpf-b",
-                                "settings": {"id": {"record": "id"}},
-                            }
-                        ],
-                    },
-                ),
-                Provider(
-                    "dpf-b",
-                    "mlit-dpf",
-                    {**settings, "target_rules": []},
-                ),
+            catalog=Catalog(
+                (
+                    Provider(
+                        "dpf-a",
+                        "mlit-dpf",
+                        {
+                            **settings,
+                            "target_rules": [
+                                {
+                                    "catalog_id": "c",
+                                    "source_id": "dpf-b",
+                                    "settings": {"id": {"record": "id"}},
+                                }
+                            ],
+                        },
+                    ),
+                    Provider(
+                        "dpf-b",
+                        "mlit-dpf",
+                        {**settings, "target_rules": []},
+                    ),
+                )
             )
         )
     with pytest.raises(ConfigValidationError, match="discovery-only Provider"):
         configure(
-            sources=(
-                Provider(
-                    "dpf",
-                    "mlit-dpf",
-                    {
-                        **settings,
-                        "target_rules": [
-                            {
-                                "catalog_id": "c",
-                                "source_id": "search",
-                                "settings": {"id": {"record": "id"}},
-                            }
-                        ],
-                    },
-                ),
-                Provider(
-                    "search",
-                    "search-ckan-jp",
-                    {"endpoint": "https://search.ckan.jp/backend/api"},
-                ),
+            catalog=Catalog(
+                (
+                    Provider(
+                        "dpf",
+                        "mlit-dpf",
+                        {
+                            **settings,
+                            "target_rules": [
+                                {
+                                    "catalog_id": "c",
+                                    "source_id": "search",
+                                    "settings": {"id": {"record": "id"}},
+                                }
+                            ],
+                        },
+                    ),
+                    Provider(
+                        "search",
+                        "search-ckan-jp",
+                        {"endpoint": "https://search.ckan.jp/backend/api"},
+                    ),
+                )
             )
         )
 
@@ -591,17 +606,19 @@ def test_source_transport_failure_is_metadata_diagnostic_without_secret(
 
     monkeypatch.setattr(_http, "post_json", fail)
     app = configure(
-        sources=(
-            Provider(
-                "dpf",
-                "mlit-dpf",
-                {
-                    "endpoint": "https://data-platform.mlit.go.jp/api/v1",
-                    "credential": "mlit-dpf",
-                    "target_rules": [],
-                    "representations": {},
-                },
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {
+                        "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+                        "credential": "mlit-dpf",
+                        "target_rules": [],
+                        "representations": {},
+                    },
+                ),
+            )
         ),
         credentials={"mlit-dpf": lambda: "secret-value"},
     )
@@ -614,17 +631,19 @@ def test_source_transport_failure_is_metadata_diagnostic_without_secret(
 
 def test_missing_default_dpf_credential_is_isolated_as_search_diagnostic() -> None:
     app = configure(
-        sources=(
-            Provider(
-                "dpf",
-                "mlit-dpf",
-                {
-                    "endpoint": "https://data-platform.mlit.go.jp/api/v1",
-                    "credential": "mlit-dpf",
-                    "target_rules": [],
-                    "representations": {},
-                },
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {
+                        "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+                        "credential": "mlit-dpf",
+                        "target_rules": [],
+                        "representations": {},
+                    },
+                ),
+            )
         )
     )
 

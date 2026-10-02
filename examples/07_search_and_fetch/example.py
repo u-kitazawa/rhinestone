@@ -2,10 +2,13 @@
 
 import os
 
-from rhinestone import configure, sources
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.models import SearchQuery
 
-app = configure(sources=(sources.GEOSPATIAL_JP,))
+app = configure(
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "geospatial-jp")
+)
 grouped = app.search(
     SearchQuery(text=os.environ.get("RHINESTONE_QUERY", "人口"), limit=3)
 )

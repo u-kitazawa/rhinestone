@@ -102,7 +102,7 @@ HTTP通信はRhinestoneに組み込まれています。
 ## APIの段階
 
 通常の利用では、トップレベルの`search`を使います。高度な構成では`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
-`Format`、`FormatPreset`、`Result`、`SearchResults`、`Resource`、`sources`を使います。`Source`、`AccessPlan`、
+`Result`、`SearchResults`、`Resource`、`Format`、`FormatPreset`を使います。`Source`、`AccessPlan`、
 `Metadata`、`Provenance`、Runtime、Adapter、Registryなどを扱う拡張コードは、用途別の
 サブモジュールからimportします。詳しくは[APIリファレンス](docs/api.md)の
 [拡張・Adapter向けAPI](docs/api.md#拡張-adapter向けapi)を参照してください。

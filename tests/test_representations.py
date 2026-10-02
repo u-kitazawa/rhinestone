@@ -2,7 +2,6 @@ from typing import Any
 
 import pytest
 
-from rhinestone.adapters.source.ckan import canonical_format as ckan_canonical_format
 from rhinestone.representations import (
     CANONICAL_FORMATS,
     CONTAINER_MEDIA_TYPES,
@@ -70,14 +69,11 @@ def test_container_media_type_is_kept_separate_from_payload_format(
     assert format_from_media_type(value) is None
 
 
-def test_representation_definitions_are_immutable_and_legacy_ckan_import_is_compatible() -> (
-    None
-):
+def test_representation_definitions_are_immutable() -> None:
     assert FORMAT_ALIASES["geopackage"] == "gpkg"
     assert MEDIA_TYPE_FORMATS["image/tiff"] == "geotiff"
     assert CONTAINER_MEDIA_TYPES["application/zip"] == "zip"
     assert "gpkg" in CANONICAL_FORMATS
     assert FORMAT_CATEGORIES["gpkg"] == "vector"
-    assert ckan_canonical_format("GeoPackage") == canonical_format("GeoPackage")
     with pytest.raises(TypeError):
         FORMAT_ALIASES["new"] = "format"  # type: ignore[index]

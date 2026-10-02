@@ -157,6 +157,7 @@ app = configure(
 secretはCatalogやProviderに保存せず、Credential factoryとして渡します。
 
 ```python
+from rhinestone.catalogs import BUILTIN
 app = configure(
     catalog=BUILTIN,
     credentials={
@@ -190,8 +191,8 @@ ODPTでは`endpoint + resource_types`だけが対象です。`none`では宛先�
 
 Adapterを直接構築する既存コードでは、明示的に作成した`DestinationPolicy(rules=...)`の
 ruleをCredential付き通信にも引き続き利用できます。`from_catalog()`で生成したpolicyは、
-Providerの実行endpointからCredential専用ruleを生成します。Catalogに論理Credential名を
-持たないProviderでも、直接指定した`api_token`／`api_key`はその実行endpointだけへ送信できます。
+Providerの実行endpointからCredential専用ruleを生成します。認証情報は論理名を指定し、
+CredentialRegistryへ登録したfactoryから取得します。`api_token`／`api_key`は受け付けません。
 
 ## 高度なAPI
 

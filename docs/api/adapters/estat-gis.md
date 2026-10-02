@@ -17,10 +17,11 @@ ZIP 配布物は `archive="zip"` と安全な相対 `entry_point` を明示し�
 ## 設定例
 
 ```python
+from rhinestone.catalogs import Catalog
 from rhinestone import Config, Provider, configure
 
 app = configure(
-    sources=(
+    catalog=Catalog((
         Provider(
             "estat",
             "estat-gis",
@@ -40,7 +41,7 @@ app = configure(
                 ]
             },
         ),
-    )
+    ))
 )
 
 resource = app.resolve(

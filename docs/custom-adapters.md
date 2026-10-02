@@ -88,6 +88,7 @@ Source Definition の `dependencies` に Runtime 名を宣言すると、その�
 Context に渡されます。
 
 ```python
+from rhinestone.catalogs import Catalog
 from rhinestone.adapters.contracts import SourceAdapterDefinition
 from rhinestone.models import RuntimeFactory
 
@@ -98,7 +99,7 @@ definition = SourceAdapterDefinition(
 )
 
 app = configure(
-    sources=(Provider("catalog", "rdf-source"),),
+    catalog=Catalog((Provider("catalog", "rdf-source"),)),
     adapters=(definition,),
     dependencies={"rdflib": RuntimeFactory(load_rdflib)},
 )

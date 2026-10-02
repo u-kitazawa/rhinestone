@@ -9,8 +9,8 @@ from ....models import (
     Metadata,
     Provenance,
     ResourceCandidate,
+    Result,
     SearchQuery,
-    SearchResult,
     Source,
 )
 from ....registry import CredentialRegistry
@@ -30,9 +30,6 @@ class OgcFeaturesAdapter(ProviderAdapter):
         get_json: JsonTransport,
         endpoint: str | None = None,
         collection_id: str | None = None,
-        api_token: str | None = None,
-        api_key: str | None = None,
-        api_key_header: str = "X-API-Key",
         credential: str | None = None,
         credential_header: str | None = None,
         credential_scheme: str | None = None,
@@ -43,9 +40,6 @@ class OgcFeaturesAdapter(ProviderAdapter):
         super().__init__(
             get_json=get_json,
             endpoint=endpoint,
-            api_token=api_token,
-            api_key=api_key,
-            api_key_header=api_key_header,
             credential=credential,
             credential_header=credential_header,
             credential_scheme=credential_scheme,
@@ -95,7 +89,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
             raw_metadata=collection,
         )
 
-    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
         """Search one configured OGC collection using standard parameters."""
         endpoint = self._endpoint_from({}, self._endpoint)
         if not self._collection_id:
@@ -110,13 +104,13 @@ class OgcFeaturesAdapter(ProviderAdapter):
         items_url = f"{endpoint}/collections/{collection_path}/items"
         response = self._request(items_url, params)
         features = self._objects(response.get("features"), "OGC features")
-        found: list[SearchResult] = []
+        found: list[Result] = []
         for feature in features:
             feature_id = self._required_string(feature, "id")
             properties = self._object(feature.get("properties"), "OGC properties")
             title = _feature_title(properties, feature_id)
             found.append(
-                SearchResult(
+                Result(
                     title=title,
                     description=_optional_string(properties.get("description")),
                     discovered_by=self.adapter_type,

@@ -12,7 +12,7 @@ Rhinestoneは、日本の公的・地理空間データを使える形へ解決�
 - Source固有の知識はSource AdapterまたはCatalogに閉じ込める。
 - URLの推測、暗黙のフォーマット変換、HTML scrapingを追加しない。
 - 振る舞いを変更した場合は、テスト、仕様、またはドキュメントも更新する。
-- 公開APIを変更する場合は、後方互換性の要否と影響をPRに明記する。
+- 公開APIを変更する場合は旧APIを削除し、影響と移行先をPRに明記する。後方互換のための別名、wrapper、旧引数は追加しない。
 
 Source Adapterを追加・変更する場合は、代表的なFixture、期待されるSource・Resource・AccessPlan、仕様適合テストを一緒に追加してください。組み込みSourceの接続先や静的な仕様は、可能な限りCatalogで管理します。
 

@@ -13,8 +13,8 @@ from rhinestone import (
     Provider,
     Result,
     configure,
-    sources,
 )
+from rhinestone.catalogs import BUILTIN
 from rhinestone.errors import (
     AdapterRegistrationError,
     ConfigValidationError,
@@ -45,12 +45,10 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
         "Provider",
         "Config",
         "Result",
-        "SearchResult",
         "SearchResults",
         "Resource",
         "Format",
         "FormatPreset",
-        "sources",
     ]
     removed = (
         "Source",
@@ -67,6 +65,8 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
         "DestinationPolicy",
         "canonical_format",
         "SourceDefinition",
+        "SearchResult",
+        "sources",
     )
     assert all(not hasattr(rhinestone, name) for name in removed)
 
@@ -128,7 +128,7 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
     monkeypatch.setattr(_http, "get_json", get_json)
     runtime = FakeRasterio("opened")
     app = configure(
-        sources=(Provider("imagery", "stac", {"endpoint": endpoint}),),
+        catalog=Catalog((Provider("imagery", "stac", {"endpoint": endpoint}),)),
     )
     resource = app.resolve(
         Config(
@@ -149,21 +149,21 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
 
 
 def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
-    assert isinstance(sources.ALL, tuple)
-    assert sources.ALL == (
-        sources.GEOSPATIAL_JP,
-        sources.PLATEAU,
-        sources.GSI,
-        sources.ODPT,
-        sources.MLIT_DPF,
-        sources.SEARCH_CKAN_JP,
+    assert isinstance(BUILTIN.providers, tuple)
+    assert BUILTIN.providers == (
+        BUILTIN[0],
+        BUILTIN[1],
+        BUILTIN[2],
+        BUILTIN[3],
+        BUILTIN[4],
+        BUILTIN[5],
     )
-    assert all(isinstance(source, Provider) for source in sources.ALL)
-    assert all(source.id != "direct" for source in sources.ALL)
+    assert all(isinstance(source, Provider) for source in BUILTIN.providers)
+    assert all(source.id != "direct" for source in BUILTIN.providers)
 
 
 def test_source_definitions_do_not_store_runtime_or_secret_values() -> None:
-    for source in sources.ALL:
+    for source in BUILTIN.providers:
         assert "credentials" not in source.settings
         assert "dependencies" not in source.settings
         assert "app_id" not in source.settings
@@ -176,7 +176,7 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
     credential_calls: list[bool] = []
 
     configure(
-        sources=sources.ALL,
+        catalog=Catalog(BUILTIN.providers),
         dependencies={"rdflib": RuntimeFactory(lambda: dependency_calls.append(True))},
         credentials={"odpt": lambda: credential_calls.append(True) or "secret"},
     )
@@ -186,7 +186,7 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
 
 
 def test_configure_one_source_only_enables_that_source_and_direct() -> None:
-    app = configure(sources=(sources.GSI,))
+    app = configure(catalog=Catalog((BUILTIN[2],)))
 
     assert app.resolve(Config("gsi", {"id": "std"})).provenance.provider == "gsi"
     assert app.resolve(direct_config()).provenance.provider == "direct"
@@ -252,7 +252,7 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     monkeypatch.setattr(_http, "get_json", get_json)
     first = Provider("catalog-a", "ckan", {"endpoint": "https://first.test"})
     second = Provider("catalog-b", "ckan", {"endpoint": "https://second.test"})
-    app = configure(sources=(first, second))
+    app = configure(catalog=Catalog((first, second)))
 
     grouped = app.search(SearchQuery(text="dataset", limit=1))
 
@@ -298,7 +298,7 @@ def test_discovery_result_resolves_through_a_different_target_source(
         return cast(dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
 
     monkeypatch.setattr(_http, "get_json", get_json)
-    app = configure(sources=(sources.SEARCH_CKAN_JP,))
+    app = configure(catalog=Catalog((BUILTIN[5],)))
 
     result = app.search(text="river", limit=1)[0]
     resource = app.resolve(result)
@@ -325,7 +325,7 @@ def test_discovery_result_resolves_through_a_different_target_source(
 
 def test_public_search_reports_unsupported_conditions_per_source() -> None:
     source = Provider("catalog", "ckan", {"endpoint": "https://example.test"})
-    app = configure(sources=(source,))
+    app = configure(catalog=Catalog((source,)))
 
     results = app.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
 
@@ -353,9 +353,11 @@ def test_public_search_isolates_builtin_malformed_json_response(
 
     monkeypatch.setattr(_http, "urlopen", open_url)
     app = configure(
-        sources=(
-            Provider("broken", "ckan", {"endpoint": "https://broken.test"}),
-            Provider("healthy", "ckan", {"endpoint": "https://healthy.test"}),
+        catalog=Catalog(
+            (
+                Provider("broken", "ckan", {"endpoint": "https://broken.test"}),
+                Provider("healthy", "ckan", {"endpoint": "https://healthy.test"}),
+            )
         )
     )
 
@@ -379,7 +381,7 @@ def test_public_search_skips_search_ckan_jp_without_required_text(
         raise AssertionError("search-ckan.jp must be skipped without text")
 
     monkeypatch.setattr(_http, "get_json", fail_if_called)
-    app = configure(sources=(sources.SEARCH_CKAN_JP,))
+    app = configure(catalog=Catalog((BUILTIN[5],)))
 
     results = app.search(bbox=(139.0, 35.0, 140.0, 36.0), limit=10)
 
@@ -413,25 +415,27 @@ def test_invalid_public_search_parameters_fail_before_provider_requests(
 
     monkeypatch.setattr(_http, "get_json", get_json)
     app = configure(
-        sources=(
-            Provider("ckan", "ckan", {"endpoint": "https://ckan.test"}),
-            Provider("stac", "stac", {"endpoint": "https://stac.test"}),
-            Provider(
-                "static",
-                "static",
-                {
-                    "items": {
-                        "one": {
-                            "candidates": [
-                                {
-                                    "uri": "https://example.test/one.geojson",
-                                    "format": "geojson",
-                                }
-                            ]
+        catalog=Catalog(
+            (
+                Provider("ckan", "ckan", {"endpoint": "https://ckan.test"}),
+                Provider("stac", "stac", {"endpoint": "https://stac.test"}),
+                Provider(
+                    "static",
+                    "static",
+                    {
+                        "items": {
+                            "one": {
+                                "candidates": [
+                                    {
+                                        "uri": "https://example.test/one.geojson",
+                                        "format": "geojson",
+                                    }
+                                ]
+                            }
                         }
-                    }
-                },
-            ),
+                    },
+                ),
+            )
         )
     )
 
@@ -443,17 +447,17 @@ def test_invalid_public_search_parameters_fail_before_provider_requests(
 
 def test_duplicate_source_id_is_rejected_during_configuration() -> None:
     with pytest.raises(AdapterRegistrationError, match="registered more than once"):
-        configure(sources=(sources.GSI, sources.GSI))
+        configure(catalog=Catalog((BUILTIN[2], BUILTIN[2])))
 
 
 def test_direct_source_id_is_reserved() -> None:
     with pytest.raises(AdapterRegistrationError, match="direct"):
-        configure(sources=(Provider("direct", "static"),))
+        configure(catalog=Catalog((Provider("direct", "static"),)))
 
 
 def test_unknown_built_in_adapter_type_is_rejected() -> None:
     with pytest.raises(AdapterRegistrationError, match="unknown"):
-        configure(sources=(Provider("custom", "unknown"),))
+        configure(catalog=Catalog((Provider("custom", "unknown"),)))
 
 
 def test_open_calls_use_the_supplied_runtime_instance() -> None:
@@ -530,11 +534,11 @@ def test_legacy_provider_composition_api_is_not_public() -> None:
 
 
 def test_catalog_provider_and_result_are_the_short_public_path() -> None:
-    catalog = Catalog((sources.GSI,))
+    catalog = Catalog((BUILTIN[2],))
     app = configure(catalog=catalog)
 
-    assert isinstance(sources.GSI, Provider)
-    assert tuple(catalog) == (sources.GSI,)
+    assert isinstance(BUILTIN[2], Provider)
+    assert tuple(catalog) == (BUILTIN[2],)
     result = app.search(text="標準", limit=1)[0]
     resource = app.resolve(result)
 
@@ -542,9 +546,10 @@ def test_catalog_provider_and_result_are_the_short_public_path() -> None:
     assert resource.provenance.provider == "gsi"
 
 
-def test_catalog_and_provider_selection_conflicts_are_rejected() -> None:
-    with pytest.raises(TypeError, match="either catalog or sources"):
-        configure(sources=(sources.GSI,), catalog=Catalog((sources.GSI,)))
+def test_removed_sources_argument_is_rejected() -> None:
+    with pytest.raises(TypeError, match="sources"):
+        kwargs: dict[str, Any] = {"sources": BUILTIN.providers}
+        configure(**kwargs)
 
 
 def test_search_parameters_and_open_shortcuts_are_supported() -> None:
@@ -576,3 +581,15 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
         app.open(result, "rasterio", runtime=runtime)
         == "runtime:https://example.test/dataset.tif"
     )
+
+
+def test_removed_compatibility_modules_and_model_aliases_are_unavailable() -> None:
+    import importlib
+
+    from rhinestone import models
+
+    for module in ("rhinestone.sources", "rhinestone.adapters.source.ckan.format"):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(module)
+    assert not hasattr(models, "SourceDefinition")
+    assert not hasattr(models, "SearchResult")

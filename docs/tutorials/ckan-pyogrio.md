@@ -20,14 +20,16 @@ distributionを選べる検索語を指定してください。ZIP Shapefile を
 ## 検索、distribution選択、pyogrioへの受け渡し
 
 ```python
+from rhinestone.catalogs import BUILTIN
+from rhinestone.catalogs import Catalog
 import os
 
 import pyogrio
 
-from rhinestone import FormatPreset, configure, sources
+from rhinestone import FormatPreset, configure
 
 app = configure(
-    sources=(sources.GEOSPATIAL_JP,),
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "geospatial-jp"),
 )
 results = app.search(
     text=os.environ.get("RHINESTONE_CKAN_QUERY", "河川"),

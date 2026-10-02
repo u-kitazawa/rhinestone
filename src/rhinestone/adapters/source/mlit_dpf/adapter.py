@@ -12,7 +12,7 @@ from ....errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from ....models import Config, Metadata, Provenance, SearchQuery, SearchResult, Source
+from ....models import Config, Metadata, Provenance, Result, SearchQuery, Source
 from ....registry import CredentialRegistry
 from ....representations import canonical_format
 from ..base import ProviderAdapter
@@ -62,7 +62,7 @@ class MlitDpfAdapter(ProviderAdapter):
             "mlit-dpf is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
         """Search DPF, preferring explicit native-source delegation."""
         limit = DEFAULT_LIMIT if query.limit is None else query.limit
         if limit == 0:
@@ -87,7 +87,7 @@ class MlitDpfAdapter(ProviderAdapter):
                 "MLIT DPF searchResults must be an array; response shape is invalid"
             )
         parameters = _query_parameters(query, limit)
-        found: list[SearchResult] = []
+        found: list[Result] = []
         for value in cast(list[Any], records):
             record = _object(value, "MLIT DPF search record")
             found.extend(self._record_results(record, parameters))
@@ -95,7 +95,7 @@ class MlitDpfAdapter(ProviderAdapter):
 
     def _record_results(
         self, record: JsonObject, parameters: Mapping[str, Any]
-    ) -> tuple[SearchResult, ...]:
+    ) -> tuple[Result, ...]:
         data_id = _required_record_string(record, "id")
         dataset_id = _required_record_string(record, "dataset_id")
         catalog_id = _required_record_string(record, "catalog_id")
@@ -122,7 +122,7 @@ class MlitDpfAdapter(ProviderAdapter):
         target = self._native_target(record, metadata_values, catalog_id, dataset_id)
         if target is not None:
             return (
-                SearchResult(
+                Result(
                     title=title,
                     description=None,
                     discovered_by=self.adapter_type,
@@ -144,7 +144,7 @@ class MlitDpfAdapter(ProviderAdapter):
             raise ProviderResponseError(
                 "MLIT DPF DPF:downloadURLs must be an array of URL strings"
             )
-        results: list[SearchResult] = []
+        results: list[Result] = []
         for uri in cast(list[str], urls):
             if not is_valid_http_authority(uri) or urlsplit(
                 uri
@@ -161,7 +161,7 @@ class MlitDpfAdapter(ProviderAdapter):
                 if name in representation:
                     settings[name] = representation[name]
             results.append(
-                SearchResult(
+                Result(
                     title=title,
                     description=None,
                     discovered_by=self.adapter_type,

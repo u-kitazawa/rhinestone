@@ -6,7 +6,6 @@ belong to the adapter that has the relevant advertised capability.
 """
 
 import re
-from collections.abc import Iterator
 from dataclasses import dataclass
 from math import isfinite
 from typing import Literal, cast
@@ -108,10 +107,6 @@ class BoundingBox:
 
     def as_tuple(self) -> tuple[float, float, float, float]:
         return (self.west, self.south, self.east, self.north)
-
-    def __iter__(self) -> Iterator[float]:
-        """Keep existing provider query serializers compatible with this value."""
-        return iter(self.as_tuple())
 
 
 @dataclass(frozen=True)

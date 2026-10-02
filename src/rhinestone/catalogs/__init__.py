@@ -75,12 +75,7 @@ class CatalogSource:
     """A built-in catalog entry pairing a display name with its Provider."""
 
     name: str
-    definition: Provider
-
-    @property
-    def provider(self) -> Provider:
-        """Return the Provider definition represented by this catalog entry."""
-        return self.definition
+    provider: Provider
 
 
 def load_source_catalog(
@@ -132,7 +127,7 @@ def load_source_catalog(
         entries.append(
             CatalogSource(
                 name=public_name,
-                definition=Provider(
+                provider=Provider(
                     id=raw_id,
                     adapter_type=adapter_type,
                     settings=settings,
@@ -146,7 +141,7 @@ def load_source_definitions(
     name: str = "sources.json",
 ) -> tuple[Provider, ...]:
     """Load built-in Source definitions in catalog order."""
-    return tuple(entry.definition for entry in load_source_catalog(name))
+    return tuple(entry.provider for entry in load_source_catalog(name))
 
 
 __all__ = [

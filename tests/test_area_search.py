@@ -11,6 +11,7 @@ from rhinestone.adapters.knowledge import (
     KnowledgeAdapterRegistry,
     StaticAdministrativeAreaAdapter,
 )
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     KnowledgeResolutionError,
@@ -147,7 +148,7 @@ def test_area_must_be_a_non_empty_string(area: object) -> None:
 
 
 def test_public_search_accepts_area_keyword() -> None:
-    results = configure(sources=()).search(area="神奈川県")
+    results = configure(catalog=Catalog(())).search(area="神奈川県")
 
     assert results.keys() == ()
 

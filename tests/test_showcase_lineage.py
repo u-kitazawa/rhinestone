@@ -41,7 +41,7 @@ def test_lineage_showcase_keeps_discovery_and_resolution_records_separate() -> N
     assert notebook["metadata"]["colab"]["name"] == LINEAGE_NOTEBOOK.name
     source = notebook_source(notebook)
     for marker in (
-        "sources.SEARCH_CKAN_JP",
+        'provider.id == "search-ckan-jp"',
         "item.discovered_by != item.target.source_id",
         "resource = app.resolve(result)",
         "resource.discovery is None",

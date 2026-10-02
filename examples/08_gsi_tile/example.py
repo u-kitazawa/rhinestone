@@ -2,10 +2,11 @@
 
 from osgeo import gdal
 
-from rhinestone import Config, configure, sources
+from rhinestone import Config, configure
+from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
-    sources=(sources.GSI,),
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "gsi"),
 )
 
 resource = app.resolve(Config("gsi", {"id": "std"}))

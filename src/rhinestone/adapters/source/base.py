@@ -54,10 +54,6 @@ class ProviderAdapter(ABC):
         self,
         get_json: JsonTransport,
         endpoint: str | None = None,
-        api_token: str | None = None,
-        api_key: str | None = None,
-        api_key_header: str = "X-API-Key",
-        token_scheme: str = "Bearer",
         credential: str | None = None,
         credential_header: str | None = None,
         credential_scheme: str | None = None,
@@ -69,25 +65,12 @@ class ProviderAdapter(ABC):
         self._endpoint = self._normalize_endpoint(endpoint) if endpoint else None
         if credential is not None and not credential:
             raise ConfigValidationError("credential must be a non-empty string")
-        if credential is not None and (api_token is not None or api_key is not None):
-            raise ConfigValidationError(
-                "Configure either credential or a direct API secret"
-            )
         self._credential_name = credential
         self._provider_id = provider_id
         self._credentials = credentials or CredentialRegistry({})
         self._destination_policy = (
             destination_policy or DestinationPolicy.unrestricted()
         )
-        if api_token is not None and api_key is not None:
-            raise ConfigValidationError(
-                "Configure either api_token or api_key, not both"
-            )
-        if api_token is not None and not api_token:
-            raise ConfigValidationError("api_token must be non-empty")
-        if api_key is not None and (not api_key or not api_key_header):
-            raise ConfigValidationError("api_key and api_key_header must be non-empty")
-        self._headers: dict[str, str] = {}
         self._credential_header = (
             "Authorization" if credential_header is None else credential_header
         )
@@ -97,16 +80,10 @@ class ProviderAdapter(ABC):
         ):
             raise ConfigValidationError("credential_header must be non-empty")
         if credential is not None:
-            scheme = token_scheme if credential_scheme is None else credential_scheme
+            scheme = "Bearer" if credential_scheme is None else credential_scheme
             if not isinstance(cast(object, scheme), str):
                 raise ConfigValidationError("credential_scheme must be a string")
             self._credential_prefix = f"{scheme} " if scheme else ""
-        if api_token is not None:
-            self._headers["Authorization"] = (
-                f"{token_scheme} {api_token}" if token_scheme else api_token
-            )
-        elif api_key is not None:
-            self._headers[api_key_header] = api_key
 
     @abstractmethod
     def load(self, config: Config) -> Source:
@@ -155,9 +132,7 @@ class ProviderAdapter(ABC):
                         "provider API endpoint"
                     )
                 if self._normalize_endpoint(configured) != self._endpoint:
-                    raise ConfigValidationError(
-                        "endpoint is managed by the SourceDefinition"
-                    )
+                    raise ConfigValidationError("endpoint is managed by the Provider")
             return self._endpoint
         value = settings.get("endpoint", self._endpoint or default)
         if not isinstance(value, str) or not value.strip():
@@ -199,7 +174,7 @@ class ProviderAdapter(ABC):
     def _request_with_uri(
         self, url: str, params: Mapping[str, Any]
     ) -> tuple[JsonObject, str]:
-        credentialed = self._credential_name is not None or bool(self._headers)
+        credentialed = self._credential_name is not None
         self._destination_policy.authorize(
             url,
             credentialed=credentialed,
@@ -207,7 +182,7 @@ class ProviderAdapter(ABC):
             service=self.adapter_type,
             credential=self._credential_name,
         )
-        headers: dict[str, str] = dict(self._headers)
+        headers: dict[str, str] = {}
         if self._credential_name is not None:
             headers[self._credential_header] = (
                 self._credential_prefix + self._credentials.get(self._credential_name)

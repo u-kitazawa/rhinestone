@@ -15,8 +15,11 @@ def tutorial_python(name: str) -> str:
     return documentation_python(f"tutorials/{name}")
 
 
+@pytest.mark.parametrize("reverse_catalog", (False, True))
 def test_documentation_index_example_opens_a_compatible_resource(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    reverse_catalog: bool,
 ) -> None:
     """冒頭例が決定的な検索結果を明示Runtimeで開けることを保証する。"""
 
@@ -36,6 +39,13 @@ def test_documentation_index_example_opens_a_compatible_resource(
     osgeo.gdal = gdal  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "osgeo", osgeo)
     monkeypatch.setitem(sys.modules, "osgeo.gdal", gdal)
+
+    if reverse_catalog:
+        import rhinestone.catalogs as catalogs
+
+        monkeypatch.setattr(
+            catalogs, "BUILTIN", catalogs.Catalog(reversed(catalogs.BUILTIN))
+        )
 
     source = documentation_python("index.md")
     exec(compile(source, "docs/index.md", "exec"), {})
