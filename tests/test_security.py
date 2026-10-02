@@ -10,11 +10,11 @@ from rhinestone import (
     Config,
     Provider,
     configure,
-    sources,
 )
 from rhinestone.adapters.execution.json_service import JsonServiceAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.adapters.source.odpt import OdptAdapter
+from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
@@ -130,7 +130,7 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
         )
 
     app = configure(
-        sources=(sources.ODPT,),
+        catalog=Catalog((BUILTIN[3],)),
         credentials={
             "odpt": lambda: factory_calls.append(True) or "secret",
         },
@@ -155,7 +155,7 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
             CredentialRegistry(
                 {"odpt": lambda: factory_calls.append(True) or "secret"}
             ),
-            DestinationPolicy.from_catalog((sources.ODPT,)),
+            DestinationPolicy.from_catalog((BUILTIN[3],)),
         ).open(tampered, SimpleNamespace(get=get_json))
     assert factory_calls == []
 
@@ -176,10 +176,10 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry(
 
     monkeypatch.setattr(_http, "JsonServiceRuntime", lambda: SimpleNamespace(get=get))
 
-    settings = dict(sources.ODPT.settings)
+    settings = dict(BUILTIN[3].settings)
     settings["endpoint"] = endpoint
     app = configure(
-        sources=(Provider("private-odpt", "odpt", settings),),
+        catalog=Catalog((Provider("private-odpt", "odpt", settings),)),
         credentials={"key": lambda: "secret"},
     )
 
@@ -194,7 +194,7 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry(
 def test_odpt_credential_rules_exclude_metadata_and_other_providers() -> None:
     policy = DestinationPolicy.from_catalog(
         (
-            sources.ODPT,
+            BUILTIN[3],
             Provider(
                 "other",
                 "ckan",
@@ -281,7 +281,8 @@ def test_explicit_rules_remain_usable_for_direct_adapter_credentials() -> None:
     CkanAdapter(
         get_json=get_json,
         endpoint=endpoint,
-        api_token="secret",
+        credential="secret",
+        credentials=CredentialRegistry({"secret": lambda: "secret"}),
         destination_policy=DestinationPolicy(rules=(rule,)),
     ).search(SearchQuery(text="river"))
 
@@ -330,7 +331,7 @@ def test_invalid_credential_endpoint_does_not_create_rule() -> None:
 
 def test_odpt_credential_rule_is_scoped_to_provider_and_resource_path() -> None:
     endpoint = "https://shared.example/api/v4"
-    settings = dict(sources.ODPT.settings)
+    settings = dict(BUILTIN[3].settings)
     settings["endpoint"] = endpoint
     policy = DestinationPolicy.from_catalog(
         (Provider("private-odpt", "odpt", settings),)
@@ -355,7 +356,7 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
     credential_calls: list[bool] = []
     runtime_calls: list[bool] = []
     app = configure(
-        sources=(sources.ODPT, sources.GSI),
+        catalog=Catalog((BUILTIN[3], BUILTIN[2])),
         credentials={
             "odpt": lambda: credential_calls.append(True) or "secret",
         },
@@ -384,7 +385,7 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
             CredentialRegistry(
                 {"odpt": lambda: credential_calls.append(True) or "secret"}
             ),
-            DestinationPolicy.from_catalog((sources.ODPT, sources.GSI)),
+            DestinationPolicy.from_catalog((BUILTIN[3], BUILTIN[2])),
         ).open(tampered, Runtime())
 
     assert credential_calls == []
@@ -442,7 +443,7 @@ def test_public_http_sources_bind_credentials_lazily(
     if adapter_type == "ogc-features":
         settings["collection_id"] = "rivers"
     app = configure(
-        sources=(Provider("protected", adapter_type, settings),),
+        catalog=Catalog((Provider("protected", adapter_type, settings),)),
         credentials={
             "secret": lambda: factory_calls.append(True) or "secret",
         },
@@ -467,12 +468,14 @@ def test_configured_source_endpoint_cannot_be_overridden(
 
     monkeypatch.setattr(_http, "get_json", get_json)
     app = configure(
-        sources=(
-            Provider(
-                "protected",
-                "ckan",
-                {"endpoint": "https://known.example", "credential": "secret"},
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "protected",
+                    "ckan",
+                    {"endpoint": "https://known.example", "credential": "secret"},
+                ),
+            )
         ),
         credentials={"secret": lambda: "secret"},
     )
@@ -505,8 +508,6 @@ def test_direct_source_adapter_can_use_a_destination_policy() -> None:
 def test_source_credential_configuration_is_validated() -> None:
     with pytest.raises(ConfigValidationError, match="non-empty string"):
         CkanAdapter(get_json=lambda url, params: {}, credential="")
-    with pytest.raises(ConfigValidationError, match="either credential"):
-        CkanAdapter(get_json=lambda url, params: {}, credential="name", api_token="x")
     with pytest.raises(ConfigValidationError, match="credential_header"):
         CkanAdapter(
             get_json=lambda url, params: {}, credential="name", credential_header=""

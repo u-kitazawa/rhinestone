@@ -9,7 +9,7 @@
 `Config.settings` は catalog の `uri` と Dataset URI の `dataset` が必須です。
 `serialization` は `json-ld`、`turtle`、`xml`、`distribution` は任意です。
 
-`configure(sources=...)` で利用する場合は、Provider設定の `catalog_uri` が信頼できる取得先です。
+`configure(catalog=...)` で利用する場合は、Provider設定の `catalog_uri` が信頼できる取得先です。
 解決時の `Config.settings["uri"]` がこの値と一致しない場合は、取得前に拒否されます。
 `catalog_uri` を設定しない構成では取得先を信頼済みProvider値で検証できないため、
 外部入力をそのまま `Config` に渡さないでください。

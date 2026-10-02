@@ -29,6 +29,8 @@
 
 ## 変更時の規律
 
+- 後方互換だけを目的とする別名、wrapper、旧引数、旧形式への分岐を追加・維持しない。現行APIに統一し、利用例、テスト、公開文書を同じ変更で更新する。
+
 - 実例による仕様化、仕様適合テスト、垂直スライスに従う。新しい Source Adapter には、代表的な Fixture、期待される Source・Resource・AccessPlan、仕様適合テストを追加する。
 - Config を不変に保ち、Source が保持する Metadata、raw metadata、Provenance を後続処理で破棄しない。
 - 実装パターンが繰り返され、必要性が裏付けられるまでは外部 Adapter API を設計しない。初期段階では内部 Adapter Registry で十分である。

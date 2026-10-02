@@ -49,14 +49,15 @@ CKANに`ckanext-spatial`の`spatial_query`が導入されていることを確�
 される可能性があるため既定は無効です。
 
 ```python
+from rhinestone.catalogs import Catalog
 from rhinestone import Provider, configure
 
-app = configure(sources=(
+app = configure(catalog=Catalog((
     Provider("spatial-catalog", "ckan", {
         "endpoint": "https://example.org",
         "spatial_search": True,
     }),
-))
+)))
 results = app.search(text="河川", area="神奈川県")
 ```
 

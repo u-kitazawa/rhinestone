@@ -26,7 +26,7 @@ class ConfigValidationError(RhinestoneError):
 class UnsupportedSourceError(RhinestoneError):
     """The requested source ID is not configured in this application.
 
-    Check the ``Catalog`` or ``sources`` passed to :func:`rhinestone.configure`
+    Check the ``Catalog`` passed to :func:`rhinestone.configure`
     and ensure the requested source ID is present.
     """
 

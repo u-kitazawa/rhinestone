@@ -9,8 +9,8 @@ from ....models import (
     Metadata,
     Provenance,
     ResourceCandidate,
+    Result,
     SearchQuery,
-    SearchResult,
     Source,
 )
 from ....registry import CredentialRegistry
@@ -21,7 +21,6 @@ from ....representations import (
 )
 from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
-from .format import optional_string
 
 
 class CkanAdapter(ProviderAdapter):
@@ -35,9 +34,6 @@ class CkanAdapter(ProviderAdapter):
         get_json: JsonTransport,
         endpoint: str | None = None,
         spatial_search: bool = False,
-        api_token: str | None = None,
-        api_key: str | None = None,
-        api_key_header: str = "X-CKAN-API-Key",
         credential: str | None = None,
         credential_header: str | None = None,
         credential_scheme: str | None = None,
@@ -56,13 +52,9 @@ class CkanAdapter(ProviderAdapter):
         super().__init__(
             get_json=get_json,
             endpoint=endpoint,
-            api_token=api_token,
-            api_key=api_key,
-            api_key_header=api_key_header,
-            token_scheme="",
             credential=credential,
             credential_header=credential_header,
-            credential_scheme=credential_scheme,
+            credential_scheme="" if credential_scheme is None else credential_scheme,
             credentials=credentials,
             destination_policy=destination_policy,
             provider_id=provider_id,
@@ -105,10 +97,10 @@ class CkanAdapter(ProviderAdapter):
             else None
         )
         metadata = Metadata(
-            title=optional_string(package.get("title")),
-            description=optional_string(package.get("notes")),
-            publisher=optional_string(publisher),
-            license=optional_string(package.get("license_title")),
+            title=_optional_string(package.get("title")),
+            description=_optional_string(package.get("notes")),
+            publisher=_optional_string(publisher),
+            license=_optional_string(package.get("license_title")),
             raw=package,
         )
         provenance = Provenance(
@@ -129,7 +121,7 @@ class CkanAdapter(ProviderAdapter):
             raw_metadata={"resource": resource, "package": package},
         )
 
-    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
         """Search CKAN packages and return their resource-level results."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
@@ -146,7 +138,7 @@ class CkanAdapter(ProviderAdapter):
             params["ext_bbox"] = ",".join(str(value) for value in query.bbox)
         if query.limit is not None:
             params["rows"] = query.limit
-        found: list[SearchResult] = []
+        found: list[Result] = []
         start = 0
         while True:
             page_params = dict(params)
@@ -161,7 +153,7 @@ class CkanAdapter(ProviderAdapter):
                 resources = self._objects(package.get("resources"), "CKAN resources")
                 for resource in resources:
                     resource_id = self._required_string(resource, "id")
-                    media_type = optional_string(resource.get("mimetype"))
+                    media_type = _optional_string(resource.get("mimetype"))
                     format_name = canonical_format(resource.get("format")) or (
                         format_from_media_type(media_type)
                     )
@@ -173,19 +165,20 @@ class CkanAdapter(ProviderAdapter):
                     ):
                         continue
                     found.append(
-                        SearchResult(
-                            title=optional_string(package.get("title")) or resource_id,
-                            description=optional_string(package.get("notes")),
+                        Result(
+                            title=_optional_string(package.get("title")) or resource_id,
+                            description=_optional_string(package.get("notes")),
                             discovered_by=self.adapter_type,
                             target=Config(
                                 self.adapter_type, {"resource_id": resource_id}
                             ),
                             metadata=Metadata(
-                                title=optional_string(package.get("title")), raw=package
+                                title=_optional_string(package.get("title")),
+                                raw=package,
                             ),
                             provenance=Provenance(
                                 provider="ckan",
-                                dataset_identifier=optional_string(package.get("id")),
+                                dataset_identifier=_optional_string(package.get("id")),
                                 resource_identifier=resource_id,
                                 api_endpoint=endpoint,
                                 adapter="ckan",
@@ -214,7 +207,7 @@ class CkanAdapter(ProviderAdapter):
 
     def _candidate(self, resource: JsonObject) -> ResourceCandidate:
         uri = self._required_string(resource, "url")
-        media_type = optional_string(resource.get("mimetype"))
+        media_type = _optional_string(resource.get("mimetype"))
         attributes = dict(resource)
         archive = container_from_media_type(media_type)
         if archive is not None:
@@ -231,3 +224,7 @@ class CkanAdapter(ProviderAdapter):
     def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:
         requested = {value.value for value in query.expanded_formats}
         return bool(formats & requested) or (not formats and "unknown" in requested)
+
+
+def _optional_string(value: Any) -> str | None:
+    return value if isinstance(value, str) else None

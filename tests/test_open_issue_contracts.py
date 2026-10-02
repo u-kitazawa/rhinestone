@@ -18,6 +18,7 @@ from rhinestone.adapters.knowledge import (
     require_lossless_crs84,
 )
 from rhinestone.adapters.source.estat_gis import EstatGisAdapter
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     AmbiguousResourceError,
     ConfigValidationError,
@@ -228,7 +229,7 @@ def test_space_values_fail_closed_without_reprojection() -> None:
     with pytest.raises(KnowledgeValidationError):
         MeshCode("JIS-X-0410", 6, "53394567129")
     assert MeshCode("JIS-X-0410", 3, "53394567").code == "53394567"
-    assert tuple(BoundingBox(139, 35, 140, 36)) == (139, 35, 140, 36)
+    assert BoundingBox(139, 35, 140, 36).as_tuple() == (139, 35, 140, 36)
 
 
 @pytest.mark.parametrize(
@@ -294,7 +295,9 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
         },
     ]
     app = configure(
-        sources=(Provider("estat", "estat-gis", {"distributions": distributions}),)
+        catalog=Catalog(
+            (Provider("estat", "estat-gis", {"distributions": distributions}),)
+        )
     )
 
     resource = app.resolve(
@@ -412,7 +415,7 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
 
 def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
     with pytest.raises(ConfigValidationError, match="requires distributions"):
-        configure(sources=(Provider("estat", "estat-gis"),)).resolve(
+        configure(catalog=Catalog((Provider("estat", "estat-gis"),))).resolve(
             Config("estat", {})
         )
 
@@ -521,7 +524,7 @@ def test_estat_gis_accepts_provider_frozen_distribution_settings() -> None:
     }
     provider = Provider("estat", "estat-gis", {"distributions": [distribution]})
 
-    resource = configure(sources=(provider,)).resolve(
+    resource = configure(catalog=Catalog((provider,))).resolve(
         Config("estat", {"distribution_id": "d1"})
     )
 
@@ -560,7 +563,7 @@ def test_custom_adapter_context_uses_public_ports_only() -> None:
         return Adapter()
 
     app = configure(
-        sources=(Provider("external", "external-source"),),
+        catalog=Catalog((Provider("external", "external-source"),)),
         adapters=(SourceAdapterDefinition("external-source", source_factory),),
     )
     app.resolve(Config("external", {}))
@@ -684,8 +687,12 @@ def test_custom_source_receives_one_core_managed_transport_port(
         return Adapter()
 
     configure(
-        sources=(
-            Provider("custom", "custom-source", {"endpoint": "https://custom.example"}),
+        catalog=Catalog(
+            (
+                Provider(
+                    "custom", "custom-source", {"endpoint": "https://custom.example"}
+                ),
+            )
         ),
         adapters=(SourceAdapterDefinition("custom-source", factory),),
     )
@@ -742,12 +749,14 @@ def test_custom_transport_preserves_text_headers_and_normalizes_network_errors(
         return Adapter()
 
     app = configure(
-        sources=(
-            Provider(
-                "custom",
-                "custom-source",
-                {"endpoint": "https://custom.example", "credential": "custom-key"},
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "custom",
+                    "custom-source",
+                    {"endpoint": "https://custom.example", "credential": "custom-key"},
+                ),
+            )
         ),
         adapters=(SourceAdapterDefinition("custom-source", factory),),
     )
@@ -777,8 +786,12 @@ def test_custom_transport_normalizes_network_errors(
         return Adapter()
 
     app = configure(
-        sources=(
-            Provider("custom", "custom-source", {"endpoint": "https://custom.example"}),
+        catalog=Catalog(
+            (
+                Provider(
+                    "custom", "custom-source", {"endpoint": "https://custom.example"}
+                ),
+            )
         ),
         adapters=(SourceAdapterDefinition("custom-source", factory),),
     )

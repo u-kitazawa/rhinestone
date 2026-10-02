@@ -21,6 +21,7 @@ from rhinestone.adapters.knowledge import (
 )
 from rhinestone.adapters.source.gsi_fundamental import GsiFundamentalAdapter
 from rhinestone.adapters.source.plateau import PlateauAdapter
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     AdapterRegistrationError,
     ConfigValidationError,
@@ -532,7 +533,7 @@ def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
         "standard", standard_time_factory, "time"
     )
     app = configure(
-        sources=(Provider("custom", "custom-knowledge"),),
+        catalog=Catalog((Provider("custom", "custom-knowledge"),)),
         adapters=(
             SourceAdapterDefinition("custom-knowledge", source_factory),
             registry_definition,
@@ -547,7 +548,7 @@ def test_public_builtin_source_receives_knowledge_adapters() -> None:
     settings = fundamental_settings()
     settings.update({"municipality": "14100", "time": "令和2年"})
     app = configure(
-        sources=(Provider("fundamental", "gsi-fundamental"),),
+        catalog=Catalog((Provider("fundamental", "gsi-fundamental"),)),
         adapters=(
             KnowledgeAdapterDefinition(
                 "official", lambda _context: OfficialMunicipalityAdapter(), "identity"
@@ -568,7 +569,7 @@ def test_public_application_auto_registers_standard_time_adapter() -> None:
     settings = fundamental_settings()
     settings["time"] = "令和2年"
     app = configure(
-        sources=(Provider("fundamental", "gsi-fundamental"),),
+        catalog=Catalog((Provider("fundamental", "gsi-fundamental"),)),
     )
 
     resource = app.resolve(Config("fundamental", settings))
@@ -588,7 +589,7 @@ def test_custom_time_definition_replaces_the_preinstalled_adapter() -> None:
             return TimeSemantic("calendar_year", year=2099, raw=value)
 
     app = configure(
-        sources=(Provider("fundamental", "gsi-fundamental"),),
+        catalog=Catalog((Provider("fundamental", "gsi-fundamental"),)),
         adapters=(
             KnowledgeAdapterDefinition(
                 "custom-time", lambda _context: CustomTimeAdapter(), "time"

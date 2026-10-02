@@ -12,10 +12,10 @@ from rhinestone.models import (
     Provider,
     Resource,
     ResourceCandidate,
+    Result,
     SearchDiagnostic,
     SearchExecution,
     SearchQuery,
-    SearchResult,
     Source,
 )
 
@@ -264,7 +264,7 @@ def test_resource_preserves_source_metadata_and_provenance() -> None:
 def test_search_result_returns_config_without_losing_knowledge() -> None:
     metadata = Metadata(title="Dataset", raw={"table": "raw-value"})
     provenance = Provenance(provider="catalog", raw={"query": "dataset"})
-    result = SearchResult(
+    result = Result(
         title="Dataset",
         description="Official dataset",
         discovered_by="search-ckan-jp",
@@ -304,7 +304,7 @@ def test_unbound_resource_cannot_open_without_execution_context() -> None:
 
 
 def test_unbound_search_result_cannot_resolve() -> None:
-    result = SearchResult(
+    result = Result(
         title="Dataset",
         description=None,
         discovered_by="catalog",
@@ -319,7 +319,7 @@ def test_unbound_search_result_cannot_resolve() -> None:
 
 def test_search_result_requires_a_discovery_source() -> None:
     with pytest.raises(ConfigValidationError, match="discovered_by"):
-        SearchResult(
+        Result(
             title="Dataset",
             description=None,
             discovered_by="",

@@ -7,12 +7,13 @@
 
 ## 構成
 
-組み込み定義 `sources.MLIT_DPF` はendpointと論理Credential名だけを持ちます。APIキーは
+組み込み定義 `BUILTIN[4]` はendpointと論理Credential名だけを持ちます。APIキーは
 `credentials` から遅延取得され、`Provider`、`Result`、`Resource`、例外には保存されません。
 `MLIT_DPF` は組み込みCatalogに含まれますが、APIキーを登録せず横断検索した場合はDPFだけが
 `failure_type="credential"` のdiagnosticとして隔離され、他のSourceの検索は継続します。
 
 ```python
+from rhinestone.catalogs import Catalog
 from rhinestone import Provider, configure
 
 dpf = Provider(
@@ -42,7 +43,7 @@ dpf = Provider(
 )
 
 app = configure(
-    sources=(dpf, Provider("plateau", "plateau", {"endpoint": "https://example.test/ckan"})),
+    catalog=Catalog((dpf, Provider("plateau", "plateau", {"endpoint": "https://example.test/ckan"}))),
     credentials={"mlit-dpf": lambda: load_api_key()},
 )
 ```

@@ -20,13 +20,15 @@ distributionを選べる検索語を指定してください。ZIP Shapefile を
 ## 検索、distribution選択、pyogrioへの受け渡し
 
 ```python
+from rhinestone.catalogs import BUILTIN
+from rhinestone.catalogs import Catalog
 import os
 from collections.abc import Mapping
 from typing import Any, Optional
 
 import pyogrio
 
-from rhinestone import configure, sources
+from rhinestone import configure
 
 
 def vector_format(result: Any) -> Optional[str]:
@@ -47,7 +49,7 @@ def vector_format(result: Any) -> Optional[str]:
 
 
 app = configure(
-    sources=(sources.GEOSPATIAL_JP,),
+    catalog=Catalog((BUILTIN[0],)),
 )
 PYOGRIO_VECTOR_FORMATS = {
     "shapefile",

@@ -11,7 +11,7 @@ from ....errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from ....models import Config, ResourceCandidate, SearchQuery, SearchResult, Source
+from ....models import Config, ResourceCandidate, Result, SearchQuery, Source
 from ....representations import canonical_format, format_from_media_type
 from ....security import DestinationPolicy
 from .._knowledge import source, string
@@ -153,7 +153,7 @@ class DcatAdapter(ProviderAdapter):
             capabilities=("download", "search"),
         )
 
-    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
         """Search Dataset subjects by text while preserving their distributions."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError("Unsupported DCAT search")
@@ -162,7 +162,7 @@ class DcatAdapter(ProviderAdapter):
             "serialization": self._serialization,
         }
         rdf_runtime, catalog_graph, document, catalog_uri = self._load_catalog(settings)
-        results: list[SearchResult] = []
+        results: list[Result] = []
         for dataset in sorted(
             set(
                 catalog_graph.subjects(
@@ -193,7 +193,7 @@ class DcatAdapter(ProviderAdapter):
                 endpoint=catalog_uri,
             )
             results.append(
-                SearchResult(
+                Result(
                     title=title,
                     description=description,
                     discovered_by=self.adapter_type,

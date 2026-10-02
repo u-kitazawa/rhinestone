@@ -19,18 +19,19 @@ Assetの`href`がrelative URI referenceの場合は、そのAssetを含むItem r
 ## 解決して Rasterio で開く例
 
 ```python
+from rhinestone.catalogs import Catalog
 import rasterio
 
 from rhinestone import Config, Provider, configure
 
 app = configure(
-    sources=(
+    catalog=Catalog((
         Provider(
             id="imagery",
             adapter_type="stac",
             settings={"endpoint": "https://stac.example/api"},
         ),
-    ),
+    )),
 )
 resource = app.resolve(
     Config("imagery", {

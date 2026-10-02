@@ -7,6 +7,7 @@ import pytest
 
 from rhinestone import Provider, configure
 from rhinestone.adapters.source.ckan.adapter import CkanAdapter
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery
 
@@ -51,12 +52,14 @@ def test_spatial_ckan_projects_area_to_bbox(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr("rhinestone._http.get_json", get_json)
     app = configure(
-        sources=(
-            Provider(
-                "catalog",
-                "ckan",
-                {"endpoint": "https://example.test", "spatial_search": True},
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "catalog",
+                    "ckan",
+                    {"endpoint": "https://example.test", "spatial_search": True},
+                ),
+            )
         ),
     )
     results = app.search(text="river", area="神奈川県", limit=1)
@@ -89,4 +92,6 @@ def test_default_ckan_keeps_text_fallback_and_rejects_bbox() -> None:
 @pytest.mark.parametrize("value", (1, "true", None))
 def test_spatial_ckan_requires_explicit_boolean(value: object) -> None:
     with pytest.raises(ConfigValidationError, match="spatial_search"):
-        configure(sources=(Provider("catalog", "ckan", {"spatial_search": value}),))
+        configure(
+            catalog=Catalog((Provider("catalog", "ckan", {"spatial_search": value}),))
+        )

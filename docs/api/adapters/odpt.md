@@ -10,15 +10,17 @@
 
 ## 接続先と実行
 
-endpoint、resource type、許可される filter は `sources.ODPT` の Catalog 定義から Adapter へ渡されます。HTTP実行runtimeはRhinestoneに組み込まれているため、利用者はcredential factoryだけを構成します。
+endpoint、resource type、許可される filter は `BUILTIN[3]` の Catalog 定義から Adapter へ渡されます。HTTP実行runtimeはRhinestoneに組み込まれているため、利用者はcredential factoryだけを構成します。
 
 ```python
+from rhinestone.catalogs import BUILTIN
+from rhinestone.catalogs import Catalog
 import os
 
-from rhinestone import Config, configure, sources
+from rhinestone import Config, configure
 
 app = configure(
-    sources=(sources.ODPT,),
+    catalog=Catalog((BUILTIN[3],)),
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 ```

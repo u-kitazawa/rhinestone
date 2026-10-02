@@ -107,10 +107,6 @@ class Provider:
         object.__setattr__(self, "settings", _freeze(self.settings))
 
 
-# Advanced implementation code may use this descriptive alias.
-SourceDefinition = Provider
-
-
 @dataclass(frozen=True)
 class Config:
     """Select one configured source and provide its resolution settings.
@@ -606,10 +602,6 @@ class Result:
         return self._resolver()
 
 
-# Advanced implementation code may use this descriptive alias.
-SearchResult = Result
-
-
 __all__ = [
     "AccessPlan",
     "Config",
@@ -630,8 +622,6 @@ __all__ = [
     "SearchDiagnostic",
     "SearchExecution",
     "SearchQuery",
-    "SearchResult",
     "ServiceQueryPlan",
     "Source",
-    "SourceDefinition",
 ]

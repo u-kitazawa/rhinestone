@@ -7,16 +7,18 @@
 
 ## 設定と検索
 
-組み込みCatalogの `sources.SEARCH_CKAN_JP` に検索先が定義されています。検索には `text`
+組み込みCatalogの `BUILTIN[5]` に検索先が定義されています。検索には `text`
 が必須で、`limit` を指定できます。`limit` はBackend APIへの package 件数だけでなく、
 package内の対応するresourceへ展開した最終結果にも適用されます。先頭 page に十分な
 Resource がなければ、response の `count` を根拠に `start` で次 page を取得します。
 `limit=None` では provider の既定 page を超えて走査しません。
 
 ```python
-from rhinestone import configure, sources
+from rhinestone.catalogs import BUILTIN
+from rhinestone.catalogs import Catalog
+from rhinestone import configure
 
-app = configure(sources=(sources.SEARCH_CKAN_JP,))
+app = configure(catalog=Catalog((BUILTIN[5],)))
 results = app.search(text="河川", limit=10)
 ```
 

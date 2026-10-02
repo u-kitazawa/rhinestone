@@ -4,8 +4,9 @@ from typing import Any, cast
 import pytest
 
 import rhinestone.catalogs as catalog_module
-from rhinestone import Provider, sources
+from rhinestone import Provider
 from rhinestone.catalogs import (
+    BUILTIN,
     Catalog,
     load_catalog_resource,
     load_source_catalog,
@@ -26,7 +27,7 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "search-ckan-jp",
     )
     catalog_entries = load_source_catalog()
-    assert tuple(entry.definition for entry in catalog_entries) == definitions
+    assert tuple(entry.provider for entry in catalog_entries) == definitions
     assert tuple(entry.name for entry in catalog_entries) == (
         "GEOSPATIAL_JP",
         "PLATEAU",
@@ -35,44 +36,14 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "MLIT_DPF",
         "SEARCH_CKAN_JP",
     )
-    assert definitions == sources.ALL
-    assert all(isinstance(definition, Provider) for definition in sources.ALL)
-
-
-def test_builtin_source_names_are_dynamic_catalog_exports() -> None:
-    assert sources.GEOSPATIAL_JP is sources.ALL[0]
-    assert sources.PLATEAU is sources.ALL[1]
-    assert sources.GSI is sources.ALL[2]
-    assert sources.ODPT is sources.ALL[3]
-    assert sources.MLIT_DPF is sources.ALL[4]
-    assert sources.SEARCH_CKAN_JP is sources.ALL[5]
-    assert set(sources.__all__) == {
-        "ALL",
-        "GEOSPATIAL_JP",
-        "PLATEAU",
-        "GSI",
-        "ODPT",
-        "MLIT_DPF",
-        "SEARCH_CKAN_JP",
-    }
-    assert {
-        "GEOSPATIAL_JP",
-        "PLATEAU",
-        "GSI",
-        "ODPT",
-        "MLIT_DPF",
-        "SEARCH_CKAN_JP",
-    } <= set(dir(sources))
-    with pytest.raises(AttributeError):
-        getattr(sources, "MISSING")
+    assert definitions == BUILTIN.providers
+    assert all(isinstance(definition, Provider) for definition in BUILTIN.providers)
 
 
 def test_catalog_contains_service_configuration_but_not_runtime_values() -> None:
-    assert sources.GEOSPATIAL_JP.settings["endpoint"] == (
-        "https://www.geospatial.jp/ckan"
-    )
-    assert sources.ODPT.settings["endpoint"] == "https://api.odpt.org/api/v4"
-    for source in sources.ALL:
+    assert BUILTIN[0].settings["endpoint"] == ("https://www.geospatial.jp/ckan")
+    assert BUILTIN[3].settings["endpoint"] == "https://api.odpt.org/api/v4"
+    for source in BUILTIN.providers:
         assert "credentials" not in source.settings
         assert "dependencies" not in source.settings
         assert "api_key" not in source.settings
@@ -80,8 +51,8 @@ def test_catalog_contains_service_configuration_but_not_runtime_values() -> None
 
 
 def test_gsi_tiles_are_defined_in_sources_catalog() -> None:
-    assert sources.GSI.adapter_type == "static"
-    raw_items = sources.GSI.settings["items"]
+    assert BUILTIN[2].adapter_type == "static"
+    raw_items = BUILTIN[2].settings["items"]
     assert isinstance(raw_items, Mapping)
     items = cast(Mapping[str, Any], raw_items)
     assert set(items) == {"std", "pale"}
@@ -171,12 +142,12 @@ def test_source_catalog_manifest_shapes_are_rejected(
 
 
 def test_catalog_is_an_immutable_provider_collection() -> None:
-    catalog = Catalog((sources.GSI,))
-    extended = catalog.add(sources.ODPT)
+    catalog = Catalog((BUILTIN[2],))
+    extended = catalog.add(BUILTIN[3])
 
     assert len(catalog) == 1
-    assert catalog[0] is sources.GSI
-    assert load_source_catalog()[0].provider == sources.GEOSPATIAL_JP
-    assert tuple(catalog) == (sources.GSI,)
-    assert extended.providers == (sources.GSI, sources.ODPT)
-    assert tuple(extended) == (sources.GSI, sources.ODPT)
+    assert catalog[0] is BUILTIN[2]
+    assert load_source_catalog()[0].provider == BUILTIN[0]
+    assert tuple(catalog) == (BUILTIN[2],)
+    assert extended.providers == (BUILTIN[2], BUILTIN[3])
+    assert tuple(extended) == (BUILTIN[2], BUILTIN[3])

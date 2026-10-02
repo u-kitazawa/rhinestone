@@ -2,10 +2,11 @@
 
 import os
 
-from rhinestone import Config, configure, sources
+from rhinestone import Config, configure
+from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
-    sources=(sources.ODPT,),
+    catalog=Catalog((BUILTIN[3],)),
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 records = app.open(

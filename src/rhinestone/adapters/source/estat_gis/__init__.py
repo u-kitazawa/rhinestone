@@ -26,8 +26,8 @@ from ....models import (
     Metadata,
     Provenance,
     ResourceCandidate,
+    Result,
     SearchQuery,
-    SearchResult,
     Source,
 )
 from ....representations import CANONICAL_FORMATS, canonical_format
@@ -155,13 +155,13 @@ class EstatGisAdapter(ProviderAdapter):
             raw_metadata=raw,
         )
 
-    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
         """Search the supplied distribution index, without broadening selectors."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError(
                 "e-Stat GIS search supports only text and limit"
             )
-        results: list[SearchResult] = []
+        results: list[Result] = []
         terms = tuple(term.casefold() for term in query.text_terms)
         for item in self._distributions:
             if query.limit is not None and len(results) >= query.limit:
@@ -176,7 +176,7 @@ class EstatGisAdapter(ProviderAdapter):
             distribution_id = cast(str, item["distribution_id"])
             raw_item = self._raw_distribution(item)
             results.append(
-                SearchResult(
+                Result(
                     title=cast(str, item["title"]),
                     description=cast(str | None, item.get("description")),
                     discovered_by=self.adapter_type,

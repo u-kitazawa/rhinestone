@@ -111,6 +111,7 @@ Metadata/Provenanceやcanonical valueを扱いますが、Credential、Runtime�
 外部Runtimeは利用者が所有します。Source Runtimeは`dependencies`へ実体または`RuntimeFactory`として渡し、Execution Runtime実体は`open(..., runtime=...)`へ渡します。
 
 ```python
+from rhinestone.catalogs import BUILTIN
 app = configure(
     catalog=BUILTIN,
     dependencies={
@@ -149,6 +150,7 @@ app = configure(
 secretはCatalogやProviderに保存せず、Credential factoryとして渡します。
 
 ```python
+from rhinestone.catalogs import BUILTIN
 app = configure(
     catalog=BUILTIN,
     credentials={

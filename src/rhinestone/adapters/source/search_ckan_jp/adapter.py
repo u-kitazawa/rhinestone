@@ -7,7 +7,7 @@ from ....errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from ....models import Config, Metadata, Provenance, SearchQuery, SearchResult, Source
+from ....models import Config, Metadata, Provenance, Result, SearchQuery, Source
 from ....security import DestinationPolicy
 from .._uri import has_embedded_credentials
 from ..base import JsonObject, JsonTransport, ProviderAdapter
@@ -41,7 +41,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
             "search-ckan-jp is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
         """Search the official search.ckan.jp endpoint using text criteria."""
         if query.text is None:
             raise ConfigValidationError(
@@ -53,7 +53,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         params: dict[str, Any] = {"q": query.text}
         if query.limit is not None:
             params["rows"] = query.limit
-        found: list[SearchResult] = []
+        found: list[Result] = []
         start = 0
         while True:
             page_params = dict(params)
@@ -93,7 +93,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         package: JsonObject,
         endpoint: str,
         params: dict[str, Any],
-    ) -> tuple[SearchResult, ...]:
+    ) -> tuple[Result, ...]:
         package_id = optional_string(package.get("xckan_original_id"))
         if package_id is None:
             package_id = optional_string(package.get("id"))
@@ -105,7 +105,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         license_name = optional_string(package.get("license_title"))
         site_url = optional_string(package.get("xckan_site_url"))
         resources = self._objects(package.get("resources"), "search.ckan.jp resources")
-        found: list[SearchResult] = []
+        found: list[Result] = []
         for resource in resources:
             resource_id = optional_string(resource.get("id"))
             uri = optional_string(resource.get("url"))
@@ -149,7 +149,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
             if media_type is not None:
                 target_settings["media_type"] = media_type
             found.append(
-                SearchResult(
+                Result(
                     title=title,
                     description=description,
                     discovered_by=self.adapter_type,

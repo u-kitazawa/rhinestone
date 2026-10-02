@@ -4,10 +4,11 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, configure, sources
+from rhinestone import Config, configure
+from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
-    sources=(sources.PLATEAU,),
+    catalog=Catalog((BUILTIN[1],)),
 )
 resource = app.resolve(
     Config(

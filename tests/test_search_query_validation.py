@@ -3,6 +3,7 @@ from typing import Any, cast
 import pytest
 
 from rhinestone import configure
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery
 
@@ -25,7 +26,7 @@ def test_search_query_rejects_invalid_limit_without_repr() -> None:
 
 
 def test_app_search_rejects_non_string_text_before_search_dispatch() -> None:
-    app = configure(sources=())
+    app = configure(catalog=Catalog(()))
 
     with pytest.raises(ConfigValidationError, match="text must be a string or None"):
         app.search(text=cast(Any, 1))

@@ -13,6 +13,7 @@ from rhinestone.adapters.contracts import (
     SourceAdapterDefinition,
 )
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
+from rhinestone.catalogs import Catalog
 from rhinestone.errors import AdapterRegistrationError
 from rhinestone.models import (
     Metadata,
@@ -70,7 +71,7 @@ def test_custom_source_and_execution_share_the_public_pipeline() -> None:
 
     runtime = SimpleNamespace(open=open_runtime)
     app = configure(
-        sources=(Provider("custom", "custom-source"),),
+        catalog=Catalog((Provider("custom", "custom-source"),)),
         adapters=(
             SourceAdapterDefinition("custom-source", custom_source),
             ExecutionAdapterDefinition(
@@ -105,7 +106,7 @@ def test_source_definition_can_declare_a_lazy_source_dependency() -> None:
         dependencies=frozenset({"custom-source-runtime"}),
     )
     app = configure(
-        sources=(Provider("custom", "custom-source"),),
+        catalog=Catalog((Provider("custom", "custom-source"),)),
         adapters=(definition,),
         dependencies={"custom-source-runtime": RuntimeFactory(factory)},
     )
@@ -122,9 +123,11 @@ def test_source_dependencies_are_scoped_to_each_definition() -> None:
         return custom_source(provider, context)
 
     app = configure(
-        sources=(
-            Provider("first", "first-source"),
-            Provider("second", "second-source"),
+        catalog=Catalog(
+            (
+                Provider("first", "first-source"),
+                Provider("second", "second-source"),
+            )
         ),
         adapters=(
             SourceAdapterDefinition(
@@ -157,9 +160,11 @@ def test_source_dependency_instances_are_cached_across_provider_contexts() -> No
         return custom_source(provider, context)
 
     app = configure(
-        sources=(
-            Provider("first", "shared-source"),
-            Provider("second", "shared-source"),
+        catalog=Catalog(
+            (
+                Provider("first", "shared-source"),
+                Provider("second", "shared-source"),
+            )
         ),
         adapters=(
             SourceAdapterDefinition(
@@ -193,7 +198,7 @@ def test_custom_provider_credentials_are_authorized_by_default_policy() -> None:
 
 def test_unregistered_source_type_fails_during_context_composition() -> None:
     with pytest.raises(AdapterRegistrationError, match="unknown-source"):
-        configure(sources=(Provider("unknown", "unknown-source"),))
+        configure(catalog=Catalog((Provider("unknown", "unknown-source"),)))
 
     with pytest.raises(AdapterRegistrationError, match="unknown-source"):
         _build_source_adapter(  # pyright: ignore[reportPrivateUsage]

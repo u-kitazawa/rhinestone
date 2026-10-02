@@ -265,18 +265,13 @@ class Rhinestone:
     def __init__(
         self,
         *,
-        sources: Iterable[Provider] = (),
         catalog: Catalog | None = None,
         dependencies: Mapping[str, DependencyValue] | None = None,
         credentials: Mapping[str, Callable[[], str]] | None = None,
         network_policy: NetworkPolicyLevel = "credentialed",
         adapters: Iterable[AdapterDefinition] = (),
     ) -> None:
-        selected_sources = tuple(sources)
-        if catalog is not None:
-            if selected_sources:
-                raise TypeError("pass either catalog or sources, not both")
-            selected_sources = tuple(catalog)
+        selected_sources = tuple(catalog) if catalog is not None else ()
 
         _validate_mlit_dpf_targets(selected_sources)
 
@@ -518,7 +513,6 @@ class Rhinestone:
 
 def configure(
     *,
-    sources: Iterable[Provider] = (),
     catalog: Catalog | None = None,
     dependencies: Mapping[str, DependencyValue] | None = None,
     credentials: Mapping[str, Callable[[], str]] | None = None,
@@ -528,9 +522,7 @@ def configure(
     """Create an isolated Rhinestone application.
 
     Args:
-        sources: Provider definitions to enable when ``catalog`` is omitted.
-        catalog: Immutable Provider collection; mutually exclusive with
-            ``sources``.
+        catalog: Immutable Provider collection to enable.
         dependencies: User-owned Source runtime objects or ``RuntimeFactory``
             values, keyed by runtime name. Execution runtime names are rejected.
         credentials: Lazy factories keyed by logical credential name. Secrets
@@ -550,7 +542,6 @@ def configure(
             an inconsistent adapter.
     """
     return Rhinestone(
-        sources=sources,
         catalog=catalog,
         dependencies=dependencies,
         credentials=credentials,

@@ -9,8 +9,8 @@ from ....models import (
     Metadata,
     Provenance,
     ResourceCandidate,
+    Result,
     SearchQuery,
-    SearchResult,
     Source,
 )
 from ....registry import CredentialRegistry
@@ -30,9 +30,6 @@ class StacAdapter(ProviderAdapter):
         self,
         get_json: JsonTransport,
         endpoint: str | None = None,
-        api_token: str | None = None,
-        api_key: str | None = None,
-        api_key_header: str = "X-API-Key",
         credential: str | None = None,
         credential_header: str | None = None,
         credential_scheme: str | None = None,
@@ -43,9 +40,6 @@ class StacAdapter(ProviderAdapter):
         super().__init__(
             get_json=get_json,
             endpoint=endpoint,
-            api_token=api_token,
-            api_key=api_key,
-            api_key_header=api_key_header,
             credential=credential,
             credential_header=credential_header,
             credential_scheme=credential_scheme,
@@ -93,7 +87,7 @@ class StacAdapter(ProviderAdapter):
 
     def search(
         self, query: SearchQuery, collections: Sequence[str] = ()
-    ) -> tuple[SearchResult, ...]:
+    ) -> tuple[Result, ...]:
         """Search STAC Items using bbox, datetime, limit, and collections."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
@@ -106,7 +100,7 @@ class StacAdapter(ProviderAdapter):
             params["collections"] = ",".join(collections)
         response = self._request(f"{endpoint}/search", params)
         items = self._objects(response.get("features"), "STAC features")
-        found: list[SearchResult] = []
+        found: list[Result] = []
         for item in items:
             item_id = self._required_string(item, "id")
             collection_id = self._required_string(item, "collection")
@@ -119,7 +113,7 @@ class StacAdapter(ProviderAdapter):
             )
             title = _optional_string(properties.get("title")) or item_id
             found.append(
-                SearchResult(
+                Result(
                     title=title,
                     description=_optional_string(properties.get("description")),
                     discovered_by=self.adapter_type,

@@ -24,7 +24,7 @@ Resolver、Registry、Adapterの内部実装は、公開ドキュメントで明
 ### 変更の扱い
 
 - 破壊的変更は`0.1.x`でも許容しますが、GitHub Release notesの`Removed / Breaking changes`または`Changed`に利用者への影響と移行方法を記載します。
-- deprecation periodは`0.1.x`の必須条件にしません。deprecated APIを導入する場合は`Deprecated`に対象、代替手段、削除予定または判断条件を記載します。
+- 過去のAPIを維持するための別名・wrapper・旧引数は残しません。変更時に旧APIを削除し、現行APIへ統一します。廃止猶予期間は設けません。
 - セキュリティ修正や設計上の緊急対応で段階的な廃止ができない場合も、変更の影響と必要な対応をRelease notesに記載します。
 - 内部実装の変更は、公開APIの挙動や利用者の設定・依存関係に影響しない限り、Release notesへの個別記載を必須にしません。
 

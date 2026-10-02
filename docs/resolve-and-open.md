@@ -20,6 +20,7 @@ Sourceによってはprovider metadataを解釈するためのSource Runtimeが�
 開くRuntimeを明示します。
 
 ```python
+from rhinestone.catalogs import BUILTIN
 import rasterio
 
 app = configure(

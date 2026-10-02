@@ -13,8 +13,8 @@ from ....models import (
     Metadata,
     Provenance,
     ResourceCandidate,
+    Result,
     SearchQuery,
-    SearchResult,
     Source,
 )
 from .._knowledge import string
@@ -43,14 +43,14 @@ class StaticAdapter(ProviderAdapter):
             ) from None
         return self._build_source(identifier, item)
 
-    def search(self, query: SearchQuery) -> tuple[SearchResult, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...]:
         """Search static item identifiers and metadata by text and limit."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError(
                 "Unsupported static source search condition"
             )
 
-        results: list[SearchResult] = []
+        results: list[Result] = []
         for identifier in sorted(self._resource_definitions):
             source = self.load(Config(self.adapter_type, {"id": identifier}))
             title = source.metadata.title or identifier
@@ -66,7 +66,7 @@ class StaticAdapter(ProviderAdapter):
             ):
                 continue
             results.append(
-                SearchResult(
+                Result(
                     title=title,
                     description=description,
                     discovered_by=self.adapter_type,

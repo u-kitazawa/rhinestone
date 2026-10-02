@@ -11,9 +11,9 @@ import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
     Config,
     configure,
-    sources,
 )
 from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
+from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     DependencyUnavailableError,
@@ -33,14 +33,14 @@ from tests.provider_support import fixture_json
             "ogc-features",
             {"endpoint": "https://ogc.test", "collection_id": "rivers"},
         ),
-        Provider("plateau-source", "plateau", sources.PLATEAU.settings),
+        Provider("plateau-source", "plateau", BUILTIN[1].settings),
         Provider("fundamental-source", "gsi-fundamental"),
         Provider("dcat-source", "dcat"),
-        Provider("odpt-source", "odpt", sources.ODPT.settings),
+        Provider("odpt-source", "odpt", BUILTIN[3].settings),
     ),
 )
 def test_advanced_source_definitions_compose(source: Provider) -> None:
-    configure(sources=(source,))
+    configure(catalog=Catalog((source,)))
 
 
 def test_dcat_dependencies_are_lazy_and_source_scoped(
@@ -56,10 +56,14 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
     monkeypatch.setattr(_http, "get_text", get_document)
     dependency_calls: list[str] = []
     app = configure(
-        sources=(
-            Provider(
-                "catalog", "dcat", {"catalog_uri": "https://fixture.example/catalog"}
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "catalog",
+                    "dcat",
+                    {"catalog_uri": "https://fixture.example/catalog"},
+                ),
+            )
         ),
         dependencies={
             "rdflib": RuntimeFactory(
@@ -94,12 +98,14 @@ def test_configured_dcat_rejects_tampered_catalog_uri_before_fetch(
 
     monkeypatch.setattr(_http, "get_text", get_document)
     app = configure(
-        sources=(
-            Provider(
-                "catalog",
-                "dcat",
-                {"catalog_uri": "https://trusted.example/catalog"},
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "catalog",
+                    "dcat",
+                    {"catalog_uri": "https://trusted.example/catalog"},
+                ),
+            )
         ),
         dependencies={"rdflib": rdflib},
     )
@@ -131,12 +137,14 @@ def test_dcat_search_loads_source_runtime_on_demand(
     monkeypatch.setattr(_http, "get_text", get_document)
     dependency_calls: list[str] = []
     app = configure(
-        sources=(
-            Provider(
-                "catalog",
-                "dcat",
-                {"catalog_uri": "https://fixture.example/catalog"},
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "catalog",
+                    "dcat",
+                    {"catalog_uri": "https://fixture.example/catalog"},
+                ),
+            )
         ),
         dependencies={
             "rdflib": RuntimeFactory(
@@ -160,7 +168,7 @@ def test_dcat_missing_runtime_is_not_reported_as_provider_metadata(
         return "unused"
 
     monkeypatch.setattr(_http, "get_text", get_document)
-    app = configure(sources=(Provider("catalog", "dcat"),))
+    app = configure(catalog=Catalog((Provider("catalog", "dcat"),)))
 
     with pytest.raises(DependencyUnavailableError, match="rdflib"):
         app.resolve(
@@ -195,7 +203,7 @@ def test_resolved_resource_does_not_retain_source_runtime(
     factory = RdfRuntimeFactory()
     factory_ref = ref(factory)
     app = configure(
-        sources=(Provider("catalog", "dcat"),),
+        catalog=Catalog((Provider("catalog", "dcat"),)),
         dependencies={"rdflib": RuntimeFactory(factory)},
     )
     resource = app.resolve(
@@ -225,7 +233,7 @@ def test_dcat_document_failure_remains_provider_metadata_error(
 
     monkeypatch.setattr(_http, "get_text", fail_document)
     app = configure(
-        sources=(Provider("catalog", "dcat"),),
+        catalog=Catalog((Provider("catalog", "dcat"),)),
         dependencies={"rdflib": rdflib},
     )
 
@@ -244,10 +252,14 @@ def test_dcat_document_failure_remains_provider_metadata_error(
 def test_source_options_reject_unknown_values() -> None:
     with pytest.raises(ConfigValidationError, match="typo"):
         configure(
-            sources=(
-                Provider(
-                    "catalog", "ckan", {"endpoint": "https://example.test", "typo": 1}
-                ),
+            catalog=Catalog(
+                (
+                    Provider(
+                        "catalog",
+                        "ckan",
+                        {"endpoint": "https://example.test", "typo": 1},
+                    ),
+                )
             )
         )
 
@@ -269,11 +281,14 @@ def test_configured_json_transport_supports_adapter_headers(
 
     monkeypatch.setattr(_http, "get_json", get_json)
     adapter = _build_source_adapter(
-        Provider("catalog", "ckan", {"endpoint": endpoint}),
+        Provider(
+            "catalog",
+            "ckan",
+            {"endpoint": endpoint, "credential": "test", "credential_header": "X-Test"},
+        ),
         DependencyRegistry({}),
-        CredentialRegistry({}),
+        CredentialRegistry({"test": lambda: "value"}),
     )
-    adapter._headers["X-Test"] = "value"  # type: ignore[attr-defined]
     adapter.search(SearchQuery(limit=1))  # type: ignore[attr-defined]
     assert seen["headers"] == {"X-Test": "value"}
     assert search_url

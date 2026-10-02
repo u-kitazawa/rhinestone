@@ -10,7 +10,7 @@ from typing import Any, cast
 
 import pytest
 
-from rhinestone import Config, configure, sources
+from rhinestone import Config, configure
 from rhinestone.adapters import (
     DcatAdapter,
     GsiFundamentalAdapter,
@@ -18,6 +18,7 @@ from rhinestone.adapters import (
     PlateauAdapter,
 )
 from rhinestone.adapters.execution import GdalAdapter, JsonServiceAdapter
+from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     AmbiguousResourceError,
     ConfigValidationError,
@@ -50,7 +51,7 @@ def fail(*args: Any, **kwargs: Any) -> Any:
 
 
 def odpt_adapter() -> OdptAdapter:
-    return OdptAdapter(**dict(sources.ODPT.settings))
+    return OdptAdapter(**dict(BUILTIN[3].settings))
 
 
 def test_dcat_rejects_an_unsupported_serialization_before_loading() -> None:
@@ -79,19 +80,12 @@ def test_plateau_requires_catalog_endpoint() -> None:
         PlateauAdapter(plateau_client)
 
 
-def test_plateau_keeps_provider_id_positionally_compatible() -> None:
+def test_plateau_accepts_provider_id() -> None:
     adapter = PlateauAdapter(
         plateau_client,
-        "https://fixture.example",
-        None,
-        None,
-        None,
-        None,
-        None,
-        "legacy-provider",
-        knowledge=None,
+        endpoint="https://fixture.example",
+        provider_id="plateau-provider",
     )
-
     assert adapter is not None
 
 
@@ -392,7 +386,7 @@ def test_odpt_catalog_shapes_are_rejected() -> None:
         {"terms_url": ""},
     )
     for change in changes:
-        kwargs = dict(sources.ODPT.settings)
+        kwargs = dict(BUILTIN[3].settings)
         kwargs.update(change)
         with pytest.raises(ConfigValidationError):
             OdptAdapter(**kwargs)
@@ -437,7 +431,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource(
         return "rotating-secret"
 
     app = configure(
-        sources=(sources.ODPT,),
+        catalog=Catalog((BUILTIN[3],)),
         credentials={"odpt": credential},
     )
     config = Config(
@@ -456,7 +450,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource(
     assert resource.open("json-service") == data
     assert len(factory_calls) == 2
     other = configure(
-        sources=(sources.ODPT,),
+        catalog=Catalog((BUILTIN[3],)),
     )
     with pytest.raises(CredentialUnavailableError):
         other.open(config, library="json-service")
