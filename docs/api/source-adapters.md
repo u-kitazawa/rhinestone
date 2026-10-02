@@ -29,7 +29,10 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 Source Adapter は `SourceAdapterDefinition` として明示登録できます。Definition は
 `adapter_type` と `(provider, context) -> adapter` factory から構成され、同じ Definition を
 異なる source id へ複数割り当てられます。Adapter は `load(config) -> Source` を実装し、
-`search(query)` は任意です。Context には組み込み transport、読み取り専用の Credential /
+`search(query)` は任意です。検索を実装する場合、`SearchableSourceAdapter.search()`は
+`tuple[Result, ...] | ProviderSearchResults`を返します。後者はItem単位の
+`SearchDiagnostic`をResultと一緒に返すための型です。
+Context には組み込み transport、読み取り専用の Credential /
 Runtime Port、DestinationPolicy、共有Knowledge Adapterを取得する`knowledge` Portが含まれます。
 
 Source factory に渡される `SourceAdapterContext` の通信境界は `context.transport` に一本化
