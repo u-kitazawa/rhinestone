@@ -10,6 +10,9 @@ Catalog -> Provider -> search -> Result -> resolve -> Resource -> open -> Data
 
 ## まず動かす
 
+この例は文書と同じブランチのAPIを使います。`develop`を試す場合のインストール方法と
+公開済み版との違いは[はじめに](getting-started.md)を参照してください。
+
 GDALを用意し、組み込みCatalogの検索結果からResourceを解決して開きます。
 
 ```console

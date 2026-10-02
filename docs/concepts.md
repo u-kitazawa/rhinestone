@@ -13,6 +13,7 @@ Catalog -> Provider -> Result -> Resource
 `Catalog`は、Rhinestoneが使う提供元の一覧です。組み込みの一覧と、利用者が追加する提供元を同じ形で扱います。
 
 ```python
+from rhinestone import configure
 from rhinestone.catalogs import BUILTIN
 
 app = configure(catalog=BUILTIN)
@@ -45,7 +46,10 @@ resource = app.resolve(result)
 
 ### Runtime（外部ライブラリ）
 
-Runtimeは、Rhinestoneが処理を任せる利用者所有の外部ライブラリです。GDAL、Rasterio、pyogrio、RDFLibなどが該当します。必要になるまで読み込まない場合は`RuntimeFactory`を使います。
+Runtimeは、Rhinestoneが処理を任せる利用者所有の外部ライブラリです。RDFLibは検索・解決用の
+Source Runtimeで、`configure(dependencies=...)`へ渡します。Source Runtimeを遅延読み込み
+する場合は`RuntimeFactory`を使います。GDAL、Rasterio、pyogrioはデータを開くExecution
+Runtimeで、`open(..., runtime=...)`へ実体を渡します。
 
 ### Credential（認証情報）
 

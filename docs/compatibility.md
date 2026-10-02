@@ -1,6 +1,9 @@
 # 対応状況と既知の非対応
 
-この文書は Rhinestone 0.1.1 の実装済み範囲を示します。表にない提供元、通信仕様、形式は、
+この文書は、このドキュメントと同じブランチの実装済み範囲を示します。`develop`では
+次回リリース候補を扱うため、PyPIの公開済み版と一致するとは限りません。
+公開済み版を確認する場合は、そのリリースタグの文書を参照してください。
+表にない提供元、通信仕様、形式は、
 対応しているとは限りません。RhinestoneはURLの拡張子や応答内容だけから形式を推測しません。
 
 「Source Adapter」は提供元のAPIやメタデータを読み取る部分、「Execution Adapter」は確定した
@@ -22,7 +25,7 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 
 | source type | 対応する提供仕様・版 | 解決できる対象 | 明示的な制限 |
 | --- | --- | --- | --- |
-| `ckan` | CKAN Action API (`/api/3/action`) | 指定 resource の公式 download URL | HTML catalog、URL 推測、resource 検索以外の Action API は非対応。 |
+| `ckan` | CKAN Action API (`/api/3/action`) | 指定 resource の公式 download URL、package検索からのResource展開 | 対象は`resource_show`、`package_show`、`package_search`。HTML catalog、URL推測、その他のAction APIは非対応。 |
 | `dcat` | DCAT RDF: JSON-LD、Turtle、RDF/XML | `dcat:downloadURL` を持つ Distribution | 他の RDF serialization、`accessURL` だけの Distribution は非対応。 |
 | `direct` | provider 非依存 | 利用者が明示する URI / format | format、media type、実行方法の推測はしない。 |
 | `estat-gis` | e-Stat Statistics GIS の利用者管理 distribution index | 明示された GML / KML / Shapefile 配布物 | HTML scraping、安定 API とみなした URL 発見、selector の推測は非対応。 |
@@ -39,7 +42,7 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 
 | Execution Adapter | 対応 format / access | 非対応・注意点 |
 | --- | --- | --- |
-| `gdal` | `shapefile`、`geotiff`、`cog`、`netcdf`、`wms`、`gml`、`kml`、`citygml`、GSI XYZ tile | ZIP URI の `/vsizip/` 変換はこれだけが行う。上記以外の format は選択しない。 |
+| `gdal` | `shapefile`、`geotiff`、`cog`、`netcdf`、`wms`、`gml`、`kml`、`citygml`、GSI XYZ tile | 明示されたZIP AccessPlanを`/vsizip/` URIへ変換する。pyogrioもZIP変換に対応する。上記以外のformatは選択しない。 |
 | `rasterio` | `cog`、`geotiff` | URI と option をそのまま `rasterio.open()` へ渡す。archive 展開や format 変換はしない。 |
 | `pyogrio` | representation registry で `vector` と明示された `shapefile`、`geojson`、`gpkg`、`flatgeobuf`、`gml`、`kml`、`citygml` | URI と encoding を `read_dataframe()` へ渡す。明示された ZIP AccessPlan は GDAL VSI URI に変換する。URI suffix や archive内容から形式・memberを推測せず、環境に対応 driver がない場合は `ResourceAccessError`。 |
 | `json-service` | `application/json` の ODPT service query | 組み込みHTTP runtimeとODPT用request preparerを使用する。他providerのJSON APIを汎用的に実行しない。 |

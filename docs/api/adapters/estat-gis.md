@@ -62,5 +62,8 @@ resource = app.resolve(
 複数候補が残る場合は Resolver が曖昧さとして扱います。`time` を指定すると共有 Time
 Knowledge Adapter で解決し、統計調査年として候補を絞ります。
 
-`search()` は渡されたインデックス内の `text` と `limit` だけを扱います。検索条件を
-追加して推測による discovery を行うことはありません。
+Adapterの`search()`は渡されたインデックス内の`text`と`limit`を扱います。
+`app.search(format=...)`はCoordinatorで絞り込みますが、現行Adapterは`Result.formats`を
+設定しないため、形式検索では不明として扱います。特定形式の配布物を解決する場合は
+上記の`Config.settings["format"]`を使ってください。詳細は
+[検索能力の対照表](../../search-capabilities.md)の「形式検索の適用段階」を参照してください。
