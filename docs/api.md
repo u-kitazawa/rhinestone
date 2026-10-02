@@ -132,8 +132,12 @@ resource = result.resolve()
 
 `title`、`description`、`discovered_by`、`target`、`metadata`、`raw_metadata`、`provenance`、
 `formats`を参照できます。`target`は解決先の`Config`で、`to_config()`でも取得できます。
-`formats`は検索時に宣言された形式の`frozenset[str]`です。空の場合や既知の形式へ
-正規化できない場合、形式検索では不明として扱います。`Resource.format`の保証ではありません。
+`formats`は検索時に宣言された形式の`frozenset[str]`です。`Resource.format`の保証ではありません。
+Coordinatorによる形式照合では、空の場合や`Format`の値へ正規化できない場合に不明として
+扱います。一方、CKAN、PLATEAU、search.ckan.jpのAdapter内照合では、非空の未登録形式
+（例：`xlsx`）は`Format.UNKNOWN`に一致しません。こうした形式を取得する場合は`format`を
+省略して検索し、`result.formats`を確認してください。詳しくは
+[検索能力の対照表](search-capabilities.md)を参照してください。
 
 検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。Providerの通信・metadata・response障害は`reason="provider_failure"`、`failure_type`（`metadata`または`response`）として診断され、他のSourceの結果は継続して返されます。必要なCredentialが未登録の場合は`failure_type="credential"`です。Credential factoryの失敗や予期しないプログラムエラーはこの診断へ変換されません。
 

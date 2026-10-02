@@ -37,8 +37,19 @@ Search Coordinatorで絞り込む場合、Adapterへは`format`を渡さず、`l
 対象となり、指定件数に達するまで追加取得する契約ではありません。
 CKAN系の形式照合もサーバーの形式検索パラメータへ変換せず、Adapter内で行います。
 
-既知の形式がない結果は`Format.UNKNOWN`を明示した場合だけ一致します。URIの拡張子や
-raw metadataを調べて形式を補完したり、検索中に`resolve()`したりしません。
+`Format.UNKNOWN`の照合対象は適用段階によって異なります。
+
+| 適用段階 | `Format.UNKNOWN`に一致する形式集合 | 非空の未登録形式（例：`xlsx`） |
+| --- | --- | --- |
+| Search Coordinator | 空の集合、`Format`の値へ正規化できない形式だけの集合、または`unknown`を含む集合 | 不明として一致する |
+| CKAN / PLATEAU / search.ckan.jpのAdapter内 | 空の集合、または`unknown`を明示的に含む集合 | 一致しない |
+
+`canonical_format("XLSX")`は`"xlsx"`を保持し、`None`や`"unknown"`へ変換しません。
+CKAN系でこのような未登録形式を取得する場合は`format`を省略して検索し、
+`result.formats`を確認してください。形式条件を省略すれば、未知形式だけを抽出する検索には
+なりませんが、非空の未登録形式も結果に含まれます。
+
+URIの拡張子やraw metadataを調べて形式を補完したり、検索中に`resolve()`したりしません。
 `Format.UNKNOWN`は解決・openの成功を保証せず、Adapterが検索結果自体を省略する規則も
 変更しません。たとえばsearch.ckan.jpが省略する形式未宣言のResourceは取得できません。
 `FormatPreset.PYOGRIO`も検索候補の形式集合であり、Runtimeのdriver対応を保証しません。

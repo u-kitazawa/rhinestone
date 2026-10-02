@@ -74,6 +74,10 @@ MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一
 複数指定はOR条件です。Providerが形式検索を宣言する場合は条件を渡し、それ以外は明示された
 候補形式をRhinestoneが検索後に絞り込みます。post-filter時の`limit`は絞り込み後に適用します。
 URI suffixから形式を推測しません。形式不明の結果を含めるには`Format.UNKNOWN`を明示します。
+ただし、CKAN系のAdapter内照合では、`XLSX`のような非空の未登録形式は
+`Format.UNKNOWN`に一致しません。取得する場合は`format`を省略し、`result.formats`を
+確認してください。Coordinatorによる照合との違いは
+[検索能力の対照表](search-capabilities.md)に記載しています。
 
 ```python
 from rhinestone import Format, FormatPreset
