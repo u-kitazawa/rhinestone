@@ -153,12 +153,19 @@ class SearchableExampleSource(ExampleSource):
         ...
 ```
 
-宣言していない条件（例えば `bbox`）を受け取った場合、Search Coordinator がその
-Provider を skip し、`SearchResults.diagnostics` に理由を記録します。Provider 横断の
+宣言していない条件（例えば `bbox`）はSearch Coordinatorが除外し、
+`SearchResults.diagnostics`に記録します。対応条件が一つもない場合や必須条件が不足する
+場合だけ、そのProviderをskipします。Provider 横断の
 ranking は行わないため、Adapter は provider 固有の結果順を保ちます。
 
 検索結果の `target` は通常の `Config` に戻せる形にし、`metadata` と `provenance` を
 失わないようにします。検索を実装しない Adapter は `load()` だけで利用できます。
+
+形式検索に対応するには、対象データの宣言済み形式を`Result.formats`へ保持します。
+`search_conditions`に`format`を宣言しなければ、Coordinatorが結果を絞り込み、
+その後に`limit`を適用します。`format`を宣言する場合は、AdapterがOR照合、Preset展開、
+`Format.UNKNOWN`の明示指定、照合後の`limit`を扱います。
+URIや隣接する別データの形式から対象の形式を推測しません。
 
 ## Execution Adapter（実行アダプター）
 
@@ -189,10 +196,12 @@ data = app.open(resource, "example-runtime", runtime=example_runtime)
 ```
 
 `supports()` は Resource の形式・AccessPlanだけを見て、実際の Resource
-選択を行いません。`priority` が大きい Adapter が自動選択され、`app.open(..., name)` で
-明示選択もできます。Definition の `name` と生成された Adapter の `name` は一致させます。
+選択を行いません。公開APIでは`app.open(..., name, runtime=...)`でAdapter名とRuntimeを
+明示します。指定した名前が未登録・非互換なら`ExecutionAdapterUnavailableError`となり、
+別のAdapterへ切り替えません。内部Selectorの優先度規則は、公開APIのRuntime自動選択を
+意味しません。Definition の `name` と生成された Adapter の `name` は一致させます。
 
-`open()` がネットワークへアクセスする場合は、Runtime を解決する前に
+`open()` がネットワークへアクセスする場合は、通信の前に
 `destination_policy.authorize(resource.uri)` を適用するか、必要に応じて既存の
 Execution Adapter 基底クラスの `authorize()` を利用してください。Core に GDAL、Rasterio、
 pyogrio などを依存させず、Execution Runtime は `open()` で注入します。

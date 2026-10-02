@@ -15,7 +15,7 @@ Runtime が必要になる段階は二つあります。
 
 Execution Runtimeは構成時に登録しません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
 
-bare valueはcallableでもRuntime実体として扱います。遅延factoryを使う場合だけ明示的に
+Source Runtimeのbare valueはcallableでもRuntime実体として扱います。遅延factoryを使う場合だけ明示的に
 `RuntimeFactory` で包むため、callable façadeやMockを誤って呼び出しません。
 
 ```python

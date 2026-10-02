@@ -64,12 +64,11 @@ resource = app.resolve(config)
 
 ## `configure()`（アプリケーションを作る）
 
-Catalog、Runtime、Credentialを組み合わせて`Rhinestone`アプリケーションを作ります。
+Catalog、Source Runtime、Credentialを組み合わせて`Rhinestone`アプリケーションを作ります。
+Execution Runtimeは`open()`で渡します。
 
 ```python
 import os
-
-import rasterio
 
 from rhinestone import configure
 from rhinestone.catalogs import BUILTIN
@@ -107,8 +106,16 @@ results = app.search(text="河川", limit=10)
 result = results[0]
 ```
 
-`text`、`area`、`bbox`、`time`、`limit`をキーワードで指定できます。`area`は行政区域名・別名・コードを受け取り、bbox対応SourceにはCRS84 bbox、明示的なtext fallbackを持つSourceには正式区域名として投影されます。`area`と`bbox`は同時指定できず、未知区域はProvider呼び出し前に`area_resolution_failed` diagnosticになります。`SearchQuery`を直接渡す場合は
+`text`、`area`、`bbox`、`time`、`format`、`limit`をキーワードで指定できます。`area`は行政区域名・別名・コードを受け取り、bbox対応SourceにはCRS84 bbox、明示的なtext fallbackを持つSourceには正式区域名として投影されます。`area`と`bbox`は同時指定できず、未知区域はProvider呼び出し前に`area_resolution_failed` diagnosticになります。`SearchQuery`を直接渡す場合は
 `rhinestone.models`からimportします。
+
+`format`は`Format`または`FormatPreset`の空でないtupleで指定し、複数値はOR条件です。
+文字列やlistは`ConfigValidationError`になります。`limit`はProviderごとの上限であり、
+横断検索全体の上限ではありません。既定の`None`は全件取得を保証しません。
+具体的な適用段階とpage制限は[検索能力の対照表](search-capabilities.md)を参照してください。
+
+位置引数`query`には`SearchQuery`または検索文字列を渡せます。`query`とキーワード検索条件の
+併用は`TypeError`になります。この呼び出し契約はトップレベルの`search()`と共通です。
 
 `SearchResults`のiterationと整数indexingは、構成したProvider順にgroupを連結し、
 各Provider内の順序を保持します。このsequenceは決定的な走査用であり、Providerを
@@ -120,18 +127,33 @@ result = results[0]
 検索で見つかった候補です。通常は次のようにResourceへ解決します。
 
 ```python
-resource = app.resolve(result)
+resource = result.resolve()
 ```
 
-`title`、`description`、`discovered_by`、`target`、`metadata`、`provenance`を参照できます。`target`は解決先の`Config`で、`to_config()`でも取得できます。
+`title`、`description`、`discovered_by`、`target`、`metadata`、`raw_metadata`、`provenance`、
+`formats`を参照できます。`target`は解決先の`Config`で、`to_config()`でも取得できます。
+`formats`は検索時に宣言された形式の`frozenset[str]`です。`Resource.format`の保証ではありません。
+Coordinatorによる形式照合では、空の場合や`Format`の値へ正規化できない場合に不明として
+扱います。一方、CKAN、PLATEAU、search.ckan.jpのAdapter内照合では、非空の未登録形式
+（例：`xlsx`）は`Format.UNKNOWN`に一致しません。こうした形式を取得する場合は`format`を
+省略して検索し、`result.formats`を確認してください。詳しくは
+[検索能力の対照表](search-capabilities.md)を参照してください。
 
-検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。Providerの通信・metadata・response障害は`reason="provider_failure"`、`failure_type`（`metadata`または`response`）として診断され、他のSourceの結果は継続して返されます。予期しないプログラムエラーはこの診断へ変換されません。
+検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。Providerの通信・metadata・response障害は`reason="provider_failure"`、`failure_type`（`metadata`または`response`）として診断され、他のSourceの結果は継続して返されます。必要なCredentialが未登録の場合は`failure_type="credential"`です。Credential factoryの失敗や予期しないプログラムエラーはこの診断へ変換されません。
 
 `Result.metadata`、`Result.raw_metadata`、`Result.provenance`は検索時の情報です。`app.resolve(result)`は
 cross-source解決後もこれらを`resource.discovery`へ保持し、target Sourceが生成した
 `resource.metadata`、`resource.provenance`、`resource.source.raw_metadata`を上書きしません。
 アプリケーションから独立して作成したResultでは
 `result.resolve()`を使えないため、`app.resolve(result)`を使用してください。
+
+## `SearchResults`（提供元別の検索結果）
+
+整数index・iterationはProvider順の結果列、sliceは`tuple[Result, ...]`、文字列indexは
+該当Providerの結果tupleを返します。`keys()`、`values()`、`items()`、`get()`で
+Provider別に参照できます。条件の診断は`diagnostics`、実行したProviderの
+`source_id`・`elapsed_ms`・`result_count`は`executions`で確認できます。
+結果が空でも、Provider障害などの理由を診断から調べられます。
 
 ## `Rhinestone.resolve()`（Resourceを確定する）
 
@@ -152,6 +174,27 @@ data = resource.open("rasterio", runtime=rasterio)
 ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作成した後の値です。
 `access_plan.kind`は`file`、`remote-dataset`、`service-query`のいずれかです。
 `Resource.open()`はデータ解析を行わず、指定した利用者所有Runtimeへ処理を委譲します。
+
+`library`は必須です。外部Runtimeは`runtime=`へ実体を渡し、`RuntimeFactory`は
+受け付けません。未登録・非互換のAdapterやRuntime不足は
+`ExecutionAdapterUnavailableError`となり、別Runtimeへ自動で切り替えません。
+`json-service`はCoreのRuntimeを使うため`resource.open("json-service")`とし、
+`runtime=`を省略します。この契約は`Rhinestone.open()`にも共通です。
+
+## `Format` / `FormatPreset`（検索形式）
+
+```python
+from rhinestone import Format, FormatPreset
+
+results = app.search(text="河川", format=(Format.GEOJSON, Format.GPKG))
+vectors = app.search(text="河川", format=(FormatPreset.PYOGRIO,), limit=10)
+```
+
+`Format`は共通の形式名を表すEnumです。形式不明には`Format.UNKNOWN`を明示します。
+`FormatPreset.PYOGRIO`は`SHAPEFILE`、`GEOJSON`、`GPKG`、`FLATGEOBUF`、`GML`、
+`KML`、`CITYGML`の集合へ展開されます。Presetは検索候補集合であり、解決やRuntimeの
+open成功を保証しません。検索時に形式が設定されないProviderを含む制限は
+[検索能力の対照表](search-capabilities.md)の「形式検索の適用段階」を参照してください。
 
 ## エラー処理
 

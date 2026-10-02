@@ -80,6 +80,90 @@ def test_ckan_pyogrio_tutorial_passes_runtime_at_open() -> None:
     )
 
 
+def test_ckan_pyogrio_tutorial_filters_formats_before_opening(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """CSVのpageを飛ばし、後続のベクター配布物を解決して開ける。"""
+    from rhinestone import api
+
+    csv_resource = {
+        "id": "table",
+        "url": "https://assets.example/table.csv",
+        "format": "CSV",
+    }
+    vector_resource = {
+        "id": "vector",
+        "package_id": "vector-package",
+        "url": "https://assets.example/vector.gpkg",
+        "format": "GeoPackage",
+    }
+    package = {
+        "id": "vector-package",
+        "title": "河川",
+        "resources": [vector_resource],
+    }
+    search_params: list[dict[str, object]] = []
+
+    def get_json(
+        url: str, params: dict[str, object], headers: object = None
+    ) -> dict[str, object]:
+        if url.endswith("/package_search"):
+            search_params.append(dict(params))
+            return {
+                "success": True,
+                "result": {
+                    "count": 2,
+                    "results": [
+                        package
+                        if params.get("start") == 1
+                        else {
+                            "id": "table-package",
+                            "title": "河川",
+                            "resources": [csv_resource],
+                        }
+                    ],
+                },
+            }
+        if url.endswith("/resource_show"):
+            assert params == {"id": "vector"}
+            return {"success": True, "result": vector_resource}
+        assert url.endswith("/package_show")
+        assert params == {"id": "vector-package"}
+        return {"success": True, "result": package}
+
+    class Frame:
+        columns = ("geometry", "name")
+
+        def __len__(self) -> int:
+            return 1
+
+    opened: list[str] = []
+    pyogrio = ModuleType("pyogrio")
+
+    def read_dataframe(uri: str, **kwargs: object) -> Frame:
+        opened.append(uri)
+        return Frame()
+
+    pyogrio.read_dataframe = read_dataframe  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "pyogrio", pyogrio)
+    monkeypatch.setattr(getattr(api, "_http"), "get_json", get_json)
+    monkeypatch.setenv("RHINESTONE_CKAN_QUERY", "河川")
+    monkeypatch.setenv("RHINESTONE_CKAN_RESULT_INDEX", "0")
+
+    source = tutorial_python("ckan-pyogrio.md")
+    exec(compile(source, "docs/tutorials/ckan-pyogrio.md", "exec"), {})
+
+    assert search_params == [
+        {"q": "河川", "rows": 20},
+        {"q": "河川", "rows": 20, "start": 1},
+    ]
+    assert opened == ["https://assets.example/vector.gpkg"]
+    output = capsys.readouterr().out
+    assert "formats: ['gpkg']" in output
+    assert "format: gpkg\n" in output
+    assert "rows: 1\n" in output
+
+
 def test_stac_rasterio_tutorial_selects_an_explicit_asset(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

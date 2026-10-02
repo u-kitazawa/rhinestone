@@ -12,7 +12,7 @@ results = app.search(text="人口", limit=10)
 
 - `text`: `str`または`None`
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
-- `limit`: `bool`を除く0以上の整数
+- `limit`: `bool`を除く0以上の整数または`None`（Providerごとの上限）
 - `bbox`: 数値4要素のtuple
 - `time`: `datetime`または`None`を2要素で保持するtuple
 - `format`: `Format`または`FormatPreset`を1つ以上保持するtuple（OR条件）
@@ -74,6 +74,10 @@ MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一
 複数指定はOR条件です。Providerが形式検索を宣言する場合は条件を渡し、それ以外は明示された
 候補形式をRhinestoneが検索後に絞り込みます。post-filter時の`limit`は絞り込み後に適用します。
 URI suffixから形式を推測しません。形式不明の結果を含めるには`Format.UNKNOWN`を明示します。
+ただし、CKAN系のAdapter内照合では、`XLSX`のような非空の未登録形式は
+`Format.UNKNOWN`に一致しません。取得する場合は`format`を省略し、`result.formats`を
+確認してください。Coordinatorによる照合との違いは
+[検索能力の対照表](search-capabilities.md)に記載しています。
 
 ```python
 from rhinestone import Format, FormatPreset
@@ -85,6 +89,12 @@ unknown = app.search(format=(Format.UNKNOWN,))
 
 Presetは検索候補集合であり、Runtimeでのopen成功を保証しません。最終判定は解決後のExecution
 Adapterが行います。collection、asset、provider固有の詳細検索は共通引数にしていません。
+
+Coordinatorによる絞り込みは`Result.formats`だけを照合し、raw metadataやURIから形式を
+補完しません。`limit=None`で取得したProviderの既定範囲を絞るため、指定件数に達するまで
+追加pageを取得するとは限りません。CKAN系はAdapter内で形式を照合し、件数が足りなければ
+次のpackage pageを取得します。検索時に形式を設定しないProviderもあります。
+詳細は[検索能力の対照表](search-capabilities.md)の「形式検索の適用段階」を参照してください。
 
 `search-ckan-jp` では、`limit` はCKANへのpackage取得数（`rows`）に使われるだけでなく、packageをsupported resourceへ展開した後の結果列にも適用されます。そのため、1つのpackageに複数のresourceがある場合、flattened結果全体が`limit`件に達した時点で後続resourceやpackageの結果が省略されます。`limit=None`ならこの展開後の制限はありません。
 
@@ -116,7 +126,9 @@ print(result.metadata)
 print(resource.uri)
 ```
 
-`Result`は検索中だけ使う一時的な値です。Provider固有の対象指定はResultに保持されますが、endpointやCredentialは複製されません。
+`Result`は検索で得た候補と解決先を保持する値です。Provider固有の対象指定に加えて、
+出典となるendpointはprovenanceやraw metadataに残る場合があります。
+CredentialのsecretやRuntime実体は保持しません。
 
 Resultは次の情報を持ちます。
 
@@ -124,6 +136,7 @@ Resultは次の情報を持ちます。
 - `target`: `app.resolve()`へ渡す解決先の`Config`
 - `metadata` / `provenance`: 発見時に得られた知識
 - `raw_metadata`: 発見元が返した未加工の provider metadata
+- `formats`: 検索時に宣言された形式の集合。解決後の`Resource.format`とは別の情報
 
 横断CKAN検索の結果は、`discovered_by="search-ckan-jp"`、`target.source_id="direct"` のようになります。`target`は`result.to_config()`で取得できます。解決先が発見元と異なる場合、target側の`resource.metadata` / `resource.provenance` / `resource.source.raw_metadata`を保持したまま、発見元の3つの記録は`resource.discovery`へ保持されます。
 

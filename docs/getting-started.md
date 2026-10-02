@@ -10,6 +10,16 @@ pip install rhinestone
 
 HTTP通信は組み込みです。データを開くときだけ、GDAL、Rasterio、pyogrioなど必要な外部ライブラリを用意します。
 
+`develop`のドキュメントは次回リリース候補を説明します。このブランチのAPIを試す場合は
+次のようにインストールしてください。PyPIの公開済み版とはAPIが異なる場合があります。
+
+```console
+python -m pip install "rhinestone @ git+https://github.com/u-kitazawa/rhinestone.git@develop"
+```
+
+環境を固定する場合は`develop`をコミットSHAへ置き換えます。文書の対象は
+[ドキュメントの位置付け](documentation-status.md)を参照してください。
+
 ## 2. 検索して解決する
 
 ```python
