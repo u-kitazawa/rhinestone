@@ -107,7 +107,7 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     assert "@2364508f02f010f3fcc96c4677d133951524fa85" in source
     assert "@develop" not in source
     for marker in (
-        "BUILTIN[0]",
+        'provider.id == "geospatial-jp"',
         'app.search(text="河川"',
         'resource.open("pyogrio", runtime=pyogrio)',
         "PYOGRIO_VECTOR_FORMATS",

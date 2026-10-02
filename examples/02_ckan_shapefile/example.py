@@ -6,7 +6,9 @@ from rhinestone import Config, configure
 from rhinestone.catalogs import BUILTIN, Catalog
 
 resource_id = os.environ["RHINESTONE_CKAN_RESOURCE_ID"]
-app = configure(catalog=Catalog((BUILTIN[0],)))
+app = configure(
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "geospatial-jp")
+)
 resource = app.resolve(
     Config(
         source_id="geospatial-jp",

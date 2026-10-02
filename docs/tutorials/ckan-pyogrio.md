@@ -49,7 +49,7 @@ def vector_format(result: Any) -> Optional[str]:
 
 
 app = configure(
-    catalog=Catalog((BUILTIN[0],)),
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "geospatial-jp"),
 )
 PYOGRIO_VECTOR_FORMATS = {
     "shapefile",

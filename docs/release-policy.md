@@ -104,3 +104,46 @@ Adapter／Knowledge Adapter契約、`DestinationPolicy`、format定義・正規�
 `Provider`が通常利用における提供元定義の正式名です。`SourceDefinition`を使っていた設定例は
 `Provider`へ置き換えてください。0.1.xでもbreaking changeを許容する方針に基づき、0.2まで
 旧トップレベルimportを残す段階的廃止は行いません。
+
+
+後方互換用のAPIも削除しました。旧名や旧引数を受け付けるwrapperは提供しません。
+
+| 削除したAPI・利用方法 | 現行の利用方法 |
+| --- | --- |
+| `rhinestone.sources` と `sources.ALL` | `rhinestone.catalogs.BUILTIN`。Providerは `Provider.id` で選びます |
+| `SourceDefinition`（`rhinestone.models`を含む） | `Provider` |
+| `SearchResult`（`rhinestone.models`を含む） | `Result` |
+| `configure(sources=...)` / `Rhinestone(sources=...)` | `catalog=Catalog(providers)` |
+| `CatalogSource.definition` | `CatalogSource.provider` |
+| `rhinestone.adapters.source.ckan.canonical_format` / `ckan.format.canonical_format` | `rhinestone.representations.canonical_format` |
+| Adapterの `api_token` / `api_key` | `credential` に論理名を指定し、`credentials` に `CredentialRegistry` を渡します |
+| Adapterの `api_key_header` / `token_scheme` | `credential_header` / `credential_scheme` |
+| `tuple(bbox)` やBoundingBoxの反復 | `bbox.as_tuple()` |
+
+組み込みProviderを選ぶ例です。一覧の並び順には依存しません。
+
+```python
+from rhinestone import Catalog, configure
+from rhinestone.catalogs import BUILTIN
+
+app = configure(
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "gsi"),
+)
+```
+
+Adapterを直接構成する場合も、secretを直接渡す引数を使わず、認証情報をRegistryへ登録します。
+`configure()` では `credentials={"catalog-key": lambda: token}` のようにfactoryのmappingを渡します。
+
+```python
+from rhinestone.adapters.source.ckan import CkanAdapter
+from rhinestone.registry import CredentialRegistry
+
+adapter = CkanAdapter(
+    get_json=get_json,
+    endpoint="https://catalog.example",
+    credential="catalog-key",
+    credential_header="X-CKAN-API-Key",
+    credential_scheme="",
+    credentials=CredentialRegistry({"catalog-key": lambda: token}),
+)
+```

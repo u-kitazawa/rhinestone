@@ -6,7 +6,7 @@ from rhinestone import Config, configure
 from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
-    catalog=Catalog((BUILTIN[2],)),
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "gsi"),
 )
 
 resource = app.resolve(Config("gsi", {"id": "std"}))

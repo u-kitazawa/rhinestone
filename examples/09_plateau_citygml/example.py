@@ -8,7 +8,7 @@ from rhinestone import Config, configure
 from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
-    catalog=Catalog((BUILTIN[1],)),
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "plateau"),
 )
 resource = app.resolve(
     Config(

@@ -12,7 +12,7 @@ export RHINESTONE_CKAN_RESOURCE_ID="the-resource-uuid"
 uv run python examples/02_ckan_shapefile/example.py
 ```
 
-接続先は`rhinestone.catalogs.BUILTIN[0]`に定義されています。HTTP通信はRhinestoneに組み込まれているため、
+接続先は`BUILTIN`内の`geospatial-jp` Providerに定義されています。HTTP通信はRhinestoneに組み込まれているため、
 この例ではGDALは必要ありません。ZIP形式のShapefile Resourceを選ぶと、アーカイブ情報も確認できます。
 
 実行時に外部APIへ接続するため、提供元の仕様変更やResource削除によって失敗することがあります。

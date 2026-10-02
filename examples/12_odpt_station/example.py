@@ -6,7 +6,7 @@ from rhinestone import Config, configure
 from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
-    catalog=Catalog((BUILTIN[3],)),
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "odpt"),
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 records = app.open(
