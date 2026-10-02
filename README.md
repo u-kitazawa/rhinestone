@@ -38,6 +38,16 @@ RhinestoneはGIS処理ライブラリやワークフローエンジンではあ�
 python -m pip install rhinestone
 ```
 
+PyPIは公開済み版です。`develop`のREADMEとドキュメントは次回リリース候補を説明するため、
+ここにある最新APIを試す場合は同じブランチをインストールしてください。
+
+```console
+python -m pip install "rhinestone @ git+https://github.com/u-kitazawa/rhinestone.git@develop"
+```
+
+再現可能な環境では`develop`をコミットSHAへ置き換えます。公開済み版は対応する
+リリースタグのドキュメントを参照してください。
+
 ## 基本的な使い方
 
 ```python
@@ -52,6 +62,9 @@ print(resource.metadata)
 
 `rs.search()`はRhinestoneが用意する提供元からデータ候補を返し、検索結果は`result.resolve()`で使えるデータ情報へ解決できます。
 複数の提供元を使う場合、結果の順番は設定した順番であり、提供元をまたいだ関連度順ではありません。詳細は[検索結果の順序](docs/search.md#結果の順序)を参照してください。
+
+形式を限定する場合は`rs.search(text="河川", format=(rs.FormatPreset.PYOGRIO,))`のように
+指定します。対応形式と取得範囲は[検索能力の対照表](docs/search-capabilities.md)を参照してください。
 
 検索を使わず、既知のProviderを選んで構成することもできます。
 

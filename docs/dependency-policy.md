@@ -63,7 +63,10 @@ Execution Adapter identity = どの翻訳規則を使うか
 Runtime identity           = どの外部実行環境を呼び出すか
 ```
 
-現行の組み込みAdapterは1つのAdapterと1つのRuntimeが対応するため、`ExecutionAdapter.name`を選択名とDependency Registryのキーに兼用します。これは現在の契約として維持します。
+現行の組み込みExecution Adapterは1つのAdapterと1つのRuntimeが対応します。
+`ExecutionAdapter.name`は`open()`で明示する選択名で、Runtime実体は同じ呼び出しの
+`runtime=`へ渡します。Execution RuntimeをDependency Registryへ登録する契約はありません。
+`json-service`だけはCoreがRuntimeを用意するため、`runtime=`を省略します。
 
 ## Adapterの連結
 

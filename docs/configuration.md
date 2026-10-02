@@ -1,7 +1,8 @@
 # アプリケーションを構成する
 
-Rhinestoneのアプリケーションは、使うデータ提供元、必要な外部ライブラリ、認証情報を組み合わせて作ります。
-最初は組み込みCatalogだけで構成し、必要になったときにRuntimeやCredentialを追加してください。
+Rhinestoneのアプリケーションは、使うデータ提供元、検索・解決用のSource Runtime、認証情報を組み合わせて作ります。
+データを開くExecution Runtimeは、構成時ではなく`open()`の呼び出しごとに渡します。
+組み込みCatalogを検索するだけなら、[トップレベルのsearch()](api.md)も利用できます。
 
 ## Catalogを指定する
 
@@ -111,7 +112,11 @@ Metadata/Provenanceやcanonical valueを扱いますが、Credential、Runtime�
 外部Runtimeは利用者が所有します。Source Runtimeは`dependencies`へ実体または`RuntimeFactory`として渡し、Execution Runtime実体は`open(..., runtime=...)`へ渡します。
 
 ```python
+import rdflib
+
+from rhinestone import configure
 from rhinestone.catalogs import BUILTIN
+
 app = configure(
     catalog=BUILTIN,
     dependencies={
@@ -138,12 +143,14 @@ app = configure(
 )
 ```
 
-| 種類 | 用途 | factoryの評価時点 | 例 |
+| 種類 | 用途 | 供給・評価時点 | 例 |
 | --- | --- | --- | --- |
-| Source Runtime | provider / protocol metadataの解釈 | 対象Sourceの`search()`または`resolve()`で初めて必要になった時 | `rdflib` |
-| Execution Runtime | 解決済みResourceを開く | `Resource.open()`で初めて必要になった時 | `gdal`、`rasterio`、`pyogrio` |
+| Source Runtime | provider / protocol metadataの解釈 | `dependencies`へ実体または`RuntimeFactory`を登録。factoryは初めて必要になった時に評価 | `rdflib` |
+| Execution Runtime | 解決済みResourceを開く | `open(..., runtime=...)`へ実体を渡す。`RuntimeFactory`は受け付けない | `gdal`、`rasterio`、`pyogrio` |
 
 `configure()`は Source Runtimeの`RuntimeFactory`を評価しません。Resourceは実行コンテキストを引き継ぎますが、Execution Runtime実体は保持しません。
+`dependencies`に`gdal`、`rasterio`、`pyogrio`、`json-service`などのExecution名を
+登録すると`ConfigValidationError`になります。
 
 ## 認証情報（Credential）
 
@@ -184,8 +191,8 @@ ODPTでは`endpoint + resource_types`だけが対象です。`none`では宛先�
 
 Adapterを直接構築する既存コードでは、明示的に作成した`DestinationPolicy(rules=...)`の
 ruleをCredential付き通信にも引き続き利用できます。`from_catalog()`で生成したpolicyは、
-Providerの実行endpointからCredential専用ruleを生成します。Catalogに論理Credential名を
-持たないProviderでも、直接指定した`api_token`／`api_key`はその実行endpointだけへ送信できます。
+Providerの実行endpointからCredential専用ruleを生成します。認証情報は論理名を指定し、
+CredentialRegistryへ登録したfactoryから取得します。`api_token`／`api_key`は受け付けません。
 
 ## 高度なAPI
 

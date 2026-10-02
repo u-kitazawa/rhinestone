@@ -7,9 +7,10 @@
 
 ## 設定と検索
 
-組み込みCatalogの `BUILTIN`内の`search-ckan-jp` Provider に検索先が定義されています。検索には `text`
-が必須で、`limit` を指定できます。`limit` はBackend APIへの package 件数だけでなく、
-package内の対応するresourceへ展開した最終結果にも適用されます。先頭 page に十分な
+組み込みCatalogの `BUILTIN内のsearch-ckan-jp Provider` に検索先が定義されています。検索には `text`
+が必須で、`format`と`limit`を指定できます。形式はBackend APIへ送らず、Adapter内で
+対象Resourceごとに照合します。`limit` はBackend APIへの package 件数だけでなく、
+形式照合後の最終結果にも適用されます。先頭 page に十分な
 Resource がなければ、response の `count` を根拠に `start` で次 page を取得します。
 `limit=None` では provider の既定 page を超えて走査しません。
 

@@ -40,6 +40,12 @@ dataset = app.open(result, "rasterio", runtime=rasterio)
 RhinestoneはGIS I/O、形式変換、空間演算、解析を行いません。選択済みResourceを利用者が所有するRuntimeへ渡します。
 Execution Runtimeは`configure()`に登録せず、`open()`の呼び出しごとに渡します。
 
+Adapter名（`gdal`、`rasterio`、`pyogrio`など）は必須です。指定したAdapterがResourceに
+対応しない場合やRuntime実体がない場合は`ExecutionAdapterUnavailableError`になります。
+Execution Runtimeへ`RuntimeFactory`を渡すこともできません。
+ODPTのJSONサービスはCoreが通信するため、`resource.open("json-service")`とし、
+`runtime=`を省略します。
+
 ## 高度な直接解決
 
 Provider固有の対象指定を再現可能なConfigとして扱う必要がある場合だけ、`Config`を使います。
