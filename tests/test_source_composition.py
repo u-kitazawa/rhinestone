@@ -12,15 +12,13 @@ from rhinestone import (
     Config,
     configure,
 )
-from rhinestone.api import _build_source_adapter  # pyright: ignore[reportPrivateUsage]
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     DependencyUnavailableError,
     ProviderMetadataError,
 )
-from rhinestone.models import Provider, RuntimeFactory, SearchQuery
-from rhinestone.registry import CredentialRegistry, DependencyRegistry
+from rhinestone.models import Provider, RuntimeFactory
 from tests.provider_support import fixture_json
 
 
@@ -280,15 +278,22 @@ def test_configured_json_transport_supports_adapter_headers(
         return fixture_json("ckan/package_search.json")
 
     monkeypatch.setattr(_http, "get_json", get_json)
-    adapter = _build_source_adapter(
-        Provider(
-            "catalog",
-            "ckan",
-            {"endpoint": endpoint, "credential": "test", "credential_header": "X-Test"},
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider(
+                    "catalog",
+                    "ckan",
+                    {
+                        "endpoint": endpoint,
+                        "credential": "test",
+                        "credential_header": "X-Test",
+                    },
+                ),
+            )
         ),
-        DependencyRegistry({}),
-        CredentialRegistry({"test": lambda: "value"}),
+        credentials={"test": lambda: "value"},
     )
-    adapter.search(SearchQuery(limit=1))  # type: ignore[attr-defined]
+    app.search(limit=1)
     assert seen["headers"] == {"X-Test": "value"}
     assert search_url

@@ -5,10 +5,10 @@ import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Provider, configure
-from rhinestone.adapters.source.mlit_dpf import MlitDpfAdapter
-from rhinestone.api import (
-    _validate_mlit_dpf_targets,  # pyright: ignore[reportPrivateUsage]
+from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
+    validate_mlit_dpf_targets,  # pyright: ignore[reportPrivateUsage]
 )
+from rhinestone.adapters.source.mlit_dpf import MlitDpfAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     ConfigValidationError,
@@ -655,7 +655,7 @@ def test_missing_default_dpf_credential_is_isolated_as_search_diagnostic() -> No
 
 
 def test_target_prevalidation_ignores_malformed_rules_for_adapter_validation() -> None:
-    _validate_mlit_dpf_targets(
+    validate_mlit_dpf_targets(
         (
             Provider("other", "static", {"items": {}}),
             Provider("dpf", "mlit-dpf", {"target_rules": "bad"}),
