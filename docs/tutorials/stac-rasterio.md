@@ -71,12 +71,10 @@ with resource.open("rasterio", runtime=rasterio) as dataset:
 
 ## 検索時の制約
 
-現行の `StacAdapter.search()` は、各Itemで `data` roleのassetがちょうど1件の場合だけ
-そのasset keyを含む検索結果を返します。0件または複数件の場合は、assetを推測せず
-`ProviderResponseError` を返します。Federated searchではこのProviderだけが
-`provider_failure` として診断され、他のProviderの結果は継続して返されます。そのため、
-複数の `data` assetを含み得る一般的なendpointでは、「検索後に結果をfilterしてassetを選ぶ」
-ことはできません。
+`StacAdapter.search()` は、各Itemで `data` roleのassetがちょうど1件の場合だけ
+そのasset keyを含む検索結果を返します。0件または複数件の場合はassetを推測せず、
+そのItemだけをスキップします。スキップしたItem IDと理由はFederated searchの
+`diagnostics`で確認できます。
 
 そのようなItemを扱う場合は、この例のように利用するItemとasset keyを明示してください。
 単一 `data` assetに制約され、かつそのassetがCOG media typeを広告するcollectionでのみ

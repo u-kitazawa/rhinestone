@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from math import isfinite
@@ -497,9 +497,11 @@ class SearchDiagnostic:
     """Explain how one source participated in a federated search.
 
     ``reason`` is normally ``unsupported``, ``missing_required``,
-    ``area_resolution_failed``, or ``provider_failure``. For provider failures, ``failure_type`` distinguishes
-    metadata retrieval, response interpretation, and unavailable credentials
-    without exposing raw exceptions in search results.
+    ``area_resolution_failed``, ``provider_failure``, or ``item_skipped``.
+    For provider failures, ``failure_type`` distinguishes metadata retrieval,
+    response interpretation, and unavailable credentials without exposing raw
+    exceptions in search results. Item-scoped diagnostics identify the skipped
+    provider resource and expose a stable machine-readable ``detail``.
     """
 
     source_id: str
@@ -507,6 +509,8 @@ class SearchDiagnostic:
     reason: str = "unsupported"
     missing_conditions: frozenset[str] = frozenset()
     failure_type: str | None = None
+    resource_identifier: str | None = None
+    detail: str | None = None
 
     def __post_init__(self) -> None:
         if not self.source_id:
@@ -602,6 +606,33 @@ class Result:
         return self._resolver()
 
 
+@dataclass(frozen=True)
+class ProviderSearchResults(Sequence[Result]):
+    """Carry provider results and item-scoped diagnostics atomically."""
+
+    results: tuple[Result, ...]
+    diagnostics: tuple[SearchDiagnostic, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "results", tuple(self.results))
+        object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
+
+    def __iter__(self) -> Iterator[Result]:
+        return iter(self.results)
+
+    @overload
+    def __getitem__(self, index: int) -> Result: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> tuple[Result, ...]: ...
+
+    def __getitem__(self, index: int | slice) -> Result | tuple[Result, ...]:
+        return self.results[index]
+
+    def __len__(self) -> int:
+        return len(self.results)
+
+
 __all__ = [
     "AccessPlan",
     "Config",
@@ -613,6 +644,7 @@ __all__ = [
     "Metadata",
     "Provenance",
     "Provider",
+    "ProviderSearchResults",
     "RemoteDatasetPlan",
     "Resource",
     "ResourceCandidate",

@@ -8,8 +8,10 @@ from ....models import (
     Config,
     Metadata,
     Provenance,
+    ProviderSearchResults,
     ResourceCandidate,
     Result,
+    SearchDiagnostic,
     SearchQuery,
     Source,
 )
@@ -87,7 +89,7 @@ class StacAdapter(ProviderAdapter):
 
     def search(
         self, query: SearchQuery, collections: Sequence[str] = ()
-    ) -> tuple[Result, ...]:
+    ) -> ProviderSearchResults:
         """Search STAC Items using bbox, datetime, limit, and collections."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
@@ -101,11 +103,27 @@ class StacAdapter(ProviderAdapter):
         response = self._request(f"{endpoint}/search", params)
         items = self._objects(response.get("features"), "STAC features")
         found: list[Result] = []
+        diagnostics: list[SearchDiagnostic] = []
         for item in items:
             item_id = self._required_string(item, "id")
             collection_id = self._required_string(item, "collection")
             properties = self._object(item.get("properties"), "STAC properties")
-            asset_key = self._single_data_asset_key(item)
+            asset_key, data_asset_count = self._single_data_asset_key(item)
+            if asset_key is None:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=self.adapter_type,
+                        skipped_conditions=frozenset(),
+                        reason="item_skipped",
+                        resource_identifier=item_id,
+                        detail=(
+                            "missing_data_asset"
+                            if data_asset_count == 0
+                            else "multiple_data_assets"
+                        ),
+                    )
+                )
+                continue
             asset = self._asset(item, asset_key)
             candidate = self._candidate(asset, asset_key, f"{endpoint}/search")
             formats: frozenset[str] = (
@@ -139,7 +157,7 @@ class StacAdapter(ProviderAdapter):
                     raw_metadata=item,
                 )
             )
-        return tuple(found)
+        return ProviderSearchResults(tuple(found), tuple(diagnostics))
 
     @staticmethod
     def _query_parameters(query: SearchQuery) -> dict[str, Any]:
@@ -180,7 +198,7 @@ class StacAdapter(ProviderAdapter):
             attributes={"asset_key": key, "asset": asset},
         )
 
-    def _single_data_asset_key(self, item: JsonObject) -> str:
+    def _single_data_asset_key(self, item: JsonObject) -> tuple[str | None, int]:
         assets = self._object(item.get("assets"), "STAC assets")
         data_keys: list[str] = []
         for key, raw_asset in assets.items():
@@ -189,10 +207,8 @@ class StacAdapter(ProviderAdapter):
             if isinstance(roles, list) and "data" in roles:
                 data_keys.append(key)
         if len(data_keys) != 1:
-            raise ProviderResponseError(
-                "STAC search result must expose exactly one data asset"
-            )
-        return data_keys[0]
+            return None, len(data_keys)
+        return data_keys[0], 1
 
 
 def _optional_string(value: Any) -> str | None:

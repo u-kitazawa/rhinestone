@@ -151,8 +151,17 @@ class SearchableExampleSource(ExampleSource):
 
     def search(self, query: SearchQuery):
         # provider の公式検索 API を呼び、Result の tuple を返す。
+        # Item 単位の診断がある場合は ProviderSearchResults を返す。
         ...
 ```
+
+`SearchableSourceAdapter.search()` の戻り値は `tuple[Result, ...] | ProviderSearchResults` です。
+`ProviderSearchResults(results=(...), diagnostics=(...))` により、取得できたResultと
+Item単位の診断を同じ呼び出しで返せます。例えば対象Itemに選択可能な配布物がない場合は、
+`SearchDiagnostic(source_id="adapter-type", skipped_conditions=frozenset(),
+reason="item_skipped", resource_identifier="item-id", detail="missing_data_asset")`
+を渡します。`source_id`は設定済みProvider IDへ置き換えられます。Adapterインスタンスの
+可変な状態を使って診断を受け渡しません。
 
 宣言していない条件（例えば `bbox`）はSearch Coordinatorが除外し、
 `SearchResults.diagnostics`に記録します。対応条件が一つもない場合や必須条件が不足する

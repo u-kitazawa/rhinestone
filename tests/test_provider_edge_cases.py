@@ -66,7 +66,7 @@ def test_ckan_empty_query_omits_optional_action_parameters() -> None:
     assert client.calls == [(search_url, {})]
 
 
-def test_stac_serializes_interval_and_rejects_ambiguous_data_assets() -> None:
+def test_stac_serializes_interval_and_skips_ambiguous_data_assets() -> None:
     """STAC時間条件を標準intervalへ変換し、複数data assetを推測選択しないために必要である。"""
     endpoint = "https://stac.example"
     search_url = endpoint + "/search"
@@ -88,8 +88,12 @@ def test_stac_serializes_interval_and_rejects_ambiguous_data_assets() -> None:
     adapter = StacAdapter(endpoint=endpoint, get_json=client)
     query = SearchQuery(time=(datetime(2024, 1, 1, tzinfo=timezone.utc), None))
 
-    with pytest.raises(ProviderResponseError, match="exactly one"):
-        adapter.search(query)
+    results = adapter.search(query)
+
+    assert tuple(results) == ()
+    assert results.diagnostics[0].reason == "item_skipped"
+    assert results.diagnostics[0].resource_identifier == "item"
+    assert results.diagnostics[0].detail == "multiple_data_assets"
     assert client.calls[0][1]["datetime"] == "2024-01-01T00:00:00+00:00/.."
     with pytest.raises(ConfigValidationError, match="text"):
         adapter.search(SearchQuery(text="unsupported"))

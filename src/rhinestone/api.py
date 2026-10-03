@@ -59,6 +59,7 @@ from .models import (
     DiscoveryRecord,
     LibraryName,
     Provider,
+    ProviderSearchResults,
     Resource,
     Result,
     SearchQuery,
@@ -116,12 +117,14 @@ class _ConfiguredSourceAdapter:
             provenance=replace(source.provenance, provider=self.source_id),
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Result, ...] | ProviderSearchResults:
         search_method = getattr(self._source_adapter, "search")
         search_results = cast(
-            Callable[[SearchQuery], tuple[Result, ...]], search_method
+            Callable[[SearchQuery], tuple[Result, ...] | ProviderSearchResults],
+            search_method,
         )
-        return tuple(
+        raw_results = search_results(query)
+        mapped_results = tuple(
             replace(
                 result,
                 discovered_by=self.source_id,
@@ -136,7 +139,16 @@ class _ConfiguredSourceAdapter:
                     else result.provenance
                 ),
             )
-            for result in search_results(query)
+            for result in raw_results
+        )
+        if not isinstance(raw_results, ProviderSearchResults):
+            return mapped_results
+        return ProviderSearchResults(
+            mapped_results,
+            tuple(
+                replace(diagnostic, source_id=self.source_id)
+                for diagnostic in raw_results.diagnostics
+            ),
         )
 
 

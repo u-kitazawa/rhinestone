@@ -12,7 +12,7 @@ Provider の `settings` へ `endpoint`、Config へ `collection_id`、`item_id`�
 
 ## 接続先と認証
 
-Item と Search の公式 STAC API endpoint はRhinestoneの組み込みHTTP transportで呼びます。Adapterを直接構築する場合も、`credential`に論理名を指定し、`credentials`のCredentialRegistryから認証情報を取得します。検索結果では data role の asset がちょうど一件である必要があり、asset format は推測しません。
+Item と Search の公式 STAC API endpoint はRhinestoneの組み込みHTTP transportで呼びます。Adapterを直接構築する場合も、`credential`に論理名を指定し、`credentials`のCredentialRegistryから認証情報を取得します。検索結果では data role の asset がちょうど一件であるItemだけを返し、0件または複数件のItemは推測選択せずItem単位でスキップします。スキップしたItem IDと理由は検索結果の`diagnostics`で確認できます。asset format は推測しません。
 
 Assetの`href`がrelative URI referenceの場合は、そのAssetを含むItem responseの最終URI（HTTP redirect後を含む）を基準にRFC 3986の規則でabsolute URIへ解決します。元の`href`はraw metadataに保持し、解決済みURIをResourceとprovenanceの`original_url`に使用します。認証付きリクエストでは、認証情報が別originへ転送されないようredirectを許可しません。
 
