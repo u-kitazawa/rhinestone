@@ -43,6 +43,7 @@ from .models import (
     DiscoveryRecord,
     LibraryName,
     Provider,
+    ProviderSearchResults,
     Resource,
     Result,
     SearchQuery,

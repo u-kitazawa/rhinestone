@@ -1,6 +1,9 @@
 import pytest
 
 from rhinestone.adapters.source.stac import StacAdapter
+from rhinestone.api import (
+    _ConfiguredSourceAdapter,  # pyright: ignore[reportPrivateUsage]
+)
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import (
@@ -70,6 +73,85 @@ def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
     )
     assert "endpoint" not in results[0].target.settings
     assert results[0].metadata.raw["stac_version"] == "1.0.0"
+
+
+def test_stac_search_isolates_items_without_one_data_asset() -> None:
+    endpoint = "https://stac.example"
+    search_url = endpoint + "/search"
+
+    def item(item_id: str, assets: dict[str, object]) -> dict[str, object]:
+        return {
+            "id": item_id,
+            "collection": "imagery",
+            "properties": {"title": item_id},
+            "assets": assets,
+        }
+
+    response = {
+        "features": [
+            item("missing", {"thumbnail": {"href": "https://thumb"}}),
+            item(
+                "usable",
+                {
+                    "visual": {
+                        "href": "https://assets.example/usable.tif",
+                        "type": "image/tiff; application=geotiff",
+                        "roles": ["data"],
+                    }
+                },
+            ),
+            item(
+                "ambiguous",
+                {
+                    "red": {"href": "https://red", "roles": ["data"]},
+                    "green": {"href": "https://green", "roles": ["data"]},
+                },
+            ),
+        ]
+    }
+    results = StacAdapter(
+        endpoint=endpoint, get_json=RecordingJsonClient({search_url: response})
+    ).search(SearchQuery())
+
+    assert [result.title for result in results] == ["usable"]
+    assert results[0].target.settings["asset_key"] == "visual"
+    assert [diagnostic.resource_identifier for diagnostic in results.diagnostics] == [
+        "missing",
+        "ambiguous",
+    ]
+    assert [diagnostic.detail for diagnostic in results.diagnostics] == [
+        "missing_data_asset",
+        "multiple_data_assets",
+    ]
+
+
+def test_configured_stac_search_rebinds_item_diagnostic_source() -> None:
+    endpoint = "https://stac.example"
+    search_url = endpoint + "/search"
+    adapter = StacAdapter(
+        endpoint=endpoint,
+        get_json=RecordingJsonClient(
+            {
+                search_url: {
+                    "features": [
+                        {
+                            "id": "ambiguous",
+                            "collection": "imagery",
+                            "properties": {},
+                            "assets": {},
+                        }
+                    ]
+                }
+            }
+        ),
+    )
+
+    results = _ConfiguredSourceAdapter("earth-observation", adapter).search(
+        SearchQuery()
+    )
+
+    assert not isinstance(results, tuple)
+    assert results.diagnostics[0].source_id == "earth-observation"
 
 
 def test_stac_requires_explicit_asset_key() -> None:

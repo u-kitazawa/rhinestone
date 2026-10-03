@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from ..models import Config, Provider, Resource, Result, Source
+from ..models import Config, Provider, ProviderSearchResults, Resource, Result, Source
 from ..security import DestinationPolicy
 from .knowledge.base import KnowledgeAdapterDefinition, KnowledgePort
 from .ports import CredentialPort, DependencyPort, TransportPort
@@ -21,8 +21,8 @@ class SourceAdapter(Protocol):
 class SearchableSourceAdapter(SourceAdapter, Protocol):
     """Optional Source Adapter contract for provider-backed search."""
 
-    def search(self, query: Any) -> tuple[Result, ...]:
-        """Return results for the already projected source query."""
+    def search(self, query: Any) -> tuple[Result, ...] | ProviderSearchResults:
+        """Return results and optional item diagnostics for the projected query."""
         ...
 
 

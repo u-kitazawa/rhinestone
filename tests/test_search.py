@@ -5,7 +5,7 @@ from rhinestone.errors import (
     ProviderMetadataError,
     ProviderResponseError,
 )
-from rhinestone.models import SearchQuery
+from rhinestone.models import ProviderSearchResults, SearchDiagnostic, SearchQuery
 from rhinestone.search import SearchCoordinator
 
 
@@ -56,6 +56,29 @@ class FailingSearchableAdapter(SearchableAdapter):
     def search(self, query: SearchQuery) -> tuple[object, ...]:
         self.queries.append(query)
         raise self.error
+
+
+class DiagnosticSearchableAdapter:
+    source_id = "searchable"
+    search_conditions = frozenset({"text", "limit"})
+
+    def __init__(self) -> None:
+        self.queries: list[SearchQuery] = []
+
+    def search(self, query: SearchQuery) -> ProviderSearchResults:
+        self.queries.append(query)
+        return ProviderSearchResults(
+            (),
+            (
+                SearchDiagnostic(
+                    source_id=self.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="item_skipped",
+                    resource_identifier="item-1",
+                    detail="missing_data_asset",
+                ),
+            ),
+        )
 
 
 def test_search_calls_only_adapters_declaring_search_capability() -> None:
@@ -203,6 +226,14 @@ def test_provider_failure_is_distinct_from_a_successful_empty_provider() -> None
     assert results["empty"] == ()
     assert results.diagnostics[0].reason == "provider_failure"
     assert results.diagnostics[0].failure_type == "response"
+
+
+def test_provider_item_diagnostics_are_preserved() -> None:
+    results = SearchCoordinator((DiagnosticSearchableAdapter(),)).search(SearchQuery())
+
+    assert results.keys() == ("searchable",)
+    assert results.diagnostics[0].resource_identifier == "item-1"
+    assert results.diagnostics[0].detail == "missing_data_asset"
 
 
 def test_unexpected_provider_errors_are_not_swallowed() -> None:
