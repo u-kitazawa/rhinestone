@@ -1,8 +1,10 @@
 """Internal adapter and user-owned dependency registries."""
 
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any
+from typing import Any, TypeVar
 
+from ._adapter_contracts import RegisteredSourceAdapter
+from .adapters.contracts import ExecutionAdapter
 from .errors import (
     AdapterRegistrationError,
     CredentialLoadError,
@@ -104,29 +106,40 @@ class DependencyRegistry:
         return frozenset(self._dependency_values)
 
 
+_Adapter = TypeVar("_Adapter")
+
+
 class AdapterRegistry:
     """Index configured Source and Execution Adapters by their public identity."""
 
     def __init__(
-        self, source_adapters: Iterable[Any], execution_adapters: Iterable[Any]
+        self,
+        source_adapters: Iterable[RegisteredSourceAdapter],
+        execution_adapters: Iterable[ExecutionAdapter],
     ) -> None:
-        self._source_adapters = self._index(source_adapters, "source_id")
-        self._execution_adapters = self._index(execution_adapters, "name")
+        self._source_adapters = self._index(
+            source_adapters, lambda adapter: adapter.source_id
+        )
+        self._execution_adapters = self._index(
+            execution_adapters, lambda adapter: adapter.name
+        )
 
     @staticmethod
-    def _index(adapters: Iterable[Any], identity_attribute: str) -> dict[str, Any]:
-        indexed: dict[str, Any] = {}
+    def _index(
+        adapters: Iterable[_Adapter], identity: Callable[[_Adapter], str]
+    ) -> dict[str, _Adapter]:
+        indexed: dict[str, _Adapter] = {}
         for adapter in adapters:
-            identity = getattr(adapter, identity_attribute)
-            if identity in indexed:
+            adapter_identity = identity(adapter)
+            if adapter_identity in indexed:
                 raise AdapterRegistrationError(
-                    f"Adapter {identity!r} is registered more than once; each "
+                    f"Adapter {adapter_identity!r} is registered more than once; each "
                     "adapter identity must be unique"
                 )
-            indexed[identity] = adapter
+            indexed[adapter_identity] = adapter
         return indexed
 
-    def source(self, source_id: str) -> Any:
+    def source(self, source_id: str) -> RegisteredSourceAdapter:
         """Return the configured Source Adapter for ``source_id``."""
         try:
             return self._source_adapters[source_id]
@@ -136,7 +149,7 @@ class AdapterRegistry:
                 "application Catalog or sources iterable"
             )
 
-    def execution(self, name: str) -> Any:
+    def execution(self, name: str) -> ExecutionAdapter:
         """Return the registered Execution Adapter named ``name``."""
         try:
             return self._execution_adapters[name]
@@ -147,6 +160,6 @@ class AdapterRegistry:
             )
 
     @property
-    def execution_adapters(self) -> tuple[Any, ...]:
+    def execution_adapters(self) -> tuple[ExecutionAdapter, ...]:
         """Return registered Execution Adapters in deterministic order."""
         return tuple(self._execution_adapters.values())

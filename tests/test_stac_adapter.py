@@ -1,9 +1,9 @@
 import pytest
 
-from rhinestone.adapters.source.stac import StacAdapter
-from rhinestone.api import (
-    _ConfiguredSourceAdapter,  # pyright: ignore[reportPrivateUsage]
+from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
+    ConfiguredSourceAdapter,
 )
+from rhinestone.adapters.source.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Config, SearchQuery
 from tests.provider_support import (
@@ -146,7 +146,7 @@ def test_configured_stac_search_rebinds_item_diagnostic_source() -> None:
         ),
     )
 
-    results = _ConfiguredSourceAdapter("earth-observation", adapter).search(
+    results = ConfiguredSourceAdapter("earth-observation", adapter, "stac").search(
         SearchQuery()
     )
 

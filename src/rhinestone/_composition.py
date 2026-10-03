@@ -8,6 +8,8 @@ from . import _http
 from .adapters.contracts import (
     AdapterDefinition,
     ExecutionAdapterDefinition,
+    SearchableSourceAdapter,
+    SourceAdapter,
     SourceAdapterContext,
     SourceAdapterDefinition,
 )
@@ -49,6 +51,7 @@ from .errors import (
 from .models import (
     Config,
     Provider,
+    ProviderSearchResults,
     Result,
     SearchQuery,
     Source,
@@ -63,12 +66,12 @@ class ConfiguredSourceAdapter:
     def __init__(
         self,
         source_id: str,
-        source_adapter: ProviderAdapter,
-        adapter_type: str | None = None,
+        source_adapter: SourceAdapter,
+        adapter_type: str,
     ) -> None:
         self.source_id = source_id
-        self.adapter_type = adapter_type or source_adapter.adapter_type
-        self.searchable = callable(getattr(source_adapter, "search", None))
+        self.adapter_type = adapter_type
+        self.searchable = isinstance(source_adapter, SearchableSourceAdapter)
         empty_conditions: frozenset[str] = frozenset()
         self.search_conditions = cast(
             frozenset[str],
@@ -101,12 +104,10 @@ class ConfiguredSourceAdapter:
             provenance=replace(source.provenance, provider=self.source_id),
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
-        search_method = getattr(self._source_adapter, "search")
-        search_results = cast(
-            Callable[[SearchQuery], tuple[Result, ...]], search_method
-        )
-        return tuple(
+    def search(self, query: SearchQuery) -> tuple[Result, ...] | ProviderSearchResults:
+        source_adapter = cast(SearchableSourceAdapter, self._source_adapter)
+        raw_results = source_adapter.search(query)
+        mapped_results = tuple(
             replace(
                 result,
                 discovered_by=self.source_id,
@@ -121,7 +122,16 @@ class ConfiguredSourceAdapter:
                     else result.provenance
                 ),
             )
-            for result in search_results(query)
+            for result in raw_results
+        )
+        if not isinstance(raw_results, ProviderSearchResults):
+            return mapped_results
+        return ProviderSearchResults(
+            mapped_results,
+            tuple(
+                replace(diagnostic, source_id=self.source_id)
+                for diagnostic in raw_results.diagnostics
+            ),
         )
 
 
@@ -629,6 +639,6 @@ def build_source_adapter(
     source: Provider,
     definitions: Mapping[str, SourceAdapterDefinition],
     context: SourceAdapterContext,
-) -> ProviderAdapter:
+) -> SourceAdapter:
     definition = definitions[source.adapter_type]
-    return cast(ProviderAdapter, definition.factory(source, context))
+    return definition.factory(source, context)
