@@ -4,12 +4,11 @@ from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from time import perf_counter
-from typing import (
-    Any,
-    cast,
-    overload,
-)
+from typing import overload
 
+from ._adapter_contracts import SearchParticipant, is_searchable_source
+from .adapters.knowledge import AreaKnowledgeAdapter
+from .adapters.knowledge.models import AdministrativeArea
 from .errors import (
     CredentialUnavailableError,
     KnowledgeResolutionError,
@@ -152,7 +151,11 @@ class SearchResults(Sequence[Result]):
 class SearchCoordinator:
     """Search capable adapters in configuration order without cross-source ranking."""
 
-    def __init__(self, adapters: Iterable[Any], knowledge: Any | None = None) -> None:
+    def __init__(
+        self,
+        adapters: Iterable[SearchParticipant],
+        knowledge: AreaKnowledgeAdapter | None = None,
+    ) -> None:
         self._adapters = tuple(adapters)
         self._knowledge = knowledge
 
@@ -165,16 +168,12 @@ class SearchCoordinator:
         continue to propagate.
         """
         searchable_adapters = [
-            adapter
-            for adapter in self._adapters
-            if getattr(adapter, "searchable", True)
-            and callable(getattr(adapter, "search", None))
-            and hasattr(adapter, "search_conditions")
+            adapter for adapter in self._adapters if is_searchable_source(adapter)
         ]
-        grouped_results: OrderedDict[str, tuple[Any, ...]] = OrderedDict()
+        grouped_results: OrderedDict[str, tuple[Result, ...]] = OrderedDict()
         diagnostics: list[SearchDiagnostic] = []
         executions: list[SearchExecution] = []
-        resolved_area: Any | None = None
+        resolved_area: AdministrativeArea | None = None
         if query.area is not None:
             try:
                 if self._knowledge is None:
@@ -196,9 +195,7 @@ class SearchCoordinator:
                 )
 
         for adapter in searchable_adapters:
-            supported_conditions = frozenset(
-                cast(Iterable[str], adapter.search_conditions)
-            )
+            supported_conditions = adapter.search_conditions
             native_format_search = "format" in supported_conditions
             format_conditions: frozenset[str] = (
                 frozenset({"format"}) if query.format is not None else frozenset()
@@ -214,9 +211,7 @@ class SearchCoordinator:
                         bbox=resolved_area.bbox.as_tuple(),
                     )
                     area_handled = True
-                elif "text" in supported_conditions and bool(
-                    getattr(adapter, "area_text_fallback", False)
-                ):
+                elif "text" in supported_conditions and adapter.area_text_fallback:
                     text = resolved_area.canonical_name
                     if query.text:
                         text = f"{query.text} {text}"
@@ -228,9 +223,7 @@ class SearchCoordinator:
             unsupported_conditions = query.supplied_conditions - effective_conditions
             if area_handled:
                 unsupported_conditions -= {"area"}
-            required_conditions = frozenset(
-                cast(Iterable[str], getattr(adapter, "required_search_conditions", ()))
-            )
+            required_conditions = adapter.required_search_conditions
             missing_required_conditions = (
                 required_conditions - projected_query.supplied_conditions
             )
@@ -255,7 +248,7 @@ class SearchCoordinator:
             ):
                 continue
             started = perf_counter()
-            provider_results: tuple[Any, ...] = ()
+            provider_results: tuple[Result, ...] = ()
             try:
                 adapter_query = projected_query.project(supported_conditions)
                 if query.format is not None and not native_format_search:

@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
-from typing import Any
+from typing import Protocol, runtime_checkable
 
 from . import _http
 from ._composition import (
@@ -25,6 +25,7 @@ from ._composition import (
 )
 from .adapters.contracts import (
     AdapterDefinition,
+    ExecutionAdapter,
     ExecutionAdapterContext,
 )
 from .adapters.knowledge import (
@@ -43,7 +44,6 @@ from .models import (
     DiscoveryRecord,
     LibraryName,
     Provider,
-    ProviderSearchResults,
     Resource,
     Result,
     SearchQuery,
@@ -54,6 +54,15 @@ from .representations import Format, FormatPreset
 from .resolution import Resolver
 from .search import SearchCoordinator, SearchResults
 from .security import DestinationPolicy, NetworkPolicyLevel
+
+
+@runtime_checkable
+class _CredentialBindableExecutionAdapter(Protocol):
+    """Optional capability for adapters using application credentials."""
+
+    def bind_credentials(self, credentials: CredentialRegistry) -> ExecutionAdapter:
+        """Return an adapter bound to the application credential registry."""
+        ...
 
 
 class Rhinestone:
@@ -170,17 +179,14 @@ class Rhinestone:
                 )
             )
 
-        source_adapters: tuple[Any, ...] = tuple(configured_sources)
+        source_adapters = tuple(configured_sources)
 
-        def bind_credentials(adapter: Any) -> Any:
-            credential_binder = getattr(adapter, "bind_credentials", None)
-            return (
-                credential_binder(credential_registry)
-                if callable(credential_binder)
-                else adapter
-            )
+        def bind_credentials(adapter: ExecutionAdapter) -> ExecutionAdapter:
+            if isinstance(adapter, _CredentialBindableExecutionAdapter):
+                return adapter.bind_credentials(credential_registry)
+            return adapter
 
-        configured_executions: list[Any] = []
+        configured_executions: list[ExecutionAdapter] = []
         for definition in execution_definitions:
             execution = definition.factory(
                 ExecutionAdapterContext(

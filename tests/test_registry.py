@@ -5,17 +5,36 @@ from rhinestone.errors import (
     ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
+from rhinestone.models import Config, Resource, Source
 from rhinestone.registry import AdapterRegistry
+from rhinestone.security import DestinationPolicy
 
 
 class SourceAdapter:
     def __init__(self, source_id: str) -> None:
         self.source_id = source_id
 
+    def load(self, config: Config) -> Source:
+        raise NotImplementedError
+
 
 class ExecutionAdapter:
+    priority = 0
+
     def __init__(self, name: str) -> None:
         self.name = name
+
+    def supports(self, resource: Resource) -> bool:
+        return False
+
+    def open(
+        self,
+        resource: Resource,
+        runtime: object,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> object:
+        raise NotImplementedError
 
 
 def test_registry_keeps_source_and_execution_adapters_separate() -> None:

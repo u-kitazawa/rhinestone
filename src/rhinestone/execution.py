@@ -1,23 +1,39 @@
 """Deterministic selection of execution adapters."""
 
 from collections.abc import Iterable
-from typing import Any
+from typing import Protocol, runtime_checkable
 
+from .adapters.contracts import ExecutionAdapter
 from .errors import ExecutionAdapterUnavailableError
-from .models import LibraryName
+from .models import LibraryName, Resource
+from .security import DestinationPolicy
+
+
+@runtime_checkable
+class AuthorizingExecutionAdapter(Protocol):
+    """Optional execution capability for pre-runtime authorization."""
+
+    def authorize(
+        self,
+        resource: Resource,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> None:
+        """Authorize access before resolving a user-owned runtime."""
+        ...
 
 
 class ExecutionAdapterSelector:
     """Select the highest-priority compatible execution adapter."""
 
-    def __init__(self, adapters: Iterable[Any]) -> None:
+    def __init__(self, adapters: Iterable[ExecutionAdapter]) -> None:
         self._adapters = tuple(adapters)
 
     def select(
         self,
-        resource: Any,
+        resource: Resource,
         requested: LibraryName | None = None,
-    ) -> Any:
+    ) -> ExecutionAdapter:
         """Select an adapter for a Resource and optional explicit library name.
 
         A requested library is never silently replaced by another adapter. If

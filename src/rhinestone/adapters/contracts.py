@@ -2,9 +2,17 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
-from ..models import Config, Provider, ProviderSearchResults, Resource, Result, Source
+from ..models import (
+    Config,
+    Provider,
+    ProviderSearchResults,
+    Resource,
+    Result,
+    SearchQuery,
+    Source,
+)
 from ..security import DestinationPolicy
 from .knowledge.base import KnowledgeAdapterDefinition, KnowledgePort
 from .ports import CredentialPort, DependencyPort, TransportPort
@@ -18,10 +26,13 @@ class SourceAdapter(Protocol):
         ...
 
 
+@runtime_checkable
 class SearchableSourceAdapter(SourceAdapter, Protocol):
     """Optional Source Adapter contract for provider-backed search."""
 
-    def search(self, query: Any) -> tuple[Result, ...] | ProviderSearchResults:
+    search_conditions: frozenset[str]
+
+    def search(self, query: SearchQuery) -> tuple[Result, ...] | ProviderSearchResults:
         """Return results and optional item diagnostics for the projected query."""
         ...
 

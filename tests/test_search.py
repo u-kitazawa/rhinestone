@@ -11,7 +11,10 @@ from rhinestone.search import SearchCoordinator
 
 class SearchableAdapter:
     source_id = "searchable"
+    searchable = True
     search_conditions = frozenset({"text", "limit"})
+    required_search_conditions: frozenset[str] = frozenset()
+    area_text_fallback = False
 
     def __init__(self) -> None:
         self.queries: list[SearchQuery] = []
@@ -60,7 +63,10 @@ class FailingSearchableAdapter(SearchableAdapter):
 
 class DiagnosticSearchableAdapter:
     source_id = "searchable"
+    searchable = True
     search_conditions = frozenset({"text", "limit"})
+    required_search_conditions: frozenset[str] = frozenset()
+    area_text_fallback = False
 
     def __init__(self) -> None:
         self.queries: list[SearchQuery] = []

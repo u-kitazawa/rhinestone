@@ -9,7 +9,7 @@ from .errors import (
     ProviderMetadataError,
     RhinestoneError,
 )
-from .execution import ExecutionAdapterSelector
+from .execution import AuthorizingExecutionAdapter, ExecutionAdapterSelector
 from .models import Config, LibraryName, Resource, RuntimeFactory
 from .registry import AdapterRegistry
 from .resolution import Resolver
@@ -102,9 +102,8 @@ class AccessPipeline:
             resource,
             requested=library,
         )
-        authorize = getattr(selected, "authorize", None)
-        if callable(authorize):
-            authorize(resource, destination_policy=destination_policy)
+        if isinstance(selected, AuthorizingExecutionAdapter):
+            selected.authorize(resource, destination_policy=destination_policy)
         else:
             destination_policy.authorize(resource.uri)
         if selected.name == "json-service":
