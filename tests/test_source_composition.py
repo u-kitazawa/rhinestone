@@ -41,6 +41,43 @@ def test_advanced_source_definitions_compose(source: Provider) -> None:
     configure(catalog=Catalog((source,)))
 
 
+def test_builtin_ckan_and_plateau_searches_have_distinct_scopes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url.endswith("/api/3/action/package_search")
+        calls.append(dict(params))
+        packages = (
+            []
+            if params.get("fq") == "tags:PLATEAU"
+            else [
+                {
+                    "id": "general-roads",
+                    "title": "道路データ",
+                    "resources": [{"id": "roads-csv", "format": "CSV"}],
+                }
+            ]
+        )
+        return {
+            "success": True,
+            "result": {"count": len(packages), "results": packages},
+        }
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    app = configure(catalog=Catalog((BUILTIN[0], BUILTIN[1])))
+
+    results = app.search(text="道路", limit=1)
+
+    assert len(results["geospatial-jp"]) == 1
+    assert results["plateau"] == ()
+    assert {tuple(sorted(call.items())) for call in calls} == {
+        (("q", "道路"), ("rows", 1)),
+        (("fq", "tags:PLATEAU"), ("q", "道路"), ("rows", 1)),
+    }
+
+
 def test_dcat_dependencies_are_lazy_and_source_scoped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

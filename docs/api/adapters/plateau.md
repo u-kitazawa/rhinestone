@@ -8,6 +8,10 @@
 
 `dataset_id` または `resource_id` のいずれかが必須です。`archive="zip"`、`entry_point` は任意です。`time` を指定する場合は、必要に応じて `time_kind` に `calendar_year`、`fiscal_year`、`survey_year`、`as_of_date` のいずれかを指定して意味を明示できます。組み込みSourceではendpointはCatalogから渡され、CKAN Action APIへのHTTP通信はRhinestoneの組み込みtransportを使用します。検索条件は `text` と `limit` です。
 
+検索ではG空間情報センターがデータセットに付与した明示的な`PLATEAU`タグをCKAN
+Action APIの`fq`で指定します。同じendpointを使う`geospatial-jp`はタグで限定せず、
+G空間情報センター全体を検索します。endpointの共有は、検索対象が同じことを意味しません。
+
 Adapterを直接構築する内部テストや再利用用途では、transport callbackをconstructorへ注入できます。標準の`configure()`経路で利用者がHTTP callbackを登録する必要はありません。
 
 ZIP の `entry_point` は安全な相対パスでなければなりません。候補の選択は Resolver が行い、市区町村・年度から配布物を推測しません。
