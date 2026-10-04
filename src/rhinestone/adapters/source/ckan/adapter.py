@@ -131,13 +131,7 @@ class CkanAdapter(ProviderAdapter):
             )
         if query.limit == 0:
             return ()
-        params: dict[str, Any] = {}
-        if query.text is not None:
-            params["q"] = query.text
-        if query.bbox is not None:
-            params["ext_bbox"] = ",".join(str(value) for value in query.bbox)
-        if query.limit is not None:
-            params["rows"] = query.limit
+        params = self._package_search_params(query)
         found: list[Result] = []
         start = 0
         while True:
@@ -204,6 +198,17 @@ class CkanAdapter(ProviderAdapter):
                     "CKAN search result is empty before its declared count"
                 )
             start += len(packages)
+
+    def _package_search_params(self, query: SearchQuery) -> dict[str, Any]:
+        """Build provider-specific CKAN package search parameters."""
+        params: dict[str, Any] = {}
+        if query.text is not None:
+            params["q"] = query.text
+        if query.bbox is not None:
+            params["ext_bbox"] = ",".join(str(value) for value in query.bbox)
+        if query.limit is not None:
+            params["rows"] = query.limit
+        return params
 
     def _candidate(self, resource: JsonObject) -> ResourceCandidate:
         uri = self._required_string(resource, "url")
