@@ -62,11 +62,15 @@ class DependencyRegistry:
         self,
         values: Mapping[str, DependencyValue],
         instances: dict[str, Any] | None = None,
+        initialization_locks: dict[str, RLock] | None = None,
         lock: RLock | None = None,
     ) -> None:
         self._lock = lock if lock is not None else RLock()
         self._dependency_values = dict(values)
         self._loaded_dependencies = instances if instances is not None else {}
+        self._initialization_locks = (
+            initialization_locks if initialization_locks is not None else {}
+        )
 
     def scoped(self, names: Iterable[str]) -> DependencyRegistry:
         """Return a view with the same lazy-instance cache and limited names."""
@@ -78,6 +82,7 @@ class DependencyRegistry:
                 if name in allowed
             },
             self._loaded_dependencies,
+            self._initialization_locks,
             self._lock,
         )
 
@@ -98,6 +103,12 @@ class DependencyRegistry:
                     f"Runtime dependency {name!r} is not configured; inject it in "
                     "configure(dependencies=...)"
                 )
+            initialization_lock = self._initialization_locks.setdefault(name, RLock())
+
+        with initialization_lock:
+            with self._lock:
+                if name in self._loaded_dependencies:
+                    return self._loaded_dependencies[name]
             try:
                 instance = (
                     value.factory() if isinstance(value, RuntimeFactory) else value
@@ -106,7 +117,8 @@ class DependencyRegistry:
                 raise DependencyUnavailableError(
                     f"Runtime dependency {name!r} could not be loaded"
                 ) from error
-            self._loaded_dependencies[name] = instance
+            with self._lock:
+                self._loaded_dependencies[name] = instance
             return instance
 
     @property
