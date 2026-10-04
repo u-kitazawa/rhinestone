@@ -1,6 +1,9 @@
 """Internal adapter and user-owned dependency registries."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable, Mapping
+from threading import RLock
 from typing import Any, TypeVar
 
 from ._adapter_contracts import RegisteredSourceAdapter
@@ -59,11 +62,13 @@ class DependencyRegistry:
         self,
         values: Mapping[str, DependencyValue],
         instances: dict[str, Any] | None = None,
+        lock: RLock | None = None,
     ) -> None:
+        self._lock = lock if lock is not None else RLock()
         self._dependency_values = dict(values)
         self._loaded_dependencies = instances if instances is not None else {}
 
-    def scoped(self, names: Iterable[str]) -> "DependencyRegistry":
+    def scoped(self, names: Iterable[str]) -> DependencyRegistry:
         """Return a view with the same lazy-instance cache and limited names."""
         allowed = frozenset(names)
         return DependencyRegistry(
@@ -73,6 +78,7 @@ class DependencyRegistry:
                 if name in allowed
             },
             self._loaded_dependencies,
+            self._lock,
         )
 
     def get(self, name: str) -> Any:
@@ -82,23 +88,26 @@ class DependencyRegistry:
             DependencyUnavailableError: If the name is missing or its factory
                 cannot load the runtime. The original factory error is chained.
         """
-        if name in self._loaded_dependencies:
-            return self._loaded_dependencies[name]
-        try:
-            value = self._dependency_values[name]
-        except KeyError:
-            raise DependencyUnavailableError(
-                f"Runtime dependency {name!r} is not configured; inject it in "
-                "configure(dependencies=...)"
-            )
-        try:
-            instance = value.factory() if isinstance(value, RuntimeFactory) else value
-        except Exception as error:
-            raise DependencyUnavailableError(
-                f"Runtime dependency {name!r} could not be loaded"
-            ) from error
-        self._loaded_dependencies[name] = instance
-        return instance
+        with self._lock:
+            if name in self._loaded_dependencies:
+                return self._loaded_dependencies[name]
+            try:
+                value = self._dependency_values[name]
+            except KeyError:
+                raise DependencyUnavailableError(
+                    f"Runtime dependency {name!r} is not configured; inject it in "
+                    "configure(dependencies=...)"
+                )
+            try:
+                instance = (
+                    value.factory() if isinstance(value, RuntimeFactory) else value
+                )
+            except Exception as error:
+                raise DependencyUnavailableError(
+                    f"Runtime dependency {name!r} could not be loaded"
+                ) from error
+            self._loaded_dependencies[name] = instance
+            return instance
 
     @property
     def available(self) -> frozenset[str]:

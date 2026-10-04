@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from dataclasses import replace
+from threading import RLock
 from typing import cast
 
 from ...errors import (
@@ -50,6 +51,7 @@ class KnowledgeAdapterRegistry:
         definitions: Iterable[KnowledgeAdapterDefinition] = (),
         context: KnowledgeAdapterContext | None = None,
     ) -> None:
+        self._lock = RLock()
         self._definitions: dict[KnowledgeKind, KnowledgeAdapterDefinition] = {}
         self._instances: dict[KnowledgeKind, KnowledgeAdapter] = {}
         self._context = context
@@ -141,29 +143,30 @@ class KnowledgeAdapterRegistry:
             ) from None
 
     def _get(self, kind: KnowledgeKind) -> KnowledgeAdapter:
-        if kind in self._instances:
-            return self._instances[kind]
-        definition = self._definition(kind)
-        if self._context is None:
-            raise KnowledgeResolutionError(
-                "Knowledge adapter registry has no factory context; construct it "
-                "through configure() or provide KnowledgeAdapterContext"
+        with self._lock:
+            if kind in self._instances:
+                return self._instances[kind]
+            definition = self._definition(kind)
+            if self._context is None:
+                raise KnowledgeResolutionError(
+                    "Knowledge adapter registry has no factory context; construct it "
+                    "through configure() or provide KnowledgeAdapterContext"
+                )
+            context = replace(
+                self._context,
+                dependencies=_ScopedDependencyPort(
+                    self._context.dependencies, definition.dependencies
+                ),
             )
-        context = replace(
-            self._context,
-            dependencies=_ScopedDependencyPort(
-                self._context.dependencies, definition.dependencies
-            ),
-        )
-        try:
-            adapter = definition.factory(context)
-        except Exception as error:
-            raise KnowledgeResolutionError(
-                f"Knowledge adapter {definition.adapter_type!r} could not be "
-                "loaded; inspect its factory and declared dependencies"
-            ) from error
-        self._instances[kind] = adapter
-        return adapter
+            try:
+                adapter = definition.factory(context)
+            except Exception as error:
+                raise KnowledgeResolutionError(
+                    f"Knowledge adapter {definition.adapter_type!r} could not be "
+                    "loaded; inspect its factory and declared dependencies"
+                ) from error
+            self._instances[kind] = adapter
+            return adapter
 
 
 __all__ = ["KnowledgeAdapterRegistry"]

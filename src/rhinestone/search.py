@@ -2,11 +2,16 @@
 
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from time import perf_counter
 from typing import overload
 
-from ._adapter_contracts import SearchParticipant, is_searchable_source
+from ._adapter_contracts import (
+    SearchableRegisteredSourceAdapter,
+    SearchParticipant,
+    is_searchable_source,
+)
 from .adapters.knowledge import AreaKnowledgeAdapter
 from .adapters.knowledge.models import AdministrativeArea
 from .errors import (
@@ -194,111 +199,137 @@ class SearchCoordinator:
                     ),
                 )
 
-        for adapter in searchable_adapters:
-            supported_conditions = adapter.search_conditions
-            native_format_search = "format" in supported_conditions
-            format_conditions: frozenset[str] = (
-                frozenset({"format"}) if query.format is not None else frozenset()
-            )
-            effective_conditions = supported_conditions | format_conditions
-            projected_query = query
-            area_handled = False
-            if resolved_area is not None:
-                if "bbox" in supported_conditions:
-                    projected_query = replace(
-                        query,
-                        area=None,
-                        bbox=resolved_area.bbox.as_tuple(),
-                    )
-                    area_handled = True
-                elif "text" in supported_conditions and adapter.area_text_fallback:
-                    text = resolved_area.canonical_name
-                    if query.text:
-                        text = f"{query.text} {text}"
-                    projected_query = replace(query, area=None, text=text)
-                    area_handled = True
-                else:
-                    projected_query = replace(query, area=None)
+        def search_provider(
+            adapter: SearchableRegisteredSourceAdapter,
+        ) -> SearchResults:
+            return self._search_provider(adapter, query, resolved_area)
 
-            unsupported_conditions = query.supplied_conditions - effective_conditions
-            if area_handled:
-                unsupported_conditions -= {"area"}
-            required_conditions = adapter.required_search_conditions
-            missing_required_conditions = (
-                required_conditions - projected_query.supplied_conditions
+        # Workers own their provider state; aggregation follows configuration order.
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            provider_searches = executor.map(
+                search_provider,
+                searchable_adapters,
             )
-            if unsupported_conditions or missing_required_conditions:
-                diagnostics.append(
-                    SearchDiagnostic(
-                        source_id=adapter.source_id,
-                        skipped_conditions=unsupported_conditions,
-                        reason=(
-                            "missing_required"
-                            if missing_required_conditions
-                            else "unsupported"
-                        ),
-                        missing_conditions=missing_required_conditions,
-                    )
+            for results in provider_searches:
+                grouped_results.update(results.items())
+                diagnostics.extend(results.diagnostics)
+                executions.extend(results.executions)
+        return SearchResults.from_grouped(grouped_results, diagnostics, executions)
+
+    @staticmethod
+    def _search_provider(
+        adapter: SearchableRegisteredSourceAdapter,
+        query: SearchQuery,
+        resolved_area: AdministrativeArea | None,
+    ) -> SearchResults:
+        """Execute one provider with local diagnostics and timing state."""
+        grouped_results: OrderedDict[str, tuple[Result, ...]] = OrderedDict()
+        diagnostics: list[SearchDiagnostic] = []
+        executions: list[SearchExecution] = []
+        supported_conditions = adapter.search_conditions
+        native_format_search = "format" in supported_conditions
+        format_conditions: frozenset[str] = (
+            frozenset({"format"}) if query.format is not None else frozenset()
+        )
+        effective_conditions = supported_conditions | format_conditions
+        projected_query = query
+        area_handled = False
+        if resolved_area is not None:
+            if "bbox" in supported_conditions:
+                projected_query = replace(
+                    query,
+                    area=None,
+                    bbox=resolved_area.bbox.as_tuple(),
                 )
-            if missing_required_conditions:
-                continue
-            if (
-                query.supplied_conditions
-                and not projected_query.supplied_conditions & effective_conditions
-            ):
-                continue
-            started = perf_counter()
-            provider_results: tuple[Result, ...] = ()
-            try:
-                adapter_query = projected_query.project(supported_conditions)
-                if query.format is not None and not native_format_search:
-                    adapter_query = replace(adapter_query, limit=None)
-                adapter_results = adapter.search(adapter_query)
-                provider_results = tuple(adapter_results)
-                if isinstance(adapter_results, ProviderSearchResults):
-                    diagnostics.extend(adapter_results.diagnostics)
-                if query.format is not None and not native_format_search:
-                    provider_results = tuple(
-                        result
-                        for result in provider_results
-                        if _matches_format(result, query)
-                    )
-                    if query.limit is not None:
-                        provider_results = provider_results[: query.limit]
-                grouped_results[adapter.source_id] = provider_results
-            except ProviderMetadataError:
-                diagnostics.append(
-                    SearchDiagnostic(
-                        source_id=adapter.source_id,
-                        skipped_conditions=frozenset(),
-                        reason="provider_failure",
-                        failure_type="metadata",
-                    )
+                area_handled = True
+            elif "text" in supported_conditions and adapter.area_text_fallback:
+                text = resolved_area.canonical_name
+                if query.text:
+                    text = f"{query.text} {text}"
+                projected_query = replace(query, area=None, text=text)
+                area_handled = True
+            else:
+                projected_query = replace(query, area=None)
+
+        unsupported_conditions = query.supplied_conditions - effective_conditions
+        if area_handled:
+            unsupported_conditions -= {"area"}
+        required_conditions = adapter.required_search_conditions
+        missing_required_conditions = (
+            required_conditions - projected_query.supplied_conditions
+        )
+        if unsupported_conditions or missing_required_conditions:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=unsupported_conditions,
+                    reason=(
+                        "missing_required"
+                        if missing_required_conditions
+                        else "unsupported"
+                    ),
+                    missing_conditions=missing_required_conditions,
                 )
-            except ProviderResponseError:
-                diagnostics.append(
-                    SearchDiagnostic(
-                        source_id=adapter.source_id,
-                        skipped_conditions=frozenset(),
-                        reason="provider_failure",
-                        failure_type="response",
-                    )
+            )
+        if missing_required_conditions:
+            return SearchResults.from_grouped(grouped_results, diagnostics)
+        if (
+            query.supplied_conditions
+            and not projected_query.supplied_conditions & effective_conditions
+        ):
+            return SearchResults.from_grouped(grouped_results, diagnostics)
+        started = perf_counter()
+        provider_results: tuple[Result, ...] = ()
+        try:
+            adapter_query = projected_query.project(supported_conditions)
+            if query.format is not None and not native_format_search:
+                adapter_query = replace(adapter_query, limit=None)
+            adapter_results = adapter.search(adapter_query)
+            provider_results = tuple(adapter_results)
+            if isinstance(adapter_results, ProviderSearchResults):
+                diagnostics.extend(adapter_results.diagnostics)
+            if query.format is not None and not native_format_search:
+                provider_results = tuple(
+                    result
+                    for result in provider_results
+                    if _matches_format(result, query)
                 )
-            except CredentialUnavailableError:
-                diagnostics.append(
-                    SearchDiagnostic(
-                        source_id=adapter.source_id,
-                        skipped_conditions=frozenset(),
-                        reason="provider_failure",
-                        failure_type="credential",
-                    )
+                if query.limit is not None:
+                    provider_results = provider_results[: query.limit]
+            grouped_results[adapter.source_id] = provider_results
+        except ProviderMetadataError:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="provider_failure",
+                    failure_type="metadata",
                 )
-            finally:
-                executions.append(
-                    SearchExecution(
-                        source_id=adapter.source_id,
-                        elapsed_ms=(perf_counter() - started) * 1000,
-                        result_count=len(provider_results),
-                    )
+            )
+        except ProviderResponseError:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="provider_failure",
+                    failure_type="response",
                 )
+            )
+        except CredentialUnavailableError:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="provider_failure",
+                    failure_type="credential",
+                )
+            )
+        finally:
+            executions.append(
+                SearchExecution(
+                    source_id=adapter.source_id,
+                    elapsed_ms=(perf_counter() - started) * 1000,
+                    result_count=len(provider_results),
+                )
+            )
         return SearchResults.from_grouped(grouped_results, diagnostics, executions)
