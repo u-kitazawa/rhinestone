@@ -147,6 +147,11 @@ Runtimeは `app.open(result, "gdal", runtime=gdal)` や `resource.open("rasterio
 
 ## 結果の順序
 
+Provider の検索は同期 API の内部で最大4件まで並行実行します。
+検索全体は対象 Provider の処理完了を待って返ります。完了順にかかわらず、
+結果、診断情報、`executions` は Catalog / configuration 順にまとめます。
+各 Provider 内の結果順と診断順も維持します。
+
 単一Providerでは、iterationと整数indexingはProviderが返した順序をそのまま使います。
 複数Providerでは、`catalog`へ構成したProvider順にgroupを連結し、
 各group内ではProviderが返した順序を保ちます。したがって`results[0]`は最初に構成した
