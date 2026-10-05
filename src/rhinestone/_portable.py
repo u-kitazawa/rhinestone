@@ -83,7 +83,8 @@ def _datetime_from_string(value: Any, path: str) -> datetime | None:
     if not isinstance(value, str):
         raise ConfigValidationError(f"{path} must be an ISO 8601 string or null")
     try:
-        return datetime.fromisoformat(value)
+        normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+        return datetime.fromisoformat(normalized)
     except ValueError as error:
         raise ConfigValidationError(
             f"{path} must be a valid ISO 8601 datetime"
@@ -186,9 +187,10 @@ def result_to_dict(value: Result) -> dict[str, Any]:
 def _check_envelope(data: Mapping[str, Any], schema: str) -> None:
     if data.get("schema") != schema:
         raise ConfigValidationError(f"portable data schema must be {schema!r}")
-    if data.get("version") != _SCHEMA_VERSION:
+    version = data.get("version")
+    if type(version) is not int or version != _SCHEMA_VERSION:
         raise ConfigValidationError(
-            f"portable data version must be {_SCHEMA_VERSION}; got {data.get('version')!r}"
+            f"portable data version must be {_SCHEMA_VERSION}; got {version!r}"
         )
 
 

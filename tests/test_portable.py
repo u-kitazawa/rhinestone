@@ -195,6 +195,8 @@ def test_resource_round_trip_preserves_access_plan_subtypes(plan: AccessPlan) ->
     [
         ("schema", "other", "schema"),
         ("version", 2, "version"),
+        ("version", True, "version"),
+        ("version", 1.0, "version"),
         ("title", 1, "title"),
         ("description", 1, "description"),
         ("target", [], "target"),
@@ -245,6 +247,18 @@ def test_result_from_dict_rejects_invalid_datetime(
 
     with pytest.raises(ConfigValidationError, match=message):
         Result.from_dict(data)
+
+
+def test_result_from_dict_accepts_utc_z_datetime_on_python_310() -> None:
+    data = portable_result().to_dict()
+    data["metadata"]["updated_at"] = "2026-10-05T00:00:00Z"
+    data["provenance"]["retrieved_at"] = "2026-10-05T00:00:00Z"
+
+    restored = Result.from_dict(data)
+
+    expected = datetime(2026, 10, 5, tzinfo=timezone.utc)
+    assert restored.metadata.updated_at == expected
+    assert restored.provenance.retrieved_at == expected
 
 
 @pytest.mark.parametrize(
