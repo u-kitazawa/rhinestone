@@ -139,6 +139,10 @@ Resource の URI や Source endpoint に userinfo（`https://user:password@...`�
 
 ## Search を追加する
 
+複数 Provider の `search()` は最大4件まで別スレッドで並行実行されます。
+Adapter の検索状態は呼び出しごとに保持し、共有する transport、Credential factory、
+Runtime factory は複数スレッドから安全に呼び出せるものを渡してください。
+
 `search(query)` は任意の機能です。実装する場合は、Adapter に対応条件を宣言します。
 
 ```python
