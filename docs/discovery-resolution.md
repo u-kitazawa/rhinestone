@@ -41,14 +41,25 @@ discover
 
 ## 持ち運び可能な境界の判断
 
-今回の実装では、runtime-boundな`Resource`全体をそのままJSONやIntakeへ変換する公開APIは追加しません。portableな境界は次のdomain情報です。
+`Result.to_dict()`と`Resource.to_dict()`は、次のdomain情報をversion付きのJSON-safeな表現へ変換します。`Result.from_dict()`と`Resource.from_dict()`で復元した値はdetachedであり、resolverやopenerを持ちません。別のApplicationで利用するときは`app.bind(value)`を明示的に呼びます。
 
 - `Result.target`（解決先`Config`）
 - `Metadata`
 - `Provenance`
 - `AccessPlan`のprovider非依存な値
 
-Credential、runtime instance、`Resource._opener`はこの境界に含めません。`Result`はtarget Configへ変換して別Sourceへ解決でき、解決後の`Resource`はtarget Sourceの`metadata` / `provenance` / `source.raw_metadata`を保持します。cross-sourceの場合は、発見側の`metadata` / `provenance` / `raw_metadata`を`Resource.discovery`へ別 record として保持し、target側の記録を上書きしません。JSON schemaやIntake exportは、複数Sourceで情報損失と利用価値を確認してから追加します。
+Credential、runtime instance、factory、`Result._resolver`、`Resource._opener`はこの境界に含めません。受信側ApplicationがProvider、Execution Adapter、Destination Policy、runtimeを所有します。解決後の`Resource`はtarget Sourceの`metadata` / `provenance` / `source.raw_metadata`を保持します。cross-sourceの場合は、発見側の`metadata` / `provenance` / `raw_metadata`を`Resource.discovery`へ別recordとして保持し、target側の記録を上書きしません。
+
+```python
+import json
+
+portable = json.loads(json.dumps(result.to_dict()))
+detached = Result.from_dict(portable)
+result_in_another_context = another_app.bind(detached)
+resource = result_in_another_context.resolve()
+```
+
+schema名は`rhinestone.result` / `rhinestone.resource`、versionは`1`です。raw mappingとoptionsは、string key、文字列、有限数、真偽値、null、配列、objectだけを受け入れます。既知のdatetime fieldはISO 8601文字列へ変換します。未知schema/versionやJSONにできない値は`ConfigValidationError`になります。既知version内の未知fieldは将来の追加fieldを古いreaderが扱えるよう読み飛ばします。
 
 ## 直列化／Intake出力の評価
 
@@ -61,26 +72,14 @@ STAC、CKANの現在のResourceを、JSON round-tripとIntakeの`driver / args /
 
 複数Sourceに共通するlosslessなIntake mappingは、現時点では成立しません。URIをdriver引数へ移すだけのexportは可能ですが、Rhinestoneが保持するprovider固有identity、解決理由、metadata、provenanceを失い、単なるURL passthroughになります。任意の情報をIntake metadataへ複製しても、復元規則と互換性契約がなければround-tripにはなりません。
 
-### JSONの往復変換を追加しない理由
+### JSON往復変換の契約
 
-現在のdomain modelは、serialization schemaとして次の契約をまだ持ちません。
+portable schemaでは次の契約を固定します。
 
-- `Metadata.raw`、`Provenance.raw`、`AccessPlan.options`、`Source.raw_metadata`は任意の値を保持でき、JSON型へ制限されていない
-- `datetime`、tuple、frozenset、immutable mappingのJSON表現と復元規則が定義されていない
-- Resourceは`Source`を内包し、同じmetadata / provenanceを重ねて保持するため、正規化した保存schemaが必要になる
-- `_opener`を除外したspecificationを別のRhinestone applicationへbindする公開契約がない
-- schema version、後方互換性、未知fieldの扱いが決まっていない
+- immutable mappingとtupleはJSON object / arrayへ変換する
+- Metadata / ProvenanceのdatetimeはISO 8601へ変換する
+- Resourceが内包するSource、candidate、AccessPlan、discovery recordを省略せず保存する
+- 復元値はdetachedとし、`app.bind()`だけが実行contextを付与する
+- schema versionが未知の場合は推測せず拒否する
 
-この状態でdataclassをそのままdictionary化するテストを追加しても、利用者が保存・転送できる安定した契約にはなりません。そのため、本評価ではserialization APIとround-tripテストを追加しません。
-
-### 再検討条件
-
-次を満たす具体的な利用例が現れた時点で、runtime-boundな`Resource`とは別の`ResourceSpec`を検討します。
-
-1. 保存・転送後にResourceを再利用するconsumerとbind操作が定義されている。
-2. JSONで許可する値、datetime等の表現、schema version、互換性方針が決まっている。
-3. credential、runtime instance、factory、openerを含めずに再解決またはopenできる。
-4. STAC、CKAN、PLATEAUの少なくとも3種で、保持する情報と意図的に捨てる情報をfixtureで比較できる。
-5. Intake exportでは、既存driverへ有意味に委譲でき、Rhinestone固有のresolution情報をmetadataへ退避するだけにならない。
-
-それまでは、`Result.target`を別contextで再解決する既存経路と、解決済みResourceから専門runtimeへ直接渡す経路を維持します。Intakeとの相互運用はURLの再包装ではなく、具体的なdriver integrationが実証されたSourceから個別に再評価します。
+Intake driverへのlosslessな共通mappingは引き続き成立しないため、Intake exportは追加しません。Intakeとの相互運用はURLの再包装ではなく、具体的なdriver integrationが実証されたSourceから個別に再評価します。

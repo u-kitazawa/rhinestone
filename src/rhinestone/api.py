@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
-from typing import Protocol, runtime_checkable
+from typing import Protocol, overload, runtime_checkable
 
 from . import _http
 from ._composition import (
@@ -245,6 +245,24 @@ class Rhinestone:
                 raw_metadata=value.raw_metadata,
             ),
         )
+
+    @overload
+    def bind(self, value: Result) -> Result: ...
+
+    @overload
+    def bind(self, value: Resource) -> Resource: ...
+
+    def bind(self, value: Result | Resource) -> Result | Resource:
+        """Bind a detached portable value to this application context.
+
+        Values restored with ``Result.from_dict`` or ``Resource.from_dict`` do
+        not contain resolver, opener, credential, or runtime state. Binding is
+        explicit so the receiving application controls providers, execution
+        adapters, destination policy, and runtimes.
+        """
+        if isinstance(value, Resource):
+            return self._pipeline.bind(value)
+        return replace(value, _resolver=lambda: self.resolve(value))
 
     def open(
         self,

@@ -171,6 +171,11 @@ data = resource.open("rasterio", runtime=rasterio)
 ```
 
 ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作成した後の値です。
+
+### Portable Result / Resource
+
+`Result.to_dict()` / `Resource.to_dict()`はversion付きのJSON-safeな値を返します。credential、runtime、resolver、openerは含みません。`Result.from_dict()` / `Resource.from_dict()`で復元した値はdetachedなので、別のApplicationで`app.bind(value)`してから`result.resolve()`または`resource.open(...)`を利用します。未知のschema/versionやJSON-safeでないraw metadataは`ConfigValidationError`として拒否されます。
+
 `access_plan.kind`は`file`、`remote-dataset`、`service-query`のいずれかです。
 `Resource.open()`はデータ解析を行わず、指定した利用者所有Runtimeへ処理を委譲します。
 
