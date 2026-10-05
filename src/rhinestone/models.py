@@ -361,6 +361,19 @@ class Resource:
             )
         return self._opener(self, library, runtime)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return a versioned JSON-safe representation without runtime state."""
+        from ._portable import resource_to_dict
+
+        return resource_to_dict(self)
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> Resource:
+        """Restore a detached Resource from :meth:`to_dict` output."""
+        from ._portable import resource_from_dict
+
+        return resource_from_dict(value)
+
 
 @dataclass(frozen=True)
 class SearchQuery:
@@ -604,6 +617,19 @@ class Result:
                 "app.resolve(result) with the application that produced it"
             )
         return self._resolver()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a versioned JSON-safe representation without runtime state."""
+        from ._portable import result_to_dict
+
+        return result_to_dict(self)
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> Result:
+        """Restore a detached Result from :meth:`to_dict` output."""
+        from ._portable import result_from_dict
+
+        return result_from_dict(value)
 
 
 @dataclass(frozen=True)

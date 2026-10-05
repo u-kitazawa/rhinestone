@@ -46,6 +46,10 @@ class AccessPipeline:
                 "loaded; inspect the endpoint and provider availability"
             ) from error
         resource = self._resolver.resolve(source)
+        return self.bind(resource)
+
+    def bind(self, resource: Resource) -> Resource:
+        """Bind a detached Resource to this execution context."""
         if self._execution_adapter_selector is None:
             return resource
         selector = self._execution_adapter_selector
