@@ -121,6 +121,21 @@ def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> No
     assert Resolver().resolve(adapter.load(found[0].to_config())).format == "citygml"
 
 
+def test_plateau_search_uses_the_explicit_catalog_tag_filter() -> None:
+    calls: list[dict[str, Any]] = []
+
+    def client(url: str, params: Mapping[str, Any]) -> Any:
+        calls.append(dict(params))
+        return plateau_client(url, params)
+
+    results = PlateauAdapter(client, endpoint="https://fixture.example").search(
+        SearchQuery(text="都市", limit=1)
+    )
+
+    assert len(results) == 1
+    assert calls == [{"q": "都市", "rows": 1, "fq": "tags:PLATEAU"}]
+
+
 def test_plateau_selection_is_decided_by_resolver() -> None:
     adapter = PlateauAdapter(plateau_client, endpoint="https://fixture.example")
     with pytest.raises(AmbiguousResourceError):

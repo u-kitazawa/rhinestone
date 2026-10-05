@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from ....errors import ConfigValidationError
-from ....models import Config, ResourceCandidate, Source
+from ....models import Config, ResourceCandidate, SearchQuery, Source
 from ....registry import CredentialRegistry
 from ....representations import canonical_format
 from ....security import DestinationPolicy
@@ -44,6 +44,12 @@ class PlateauAdapter(CkanAdapter):
             provider_id=provider_id,
         )
         self._knowledge = knowledge or KnowledgeAdapterRegistry()
+
+    def _package_search_params(self, query: SearchQuery) -> dict[str, Any]:
+        """Restrict package search to the catalog's explicit PLATEAU tag."""
+        params = super()._package_search_params(query)
+        params["fq"] = "tags:PLATEAU"
+        return params
 
     def load(self, config: Config) -> Source:
         """Load one PLATEAU resource and preserve its CityGML metadata."""
