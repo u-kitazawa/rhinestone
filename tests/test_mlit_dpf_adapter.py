@@ -937,3 +937,33 @@ def test_public_format_query_retains_declared_formats(
     assert len(results) == 1
     assert results[0].formats == frozenset({"geojson"})
     assert app.resolve(results[0]).uri == "https://example.test/a"
+
+
+@pytest.mark.parametrize(
+    "bbox", [(10, 0, 0, 1), (0, -91, 1, 1), (float("nan"), 0, 1, 1)]
+)
+def test_invalid_bbox_is_rejected_before_unavailable_credential(
+    bbox: tuple[float, float, float, float],
+) -> None:
+    def post(*_args: Any, **_kwargs: Any) -> Any:
+        pytest.fail("invalid input must not send a request")
+
+    adapter = MlitDpfAdapter(post, CredentialRegistry({}), "dpf")
+    with pytest.raises(ConfigValidationError, match="bbox"):
+        adapter.search(SearchQuery(bbox=bbox))
+
+
+def test_public_invalid_bbox_is_not_hidden_by_credential_diagnostic() -> None:
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {"endpoint": "https://data-platform.mlit.go.jp/api/v1"},
+                ),
+            )
+        )
+    )
+    with pytest.raises(ConfigValidationError, match="bbox"):
+        app.search(bbox=(10, 0, 0, 1))

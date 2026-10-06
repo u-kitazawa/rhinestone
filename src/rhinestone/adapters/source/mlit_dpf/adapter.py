@@ -71,7 +71,7 @@ class MlitDpfAdapter(ProviderAdapter):
         if limit == 0:
             return ()
         scope = self._search_scope()
-        headers = {"apikey": self._credentials.get(self._credential)}
+        headers: dict[str, str] | None = None
         found: list[Result] = []
         seen: set[tuple[str, ...]] = set()
         modes = (
@@ -83,6 +83,8 @@ class MlitDpfAdapter(ProviderAdapter):
             while True:
                 size = min(limit, PAGE_SIZE)
                 graphql = _build_query(query, size, first, phrase_match, scope)
+                if headers is None:
+                    headers = {"apikey": self._credentials.get(self._credential)}
                 response = self._post_json(
                     self._endpoint,
                     {"query": graphql},
