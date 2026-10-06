@@ -109,8 +109,7 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     assert "kernelspec" in notebook["metadata"]
     assert any(cell.get("cell_type") == "markdown" for cell in notebook_cells(notebook))
     source = notebook_source(notebook)
-    assert "@6a565afcb467c7edd571ea19c8a27439d02e2cfc" in source
-    assert "@develop" not in source
+    assert "git+https://github.com/u-kitazawa/rhinestone.git@develop" in source
     for marker in (
         'text="国土数値 ダム"',
         'area="津市"',
