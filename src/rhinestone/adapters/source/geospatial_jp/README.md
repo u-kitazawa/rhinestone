@@ -9,7 +9,7 @@
 - 解決出力: packageとresourceのmetadataを保持する `Source`。
 - 検索出力: Resource単位の `Result`。同じProviderの `resource_id` Configで解決します。
 
-本文は空白区切りのリテラルを明示的ANDで検索します。地域指定時はAPI側のarea・tags条件で
+本文は空白区切りの各語をタイトル全体（title_string）・タグで部分一致検索し、語同士を明示的ANDで結びます。地域指定時はAPI側のarea・tags条件で
 指定地域、含有都道府県、地方、全国の順に検索し、地域無指定の通常検索を混ぜません。
 各段階で本文＋地域名のAPI検索も併用し、area・タグで地域一致を照合します。
 カンマ区切りの地域metadataを比較し、取得範囲内では本文タグも優先順に使用します。

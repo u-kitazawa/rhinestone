@@ -116,12 +116,12 @@ def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -
     ]
     assert len(client.calls) == 4
     assert client.calls[0] == {
-        "q": '"河川"',
+        "q": "(title_string:*河川* OR tags:*河川*)",
         "fq": '(area:"神奈川県" OR tags:"神奈川県" OR area:神奈川県_* OR tags:神奈川県_*)',
         "rows": 100,
         "start": 0,
     }
-    assert client.calls[1]["q"] == '"河川" AND "神奈川県"'
+    assert client.calls[1]["q"] == '(title_string:*河川* OR tags:*河川*) AND "神奈川県"'
     assert "関東地方" in client.calls[2]["fq"]
     assert results[0].raw_metadata["package"]["area"] == "神奈川県"
     assert results[0].provenance.query_parameters == client.calls[0]
@@ -135,12 +135,21 @@ def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -
     [
         (None, "*:*"),
         ("  ", "*:*"),
-        ("河川 河川　洪水", '"河川" AND "洪水"'),
-        ('a"b c\\d', '"a\\"b" AND "c\\\\d"'),
-        ("OR *:*", '"OR" AND "*:*"'),
+        (
+            "河川 河川　洪水",
+            "(title_string:*河川* OR tags:*河川*) AND (title_string:*洪水* OR tags:*洪水*)",
+        ),
+        (
+            'a"b c\\d',
+            '(title_string:*a\\"b* OR tags:*a\\"b*) AND (title_string:*c\\\\d* OR tags:*c\\\\d*)',
+        ),
+        (
+            "OR *:*",
+            "(title_string:*OR* OR tags:*OR*) AND (title_string:*\\*\\:\\** OR tags:*\\*\\:\\**)",
+        ),
     ],
 )
-def test_text_is_literal_explicit_and_without_operator_injection(
+def test_text_uses_literal_substrings_and_without_operator_injection(
     text: str | None, expected: str
 ) -> None:
     client = Client([])
@@ -154,6 +163,41 @@ def test_zero_limit_and_unsupported_conditions() -> None:
     assert client.calls == []
     with pytest.raises(ConfigValidationError, match="bbox"):
         adapter(client).search(SearchQuery(bbox=(0, 0, 1, 1)))
+
+
+@pytest.mark.parametrize("area", [None, "島根県"])
+def test_observed_river_title_is_requested_by_substring_with_area_independent(
+    monkeypatch: pytest.MonkeyPatch, area: str | None
+) -> None:
+    response = fixture_json("geospatial_jp/partial_title.json")
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url.endswith("package_search")
+        assert params["q"].startswith("(title_string:*川* OR tags:*川*)")
+        calls.append(dict(params))
+        return dict(response)
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    results = configure(catalog=Catalog((BUILTIN[0],))).search(
+        text="川", area=area, limit=1
+    )
+    assert results.diagnostics == ()
+    found = results["geospatial-jp"]
+    assert ids(found) == ["c21a87b6-9cf7-4829-961b-e7cc02e8dcec"]
+    assert "河川" in found[0].title
+    assert found[0].provenance.query_parameters == calls[0]
+    assert found[0].raw_metadata["package"]["name"] == "shimane-kasen-dem"
+    assert ("fq" in calls[0]) == (area is not None)
+
+
+def test_all_solr_special_characters_are_literal_inside_generated_wildcards() -> None:
+    client = Client([])
+    adapter(client).search(SearchQuery(text='+-!():^[]"{}~*?|&/\\'))
+    assert client.calls[0]["q"] == (
+        r"(title_string:*\+\-\!\(\)\:\^\[\]\"\{\}\~\*\?\|\&\/\\* OR "
+        r"tags:*\+\-\!\(\)\:\^\[\]\"\{\}\~\*\?\|\&\/\\*)"
+    )
 
 
 def test_tag_match_prioritizes_topic_and_round_robins_resources() -> None:
@@ -407,9 +451,12 @@ def test_observed_mie_dataset_is_found_when_area_field_is_not_indexed(
     assert results.diagnostics == ()
     found = results["geospatial-jp"]
     assert ids(found) == ["e34d8feb-908d-4a7b-8517-1825a455e76d"]
-    assert client.calls[0]["q"] == '"国土数値" AND "ダム"'
+    assert (
+        client.calls[0]["q"]
+        == "(title_string:*国土数値* OR tags:*国土数値*) AND (title_string:*ダム* OR tags:*ダム*)"
+    )
     assert client.calls[1] == {
-        "q": '"国土数値" AND "ダム" AND "三重県"',
+        "q": '(title_string:*国土数値* OR tags:*国土数値*) AND (title_string:*ダム* OR tags:*ダム*) AND "三重県"',
         "rows": 100,
         "start": 0,
     }
@@ -437,5 +484,7 @@ def test_text_region_candidates_are_verified_and_paged_after_format_matching() -
     assert ids(results) == ["geojson"]
     assert [call["start"] for call in client.calls] == [0, 0, 1, 2, 3]
     assert all(
-        call["q"] == '"国土数値" AND "ダム" AND "三重県"' for call in client.calls[1:]
+        call["q"]
+        == '(title_string:*国土数値* OR tags:*国土数値*) AND (title_string:*ダム* OR tags:*ダム*) AND "三重県"'
+        for call in client.calls[1:]
     )

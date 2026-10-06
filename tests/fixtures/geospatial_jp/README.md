@@ -16,3 +16,11 @@ G空間情報センターの実応答ではありません。取得日はあり�
 応答に `area="三重県"` があり、地域タグはなく `国交DPF` だけです。
 索引にareaがない状態をテストclientで合成して回帰を確認します。
 現在の全Datasetの索引仕様や、全文検索で一致したfieldを証明するものではありません。
+
+## partial_title.json
+
+2026-10-06のユーザー提供package_show応答から、島根県河川DEMの必要項目を抜粋しました。
+同日、IDのfq条件を付けた `q=*:*`、`title:*川*`、`title_string:*川*`、`tags:*川*` が
+それぞれ `success=true, count=1` と確認されました。`name:shimane*` は0件でした。
+fixtureのpackageは観測済みmetadataですが、package_searchの応答外枠はテスト用です。
+OR・ANDの組合せや記号のエスケープを実APIで検証した応答ではありません。

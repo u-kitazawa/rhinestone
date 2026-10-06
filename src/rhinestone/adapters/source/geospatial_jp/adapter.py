@@ -68,6 +68,16 @@ def _literal(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def _partial_term(value: str) -> str:
+    """Match a literal substring in titles or tags, not Solr user syntax."""
+    escaped = "".join(
+        "\\" + character if character in '+-!():^[]"{}~*?|&/\\' else character
+        for character in value
+    )
+    pattern = "*" + escaped + "*"
+    return f"(title_string:{pattern} OR tags:{pattern})"
+
+
 def _tags(package: JsonObject) -> frozenset[str]:
     values = package.get("tags", ())
     if not isinstance(values, list | tuple):
@@ -200,7 +210,7 @@ class GeospatialJpAdapter(CkanAdapter):
         terms = tuple(dict.fromkeys((query.text or "").split()))
         # Explicit AND avoids depending on the site's default whitespace operator.
         base: dict[str, Any] = {
-            "q": " AND ".join(_literal(term) for term in terms) or "*:*",
+            "q": " AND ".join(_partial_term(term) for term in terms) or "*:*",
             "rows": 100,
         }
         stages: tuple[tuple[tuple[dict[str, str], frozenset[int]], ...], ...] = (
