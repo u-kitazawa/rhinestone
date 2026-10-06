@@ -1,0 +1,476 @@
+{
+  "observation_date": "2026-10-07",
+  "endpoint": "https://search.ckan.jp/backend/api/package_search",
+  "selection": "Counts and first-page top-10 metadata excerpts; not complete API responses or relevance labels.",
+  "cases": {
+    "river": {
+      "text": "河川",
+      "before": {
+        "request": {
+          "q": "河川",
+          "rows": 10
+        },
+        "count": 1109,
+        "top_datasets": [
+          {
+            "xckan_title": "鹿児島県河川整備計画",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_kasenseibikeikaku"
+          },
+          {
+            "xckan_title": "社会資本情報プラットフォーム（河川－ダム）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ipf0201"
+          },
+          {
+            "xckan_title": "社会資本情報プラットフォーム（河川－砂防）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ipf0202"
+          },
+          {
+            "xckan_title": "鹿児島県河川整備基本方針",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_kasenseibikihonhoushin"
+          },
+          {
+            "xckan_title": "北九州市　「準用河川改修事業」箇所一覧",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/401005_jyunyokasenkaisyujigyokasyoichiran"
+          },
+          {
+            "xckan_title": "水防警報河川一覧",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/420000_suiboukeihoukasen"
+          },
+          {
+            "xckan_title": "福岡県　河川整備計画",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/400009_keikaku-dl"
+          },
+          {
+            "xckan_title": "静岡市を流れる河川",
+            "xckan_site_name": "静岡市オープンデータカタログサイト",
+            "xckan_site_url": "http://dataset.city.shizuoka.jp/dataset/shizuoka-kasen"
+          },
+          {
+            "xckan_title": "福岡県　河川整備基本方針",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/400009_houshin-dl"
+          },
+          {
+            "xckan_title": "静岡市を流れる河川",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/221007_shizuoka-kasen"
+          }
+        ]
+      },
+      "after": {
+        "request": {
+          "q": "(xckan_title:\"河川\"^8 OR xckan_title:*河川*^4 OR \"河川\")",
+          "rows": 10
+        },
+        "count": 1114,
+        "top_datasets": [
+          {
+            "xckan_title": "河川",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/442011_river"
+          },
+          {
+            "xckan_title": "鹿児島県河川整備計画",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_kasenseibikeikaku"
+          },
+          {
+            "xckan_title": "社会資本情報プラットフォーム（河川－ダム）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ipf0201"
+          },
+          {
+            "xckan_title": "社会資本情報プラットフォーム（河川－砂防）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ipf0202"
+          },
+          {
+            "xckan_title": "鹿児島県河川整備基本方針",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_kasenseibikihonhoushin"
+          },
+          {
+            "xckan_title": "北九州市　「準用河川改修事業」箇所一覧",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/401005_jyunyokasenkaisyujigyokasyoichiran"
+          },
+          {
+            "xckan_title": "水防警報河川一覧",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/420000_suiboukeihoukasen"
+          },
+          {
+            "xckan_title": "福岡県　河川整備計画",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/400009_keikaku-dl"
+          },
+          {
+            "xckan_title": "静岡市を流れる河川",
+            "xckan_site_name": "静岡市オープンデータカタログサイト",
+            "xckan_site_url": "http://dataset.city.shizuoka.jp/dataset/shizuoka-kasen"
+          },
+          {
+            "xckan_title": "福岡県　河川整備基本方針",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/400009_houshin-dl"
+          }
+        ]
+      }
+    },
+    "river_kanagawa": {
+      "text": "河川 神奈川県",
+      "before": {
+        "request": {
+          "q": null,
+          "rows": 10
+        },
+        "count": 78374,
+        "top_datasets": [
+          {
+            "xckan_title": "国土数値情報（上水道関連施設）ー神奈川県",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ksj-p21-14"
+          },
+          {
+            "xckan_title": "社会資本情報プラットフォーム（河川－ダム）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ipf0201"
+          },
+          {
+            "xckan_title": "河川水質調査結果",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/142123_p_3315_3315"
+          },
+          {
+            "xckan_title": "東京都地域防災計画 風水害編（平成26年修正）本文",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000003d1700000031"
+          },
+          {
+            "xckan_title": "国土数値情報（洪水浸水想定区域）-関東地方整備局",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ksj-a31-83"
+          },
+          {
+            "xckan_title": "社会資本情報プラットフォーム（河川－砂防）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ipf0202"
+          },
+          {
+            "xckan_title": "鹿児島県河川一覧",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_nikyukasen2"
+          },
+          {
+            "xckan_title": "鹿児島県水位周知河川",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_suiishuchikasen"
+          },
+          {
+            "xckan_title": "鹿児島県洪水予報河川",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_kohzuiyohokasen"
+          },
+          {
+            "xckan_title": "鹿児島県水防警報河川",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/460001_suibokeihoukasen"
+          }
+        ]
+      },
+      "after": {
+        "request": {
+          "q": "(xckan_title:\"河川\"^8 OR xckan_title:*河川*^4 OR \"河川\") AND (xckan_title:\"神奈川県\"^8 OR xckan_title:*神奈川県*^4 OR \"神奈川県\")",
+          "rows": 10
+        },
+        "count": 15,
+        "top_datasets": [
+          {
+            "xckan_title": "国土数値情報（上水道関連施設）ー神奈川県",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ksj-p21-14"
+          },
+          {
+            "xckan_title": "河川水質調査結果",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/142123_p_3315_3315"
+          },
+          {
+            "xckan_title": "社会資本情報プラットフォーム（河川－ダム）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ipf0201"
+          },
+          {
+            "xckan_title": "東京都地域防災計画 風水害編（平成26年修正）本文",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t000003d1700000031"
+          },
+          {
+            "xckan_title": "国土数値情報（洪水浸水想定区域）-関東地方整備局",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/ksj-a31-83"
+          },
+          {
+            "xckan_title": "2015年農林業センサス報告書_第1巻 都道府県別統計書（全47冊）_14 神奈川県",
+            "xckan_site_name": "DATA GO JP データカタログサイト",
+            "xckan_site_url": "https://www.data.go.jp/data/dataset/maff_20180312_0133"
+          },
+          {
+            "xckan_title": "2020年農林業センサス　第１巻　都道府県別統計書（神奈川県）",
+            "xckan_site_name": "DATA GO JP データカタログサイト",
+            "xckan_site_url": "https://www.data.go.jp/data/dataset/maff_20211224_0033"
+          },
+          {
+            "xckan_title": "2010年世界農林業センサス報告書_第1巻 都道府県別統計書（全47冊）_14 神奈川県",
+            "xckan_site_name": "DATA GO JP データカタログサイト",
+            "xckan_site_url": "https://www.data.go.jp/data/dataset/maff_20180312_0077"
+          },
+          {
+            "xckan_title": "九州での記録的大雨被害状況（2023年7月）",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/aas-disaster-20230710"
+          },
+          {
+            "xckan_title": "令和6年9月21日能登地方大雨災害（斜め撮影）【アジア航測株式会社】",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/aas-disaster-20240925"
+          }
+        ]
+      }
+    },
+    "population": {
+      "text": "男女別人口",
+      "before": {
+        "request": {
+          "q": null,
+          "rows": 10
+        },
+        "count": 38768,
+        "top_datasets": [
+          {
+            "xckan_title": "大字別・年齢別・男女別人口",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/472085_population_aza"
+          },
+          {
+            "xckan_title": "町名別年齢別男女別人口",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/272183_tyomeibetu"
+          },
+          {
+            "xckan_title": "行政区別・年齢別・男女別人口",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/472085_population_202301"
+          },
+          {
+            "xckan_title": "男女別人口及び世帯数－町丁",
+            "xckan_site_name": "横浜市オープンデータポータル",
+            "xckan_site_url": "https://data.city.yokohama.lg.jp/dataset/seisaku_toroku02"
+          },
+          {
+            "xckan_title": "男女別人口及び世帯数－行政区",
+            "xckan_site_name": "横浜市オープンデータポータル",
+            "xckan_site_url": "https://data.city.yokohama.lg.jp/dataset/seisaku_suikei01"
+          },
+          {
+            "xckan_title": "豊橋市 年齢(各歳)男女別人口表",
+            "xckan_site_name": "東三河オープンデータ",
+            "xckan_site_url": "https://opendata-east-mikawa.jp/node/472"
+          },
+          {
+            "xckan_title": "新宿区の平成30年町丁別世帯数及び男女別人口情報",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131041d0000000043"
+          },
+          {
+            "xckan_title": "新宿区の令和4年町丁別世帯数及び男女別人口情報",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131041d0000000092"
+          },
+          {
+            "xckan_title": "新宿区の令和2年町丁別世帯数及び男女別人口情報",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131041d0000000045"
+          },
+          {
+            "xckan_title": "新宿区の平成31年町丁別世帯数及び男女別人口情報",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131041d0000000044"
+          }
+        ]
+      },
+      "after": {
+        "request": {
+          "q": "(xckan_title:\"男女別人口\"^8 OR xckan_title:*男女別人口*^4 OR \"男女別人口\")",
+          "rows": 10
+        },
+        "count": 1058,
+        "top_datasets": [
+          {
+            "xckan_title": "男女別人口及び世帯数－行政区",
+            "xckan_site_name": "横浜市オープンデータポータル",
+            "xckan_site_url": "https://data.city.yokohama.lg.jp/dataset/seisaku_suikei01"
+          },
+          {
+            "xckan_title": "男女別人口及び世帯数－町丁",
+            "xckan_site_name": "横浜市オープンデータポータル",
+            "xckan_site_url": "https://data.city.yokohama.lg.jp/dataset/seisaku_toroku02"
+          },
+          {
+            "xckan_title": "豊橋市 年齢(各歳)男女別人口表",
+            "xckan_site_name": "東三河オープンデータ",
+            "xckan_site_url": "https://opendata-east-mikawa.jp/node/472"
+          },
+          {
+            "xckan_title": "行政区別・年齢別・男女別人口",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/472085_population_202301"
+          },
+          {
+            "xckan_title": "大字別・年齢別・男女別人口",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/472085_population_aza"
+          },
+          {
+            "xckan_title": "町名別年齢別男女別人口",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/272183_tyomeibetu"
+          },
+          {
+            "xckan_title": "年齢、男女別人口－行政区",
+            "xckan_site_name": "横浜市オープンデータポータル",
+            "xckan_site_url": "https://data.city.yokohama.lg.jp/dataset/seisaku_suikei03"
+          },
+          {
+            "xckan_title": "新宿区の平成30年町丁別世帯数及び男女別人口情報",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131041d0000000043"
+          },
+          {
+            "xckan_title": "新宿区の令和4年町丁別世帯数及び男女別人口情報",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131041d0000000092"
+          },
+          {
+            "xckan_title": "新宿区の令和2年町丁別世帯数及び男女別人口情報",
+            "xckan_site_name": "東京都オープンデータカタログサイト",
+            "xckan_site_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131041d0000000045"
+          }
+        ]
+      }
+    },
+    "shelters_yokohama": {
+      "text": "避難所 横浜市",
+      "before": {
+        "request": {
+          "q": "避難所 横浜市",
+          "rows": 10
+        },
+        "count": 59721,
+        "top_datasets": [
+          {
+            "xckan_title": "141003_神奈川県_横浜市_防災関連データ",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/14100-107"
+          },
+          {
+            "xckan_title": "141003_神奈川県_横浜市_災害時給水所",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/14100-106"
+          },
+          {
+            "xckan_title": "141003_神奈川県_横浜市_金沢区データポータル",
+            "xckan_site_name": "Ｇ空間情報センター",
+            "xckan_site_url": "https://www.geospatial.jp/ckan/dataset/14100-101"
+          },
+          {
+            "xckan_title": "北九州市　避難場所・避難所（共通フォーマット）",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/401005_hinanbasyo"
+          },
+          {
+            "xckan_title": "【瑞浪市】指定避難所",
+            "xckan_site_name": "OPEN DATA カタログサイト 岐阜県",
+            "xckan_site_url": "https://gifu-opendata.pref.gifu.lg.jp/dataset/c212083-002"
+          },
+          {
+            "xckan_title": "福岡市　避難場所・避難所一覧",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/401307_hinanjo"
+          },
+          {
+            "xckan_title": "美馬市指定避難所及び指定緊急避難所一覧",
+            "xckan_site_name": "Our Open Data 徳島",
+            "xckan_site_url": "https://opendata.pref.tokushima.lg.jp/dataset/1987.html"
+          },
+          {
+            "xckan_title": "春日市 指定緊急避難場所一覧（福岡都市圏共通フォーマット）",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/402184_hinan20180922"
+          },
+          {
+            "xckan_title": "大野城市　指定避難所一覧（福岡都市圏共通フォーマット）",
+            "xckan_site_name": "BODIK ODCS",
+            "xckan_site_url": "https://data.bodik.jp/dataset/402192_hinanjo"
+          },
+          {
+            "xckan_title": "【岐阜市】指定一般避難所",
+            "xckan_site_name": "OPEN DATA カタログサイト 岐阜県",
+            "xckan_site_url": "https://gifu-opendata.pref.gifu.lg.jp/dataset/c212016-013"
+          }
+        ]
+      },
+      "after": {
+        "request": {
+          "q": "(xckan_title:\"避難所\"^8 OR xckan_title:*避難所*^4 OR \"避難所\") AND (xckan_title:\"横浜市\"^8 OR xckan_title:*横浜市*^4 OR \"横浜市\")",
+          "rows": 10
+        },
+        "count": 1,
+        "top_datasets": [
+          {
+            "xckan_title": "保土ケ谷区統計便覧　オープンデータ",
+            "xckan_site_name": "横浜市オープンデータポータル",
+            "xckan_site_url": "https://data.city.yokohama.lg.jp/dataset/hodogaya_opendate"
+          }
+        ]
+      }
+    }
+  },
+  "field_probes": [
+    {
+      "request": {
+        "q": "xckan_title:\"河川\"",
+        "rows": 10
+      },
+      "count": 1
+    },
+    {
+      "request": {
+        "q": "xckan_title:*河川*",
+        "rows": 10
+      },
+      "count": 300
+    },
+    {
+      "request": {
+        "q": "title:\"河川\"",
+        "rows": 10
+      },
+      "count": 287
+    },
+    {
+      "request": {
+        "q": "\"男女別人口\"",
+        "rows": 10
+      },
+      "count": 1058
+    }
+  ]
+}

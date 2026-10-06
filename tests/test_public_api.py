@@ -295,7 +295,10 @@ def test_discovery_result_resolves_through_a_different_target_source(
         headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         assert url == search_url
-        assert params == {"q": "river", "rows": 1}
+        assert params == {
+            "q": '(xckan_title:"river"^8 OR xckan_title:*river*^4 OR "river")',
+            "rows": 10,
+        }
         return cast(dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
 
     monkeypatch.setattr(_http, "get_json", get_json)
@@ -594,3 +597,34 @@ def test_removed_compatibility_modules_and_model_aliases_are_unavailable() -> No
             importlib.import_module(module)
     assert not hasattr(models, "SourceDefinition")
     assert not hasattr(models, "SearchResult")
+
+
+def test_cross_ckan_area_fallback_uses_a_verified_unique_municipality_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
+        assert url == "https://search.ckan.jp/backend/api/package_search"
+        calls.append(dict(params))
+        return cast(dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    provider = next(p for p in BUILTIN if p.id == "search-ckan-jp")
+    result = configure(catalog=Catalog((provider,))).search(
+        text="避難所", area="横浜市", limit=1
+    )[0]
+    assert calls == [
+        {
+            "q": '(xckan_title:"避難所"^8 OR xckan_title:*避難所*^4 OR "避難所") AND '
+            '(xckan_title:"横浜市"^8 OR xckan_title:*横浜市*^4 OR "横浜市")',
+            "rows": 10,
+        }
+    ]
+    resource = result.resolve()
+    assert resource.discovery is not None
+    assert resource.discovery.provenance.query_parameters == calls[0]

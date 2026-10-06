@@ -1,5 +1,6 @@
 """Discovery adapter for the Japanese cross-CKAN search service."""
 
+from collections import Counter, deque
 from typing import Any
 
 from ....errors import (
@@ -9,6 +10,7 @@ from ....errors import (
 )
 from ....models import Config, Metadata, Provenance, Result, SearchQuery, Source
 from ....security import DestinationPolicy
+from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
 from .._uri import has_embedded_credentials
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
@@ -50,11 +52,18 @@ class SearchCkanJpAdapter(ProviderAdapter):
         if query.limit == 0:
             return ()
         endpoint = self._endpoint_from({}, DEFAULT_ENDPOINT)
-        params: dict[str, Any] = {"q": query.text}
+        terms = _search_terms(query.text)
+        if not terms:
+            return ()
+        resource_terms = tuple(term for term in terms if term not in _AREA_NAMES)
+        params: dict[str, Any] = {"q": _text_query(terms)}
         if query.limit is not None:
-            params["rows"] = query.limit
+            params["rows"] = min(100, max(10, query.limit))
         found: list[Result] = []
         start = 0
+        seen: set[tuple[str | None, str | None, str | None, str | None, str | None]] = (
+            set()
+        )
         while True:
             page_params = dict(params)
             if start:
@@ -64,15 +73,47 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 raise ProviderResponseError("search.ckan.jp search was not successful")
             result = self._object(response.get("result"), "search.ckan.jp result")
             packages = self._objects(result.get("results"), "search.ckan.jp results")
+            batches: list[deque[Result]] = []
             for package in packages:
+                items: deque[Result] = deque()
                 for item in self._package_results(package, endpoint, page_params):
                     if query.format is not None and not self._matches_query_formats(
                         item.formats, query
                     ):
                         continue
-                    found.append(item)
+                    identity = (
+                        optional_string(package.get("xckan_id"))
+                        or optional_string(package.get("id")),
+                        optional_string(package.get("xckan_site_url")),
+                        item.provenance.dataset_identifier,
+                        item.provenance.resource_identifier,
+                        optional_string(item.target.settings.get("uri")),
+                    )
+                    if identity in seen:
+                        continue
+                    seen.add(identity)
+                    items.append(item)
+                if items:
+                    batches.append(
+                        deque(
+                            sorted(
+                                items,
+                                key=lambda item: _resource_priority(
+                                    item, resource_terms
+                                ),
+                            )
+                        )
+                    )
+            # Keep native Dataset relevance while giving each Dataset a turn.
+            while batches:
+                remaining: list[deque[Result]] = []
+                for items in batches:
+                    found.append(items.popleft())
                     if query.limit is not None and len(found) == query.limit:
                         return tuple(found)
+                    if items:
+                        remaining.append(items)
+                batches = remaining
             if query.limit is None:
                 return tuple(found)
             total = result.get("count")
@@ -97,7 +138,11 @@ class SearchCkanJpAdapter(ProviderAdapter):
         package_id = optional_string(package.get("xckan_original_id"))
         if package_id is None:
             package_id = optional_string(package.get("id"))
-        title = optional_string(package.get("title")) or package_id
+        title = (
+            optional_string(package.get("xckan_title"))
+            or optional_string(package.get("title"))
+            or package_id
+        )
         if title is None:
             return ()
         description = optional_string(package.get("notes"))
@@ -166,3 +211,68 @@ class SearchCkanJpAdapter(ProviderAdapter):
     def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:
         requested = {value.value for value in query.expanded_formats}
         return bool(formats & requested) or (not formats and "unknown" in requested)
+
+
+_PREFECTURES = tuple(
+    area.canonical_name for area in JAPAN_ADMINISTRATIVE_AREAS if len(area.code) == 2
+)
+# A globally unique snapshot alias avoids requiring an omitted prefecture name.
+# Ambiguous municipality names retain both prefecture and municipality criteria.
+_ALIAS_COUNTS = Counter(
+    alias for area in JAPAN_ADMINISTRATIVE_AREAS for alias in area.aliases
+)
+_AREA_TERMS = {
+    area.canonical_name: (
+        (min(aliases, key=len),)
+        if (
+            aliases := tuple(
+                alias for alias in area.aliases if _ALIAS_COUNTS[alias] == 1
+            )
+        )
+        else (prefecture, area.canonical_name[len(prefecture) :])
+    )
+    for area in JAPAN_ADMINISTRATIVE_AREAS
+    for prefecture in _PREFECTURES
+    if len(area.code) > 2 and area.canonical_name.startswith(prefecture)
+}
+
+_AREA_NAMES = {
+    name
+    for area in JAPAN_ADMINISTRATIVE_AREAS
+    for name in (area.canonical_name, *area.aliases)
+}
+
+
+def _search_terms(text: str) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            part for term in text.split() for part in _AREA_TERMS.get(term, (term,))
+        )
+    )
+
+
+def _text_query(terms: tuple[str, ...]) -> str:
+    """Use the service's guaranteed title field and Standard Query Parser."""
+    clauses: list[str] = []
+    for term in terms:
+        # Quotes preserve each user word as a phrase; escape query syntax so
+        # user input cannot introduce fields, operators, boosts or wildcards.
+        escaped = "".join(
+            "\\" + char if char in '+-&|!(){}[]^"~*?:\\/' else char for char in term
+        )
+        phrase = f'"{escaped}"'
+        clauses.append(
+            f"(xckan_title:{phrase}^8 OR xckan_title:*{escaped}*^4 OR {phrase})"
+        )
+    return " AND ".join(clauses)
+
+
+def _resource_priority(item: Result, terms: tuple[str, ...]) -> tuple[int, int]:
+    """Prefer declared Resource names matching the query inside each Dataset."""
+    resource = item.raw_metadata["resource"]
+    name = (optional_string(resource.get("name")) or "").casefold()
+    description = (optional_string(resource.get("description")) or "").casefold()
+    return (
+        -sum(term.casefold() in name for term in terms),
+        -sum(term.casefold() in description for term in terms),
+    )

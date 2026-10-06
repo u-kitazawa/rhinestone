@@ -1,0 +1,39 @@
+{
+  "observation_date": "2026-10-07",
+  "endpoint": "https://search.ckan.jp/backend/api/package_search",
+  "selection": "Metadata fields and first two Resources plus all subsequent Resources mentioning 避難所 in name/description; not a complete API response.",
+  "package": {
+    "id": "49bef14f-62fa-4d17-9e45-5ead2789e48d",
+    "xckan_id": "data.city.yokohama.lg.jp__dataset:hodogaya_opendate",
+    "xckan_title": "保土ケ谷区統計便覧　オープンデータ",
+    "title": "保土ケ谷区統計便覧　オープンデータ",
+    "xckan_site_name": "横浜市オープンデータポータル",
+    "xckan_site_url": "https://data.city.yokohama.lg.jp/dataset/hodogaya_opendate",
+    "resources": [
+      {
+        "id": "2134420d-cd10-45ac-b685-d736a1e89ec3",
+        "name": "1-1　世帯数と人口（区別）",
+        "description": "（令和７年10月１日現在推計　横浜市統計情報ポータル）",
+        "url": "https://www.city.yokohama.lg.jp/hodogaya/kusei/tokei/opendate.files/0753_20260401.csv",
+        "format": "CSV",
+        "mimetype": null
+      },
+      {
+        "id": "2a43895c-3f01-444d-9af1-079fa80cebdb",
+        "name": "1-2　市街化区域用途地域別割合（区別）",
+        "description": "（令和６年度末現在　横浜市統計情報ポータル）",
+        "url": "https://www.city.yokohama.lg.jp/hodogaya/kusei/tokei/opendate.files/0754_20260401.csv",
+        "format": "CSV",
+        "mimetype": null
+      },
+      {
+        "id": "3348ebc3-e9d9-41a7-b652-0b6c7c2c1d1c",
+        "name": "14　地域防災拠点（指定避難所）及び広域避難場所一覧",
+        "description": "（令和８年１月　保土ケ谷区総務課）",
+        "url": "https://www.city.yokohama.lg.jp/hodogaya/kusei/tokei/opendate.files/0838_20260401.csv",
+        "format": "CSV",
+        "mimetype": null
+      }
+    ]
+  }
+}
