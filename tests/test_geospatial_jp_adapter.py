@@ -236,3 +236,25 @@ def test_public_area_search_resolves_alias_keeps_text_and_resolves_resource(
     assert resource.provenance.provider == "geospatial-jp"
     assert resource.provenance.adapter == "geospatial-jp"
     assert resource.provenance.raw["package"]["area"] == "神奈川県"
+
+
+@pytest.mark.parametrize(
+    ("requested", "declared"),
+    [
+        ("北海道虻田郡ニセコ町", "北海道_ニセコ町"),
+        ("ニセコ町", "北海道_ニセコ町"),
+        ("福島県郡山市", "福島県_郡山市"),
+    ],
+)
+def test_public_municipality_search_matches_provider_names_before_prefecture(
+    monkeypatch: pytest.MonkeyPatch, requested: str, declared: str
+) -> None:
+    prefecture, municipality = declared.split("_")
+    client = Client([package("broad", prefecture), package("exact", declared)])
+    monkeypatch.setattr(_http, "get_json", client)
+    results = configure(catalog=Catalog((BUILTIN[0],))).search(
+        text="避難所", area=requested, limit=1
+    )
+    assert results.diagnostics == ()
+    assert ids(results["geospatial-jp"]) == ["exact"]
+    assert client.calls[0]["fq"] == f'tags:"{prefecture}{municipality}"'

@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import Config, Result, SearchQuery, Source
+from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
 from ..base import JsonObject
 from ..ckan import CkanAdapter
 
@@ -41,6 +42,26 @@ _REGIONS = {
     ),
 }
 
+# Use verified, prefecture-qualified aliases rather than deleting any text up
+# to 郡. This leaves names such as 郡山市 intact and avoids cross-prefecture aliases.
+_PROVIDER_AREA_NAMES = {
+    area.canonical_name: alias
+    for area in JAPAN_ADMINISTRATIVE_AREAS
+    for alias in area.aliases
+    if "郡" in area.canonical_name
+    and "郡" not in alias
+    and any(
+        area.canonical_name.startswith(prefecture) and alias.startswith(prefecture)
+        for names in _REGIONS.values()
+        for prefecture in names
+    )
+}
+
+
+def _provider_area_name(value: str) -> str:
+    normalized = value.replace("_", "")
+    return _PROVIDER_AREA_NAMES.get(normalized, normalized)
+
 
 def _literal(value: str) -> str:
     """Quote user text as a Solr literal, including embedded quotes/backslashes."""
@@ -68,8 +89,8 @@ def _area_priority(package: JsonObject, area: str | None) -> int:
     if isinstance(declared, str):
         values.add(declared)
     # Normalize only the documented prefecture_municipality separator.
-    normalized = {value.replace("_", "") for value in values}
-    area = area.replace("_", "")
+    normalized = {_provider_area_name(value) for value in values}
+    area = _provider_area_name(area)
     if area in normalized:
         return 0
     prefecture = next(
@@ -133,7 +154,10 @@ class GeospatialJpAdapter(CkanAdapter):
         }
         searches = [base]
         if query.area is not None:
-            searches.insert(0, {**base, "fq": f"tags:{_literal(query.area)}"})
+            searches.insert(
+                0,
+                {**base, "fq": f"tags:{_literal(_provider_area_name(query.area))}"},
+            )
         offsets = [0] * len(searches)
         active = [True] * len(searches)
         seen_packages: set[str] = set()
