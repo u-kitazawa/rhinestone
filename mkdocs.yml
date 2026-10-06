@@ -49,6 +49,7 @@ nav:
               - Rasterio: api/adapters/rasterio.md
 
 exclude_docs: |
+  research/*
   adapter_expansion.md
   architecture/*
   spec_v4.md
