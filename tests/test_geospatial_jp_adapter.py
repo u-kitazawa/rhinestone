@@ -25,9 +25,16 @@ def package(identifier: str, area: object = None, tags: object = ()) -> dict[str
 
 
 class Client:
-    def __init__(self, packages: list[dict[str, Any]], page_size: int = 100) -> None:
+    def __init__(
+        self,
+        packages: list[dict[str, Any]],
+        page_size: int = 100,
+        *,
+        area_indexed: bool = True,
+    ) -> None:
         self.packages = packages
         self.page_size = page_size
+        self.area_indexed = area_indexed
         self.calls: list[dict[str, Any]] = []
 
     def __call__(self, url: str, params: Mapping[str, Any]) -> dict[str, Any]:
@@ -41,6 +48,8 @@ class Client:
                 for field, exact, pattern in clauses:
                     values: list[str] = (
                         [value.strip() for value in (item.get("area") or "").split(",")]
+                        if field == "area" and self.area_indexed
+                        else []
                         if field == "area"
                         else [
                             cast(dict[str, Any], tag)["name"]
@@ -57,6 +66,14 @@ class Client:
                 return False
 
             selected = [item for item in selected if matches(item)]
+        elif " AND " in params["q"]:
+            # Synthetic full-text index; not a model of the live Solr analyzer.
+            region_terms = re.findall(r'"([^"]+)"', params["q"].rsplit(" AND ", 1)[1])
+            selected = [
+                item
+                for item in selected
+                if any(term in str(item) for term in region_terms)
+            ]
         start = params.get("start", 0)
         return {
             "success": True,
@@ -97,14 +114,15 @@ def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -
         "local-2",
         "regional-0",
     ]
-    assert len(client.calls) == 2
+    assert len(client.calls) == 4
     assert client.calls[0] == {
         "q": '"河川"',
         "fq": '(area:"神奈川県" OR tags:"神奈川県" OR area:神奈川県_* OR tags:神奈川県_*)',
         "rows": 100,
         "start": 0,
     }
-    assert "関東地方" in client.calls[1]["fq"]
+    assert client.calls[1]["q"] == '"河川" AND "神奈川県"'
+    assert "関東地方" in client.calls[2]["fq"]
     assert results[0].raw_metadata["package"]["area"] == "神奈川県"
     assert results[0].provenance.query_parameters == client.calls[0]
     assert results[0].provenance.dataset_identifier == "local"
@@ -179,7 +197,7 @@ def test_missing_metadata_and_unrelated_municipality_are_not_added() -> None:
     ]
     client = Client(rows)
     assert adapter(client).search(SearchQuery(area="神奈川県横浜市")) == ()
-    assert all("fq" in call for call in client.calls)
+    assert all("fq" in call or " AND " in call["q"] for call in client.calls)
 
 
 def test_format_filter_pages_past_empty_and_duplicate_datasets_and_resources() -> None:
@@ -199,7 +217,7 @@ def test_format_filter_pages_past_empty_and_duplicate_datasets_and_resources() -
     )
     assert ids(results) == ["vector", "extra"]
     assert all(result.formats == frozenset({"geojson"}) for result in results)
-    assert len(client.calls) == 5
+    assert len(client.calls) == 10
 
 
 def test_finite_limit_keeps_paging_and_none_limit_reads_one_window() -> None:
@@ -297,10 +315,10 @@ def test_comma_separated_areas_and_tag_only_matches_precede_broader_tiers() -> N
     results = adapter(client).search(SearchQuery(text="河川", area="島根県", limit=20))
     assert ids(results) == ["multi", "tagged", "regional", "national"]
     assert results[0].raw_metadata["package"]["area"] == "北海道, 島根県,島根県_松江市"
-    assert len(client.calls) == 3
-    assert all("fq" in call for call in client.calls)
-    assert "中国地方" in client.calls[1]["fq"]
-    assert "日本全国" in client.calls[2]["fq"]
+    assert len(client.calls) == 6
+    assert all("fq" in call or " AND " in call["q"] for call in client.calls)
+    assert "中国地方" in client.calls[2]["fq"]
+    assert "日本全国" in client.calls[4]["fq"]
 
 
 def test_requested_area_pages_finish_before_broader_searches() -> None:
@@ -314,8 +332,8 @@ def test_requested_area_pages_finish_before_broader_searches() -> None:
     )
     results = adapter(client).search(SearchQuery(area="島根県", limit=2))
     assert ids(results) == ["first", "second"]
-    assert [call["start"] for call in client.calls] == [0, 1]
-    assert all('area:"島根県"' in call["fq"] for call in client.calls)
+    assert [call["start"] for call in client.calls] == [0, 0, 1, 1]
+    assert all('area:"島根県"' in call["fq"] for call in client.calls if "fq" in call)
 
 
 def test_none_limit_reads_first_page_of_each_area_tier_and_deduplicates() -> None:
@@ -327,7 +345,7 @@ def test_none_limit_reads_first_page_of_each_area_tier_and_deduplicates() -> Non
         page_size=1,
     )
     assert ids(adapter(client).search(SearchQuery(area="島根県"))) == ["multi"]
-    assert [call["start"] for call in client.calls] == [0, 0, 0]
+    assert [call["start"] for call in client.calls] == [0, 0, 0, 0, 0, 0]
 
 
 def test_no_regional_candidates_returns_empty_without_unrestricted_search() -> None:
@@ -335,8 +353,8 @@ def test_no_regional_candidates_returns_empty_without_unrestricted_search() -> N
     assert (
         adapter(client).search(SearchQuery(text="河川", area="島根県", limit=20)) == ()
     )
-    assert len(client.calls) == 3
-    assert all("fq" in call for call in client.calls)
+    assert len(client.calls) == 6
+    assert all("fq" in call or " AND " in call["q"] for call in client.calls)
 
 
 def test_municipality_prefecture_fallback_does_not_expand_to_sibling_municipalities() -> (
@@ -353,8 +371,8 @@ def test_municipality_prefecture_fallback_does_not_expand_to_sibling_municipalit
         "exact",
         "broad",
     ]
-    assert len(client.calls) == 4
-    assert "_*" not in client.calls[1]["fq"]
+    assert len(client.calls) == 8
+    assert "_*" not in client.calls[2]["fq"]
 
 
 def test_filtered_response_with_incomplete_metadata_keeps_exact_area_first() -> None:
@@ -367,10 +385,57 @@ def test_filtered_response_with_incomplete_metadata_keeps_exact_area_first() -> 
 
     def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
         # Index fields can be present even when response metadata is incomplete.
-        assert "fq" in params
+        assert "fq" in params or " AND " in params["q"]
         return {"success": True, "result": {"count": len(rows), "results": rows}}
 
     results = GeospatialJpAdapter(get_json, endpoint="https://example.test").search(
         SearchQuery(area="島根県", limit=1)
     )
     assert ids(results) == ["exact"]
+
+
+@pytest.mark.parametrize("limit", [1, 20, None])
+def test_observed_mie_dataset_is_found_when_area_field_is_not_indexed(
+    monkeypatch: pytest.MonkeyPatch, limit: int | None
+) -> None:
+    rows = fixture_json("geospatial_jp/area_unindexed.json")["result"]["results"]
+    client = Client(rows, area_indexed=False)
+    monkeypatch.setattr(_http, "get_json", client)
+    results = configure(catalog=Catalog((BUILTIN[0],))).search(
+        text="国土数値 ダム", area="三重県", format=(Format.GEOJSON,), limit=limit
+    )
+    assert results.diagnostics == ()
+    found = results["geospatial-jp"]
+    assert ids(found) == ["e34d8feb-908d-4a7b-8517-1825a455e76d"]
+    assert client.calls[0]["q"] == '"国土数値" AND "ダム"'
+    assert client.calls[1] == {
+        "q": '"国土数値" AND "ダム" AND "三重県"',
+        "rows": 100,
+        "start": 0,
+    }
+    assert found[0].raw_metadata["package"]["area"] == "三重県"
+    assert found[0].raw_metadata["package"]["tags"] == ({"name": "国交DPF"},)
+    assert found[0].provenance.query_parameters == client.calls[1]
+    assert found[0].formats == frozenset({"geojson"})
+
+
+def test_text_region_candidates_are_verified_and_paged_after_format_matching() -> None:
+    false_positive = package("mentions-mie", "東京都")
+    false_positive["notes"] = "三重県を説明文に記載するだけ"
+    unknown = package("三重県-unknown")
+    skipped = package("csv", "三重県")
+    matching = package("geojson", "三重県")
+    matching["resources"][0]["format"] = "GeoJSON"
+    client = Client(
+        [false_positive, unknown, skipped, matching], page_size=1, area_indexed=False
+    )
+    results = adapter(client).search(
+        SearchQuery(
+            text="国土数値 ダム", area="三重県", format=(Format.GEOJSON,), limit=1
+        )
+    )
+    assert ids(results) == ["geojson"]
+    assert [call["start"] for call in client.calls] == [0, 0, 1, 2, 3]
+    assert all(
+        call["q"] == '"国土数値" AND "ダム" AND "三重県"' for call in client.calls[1:]
+    )

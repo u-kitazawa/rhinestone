@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "result": {
+    "count": 1,
+    "results": [
+      {
+        "id": "35a9f074-4bff-41b0-8cb8-14bf2f386e23",
+        "name": "ksj-w01-24",
+        "title": "国土数値情報（ダム）-三重県",
+        "area": "三重県",
+        "license_id": "ol",
+        "extras": [
+          {
+            "key": "国交DPF:検索",
+            "value": "三重県/その他データ"
+          },
+          {
+            "key": "国交DPF:種別",
+            "value": "ダム"
+          }
+        ],
+        "resources": [
+          {
+            "id": "e34d8feb-908d-4a7b-8517-1825a455e76d",
+            "package_id": "35a9f074-4bff-41b0-8cb8-14bf2f386e23",
+            "name": "三重県",
+            "format": "GeoJSON",
+            "mimetype": "application/json",
+            "url": "https://www.geospatial.jp/ckan/dataset/35a9f074-4bff-41b0-8cb8-14bf2f386e23/resource/e34d8feb-908d-4a7b-8517-1825a455e76d/download/dam24.geojson"
+          }
+        ],
+        "tags": [
+          {
+            "name": "国交DPF"
+          }
+        ]
+      }
+    ]
+  }
+}
