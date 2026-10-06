@@ -138,10 +138,13 @@ CKAN と search.ckan.jp は `limit` を Resource 数として満たすまで pac
 あれば `start` を使って後続ページを取得します。`limit=None` は provider の既定 page だけを
 取得し、全件走査を暗黙には行いません。
 
-`mlit-dpf` は `text`、`bbox`、`limit` に対応します。明示的なtarget ruleが成立する結果は
+`mlit-dpf` は `text`、`area`、`bbox`、`format`、`limit` に対応します。
+地域は行政コードで検索し、本文はDPFのフレーズ検索を優先して通常検索で補います。
+解決可能なcatalog / datasetを検索前に絞り、形式照合後の必要件数までページングします。明示的なtarget ruleが成立する結果は
 CKAN、PLATEAU、STAC、OGC等の構成済みSourceへ委譲され、それ以外は明示representationと
 `DPF:downloadURLs` が揃う場合だけDirectへfallbackします。`time` は未対応diagnosticになり、
-landing pageだけの結果やformat不明の結果は返しません。Directはfallback専用なので、
+landing pageだけの結果は返しません。Directは明示形式を保持し、Nativeの形式は検索時点では不明です。
+[DPFの詳細と制約](api/adapters/mlit-dpf.md)を参照してください。Directはfallback専用なので、
 target ruleの委譲先には指定できません。
 
 ```python
