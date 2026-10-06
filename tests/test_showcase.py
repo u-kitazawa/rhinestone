@@ -11,8 +11,10 @@ from typing import Any, cast
 
 import pytest
 
-from rhinestone import Resource
+import rhinestone
+from rhinestone import Config, Resource, Result
 from rhinestone import api as rhinestone_api
+from rhinestone.models import Metadata, Provenance
 
 ROOT = Path(__file__).parents[1]
 SHOWCASE = ROOT / "showcase"
@@ -126,6 +128,41 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     ):
         assert marker in source
     assert "item.access_plan.archive is None" not in source
+
+
+def test_ckan_showcase_displays_mixed_provider_metadata(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    records: tuple[tuple[str, dict[str, Any], str], ...] = (
+        ("geospatial-jp", {"package": {"area": "東京都"}}, "東京都"),
+        ("search-ckan-jp", {"catalog": {"area": "神奈川県"}}, "神奈川県"),
+        ("other", {}, "不明"),
+        ("other", {"package": None}, "不明"),
+    )
+    results = tuple(
+        Result(
+            title="学校",
+            description=None,
+            discovered_by=provider,
+            target=Config("direct", {"uri": "https://example.org/school.geojson"}),
+            metadata=Metadata(),
+            provenance=Provenance(provider=provider),
+            formats=frozenset({"geojson"}),
+            raw_metadata=raw,
+        )
+        for provider, raw, _ in records
+    )
+
+    def search(**kwargs: Any) -> tuple[Result, ...]:
+        return results
+
+    monkeypatch.setattr(rhinestone, "search", search)
+    cell = notebook_cells(load_notebook(MAP_NOTEBOOK))[4]
+    exec("".join(cell["source"]), {})
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == len(records)
+    for index, (provider, _, area) in enumerate(records):
+        assert lines[index] == f"{index} {provider} 学校 ['geojson'] 地域: {area}"
 
 
 def test_ckan_showcase_keeps_no_stale_execution_output() -> None:
