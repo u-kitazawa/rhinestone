@@ -63,8 +63,40 @@ metadataに安全な `DPF:downloadURLs` がある結果を `direct` Configへ変
 
 ## 検索と実行
 
-`text`、WGS84の `bbox=(west, south, east, north)`、`limit` に対応します。`time` は未対応として
-検索diagnosticに記録されます。`limit=None` のDPF取得上限は50件、`limit=0` は通信しません。
+`text`、`area`、WGS84の `bbox=(west, south, east, north)`、`format`、`limit` に対応します。
+`time` は未対応として検索diagnosticに記録されます。`limit=None` の返却上限は50 Resource、
+`limit=0` はCredential取得も通信もしません。公開検索モデル・Coordinator・解決経路は変更しません。
+
+### DPFの検索仕様に合わせた処理
+
+- `area` は共通の地名解決で得た正式区域名から、同じ行政区域snapshotのコードを参照します。
+  都道府県は `DPF:prefecture_code`、市区町村は `DPF:municipality_code` の `is` 条件にします。
+  市区町村名を単に本文に足したり、そのbbox内の近隣市町村を混ぜたりしません。
+  コードの数値・先頭ゼロの扱いは公式クライアントのsearch条件生成に合わせています。
+- `target_rules` のcatalog / datasetと、`representations` のdatasetを `attributeFilter` の
+  AND / ORで検索前に絞ります。解決ルールの優先順位やDirect fallbackの条件は維持します。
+- 空白以外の `text` がある場合は `phraseMatch: true` を先に検索し、返却上限に満たなければ
+  `phraseMatch: false` の通常検索で補います。各段階ではDPFの結果順を保ち、
+  catalog ID・dataset ID・data IDの組で重複を除きます。
+  複数語のANDや日本語の部分一致を独自に保証するものではなく、通常検索の語分割はDPFに委ねます。
+- `first` / `size` / `totalNumber` を使い、解決できないレコードを除外した後も次ページを取得します。
+  1回の取得は最大50レコードです。形式条件とResource展開を適用してから返却上限を判定します。
+  全件を取得してから並び替える方式ではありません。空ページ・同じレコードしか返らないページで
+  続行不能なら `ProviderResponseError` として診断します。
+- Direct結果には明示されたrepresentationの形式を `Result.formats` に保持します。
+  Native委譲結果の形式は検索段階では未確定なので、`format=(Format.UNKNOWN,)` の対象です。
+  URLやDPFの自由記述から形式を推測しません。
+- provenanceには利用者の条件、`first`、`size`、`phraseMatch`、解決可能な検索範囲を保持します。
+  解決先未設定の構成は検索結果を実行可能Resourceへ変換できず、ページを走査し続けません。
+
+行政コードを持たないレコードや、全国版で対象地域のコードを宣言していないレコードは、
+地域検索で残ると保証しません。全国・地方のデータを含めたい場合は `area` を指定せず検索します。
+G空間の地域タグによる包含関係をDPFに流用していません。
+
+実APIの結果数・応答時間・順位の比較は、利用者のAPIキーを使う環境での検証が必要です。
+この変更では公式仕様・公式クライアントと合成応答による回帰テストを根拠としており、
+実サービスに対する検索品質向上率を計測したものではありません。
+[調査記録](https://github.com/u-kitazawa/rhinestone/blob/develop/docs/research/mlit-dpf-search.md)に確認範囲と手動検証項目を記載しています。
 
 ```python
 results = app.search(text="道路", bbox=(139.5, 35.5, 140.0, 36.0), limit=10)

@@ -14,11 +14,14 @@ from ....errors import (
 )
 from ....models import Config, Metadata, Provenance, Result, SearchQuery, Source
 from ....registry import CredentialRegistry
-from ....representations import canonical_format
+from ....representations import Format, canonical_format
+from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
 from ..base import ProviderAdapter
 
 DEFAULT_ENDPOINT = "https://data-platform.mlit.go.jp/api/v1"
 DEFAULT_LIMIT = 50
+PAGE_SIZE = 50
+_AREA_CODES = {area.canonical_name: area.code for area in JAPAN_ADMINISTRATIVE_AREAS}
 
 JsonPoster = Callable[..., Any]
 JsonObject = Mapping[str, Any]
@@ -28,7 +31,7 @@ class MlitDpfAdapter(ProviderAdapter):
     """Discover DPF records and delegate them to configured source providers."""
 
     adapter_type = "mlit-dpf"
-    search_conditions = frozenset({"text", "bbox", "limit"})
+    search_conditions = frozenset({"text", "area", "bbox", "format", "limit"})
     required_search_conditions: frozenset[str] = frozenset()
 
     def __init__(
@@ -67,31 +70,103 @@ class MlitDpfAdapter(ProviderAdapter):
         limit = DEFAULT_LIMIT if query.limit is None else query.limit
         if limit == 0:
             return ()
-        graphql = _build_query(query, limit)
-        headers = {"apikey": self._credentials.get(self._credential)}
-        response = self._post_json(
-            self._endpoint,
-            {"query": graphql},
-            headers,
-            credential=self._credential,
-        )
-        root = _object(response, "MLIT DPF response root")
-        errors = root.get("errors")
-        if errors:
-            raise ProviderResponseError("MLIT DPF GraphQL response contains errors")
-        data = _object(root.get("data"), "MLIT DPF data")
-        search = _object(data.get("search"), "MLIT DPF search result")
-        records = search.get("searchResults")
-        if not isinstance(records, list):
-            raise ProviderResponseError(
-                "MLIT DPF searchResults must be an array; response shape is invalid"
-            )
-        parameters = _query_parameters(query, limit)
+        scope = self._search_scope()
+        headers: dict[str, str] | None = None
         found: list[Result] = []
-        for value in cast(list[Any], records):
-            record = _object(value, "MLIT DPF search record")
-            found.extend(self._record_results(record, parameters))
-        return tuple(found[:limit])
+        seen: set[tuple[str, ...]] = set()
+        modes = (
+            (True, False) if query.text and query.text.strip() and scope else (True,)
+        )
+        for phrase_match in modes:
+            first = 0
+            stage_seen: set[tuple[str, ...]] = set()
+            while True:
+                size = min(limit, PAGE_SIZE)
+                graphql = _build_query(query, size, first, phrase_match, scope)
+                if headers is None:
+                    headers = {"apikey": self._credentials.get(self._credential)}
+                response = self._post_json(
+                    self._endpoint,
+                    {"query": graphql},
+                    headers,
+                    credential=self._credential,
+                )
+                root = _object(response, "MLIT DPF response root")
+                if root.get("errors"):
+                    raise ProviderResponseError(
+                        "MLIT DPF GraphQL response contains errors"
+                    )
+                data = _object(root.get("data"), "MLIT DPF data")
+                search = _object(data.get("search"), "MLIT DPF search result")
+                records = search.get("searchResults")
+                if not isinstance(records, list):
+                    raise ProviderResponseError(
+                        "MLIT DPF searchResults must be an array"
+                    )
+                total = search.get("totalNumber")
+                if type(total) is not int or total < 0:
+                    raise ProviderResponseError(
+                        "MLIT DPF totalNumber must be a non-negative integer"
+                    )
+                parameters = {
+                    **_query_parameters(query, limit),
+                    "first": first,
+                    "size": size,
+                    "phraseMatch": phrase_match,
+                    "scope": scope,
+                }
+                previous_count = len(stage_seen)
+                for value in cast(list[Any], records):
+                    record = _object(value, "MLIT DPF search record")
+                    identity = tuple(
+                        _required_record_string(record, key)
+                        for key in ("id", "dataset_id", "catalog_id")
+                    )
+                    stage_seen.add(identity)
+                    if identity in seen:
+                        continue
+                    seen.add(identity)
+                    for item in self._record_results(record, parameters):
+                        available = {
+                            value for value in Format if value.value in item.formats
+                        }
+                        if (
+                            query.format is None
+                            or available & query.expanded_formats
+                            or (
+                                not available
+                                and Format.UNKNOWN in query.expanded_formats
+                            )
+                        ):
+                            found.append(item)
+                if len(found) >= limit:
+                    return tuple(found[:limit])
+                first += len(cast(list[Any], records))
+                if first >= total or not scope:
+                    break
+                if len(stage_seen) == previous_count:
+                    raise ProviderResponseError("MLIT DPF pagination made no progress")
+        return tuple(found)
+
+    def _search_scope(self) -> str | None:
+        """Ask DPF only for catalogs/datasets with declared resolution routes."""
+        clauses: list[str] = []
+        for rule in self._target_rules:
+            catalog = _attribute("catalog_id", rule["catalog_id"])
+            dataset = rule.get("dataset_id")
+            clauses.append(
+                catalog
+                if dataset is None
+                else "{ AND: ["
+                + catalog
+                + ", "
+                + _attribute("dataset_id", dataset)
+                + "] }"
+            )
+        clauses.extend(_attribute("dataset_id", key) for key in self._representations)
+        if not clauses:
+            return None
+        return "{ OR: [" + ", ".join(dict.fromkeys(clauses)) + "] }"
 
     def _record_results(
         self, record: JsonObject, parameters: Mapping[str, Any]
@@ -166,6 +241,7 @@ class MlitDpfAdapter(ProviderAdapter):
                     description=None,
                     discovered_by=self.adapter_type,
                     target=Config("direct", settings),
+                    formats=frozenset({representation["format"]}),
                     metadata=metadata,
                     provenance=provenance,
                     raw_metadata=record,
@@ -201,11 +277,36 @@ class MlitDpfAdapter(ProviderAdapter):
         return None
 
 
-def _build_query(query: SearchQuery, limit: int) -> str:
-    arguments = ["first: 0", f"size: {limit}"]
+def _attribute(name: str, value: Any) -> str:
+    return (
+        '{ attributeName: "DPF:'
+        + name
+        + '", is: '
+        + json.dumps(value, ensure_ascii=False)
+        + " }"
+    )
+
+
+def _build_query(
+    query: SearchQuery, limit: int, first: int, phrase_match: bool, scope: str | None
+) -> str:
+    arguments = [f"first: {first}", f"size: {limit}"]
     if query.text is not None:
         arguments.append(f"term: {json.dumps(query.text, ensure_ascii=False)}")
-        arguments.append("phraseMatch: true")
+        arguments.append(f"phraseMatch: {str(phrase_match).lower()}")
+    filters = [scope] if scope else []
+    if query.area is not None:
+        code = _AREA_CODES.get(query.area)
+        if code is None:
+            raise ConfigValidationError(
+                "mlit-dpf area must be a canonical snapshot name"
+            )
+        name = "prefecture_code" if len(code) == 2 else "municipality_code"
+        # Match the official search client's numeric/leading-zero code encoding.
+        value = code if not code.startswith("0") else json.dumps(code)
+        filters.append(f'{{ attributeName: "DPF:{name}", is: {value} }}')
+    if filters:
+        arguments.append("attributeFilter: { AND: [" + ", ".join(filters) + "] }")
     if query.bbox is not None:
         west, south, east, north = query.bbox
         if not all(math.isfinite(value) for value in query.bbox):
@@ -220,6 +321,8 @@ def _build_query(query: SearchQuery, limit: int) -> str:
             f"bottomRight: {{ lat: {south}, lon: {east} }} "
             "} }"
         )
+    if query.text is None and (filters or query.bbox is not None):
+        arguments.append('term: ""')
     joined = ", ".join(arguments)
     return (
         "query { search(" + joined + ") { totalNumber searchResults { "
@@ -231,6 +334,12 @@ def _query_parameters(query: SearchQuery, limit: int) -> Mapping[str, Any]:
     parameters: dict[str, Any] = {"limit": limit}
     if query.text is not None:
         parameters["text"] = query.text
+    if query.format is not None:
+        parameters["format"] = tuple(
+            sorted(value.value for value in query.expanded_formats)
+        )
+    if query.area is not None:
+        parameters["area"] = query.area
     if query.bbox is not None:
         parameters["bbox"] = query.bbox
     return parameters
