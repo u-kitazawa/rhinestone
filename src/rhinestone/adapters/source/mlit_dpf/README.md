@@ -13,3 +13,13 @@ diagnosticとして隔離し、他のSourceの検索を継続します。
 URL、タイトル、catalog名からProvider、識別子、形式を推測しません。ランディングページだけを
 示す `DPF:dataURLs` はResource URIとして使用しません。download URLのschemeは大文字小文字を
 区別せずHTTPまたはHTTPSとして検証します。
+
+
+検索はDPFの `attributeFilter` で解決可能なcatalog / datasetと地域コードを絞り、
+フレーズ検索を優先して通常検索で補います。`first` / `size` / `totalNumber` による
+ページングと重複除去を行い、Resource展開・形式照合後の件数にlimitを適用します。
+`area` は都道府県・市区町村コードの属性条件です。コード未宣言の全国版を含む保証はありません。
+Directの形式は明示されたrepresentationから保持し、Native委譲の形式は未確定として扱います。
+
+詳細・制約・検証範囲は[APIリファレンス](../../../../../docs/api/adapters/mlit-dpf.md)と
+[調査記録](../../../../../docs/research/mlit-dpf-search.md)を参照してください。

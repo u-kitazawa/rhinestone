@@ -18,6 +18,7 @@ from rhinestone.errors import (
 )
 from rhinestone.models import Config, SearchQuery
 from rhinestone.registry import CredentialRegistry
+from rhinestone.representations import Format
 
 
 def _record(**metadata: Any) -> dict[str, Any]:
@@ -31,7 +32,11 @@ def _record(**metadata: Any) -> dict[str, Any]:
 
 
 def _response(*records: Mapping[str, Any]) -> dict[str, Any]:
-    return {"data": {"search": {"searchResults": list(records)}}}
+    return {
+        "data": {
+            "search": {"totalNumber": len(records), "searchResults": list(records)}
+        }
+    }
 
 
 def _adapter(
@@ -676,3 +681,259 @@ def test_target_prevalidation_ignores_malformed_rules_for_adapter_validation() -
             Provider("native", "ckan", {"endpoint": "https://example.test/ckan"}),
         )
     )
+
+
+@pytest.mark.parametrize("total", [None, True, -1, "2", 1.5])
+def test_search_rejects_invalid_total(total: Any) -> None:
+    response: dict[str, Any] = {
+        "data": {"search": {"totalNumber": total, "searchResults": []}}
+    }
+    with pytest.raises(ProviderResponseError, match="totalNumber"):
+        _adapter(response).search(SearchQuery())
+
+
+def _paged_adapter(
+    pages: list[dict[str, Any]], calls: list[str], **options: Any
+) -> MlitDpfAdapter:
+    def post_json(
+        _url: str, body: Mapping[str, Any], *_args: Any, **_kwargs: Any
+    ) -> Any:
+        calls.append(body["query"])
+        return pages[len(calls) - 1]
+
+    return MlitDpfAdapter(
+        post_json, CredentialRegistry({"mlit-dpf": lambda: "secret"}), "dpf", **options
+    )
+
+
+def _page(total: int, *records: Mapping[str, Any]) -> dict[str, Any]:
+    return {"data": {"search": {"totalNumber": total, "searchResults": list(records)}}}
+
+
+def _download(data_id: str, dataset: str = "dataset-1") -> dict[str, Any]:
+    return {
+        **_record(**{"DPF:downloadURLs": [f"https://example.test/{data_id}"]}),
+        "id": data_id,
+        "dataset_id": dataset,
+    }
+
+
+def test_paging_counts_resolvable_resources_and_preserves_request_provenance() -> None:
+    calls: list[str] = []
+    skipped = {**_record(), "id": "unmapped"}
+    adapter = _paged_adapter(
+        [_page(3, skipped), _page(3, _download("a")), _page(3, _download("b"))],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+    results = adapter.search(SearchQuery(limit=2))
+    assert [item.provenance.resource_identifier for item in results] == ["a", "b"]
+    assert [item.provenance.query_parameters["first"] for item in results] == [1, 2]
+    assert all("size: 2" in request for request in calls)
+    assert 'attributeName: "DPF:dataset_id", is: "dataset-1"' in calls[0]
+    assert all(item.formats == frozenset({"geojson"}) for item in results)
+
+
+def test_phrase_results_precede_broader_matches_and_overlap_is_deduplicated() -> None:
+    calls: list[str] = []
+    adapter = _paged_adapter(
+        [
+            _page(1, _download("exact")),
+            _page(3, _download("exact"), _download("partial"), _download("last")),
+        ],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+    results = adapter.search(SearchQuery(text="河川 洪水", limit=3))
+    assert [item.provenance.resource_identifier for item in results] == [
+        "exact",
+        "partial",
+        "last",
+    ]
+    assert "phraseMatch: true" in calls[0]
+    assert "phraseMatch: false" in calls[1]
+    assert 'term: "河川 洪水"' in calls[1]
+    assert results[0].provenance.query_parameters["phraseMatch"] is True
+    assert results[1].provenance.query_parameters["phraseMatch"] is False
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_pagination_rejects_stalled_pages(empty: bool) -> None:
+    calls: list[str] = []
+    adapter = _paged_adapter(
+        [_page(4, _record()), _page(4, *([] if empty else [_record()]))],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+    with pytest.raises(ProviderResponseError, match="no progress"):
+        adapter.search(SearchQuery(limit=2))
+
+
+def test_identity_includes_catalog_and_dataset() -> None:
+    a, b = _download("same"), _download("same", "other")
+    b["catalog_id"] = "other-catalog"
+    adapter = _adapter(
+        _response(a, b),
+        representations={
+            "dataset-1": {"format": "geojson"},
+            "other": {"format": "gpkg"},
+        },
+    )
+    assert len(adapter.search(SearchQuery(limit=2))) == 2
+
+
+def test_format_filter_pages_beyond_nonmatching_resources() -> None:
+    calls: list[str] = []
+    adapter = _paged_adapter(
+        [_page(2, _download("wrong", "gpkg")), _page(2, _download("right"))],
+        calls,
+        representations={
+            "dataset-1": {"format": "geojson"},
+            "gpkg": {"format": "gpkg"},
+        },
+    )
+    results = adapter.search(SearchQuery(format=(Format.GEOJSON,), limit=1))
+    assert results[0].provenance.resource_identifier == "right"
+    assert results[0].provenance.query_parameters["format"] == ("geojson",)
+
+
+def test_native_target_keeps_unknown_format_and_scopes_specific_rules() -> None:
+    rules = [
+        {
+            "catalog_id": "catalog-1",
+            "dataset_id": "dataset-1",
+            "source_id": "native",
+            "settings": {"id": {"record": "id"}},
+        }
+    ]
+    calls: list[tuple[Any, ...]] = []
+    adapter = _adapter(_response(_record()), target_rules=rules, calls=calls)
+    assert len(adapter.search(SearchQuery(format=(Format.UNKNOWN,), limit=1))) == 1
+    request = calls[0][1]["query"]
+    assert 'attributeName: "DPF:catalog_id", is: "catalog-1"' in request
+    assert 'attributeName: "DPF:dataset_id", is: "dataset-1"' in request
+    assert 'term: ""' in request
+
+
+@pytest.mark.parametrize(
+    "area, field, code",
+    [
+        ("神奈川県", "prefecture_code", "14"),
+        ("神奈川県横浜市", "municipality_code", "14100"),
+        ("北海道", "prefecture_code", '"01"'),
+    ],
+)
+def test_area_uses_official_attribute_codes(area: str, field: str, code: str) -> None:
+    calls: list[tuple[Any, ...]] = []
+    adapter = _adapter(
+        _response(_download("a")),
+        calls=calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+    result = adapter.search(SearchQuery(area=area, limit=1))[0]
+    request = calls[0][1]["query"]
+    assert f'attributeName: "DPF:{field}", is: {code}' in request
+    assert "locationFilter" not in request
+    assert 'term: ""' in request
+    assert result.provenance.query_parameters["area"] == area
+
+
+def test_direct_adapter_rejects_unknown_canonical_area() -> None:
+    with pytest.raises(ConfigValidationError, match="canonical"):
+        _adapter(_response()).search(SearchQuery(area="unknown"))
+
+
+def test_bbox_without_keyword_supplies_empty_term() -> None:
+    calls: list[tuple[Any, ...]] = []
+    _adapter(_response(), calls=calls).search(SearchQuery(bbox=(130, 30, 140, 40)))
+    assert 'term: ""' in calls[0][1]["query"]
+
+
+def test_large_limit_uses_bounded_pages_and_default_limit_stops_at_fifty() -> None:
+    calls: list[str] = []
+    adapter = _paged_adapter(
+        [_page(60, *[_download(str(i)) for i in range(50)])],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+    assert len(adapter.search(SearchQuery())) == 50
+    assert "size: 50" in calls[0]
+
+
+def test_public_area_projection_uses_codes_and_retains_keyword(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def post(_url: str, body: Mapping[str, Any], *_args: Any, **_kwargs: Any) -> Any:
+        calls.append(body["query"])
+        return _response(_download("a"))
+
+    monkeypatch.setattr(_http, "post_json", post)
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {
+                        "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+                        "representations": {"dataset-1": {"format": "geojson"}},
+                    },
+                ),
+            )
+        ),
+        credentials={"mlit-dpf": lambda: "secret"},
+    )
+    results = app.search(text="河川", area="横浜市", limit=1)
+    assert len(results) == 1
+    assert not results.diagnostics
+    assert 'term: "河川"' in calls[0]
+    assert 'attributeName: "DPF:municipality_code", is: 14100' in calls[0]
+    assert results[0].discovered_by == "dpf"
+
+
+def test_limit_above_page_size_reads_multiple_pages() -> None:
+    calls: list[str] = []
+    adapter = _paged_adapter(
+        [
+            _page(80, *[_download(str(i)) for i in range(50)]),
+            _page(80, *[_download(str(i)) for i in range(50, 80)]),
+        ],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+    results = adapter.search(SearchQuery(text="河川", limit=80))
+    assert len(results) == 80
+    assert len(calls) == 2
+    assert "first: 50" in calls[1]
+    assert all("size: 50" in request for request in calls)
+    assert all("phraseMatch: true" in request for request in calls)
+
+
+def test_public_format_query_retains_declared_formats(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def post(*_args: Any, **_kwargs: Any) -> Any:
+        return _response(_download("a"))
+
+    monkeypatch.setattr(_http, "post_json", post)
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider(
+                    "dpf",
+                    "mlit-dpf",
+                    {
+                        "endpoint": "https://data-platform.mlit.go.jp/api/v1",
+                        "representations": {"dataset-1": {"format": "geojson"}},
+                    },
+                ),
+            )
+        ),
+        credentials={"mlit-dpf": lambda: "secret"},
+    )
+    results = app.search(text="河川", format=(Format.GEOJSON,), limit=1)
+    assert len(results) == 1
+    assert results[0].formats == frozenset({"geojson"})
+    assert app.resolve(results[0]).uri == "https://example.test/a"
