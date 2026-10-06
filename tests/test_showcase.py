@@ -112,7 +112,8 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     assert "@6a565afcb467c7edd571ea19c8a27439d02e2cfc" in source
     assert "@develop" not in source
     for marker in (
-        'text="河川"',
+        'text="国土数値 ダム"',
+        'area="津市"',
         "format=(FormatPreset.PYOGRIO,)",
         "providers=[ProviderId.GEOSPATIAL_JP]",
         "result.resolve()",
@@ -161,6 +162,7 @@ def test_ckan_showcase_search_and_resolution_run_with_offline_responses(
             json.loads((ROOT / "tests/fixtures/ckan" / f"{action}.json").read_text()),
         )
         if action == "package_search":
+            response["result"]["results"][0]["area"] = "三重県_津市"
             distribution = response["result"]["results"][0]["resources"][0]
         elif action == "resource_show":
             distribution = response["result"]
@@ -182,7 +184,7 @@ def test_ckan_showcase_search_and_resolution_run_with_offline_responses(
         resource = cast(Resource, namespace["resource"])
         assert resource.format == "geojson"
         assert resource.uri == "https://files.example/river.geojson"
-        assert calls == ["package_search", "resource_show", "package_show"]
+        assert calls == ["package_search"] * 8 + ["resource_show", "package_show"]
     finally:
         rhinestone_api._default_application.cache_clear()  # pyright: ignore[reportPrivateUsage]
 
