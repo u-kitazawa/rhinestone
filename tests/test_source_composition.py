@@ -73,7 +73,7 @@ def test_builtin_ckan_and_plateau_searches_have_distinct_scopes(
     assert len(results["geospatial-jp"]) == 1
     assert results["plateau"] == ()
     assert {tuple(sorted(call.items())) for call in calls} == {
-        (("q", "道路"), ("rows", 1)),
+        (("q", '"道路"'), ("rows", 100), ("start", 0)),
         (("fq", "tags:PLATEAU"), ("q", "道路"), ("rows", 1)),
     }
 

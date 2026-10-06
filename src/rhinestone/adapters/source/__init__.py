@@ -5,6 +5,7 @@ from .ckan import CkanAdapter
 from .dcat import DcatAdapter
 from .direct import DirectAdapter
 from .estat_gis import EstatGisAdapter
+from .geospatial_jp import GeospatialJpAdapter
 from .gsi_fundamental import GsiFundamentalAdapter
 from .mlit_dpf import MlitDpfAdapter
 from .odpt import OdptAdapter
@@ -19,6 +20,7 @@ __all__ = [
     "DirectAdapter",
     "EstatGisAdapter",
     "DcatAdapter",
+    "GeospatialJpAdapter",
     "GsiFundamentalAdapter",
     "JsonGetter",
     "JsonObject",

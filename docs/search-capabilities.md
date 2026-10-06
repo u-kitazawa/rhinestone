@@ -4,10 +4,11 @@
 適用されるかを示します。検索結果はすべて既存の `Result` であり、`resolve()` への経路、
 discovery provenance、provider ごとの順序は変わりません。
 
-`area`は検索前に行政区域Knowledge Adapterで解決されます。STAC、OGC API Features、MLIT DPFと、空間検索を明示的に有効化したCKANにはbboxとして、通常のCKAN、PLATEAU、search.ckan.jp、DCAT、Staticには正式区域名のtextとして投影されます。e-Stat GISでは未対応diagnosticになります。未知区域は全Providerの呼び出し前に失敗します。
+`area`は検索前に行政区域Knowledge Adapterで解決されます。`area`対応Adapterには正式区域名を直接渡し、G空間情報センターでは独立した地域条件として扱います。STAC、OGC API Features、MLIT DPFと、空間検索を明示的に有効化したCKANにはbboxとして、通常のCKAN、PLATEAU、search.ckan.jp、DCAT、Staticには正式区域名のtextとして投影されます。e-Stat GISでは未対応diagnosticになります。未知区域は全Providerの呼び出し前に失敗します。
 
 | Adapter | 対応条件と適用段階 | ページング / `limit` | 非対応・境界 |
 | --- | --- | --- | --- |
+| G空間情報センター | `text`は引用符付きリテラルの明示的AND。`area`は正式区域名で受け取り、地域タグ検索と本文検索を併用。取得したpackageの地域metadataとタグで優先順を決定。`format`はResourceごとに照合 | 各経路100 Datasetの取得範囲ごとにResourceを巡回展開。形式照合後のResource数が`limit`に足りなければ次page。`limit=None`は各経路の先頭page | bbox・timeは未対応。全候補の一括ランキングではない。実APIの検索品質は未検証。[詳細](api/adapters/geospatial-jp.md) |
 | CKAN | `text` を Action API の `q`、`limit` を `rows` に渡す。`format`はAdapter内でResourceごとに照合する。`spatial_search=True`で`ckanext-spatial`を導入済みのサイトに限り、`bbox`を`ext_bbox`へ渡す | `limit` は形式照合後の Resource 数。先頭 page で足りなければ `start` で続きの package を取得する。`limit=None` は provider の既定 page | 既定ではbbox非対応で`area`は正式区域名のtextに変換。空間検索が有効なら`area`をbboxに変換。`ext_bbox`を無視するサイトでは地理条件を保証できないため、対応確認済みのサイトのみ有効化する。time は未対応 |
 | PLATEAU | `text`、`format`、`limit`はCKANと同じ。加えてAction APIの`fq=tags:PLATEAU`で、明示的なPLATEAUタグを持つデータセットへ限定する。検索結果の解決時はPLATEAUの明示選択規則を使う | CKAN と同じ | 組み込み`geospatial-jp`と同じCKAN endpointを使うが、`geospatial-jp`はG空間情報センター全体、`plateau`はPLATEAUタグ付きデータセットが検索対象。タグのない関連データを名称から推測して含めない |
 | search.ckan.jp | `text` を Backend API の `q` に渡し、package から形式が明示された直接配布 Resource だけを返す。`format`はAdapter内でResourceごとに照合する | `limit` は形式照合後の Resource 数。`count` を根拠に `start` で後続 package を取得する | `text` は必須。形式不明、landing page のみ、credential 埋込み URL は結果にしない。次 page が必要なのに `count` が不正なら response error。検索サービスの構文は provider 依存 |
@@ -25,7 +26,7 @@ discovery provenance、provider ごとの順序は変わりません。
 
 | Adapter | 形式を絞り込む場所 | 検索時に照合できる形式 |
 | --- | --- | --- |
-| CKAN / PLATEAU / search.ckan.jp | Adapter内。照合後も必要に応じてpackageの次pageを取得する | 対象Resourceの宣言済みformatまたは対応media type。隣接Resourceの形式は使わない |
+| G空間情報センター / CKAN / PLATEAU / search.ckan.jp | Adapter内。照合後も必要に応じてpackageの次pageを取得する | 対象Resourceの宣言済みformatまたは対応media type。隣接Resourceの形式は使わない |
 | STAC | Search Coordinatorが取得済み結果を絞り込む | 選択済みdata assetの対応media typeから得られる形式 |
 | OGC API Features | Search Coordinatorが取得済み結果を絞り込む | `ogc-api-features` |
 | Static | Search Coordinatorが取得済み結果を絞り込む | 静的定義の候補に明示されたformat |
@@ -42,7 +43,7 @@ CKAN系の形式照合もサーバーの形式検索パラメータへ変換せ�
 | 適用段階 | `Format.UNKNOWN`に一致する形式集合 | 非空の未登録形式（例：`xlsx`） |
 | --- | --- | --- |
 | Search Coordinator | 空の集合、`Format`の値へ正規化できない形式だけの集合、または`unknown`を含む集合 | 不明として一致する |
-| CKAN / PLATEAU / search.ckan.jpのAdapter内 | 空の集合、または`unknown`を明示的に含む集合 | 一致しない |
+| G空間情報センター / CKAN / PLATEAU / search.ckan.jpのAdapter内 | 空の集合、または`unknown`を明示的に含む集合 | 一致しない |
 
 `canonical_format("XLSX")`は`"xlsx"`を保持し、`None`や`"unknown"`へ変換しません。
 CKAN系でこのような未登録形式を取得する場合は`format`を省略して検索し、

@@ -3,8 +3,9 @@
 調査日: 2026-10-06。対象: [Issue #182](https://github.com/u-kitazawa/rhinestone/issues/182)。
 コード確認時のdevelop: `3a7361652aa809713c26f190200f396d3e7cc22b`。
 
-これは未完了の調査記録であり、公開APIの仕様や実装済み機能の案内ではありません。
-検索処理、Catalog、検索結果の契約は変更していません。
+これは調査記録であり、公開APIの正本ではありません。実装は専用Adapterへ移行しました。
+現行の動作は[APIリファレンス](../api/adapters/geospatial-jp.md)に記載しています。
+ユーザーの追加指示により、共通処理で正式区域名を専用Adapterへ直接渡す変更も許容されました。
 
 ## 公式資料で確認できた事項
 
@@ -53,9 +54,9 @@ curl --fail-with-body --get --max-time 30 \
 
 これは手動調査用のコマンドです。外部APIの成功を通常CIの必須条件にしません。
 
-## 現在の地域条件の受け渡し
+## 調査開始時の地域条件の受け渡し
 
-組み込み `geospatial-jp` は汎用 `CkanAdapter` を使用しています。
+調査開始時の組み込み `geospatial-jp` は汎用 `CkanAdapter` を使用していました。
 `SearchCoordinator._search_provider()` は区域名をKnowledge Adapterで解決した後、
 次のいずれかに置換してからSource Adapterへ渡します。
 
@@ -82,7 +83,7 @@ Issueの変更範囲を保つ経路として、既存のbboxへの投影とProvi
 地域名を独立した条件として専用Adapterへ渡す方式を選ぶ場合、共通処理に
 「地域条件を直接扱えるAdapterへ地域名を渡す」分岐が必要になります。
 これはIssueの「SearchCoordinatorの共通検索semanticsを変更しない」という制約との調整事項です。
-この調査PRでは採用も実装もしていません。
+後続のユーザー指示で変更が許容され、直接areaを渡す分岐を採用・実装しました。
 
 ## 残る調査と評価
 
@@ -104,10 +105,12 @@ Issueの変更範囲を保つ経路として、既存のbboxへの投影とProvi
 
 fixtureには観測した要求条件、取得日、結果順、package・resourceのmetadataを残します。
 実応答を加工した場合は加工内容を明示し、合成データを実応答として扱いません。
-現時点では応答fixtureも検索品質の改善実績もありません。
+観測応答fixtureは未取得です。合成fixtureでは地域metadataの優先、Datasetの多様性、
+形式照合とページング、公開searchからresolveまでを検証しました。ライブ検索品質の改善実績は未確認です。
 
 実装では、専用Adapterの直接検索に加えて公開 `search()` → `resolve()` の経路を確認します。
 Resource単位の結果、format、limit、paging、metadataとprovenanceの保持を検証し、
 他のCKAN Providerの挙動とProvider横断の並び順を維持します。
 
-Issue #182は未完了です。API検証と地域条件の受け渡し方針を確定した後、実装・fixture・公開文書を更新します。
+実装と合成fixture・公開文書を追加しました。実APIの利用可能fieldと検索品質の比較は未完了のため、
+Issue #182はこのPRではCloseしません。

@@ -26,6 +26,7 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 | source type | 対応する提供仕様・版 | 解決できる対象 | 明示的な制限 |
 | --- | --- | --- | --- |
 | `ckan` | CKAN Action API (`/api/3/action`) | 指定 resource の公式 download URL、package検索からのResource展開 | 対象は`resource_show`、`package_show`、`package_search`。HTML catalog、URL推測、その他のAction APIは非対応。 |
+| `geospatial-jp` | G空間情報センター CKAN Action API | 地域metadata・タグを使う検索、Resource単位の検索と解決 | 取得範囲内での優先順。bbox・timeは非対応。実APIの検索品質は未検証。[詳細](api/adapters/geospatial-jp.md) |
 | `dcat` | DCAT RDF: JSON-LD、Turtle、RDF/XML | `dcat:downloadURL` を持つ Distribution | 他の RDF serialization、`accessURL` だけの Distribution は非対応。 |
 | `direct` | provider 非依存 | 利用者が明示する URI / format | format、media type、実行方法の推測はしない。 |
 | `estat-gis` | e-Stat Statistics GIS の利用者管理 distribution index | 明示された GML / KML / Shapefile 配布物 | HTML scraping、安定 API とみなした URL 発見、selector の推測は非対応。 |

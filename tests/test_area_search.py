@@ -96,6 +96,17 @@ def test_area_projects_to_bbox_without_changing_bbox_contract() -> None:
     ]
 
 
+def test_native_area_capability_takes_precedence_over_common_projections() -> None:
+    source = Searchable(
+        "native-area", frozenset({"text", "area", "bbox", "limit"}), text_fallback=True
+    )
+    results = SearchCoordinator((source,), AreaKnowledge()).search(
+        SearchQuery(text="河川", area="神奈川", limit=3)
+    )
+    assert results.diagnostics == ()
+    assert source.queries == [SearchQuery(text="河川", area="神奈川県", limit=3)]
+
+
 def test_area_uses_declared_text_fallback_for_non_spatial_source() -> None:
     text = Searchable(
         "text",

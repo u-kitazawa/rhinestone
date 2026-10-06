@@ -17,6 +17,7 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 | [Static](adapters/static.md) | `static` | リポジトリまたは利用者が管理する静的定義 |
 | [e-Stat Statistics GIS](adapters/estat-gis.md) | `estat-gis` | 利用者が管理する明示的な配布物インデックス |
 | [CKAN](adapters/ckan.md) | `ckan` | CKAN Action API |
+| [G空間情報センター](adapters/geospatial-jp.md) | `geospatial-jp` | G空間情報センターのCKAN Action API |
 | [DCAT](adapters/dcat.md) | `dcat` | DCAT RDF catalog |
 | [基盤地図情報](adapters/gsi-fundamental.md) | `gsi-fundamental` | 基盤地図情報のローカルGML |
 | [ODPT](adapters/odpt.md) | `odpt` | ODPT v4 |
