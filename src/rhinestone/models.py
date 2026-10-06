@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from math import isfinite
 from types import MappingProxyType
 from typing import (
@@ -22,6 +23,17 @@ from .representations.types import Format, FormatPreset, expand_formats
 
 LibraryName = str
 """Execution runtime name accepted by the public open API."""
+
+
+class ProviderId(str, Enum):
+    """Typed IDs for the built-in Providers; custom Providers use their own IDs."""
+
+    GEOSPATIAL_JP = "geospatial-jp"
+    PLATEAU = "plateau"
+    GSI = "gsi"
+    ODPT = "odpt"
+    MLIT_DPF = "mlit-dpf"
+    SEARCH_CKAN_JP = "search-ckan-jp"
 
 
 @dataclass(frozen=True)
@@ -392,8 +404,23 @@ class SearchQuery:
     time: tuple[datetime | None, datetime | None] | None = None
     format: tuple[Format | FormatPreset, ...] | None = None
     limit: int | None = None
+    providers: Sequence[ProviderId | str] | None = None
 
     def __post_init__(self) -> None:
+        raw_providers = cast(object, self.providers)
+        if raw_providers is not None:
+            if isinstance(raw_providers, str) or not isinstance(
+                raw_providers, Sequence
+            ):
+                raise ConfigValidationError(
+                    "providers must be an array of ProviderId or non-empty ID strings"
+                )
+            values = cast(Sequence[Any], raw_providers)
+            if any(not isinstance(value, str) or not value.strip() for value in values):
+                raise ConfigValidationError(
+                    "providers must be an array of ProviderId or non-empty ID strings"
+                )
+            object.__setattr__(self, "providers", tuple(values))
         raw_text = cast(object, self.text)
         if raw_text is not None and not isinstance(raw_text, str):
             raise ConfigValidationError(
@@ -670,6 +697,7 @@ __all__ = [
     "Metadata",
     "Provenance",
     "Provider",
+    "ProviderId",
     "ProviderSearchResults",
     "RemoteDatasetPlan",
     "Resource",

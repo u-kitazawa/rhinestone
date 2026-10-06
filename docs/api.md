@@ -12,13 +12,28 @@
 ```python
 import rhinestone as rs
 
-results = rs.search(text="河川", bbox=(139.5, 35.5, 140.0, 36.0), limit=10)
+results = rs.search(
+    text="河川",
+    providers=[rs.ProviderId.GEOSPATIAL_JP],
+    limit=10,
+)
 resource = results[0].resolve()
 ```
 
-`text`、`area`、`bbox`、`time`、`format`、`limit`の意味と診断は`Rhinestone.search()`と同じです。
+`text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`の意味と診断は`Rhinestone.search()`と同じです。
 独自Provider、Credential、Source Runtime、NetworkPolicy、Adapterが必要な場合は
 `configure()`で独立したアプリケーションを作成します。
+
+## `ProviderId`（組み込み提供元のID）
+
+`ProviderId`は文字列enumです。IDEの補完で組み込みProviderを選べます。
+`GEOSPATIAL_JP`、`PLATEAU`、`GSI`、`ODPT`、`MLIT_DPF`、`SEARCH_CKAN_JP`を提供します。
+独自Providerは`Provider.id`の文字列で指定します。
+
+`providers=[ProviderId.GEOSPATIAL_JP]`は検索前に対象を限定します。未選択Providerの
+検索・通信は実行しません。`None`は構成済みProvider全体、`[]`は検索なしです。
+未知または未構成のIDは`ConfigValidationError`になります。指定順や重複は結果順を変えず、
+Catalog順で各Providerを1回だけ検索します。解決専用Providerは検索を行いません。
 
 ## `Catalog`（提供元の一覧）
 

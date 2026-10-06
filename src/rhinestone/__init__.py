@@ -3,7 +3,7 @@
 from . import api as _api
 from .api import Rhinestone, configure
 from .catalogs import Catalog
-from .models import Config, Provider, Resource, Result
+from .models import Config, Provider, ProviderId, Resource, Result
 from .representations import Format, FormatPreset
 from .search import SearchResults
 
@@ -15,6 +15,7 @@ __all__ = [
     "Rhinestone",
     "Catalog",
     "Provider",
+    "ProviderId",
     "Config",
     "Result",
     "SearchResults",

@@ -15,6 +15,7 @@ from ._adapter_contracts import (
 from .adapters.knowledge import AreaKnowledgeAdapter
 from .adapters.knowledge.models import AdministrativeArea
 from .errors import (
+    ConfigValidationError,
     CredentialUnavailableError,
     KnowledgeResolutionError,
     KnowledgeValidationError,
@@ -172,9 +173,21 @@ class SearchCoordinator:
         failures affect only the failing source. Unexpected programming errors
         continue to propagate.
         """
+        selected = None if query.providers is None else set(query.providers)
+        if selected is not None:
+            unknown = selected - {adapter.source_id for adapter in self._adapters}
+            if unknown:
+                raise ConfigValidationError(
+                    f"Unknown or unconfigured Provider IDs: {sorted(unknown)!r}"
+                )
         searchable_adapters = [
-            adapter for adapter in self._adapters if is_searchable_source(adapter)
+            adapter
+            for adapter in self._adapters
+            if is_searchable_source(adapter)
+            and (selected is None or adapter.source_id in selected)
         ]
+        if not searchable_adapters:
+            return SearchResults.from_grouped({})
         grouped_results: OrderedDict[str, tuple[Result, ...]] = OrderedDict()
         diagnostics: list[SearchDiagnostic] = []
         executions: list[SearchExecution] = []

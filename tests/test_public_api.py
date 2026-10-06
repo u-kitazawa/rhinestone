@@ -43,6 +43,7 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
         "Rhinestone",
         "Catalog",
         "Provider",
+        "ProviderId",
         "Config",
         "Result",
         "SearchResults",
