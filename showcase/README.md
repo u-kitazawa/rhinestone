@@ -36,7 +36,10 @@ search(format=PYOGRIO) -> Result.resolve -> vector Resource -> AccessPlan
 
 この Notebook は live Provider を利用します。検索結果、配布 URL、公開状態は提供元によって変わるため、
 通常 CI での完全実行は要求しません。検索結果の一覧から番号を指定し、解決後の形式・URL・AccessPlanを
-確認してからベクターデータを開きます。対象形式は検索時に `FormatPreset.PYOGRIO` で絞ります。
+確認してからベクターデータを開きます。検索例では `text="国土数値 ダム"` の複数語と `area="津市"` の市名指定を組み合わせ、
+結果一覧にDatasetの対象地域を表示します。市の候補が不足すると県・地方・全国へ検索を広げるため、
+各候補の対象地域を確認してください。ファイル内の地物の切り出しは行いません。
+対象形式は検索時に `FormatPreset.PYOGRIO` で絞ります。
 URL・形式・archive memberは推測しません。ZIP を開く場合は、確定済みの `archive` と任意の `entry_point` を pyogrio 用の
 GDAL VSI URI に翻訳します。
 

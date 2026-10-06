@@ -97,9 +97,12 @@ results = app.search(text="河川", area="神奈川県")
 MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一致、部分一致の意味は各 API の
 仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
 
-G空間情報センターの専用Adapterでは、本文の空白区切りの各語をリテラルとして
-明示的ANDで検索し、地域タグ検索と通常検索を併用します。地域metadataによる優先順と
-Datasetを巡回するResource展開は、このProvider内に限定します。取得範囲とライブ検証の
+G空間情報センターの専用Adapterでは、本文の空白区切りの各語をタイトル全体（title_string）・タグで
+部分一致検索し、語同士を明示的ANDで結びます。「川」は「河川」にも一致します。地域指定時はAPI側のarea・tags条件で、指定地域から含有する
+都道府県・地方・全国へ段階的に検索します。各段階で本文＋地域名のAPI検索も併用し、
+返されたarea・タグで地域一致を照合します。地域無指定の通常検索を混ぜません。
+地域metadataによる優先順とDatasetを巡回するResource展開は、このProvider内に限定します。
+取得範囲とライブ検証の
 制限は[G空間情報センター](api/adapters/geospatial-jp.md)を参照してください。
 
 形式はcanonical vocabularyの`Format`またはRuntime向け集合の`FormatPreset`で検索できます。

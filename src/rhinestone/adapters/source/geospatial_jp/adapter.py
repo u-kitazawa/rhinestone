@@ -68,6 +68,16 @@ def _literal(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def _partial_term(value: str) -> str:
+    """Match a literal substring in titles or tags, not Solr user syntax."""
+    escaped = "".join(
+        "\\" + character if character in '+-!():^[]"{}~*?|&/\\' else character
+        for character in value
+    )
+    pattern = "*" + escaped + "*"
+    return f"(title_string:{pattern} OR tags:{pattern})"
+
+
 def _tags(package: JsonObject) -> frozenset[str]:
     values = package.get("tags", ())
     if not isinstance(values, list | tuple):
@@ -87,7 +97,7 @@ def _area_priority(package: JsonObject, area: str | None) -> int:
     values = set(_tags(package))
     declared = package.get("area")
     if isinstance(declared, str):
-        values.add(declared)
+        values.update(value.strip() for value in declared.split(",") if value.strip())
     # Normalize only the documented prefecture_municipality separator.
     normalized = {_provider_area_name(value) for value in values}
     area = _provider_area_name(area)
@@ -113,16 +123,67 @@ def _area_priority(package: JsonObject, area: str | None) -> int:
             return 2
     if normalized & {"全国", "日本全国"}:
         return 3
-    # Incomplete and unrelated metadata remain fallback candidates, not exclusions.
+    # Unknown or unrelated metadata cannot verify a regional candidate.
     return 4
+
+
+def _area_searches(
+    area: str, text: str
+) -> tuple[tuple[tuple[dict[str, str], frozenset[int]], ...], ...]:
+    """Build scoped field/text searches with verifiable regional relationships."""
+    area = _provider_area_name(area)
+    prefecture = next(
+        (
+            name
+            for names in _REGIONS.values()
+            for name in names
+            if area.startswith(name)
+        ),
+        None,
+    )
+
+    def searches(
+        names: tuple[str, ...], priorities: frozenset[int], prefix: str | None = None
+    ) -> tuple[tuple[dict[str, str], frozenset[int]], ...]:
+        clauses = [
+            f"{field}:{_literal(name)}" for field in ("area", "tags") for name in names
+        ]
+        if prefix is not None:
+            # Prefix comes from the administrative snapshot, never user syntax.
+            clauses.extend(f"{field}:{prefix}_*" for field in ("area", "tags"))
+        regional_text = " OR ".join(_literal(name) for name in names)
+        if len(names) > 1:
+            regional_text = "(" + regional_text + ")"
+        return (
+            ({"q": text, "fq": "(" + " OR ".join(clauses) + ")"}, priorities),
+            ({"q": text + " AND " + regional_text}, priorities),
+        )
+
+    names = (area,)
+    if prefecture is not None and area != prefecture:
+        names = (prefecture + "_" + area[len(prefecture) :], area)
+    groups = [
+        searches(
+            names,
+            frozenset({0, 1}) if area == prefecture else frozenset({0}),
+            prefecture if area == prefecture else None,
+        )
+    ]
+    if prefecture is not None:
+        if area != prefecture:
+            groups.append(searches((prefecture,), frozenset({1})))
+        region = next(name for name, names in _REGIONS.items() if prefecture in names)
+        groups.append(searches((region, region + "地方"), frozenset({2})))
+    groups.append(searches(("全国", "日本全国"), frozenset({3})))
+    return tuple(groups)
 
 
 class GeospatialJpAdapter(CkanAdapter):
     """Rank G Spatial candidates locally while retaining resource-level results.
 
-    Each window contains up to 100 datasets from a regional-tag search and
-    100 from ordinary text search. Ranking is window-local and stable; it is
-    not a global relevance score. Resource expansion is round-robin per window.
+    Area filters run from the requested area to containing regions and Japan.
+    No unrestricted text search is added when an area is specified. Resource
+    expansion is round-robin within each page, after format matching.
     """
 
     adapter_type = "geospatial-jp"
@@ -149,84 +210,90 @@ class GeospatialJpAdapter(CkanAdapter):
         terms = tuple(dict.fromkeys((query.text or "").split()))
         # Explicit AND avoids depending on the site's default whitespace operator.
         base: dict[str, Any] = {
-            "q": " AND ".join(_literal(term) for term in terms) or "*:*",
+            "q": " AND ".join(_partial_term(term) for term in terms) or "*:*",
             "rows": 100,
         }
-        searches = [base]
-        if query.area is not None:
-            searches.insert(
-                0,
-                {**base, "fq": f"tags:{_literal(_provider_area_name(query.area))}"},
-            )
-        offsets = [0] * len(searches)
-        active = [True] * len(searches)
+        stages: tuple[tuple[tuple[dict[str, str], frozenset[int]], ...], ...] = (
+            _area_searches(query.area, base["q"])
+            if query.area is not None
+            else ((({}, frozenset({0})),),)
+        )
         seen_packages: set[str] = set()
         seen_resources: set[str] = set()
         found: list[Result] = []
-        while any(active):
-            candidates: list[tuple[JsonObject, dict[str, Any]]] = []
-            for index, params in enumerate(searches):
-                if not active[index]:
-                    continue
-                request = {**params, "start": offsets[index]}
-                response = self._object(
-                    self._action(endpoint, "package_search", request),
-                    "G Spatial search result",
-                )
-                packages = self._objects(response.get("results"), "G Spatial packages")
-                count = response.get("count")
-                if type(count) is not int or count < 0:
-                    raise ProviderResponseError("G Spatial count must be an integer")
-                if not packages and offsets[index] < count:
-                    raise ProviderResponseError(
-                        "G Spatial page is empty before its count"
+        for stage in stages:
+            offsets = [0] * len(stage)
+            active = [True] * len(stage)
+            while any(active):
+                candidates: list[tuple[JsonObject, dict[str, Any]]] = []
+                for index, (params, priorities) in enumerate(stage):
+                    if not active[index]:
+                        continue
+                    request = {**base, **params, "start": offsets[index]}
+                    response = self._object(
+                        self._action(endpoint, "package_search", request),
+                        "G Spatial search result",
                     )
-                offsets[index] += len(packages)
-                active[index] = offsets[index] < count
-                for package in packages:
-                    identifier = self._required_string(package, "id")
-                    if identifier in seen_packages:
-                        continue
-                    seen_packages.add(identifier)
-                    candidates.append((package, request))
-            candidates.sort(
-                key=lambda item: (
-                    _area_priority(item[0], query.area),
-                    -len(_tags(item[0]) & set(terms)),
-                )
-            )
-            groups: list[list[Result]] = []
-            for package, request in candidates:
-                group: list[Result] = []
-                for resource in self._objects(
-                    package.get("resources"), "CKAN resources"
-                ):
-                    item = self._resource_result(package, resource, endpoint, query)
-                    if item is None:
-                        continue
-                    identifier = self._required_string(resource, "id")
-                    if identifier in seen_resources:
-                        continue
-                    seen_resources.add(identifier)
-                    group.append(
-                        replace(
-                            item,
-                            provenance=replace(
-                                item.provenance,
-                                provider=self.adapter_type,
-                                adapter=self.adapter_type,
-                                query_parameters=request,
-                            ),
+                    packages = self._objects(
+                        response.get("results"), "G Spatial packages"
+                    )
+                    count = response.get("count")
+                    if type(count) is not int or count < 0:
+                        raise ProviderResponseError(
+                            "G Spatial count must be an integer"
                         )
+                    if not packages and offsets[index] < count:
+                        raise ProviderResponseError(
+                            "G Spatial page is empty before its count"
+                        )
+                    offsets[index] += len(packages)
+                    active[index] = offsets[index] < count
+                    for package in packages:
+                        if _area_priority(package, query.area) not in priorities:
+                            continue
+                        identifier = self._required_string(package, "id")
+                        if identifier in seen_packages:
+                            continue
+                        seen_packages.add(identifier)
+                        candidates.append((package, request))
+                candidates.sort(
+                    key=lambda item: (
+                        _area_priority(item[0], query.area),
+                        -len(_tags(item[0]) & set(terms)),
                     )
-                groups.append(group)
-            for row in zip_longest(*groups, fillvalue=None):
-                for item in cast(tuple[Result | None, ...], row):
-                    if item is None:
-                        continue
-                    found.append(item)
-                    if query.limit is not None and len(found) == query.limit:
-                        return tuple(found)
-            if query.limit is None:
-                break
+                )
+                groups: list[list[Result]] = []
+                for package, request in candidates:
+                    group: list[Result] = []
+                    for resource in self._objects(
+                        package.get("resources"), "CKAN resources"
+                    ):
+                        item = self._resource_result(package, resource, endpoint, query)
+                        if item is None:
+                            continue
+                        identifier = self._required_string(resource, "id")
+                        if identifier in seen_resources:
+                            continue
+                        seen_resources.add(identifier)
+                        group.append(
+                            replace(
+                                item,
+                                provenance=replace(
+                                    item.provenance,
+                                    provider=self.adapter_type,
+                                    adapter=self.adapter_type,
+                                    query_parameters=request,
+                                ),
+                            )
+                        )
+                    groups.append(group)
+                for row in zip_longest(*groups, fillvalue=None):
+                    for item in cast(tuple[Result | None, ...], row):
+                        if item is None:
+                            continue
+                        found.append(item)
+                        if query.limit is not None and len(found) == query.limit:
+                            return tuple(found)
+                if query.limit is None:
+                    break
         return tuple(found)

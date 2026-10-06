@@ -1,4 +1,4 @@
-# G空間検索の合成fixture
+# G空間検索のfixture
 
 `search.json` は公式資料のmetadata構造を基に作成した合成データです。
 G空間情報センターの実応答ではありません。取得日はありません。
@@ -6,4 +6,21 @@ G空間情報センターの実応答ではありません。取得日はあり�
 地域metadataの完全一致、都道府県と市区町村の関係、地方・全国の包含、
 本文に地域名を含むだけの候補、Resource展開の偏りと形式選択を検証します。
 ライブ検索品質や実Providerの索引・検索構文への適合は保証しません。
-実API取得後、別fixtureとして観測応答と要求・取得日を追加します。
+観測応答のfixtureは下記のとおり、合成データと区別します。
+
+## area_unindexed.json
+
+2026-10-06にユーザーが共有した公開API応答の必要項目の抜粋です。
+`q="国土数値" AND "ダム" AND "三重県"` では `success=true, count=1`、
+`q="国土数値" AND "ダム"&fq=area:"三重県"` では0件でした。
+応答に `area="三重県"` があり、地域タグはなく `国交DPF` だけです。
+索引にareaがない状態をテストclientで合成して回帰を確認します。
+現在の全Datasetの索引仕様や、全文検索で一致したfieldを証明するものではありません。
+
+## partial_title.json
+
+2026-10-06のユーザー提供package_show応答から、島根県河川DEMの必要項目を抜粋しました。
+同日、IDのfq条件を付けた `q=*:*`、`title:*川*`、`title_string:*川*`、`tags:*川*` が
+それぞれ `success=true, count=1` と確認されました。`name:shimane*` は0件でした。
+fixtureのpackageは観測済みmetadataですが、package_searchの応答外枠はテスト用です。
+OR・ANDの組合せや記号のエスケープを実APIで検証した応答ではありません。
