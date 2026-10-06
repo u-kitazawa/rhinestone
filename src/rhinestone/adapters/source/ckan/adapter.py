@@ -146,42 +146,10 @@ class CkanAdapter(ProviderAdapter):
             for package in packages:
                 resources = self._objects(package.get("resources"), "CKAN resources")
                 for resource in resources:
-                    resource_id = self._required_string(resource, "id")
-                    media_type = _optional_string(resource.get("mimetype"))
-                    format_name = canonical_format(resource.get("format")) or (
-                        format_from_media_type(media_type)
-                    )
-                    formats: frozenset[str] = (
-                        frozenset({format_name}) if format_name else frozenset()
-                    )
-                    if query.format is not None and not self._matches_query_formats(
-                        formats, query
-                    ):
+                    item = self._resource_result(package, resource, endpoint, query)
+                    if item is None:
                         continue
-                    found.append(
-                        Result(
-                            title=_optional_string(package.get("title")) or resource_id,
-                            description=_optional_string(package.get("notes")),
-                            discovered_by=self.adapter_type,
-                            target=Config(
-                                self.adapter_type, {"resource_id": resource_id}
-                            ),
-                            metadata=Metadata(
-                                title=_optional_string(package.get("title")),
-                                raw=package,
-                            ),
-                            provenance=Provenance(
-                                provider="ckan",
-                                dataset_identifier=_optional_string(package.get("id")),
-                                resource_identifier=resource_id,
-                                api_endpoint=endpoint,
-                                adapter="ckan",
-                                raw=package,
-                            ),
-                            formats=formats,
-                            raw_metadata={"package": package, "resource": resource},
-                        )
-                    )
+                    found.append(item)
                     if query.limit is not None and len(found) == query.limit:
                         return tuple(found)
             if query.limit is None:
@@ -198,6 +166,45 @@ class CkanAdapter(ProviderAdapter):
                     "CKAN search result is empty before its declared count"
                 )
             start += len(packages)
+
+    def _resource_result(
+        self,
+        package: JsonObject,
+        resource: JsonObject,
+        endpoint: str,
+        query: SearchQuery,
+    ) -> Result | None:
+        """Expand one declared CKAN resource without changing package metadata."""
+        resource_id = self._required_string(resource, "id")
+        media_type = _optional_string(resource.get("mimetype"))
+        format_name = canonical_format(resource.get("format")) or (
+            format_from_media_type(media_type)
+        )
+        formats: frozenset[str] = (
+            frozenset({format_name}) if format_name else frozenset()
+        )
+        if query.format is not None and not self._matches_query_formats(formats, query):
+            return None
+        return Result(
+            title=_optional_string(package.get("title")) or resource_id,
+            description=_optional_string(package.get("notes")),
+            discovered_by=self.adapter_type,
+            target=Config(self.adapter_type, {"resource_id": resource_id}),
+            metadata=Metadata(
+                title=_optional_string(package.get("title")),
+                raw=package,
+            ),
+            provenance=Provenance(
+                provider="ckan",
+                dataset_identifier=_optional_string(package.get("id")),
+                resource_identifier=resource_id,
+                api_endpoint=endpoint,
+                adapter="ckan",
+                raw=package,
+            ),
+            formats=formats,
+            raw_metadata={"package": package, "resource": resource},
+        )
 
     def _package_search_params(self, query: SearchQuery) -> dict[str, Any]:
         """Build provider-specific CKAN package search parameters."""

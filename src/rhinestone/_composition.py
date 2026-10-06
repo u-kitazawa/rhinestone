@@ -33,6 +33,7 @@ from .adapters.source import (
     DcatAdapter,
     DirectAdapter,
     EstatGisAdapter,
+    GeospatialJpAdapter,
     GsiFundamentalAdapter,
     MlitDpfAdapter,
     OdptAdapter,
@@ -280,6 +281,21 @@ def _build_ckan(provider: Provider, context: SourceAdapterContext) -> ProviderAd
     )
 
 
+def _build_geospatial_jp(
+    provider: Provider, context: SourceAdapterContext
+) -> ProviderAdapter:
+    return GeospatialJpAdapter(
+        get_json=_json_transport(context),
+        credentials=cast(CredentialRegistry, context.credentials),
+        destination_policy=context.destination_policy,
+        provider_id=provider.id,
+        **_settings(
+            provider,
+            ("endpoint", "credential", "credential_header", "credential_scheme"),
+        ),
+    )
+
+
 def _build_stac(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
     return StacAdapter(
         get_json=_json_transport(context),
@@ -412,6 +428,7 @@ BUILTIN_SOURCE_ADAPTER_FACTORIES: Mapping[
 ] = {
     "direct": lambda _provider, _context: DirectAdapter(),
     "ckan": _build_ckan,
+    "geospatial-jp": _build_geospatial_jp,
     "stac": _build_stac,
     "ogc-features": _build_ogc,
     "plateau": _build_plateau,

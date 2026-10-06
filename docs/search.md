@@ -48,7 +48,9 @@ results = app.search(text="人口", limit=10)
 results = app.search(text="河川", area="神奈川県", limit=10)
 ```
 
-`area`は検索前に組み込みKnowledge AdapterがCRS84のbboxへ解決します。bbox対応Sourceには
+`area`は検索前に組み込みKnowledge Adapterが正式区域名とCRS84のbboxへ解決します。
+`area`対応Sourceには正式区域名をそのまま渡します。組み込みG空間情報センターはこの経路で
+地域条件を独立して扱います。bbox対応Sourceには
 そのbboxを渡し、通常のCKAN、PLATEAU、DCAT、search.ckan.jp、Staticのように明示的なtext
 fallbackを持つSourceでは正式区域名を`text`へ追加します。それ以外では`area`を
 `unsupported` diagnosticとして残すため、地理条件が無言で失われることはありません。
@@ -94,6 +96,11 @@ results = app.search(text="河川", area="神奈川県")
 すべて含まれる場合だけ一致します（大文字・小文字は区別しません）。CKAN、search.ckan.jp、
 MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一致、部分一致の意味は各 API の
 仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
+
+G空間情報センターの専用Adapterでは、本文の空白区切りの各語をリテラルとして
+明示的ANDで検索し、地域タグ検索と通常検索を併用します。地域metadataによる優先順と
+Datasetを巡回するResource展開は、このProvider内に限定します。取得範囲とライブ検証の
+制限は[G空間情報センター](api/adapters/geospatial-jp.md)を参照してください。
 
 形式はcanonical vocabularyの`Format`またはRuntime向け集合の`FormatPreset`で検索できます。
 複数指定はOR条件です。Providerが形式検索を宣言する場合は条件を渡し、それ以外は明示された

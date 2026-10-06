@@ -164,8 +164,8 @@ def test_ckan_pyogrio_tutorial_filters_formats_before_opening(
     exec(compile(source, "docs/tutorials/ckan-pyogrio.md", "exec"), {})
 
     assert search_params == [
-        {"q": "河川", "rows": 20},
-        {"q": "河川", "rows": 20, "start": 1},
+        {"q": '"河川"', "rows": 100, "start": 0},
+        {"q": '"河川"', "rows": 100, "start": 1},
     ]
     assert opened == ["https://assets.example/vector.gpkg"]
     output = capsys.readouterr().out

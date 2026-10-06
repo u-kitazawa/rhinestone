@@ -248,7 +248,10 @@ class SearchCoordinator:
         projected_query = query
         area_handled = False
         if resolved_area is not None:
-            if "bbox" in supported_conditions:
+            if "area" in supported_conditions:
+                projected_query = replace(query, area=resolved_area.canonical_name)
+                area_handled = True
+            elif "bbox" in supported_conditions:
                 projected_query = replace(
                     query,
                     area=None,

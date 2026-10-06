@@ -30,6 +30,7 @@ nav:
           - 提供元アダプター:
               - 概要: api/source-adapters.md
               - CKAN: api/adapters/ckan.md
+              - G空間情報センター: api/adapters/geospatial-jp.md
               - DCAT: api/adapters/dcat.md
               - Direct: api/adapters/direct.md
               - e-Stat Statistics GIS: api/adapters/estat-gis.md
@@ -49,6 +50,7 @@ nav:
               - Rasterio: api/adapters/rasterio.md
 
 exclude_docs: |
+  research/*
   adapter_expansion.md
   architecture/*
   spec_v4.md

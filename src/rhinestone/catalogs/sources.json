@@ -1,7 +1,7 @@
 {
   "sources": {
     "geospatial-jp": {
-      "adapter_type": "ckan",
+      "adapter_type": "geospatial-jp",
       "settings": {
         "endpoint": "https://www.geospatial.jp/ckan"
       },
