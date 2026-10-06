@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 
+from rhinestone import Format
 from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
 from rhinestone.adapters.source.direct import DirectAdapter
 from rhinestone.adapters.source.search_ckan_jp import SearchCkanJpAdapter
@@ -42,7 +43,15 @@ def test_search_ckan_jp_discovers_direct_resource_and_preserves_provenance() -> 
 
     results = adapter.search(SearchQuery(text="river", limit=5))
 
-    assert client.calls == [(search_url, {"q": "river", "rows": 5})]
+    assert client.calls == [
+        (
+            search_url,
+            {
+                "q": '(xckan_title:"river"^8 OR xckan_title:*river*^4 OR "river")',
+                "rows": 10,
+            },
+        )
+    ]
     assert len(results) == 2
     result, second = results
     assert result.discovered_by == "search-ckan-jp"
@@ -126,8 +135,15 @@ def test_search_ckan_jp_pages_packages_until_the_resource_limit_is_met() -> None
         "resource-1"
     ]
     assert calls == [
-        {"q": "river", "rows": 1},
-        {"q": "river", "rows": 1, "start": 1},
+        {
+            "q": '(xckan_title:"river"^8 OR xckan_title:*river*^4 OR "river")',
+            "rows": 10,
+        },
+        {
+            "q": '(xckan_title:"river"^8 OR xckan_title:*river*^4 OR "river")',
+            "rows": 10,
+            "start": 1,
+        },
     ]
 
 
@@ -340,3 +356,252 @@ def test_search_ckan_jp_rejects_resource_urls_with_embedded_credentials() -> Non
             "https://search.ckan.jp/backend/api",
             {},
         )
+
+
+@pytest.mark.parametrize("text", ["", " \t\n　"])
+def test_search_ckan_jp_blank_text_does_not_search_everything(text: str) -> None:
+    adapter = SearchCkanJpAdapter(
+        get_json=lambda url, params: pytest.fail("no request")
+    )
+    assert adapter.search(SearchQuery(text=text)) == ()
+
+
+def test_search_ckan_jp_literal_and_query_and_actual_provenance() -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append(dict(params))
+        return dict(fixture_json("search_ckan_jp/package_search.json"))
+
+    results = SearchCkanJpAdapter(get_json=get_json).search(
+        SearchQuery(text="河川　神奈川県 河川", limit=200)
+    )
+    assert calls == [
+        {
+            "q": '(xckan_title:"河川"^8 OR xckan_title:*河川*^4 OR "河川") AND '
+            '(xckan_title:"神奈川県"^8 OR xckan_title:*神奈川県*^4 OR "神奈川県")',
+            "rows": 100,
+        }
+    ]
+    assert results[0].provenance.query_parameters == calls[0]
+
+
+@pytest.mark.parametrize("term", ["title:*", '"', "\\", "+-&|!(){}[]^~?:/"])
+def test_search_ckan_jp_escapes_user_syntax(term: str) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append(dict(params))
+        return {"success": True, "result": {"results": []}}
+
+    assert SearchCkanJpAdapter(get_json=get_json).search(SearchQuery(text=term)) == ()
+    escaped = (
+        "".join("\\" + char for char in term) if term != "title:*" else "title\\:\\*"
+    )
+    assert calls[0]["q"] == (
+        f'(xckan_title:"{escaped}"^8 OR xckan_title:*{escaped}*^4 OR "{escaped}")'
+    )
+    assert "rows" not in calls[0]
+
+
+def test_search_ckan_jp_round_robin_filter_and_cross_site_resource_identity() -> None:
+    packages: list[dict[str, Any]] = [
+        {
+            "xckan_id": "site-a:dataset",
+            "xckan_original_id": "dataset",
+            "xckan_site_url": "https://a.example/dataset",
+            "xckan_title": "河川",
+            "title": "old title",
+            "resources": [
+                {"id": "csv", "url": "https://a.example/1.csv", "format": "CSV"},
+                {
+                    "id": "shared",
+                    "url": "https://a.example/1.json",
+                    "format": "GeoJSON",
+                },
+                {
+                    "id": "second",
+                    "url": "https://a.example/2.json",
+                    "format": "GeoJSON",
+                },
+            ],
+        },
+        {
+            "xckan_id": "site-b:dataset",
+            "xckan_original_id": "dataset",
+            "xckan_site_url": "https://b.example/dataset",
+            "xckan_title": "河川水質",
+            "resources": [
+                {
+                    "id": "shared",
+                    "url": "https://b.example/1.json",
+                    "format": "GeoJSON",
+                },
+            ],
+        },
+    ]
+    response = {
+        "success": True,
+        "result": {"count": 3, "results": packages + [packages[0]]},
+    }
+    adapter = SearchCkanJpAdapter(get_json=lambda url, params: response)
+    results = adapter.search(
+        SearchQuery(text="河川", format=(Format.GEOJSON,), limit=10)
+    )
+    assert [(r.title, r.provenance.resource_identifier) for r in results] == [
+        ("河川", "shared"),
+        ("河川水質", "shared"),
+        ("河川", "second"),
+    ]
+    # The old flattened expansion fills limit=2 with site A; both sites now appear.
+    limited = adapter.search(
+        SearchQuery(text="河川", format=(Format.GEOJSON,), limit=2)
+    )
+    assert [r.provenance.original_url for r in limited] == [
+        "https://a.example/dataset",
+        "https://b.example/dataset",
+    ]
+    resource = Resolver().resolve(DirectAdapter().load(results[0].target))
+    assert resource.uri == "https://a.example/1.json"
+    assert results[0].metadata.raw["title"] == "old title"
+
+
+def test_search_ckan_jp_deduplicates_across_pages_and_keeps_page_provenance() -> None:
+    package: dict[str, Any] = {
+        "id": "global-id",
+        "title": "河川",
+        "resources": [
+            {"id": "one", "url": "https://a.example/1.csv", "format": "CSV"},
+        ],
+    }
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append(dict(params))
+        page = (
+            package
+            if not params.get("start")
+            else {
+                **package,
+                "resources": package["resources"]
+                + [
+                    {"id": "two", "url": "https://a.example/2.csv", "format": "CSV"},
+                ],
+            }
+        )
+        return {"success": True, "result": {"count": 2, "results": [page]}}
+
+    results = SearchCkanJpAdapter(get_json=get_json).search(
+        SearchQuery(text="河川", limit=3)
+    )
+    assert [r.provenance.resource_identifier for r in results] == ["one", "two"]
+    assert results[1].provenance.query_parameters == calls[1]
+    assert calls[1]["start"] == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "terms"),
+    [
+        ("東京都府中市", ("東京都", "府中市")),
+        ("広島県府中市", ("広島県", "府中市")),
+        ("兵庫県美方郡香美町", ("香美町",)),
+        ("神奈川県横浜市", ("横浜市",)),
+    ],
+)
+def test_search_ckan_jp_snapshot_area_names_preserve_identity(
+    name: str, terms: tuple[str, ...]
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append(dict(params))
+        return {"success": True, "result": {"results": []}}
+
+    assert SearchCkanJpAdapter(get_json=get_json).search(SearchQuery(text=name)) == ()
+    assert calls[0]["q"] == " AND ".join(
+        f'(xckan_title:"{term}"^8 OR xckan_title:*{term}*^4 OR "{term}")'
+        for term in terms
+    )
+
+
+def test_search_ckan_jp_observed_yokohama_resource_names_improve_first_result() -> None:
+    excerpt = fixture_json("search_ckan_jp/yokohama_resource_excerpt.json")
+    package = excerpt["package"]
+    response = {"success": True, "result": {"count": 1, "results": [package]}}
+    results = SearchCkanJpAdapter(get_json=lambda url, params: response).search(
+        SearchQuery(text="避難所 神奈川県横浜市", limit=1)
+    )
+    # Real metadata excerpt; the old Resource order starts with population data.
+    assert package["resources"][0]["name"].startswith("1-1")
+    assert (
+        results[0].provenance.resource_identifier
+        == "3348ebc3-e9d9-41a7-b652-0b6c7c2c1d1c"
+    )
+    assert "指定避難所" in results[0].raw_metadata["resource"]["name"]
+    assert tuple(results[0].raw_metadata["catalog"]["resources"]) == tuple(
+        package["resources"]
+    )
+    assert results[0].metadata.raw["xckan_site_url"] == package["xckan_site_url"]
+
+
+def test_search_ckan_jp_resource_names_precede_descriptions_and_area_mentions() -> None:
+    resources = [
+        {
+            "id": "area",
+            "name": "横浜市",
+            "url": "https://example.org/area.csv",
+            "format": "CSV",
+        },
+        {
+            "id": "description",
+            "description": "避難所",
+            "url": "https://example.org/description.csv",
+            "format": "CSV",
+        },
+        {
+            "id": "name",
+            "name": "避難所",
+            "url": "https://example.org/name.csv",
+            "format": "CSV",
+        },
+        {
+            "id": "tied",
+            "name": "避難所",
+            "url": "https://example.org/tied.csv",
+            "format": "CSV",
+        },
+    ]
+    response = {
+        "success": True,
+        "result": {"results": [{"id": "dataset", "resources": resources}]},
+    }
+    results = SearchCkanJpAdapter(get_json=lambda url, params: response).search(
+        SearchQuery(text="避難所 神奈川県横浜市")
+    )
+    assert [r.provenance.resource_identifier for r in results] == [
+        "name",
+        "tied",
+        "description",
+        "area",
+    ]
+
+
+def test_search_ckan_jp_queries_match_observed_service_requests() -> None:
+    observations = fixture_json("search_ckan_jp/search_observations.json")
+    for case in observations["cases"].values():
+        calls: list[dict[str, Any]] = []
+
+        def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+            calls.append(dict(params))
+            return {"success": True, "result": {"count": 0, "results": []}}
+
+        assert (
+            SearchCkanJpAdapter(get_json=get_json).search(
+                SearchQuery(text=case["text"], limit=10)
+            )
+            == ()
+        )
+        assert calls == [case["after"]["request"]]
+    river = observations["cases"]["river"]
+    assert river["after"]["top_datasets"][0]["xckan_title"] == "河川"
+    assert all(p["xckan_title"] != "河川" for p in river["before"]["top_datasets"])

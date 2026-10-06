@@ -93,7 +93,7 @@ results = app.search(text="河川", area="神奈川県")
 
 `text` は provider 固有の検索構文を増やさない単一の文字列です。Static、DCAT、e-Stat GIS
 のローカル照合では、空白区切りの各語が identifier、title、description などの検索対象に
-すべて含まれる場合だけ一致します（大文字・小文字は区別しません）。CKAN、search.ckan.jp、
+すべて含まれる場合だけ一致します（大文字・小文字は区別しません）。汎用CKANと
 MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一致、部分一致の意味は各 API の
 仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
 
@@ -131,7 +131,16 @@ Coordinatorによる絞り込みは`Result.formats`だけを照合し、raw meta
 次のpackage pageを取得します。検索時に形式を設定しないProviderもあります。
 詳細は[検索能力の対照表](search-capabilities.md)の「形式検索の適用段階」を参照してください。
 
-`search-ckan-jp` では、`limit` はCKANへのpackage取得数（`rows`）に使われるだけでなく、packageをsupported resourceへ展開した後の結果列にも適用されます。そのため、1つのpackageに複数のresourceがある場合、flattened結果全体が`limit`件に達した時点で後続resourceやpackageの結果が省略されます。`limit=None`ならこの展開後の制限はありません。
+`search-ckan-jp` は本文をエスケープした語の明示的ANDに変換し、検索元が保証する
+タイトルfieldの完全一致・部分一致を優先しながら全文検索を残します。既存のarea本文fallbackで
+追加された正式市町村名は、行政区域一覧で一意な別名ならその名前を用い、同名都市では
+都道府県と市名を両方保持します。地理的範囲の一致を保証するものではありません。
+
+形式照合後のResourceはDataset内で名称・説明文の検索語一致を優先し、page内の
+Datasetを一つずつ巡回します。`limit` は重複除去後のResource数です。
+有限limitでは10〜100 Dataset/pageを要求し、単純に `rows=limit` とはしません。
+検索語の解釈、表記と取得範囲の制約は[横断CKAN検索](api/adapters/search-ckan-jp.md)を参照してください。
+
 
 CKAN と search.ckan.jp は `limit` を Resource 数として満たすまで package 検索を次ページへ
 進めます。最初の package ページに実行可能な Resource がない場合でも、応答の `count` が
