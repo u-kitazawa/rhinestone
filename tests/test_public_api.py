@@ -295,7 +295,7 @@ def test_discovery_result_resolves_through_a_different_target_source(
         headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         assert url == search_url
-        assert params == {"q": "river", "rows": 1}
+        assert params == {"q": '(xckan_title:"river"^5 OR "river")', "rows": 1}
         return cast(dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
 
     monkeypatch.setattr(_http, "get_json", get_json)

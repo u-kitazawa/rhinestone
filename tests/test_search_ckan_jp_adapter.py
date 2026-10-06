@@ -16,6 +16,8 @@ from rhinestone.resolution import Resolver
 
 from .provider_support import fixture_json
 
+RIVER_QUERY = '(xckan_title:"river"^5 OR "river")'
+
 
 class RecordingJsonClient:
     def __init__(self, responses: Mapping[str, Any]) -> None:
@@ -42,7 +44,7 @@ def test_search_ckan_jp_discovers_direct_resource_and_preserves_provenance() -> 
 
     results = adapter.search(SearchQuery(text="river", limit=5))
 
-    assert client.calls == [(search_url, {"q": "river", "rows": 5})]
+    assert client.calls == [(search_url, {"q": RIVER_QUERY, "rows": 5})]
     assert len(results) == 2
     result, second = results
     assert result.discovered_by == "search-ckan-jp"
@@ -70,6 +72,98 @@ def test_search_ckan_jp_discovers_direct_resource_and_preserves_provenance() -> 
     assert result.provenance.raw["resource"]["id"] == "resource-1"
     assert second.provenance.resource_identifier == "resource-2"
     assert second.target.settings["format"] == "csv"
+
+
+def test_search_ckan_jp_builds_literal_and_query_with_title_boost() -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append(dict(params))
+        return {"success": True, "result": {"count": 0, "results": []}}
+
+    SearchCkanJpAdapter(get_json=get_json).search(
+        SearchQuery(text='river OR *:* "quoted" river', limit=1)
+    )
+
+    assert calls == [
+        {
+            "q": (
+                '(xckan_title:"river"^5 OR "river") AND '
+                '(xckan_title:"OR"^5 OR "OR") AND '
+                '(xckan_title:"*:*"^5 OR "*:*") AND '
+                '(xckan_title:"\\"quoted\\""^5 OR "\\"quoted\\"")'
+            ),
+            "rows": 1,
+        }
+    ]
+
+
+def test_search_ckan_jp_round_robins_resources_in_package_relevance_order() -> None:
+    packages = [
+        {
+            "id": "first",
+            "xckan_id": "site-a:first",
+            "xckan_title": "Guaranteed first title",
+            "resources": [
+                {"id": "first-1", "url": "https://a.example/1.csv", "format": "CSV"},
+                {"id": "first-2", "url": "https://a.example/2.csv", "format": "CSV"},
+            ],
+        },
+        {
+            "id": "second",
+            "xckan_id": "site-b:second",
+            "xckan_title": "Guaranteed second title",
+            "resources": [
+                {"id": "second-1", "url": "https://b.example/1.csv", "format": "CSV"}
+            ],
+        },
+    ]
+    results = SearchCkanJpAdapter(
+        get_json=lambda url, params: {
+            "success": True,
+            "result": {"count": 2, "results": packages},
+        }
+    ).search(SearchQuery(text="river"))
+
+    assert [result.provenance.resource_identifier for result in results] == [
+        "first-1",
+        "second-1",
+        "first-2",
+    ]
+    assert [result.title for result in results] == [
+        "Guaranteed first title",
+        "Guaranteed second title",
+        "Guaranteed first title",
+    ]
+
+
+def test_search_ckan_jp_deduplicates_by_global_catalog_and_resource_identity() -> None:
+    def package(catalog_id: str, site: str, uri: str) -> dict[str, Any]:
+        return {
+            "id": "same-original-dataset",
+            "xckan_id": catalog_id,
+            "xckan_title": catalog_id,
+            "xckan_site_url": site,
+            "resources": [{"id": "shared-resource", "url": uri, "format": "CSV"}],
+        }
+
+    first = package(
+        "site-a:dataset", "https://a.example/dataset", "https://a.example/a.csv"
+    )
+    second = package(
+        "site-b:dataset", "https://b.example/dataset", "https://b.example/b.csv"
+    )
+    results = SearchCkanJpAdapter(
+        get_json=lambda url, params: {
+            "success": True,
+            "result": {"count": 3, "results": [first, second, dict(first)]},
+        }
+    ).search(SearchQuery(text="river", limit=3))
+
+    assert [result.target.settings["uri"] for result in results] == [
+        "https://a.example/a.csv",
+        "https://b.example/b.csv",
+    ]
 
 
 def test_search_ckan_jp_limits_flattened_resources_and_preserves_unlimited_results() -> (
@@ -126,8 +220,8 @@ def test_search_ckan_jp_pages_packages_until_the_resource_limit_is_met() -> None
         "resource-1"
     ]
     assert calls == [
-        {"q": "river", "rows": 1},
-        {"q": "river", "rows": 1, "start": 1},
+        {"q": RIVER_QUERY, "rows": 1},
+        {"q": RIVER_QUERY, "rows": 1, "start": 1},
     ]
 
 
@@ -302,7 +396,7 @@ def test_search_ckan_jp_canonicalizes_geopackage_for_direct_resolution() -> None
             },
         },
         endpoint,
-        {"q": "gpkg"},
+        {"q": '(xckan_title:"gpkg"^5 OR "gpkg")'},
     )[0]
 
     assert result.target.settings["format"] == "gpkg"

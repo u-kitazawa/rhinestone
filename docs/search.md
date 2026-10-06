@@ -93,9 +93,10 @@ results = app.search(text="河川", area="神奈川県")
 
 `text` は provider 固有の検索構文を増やさない単一の文字列です。Static、DCAT、e-Stat GIS
 のローカル照合では、空白区切りの各語が identifier、title、description などの検索対象に
-すべて含まれる場合だけ一致します（大文字・小文字は区別しません）。CKAN、search.ckan.jp、
-MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一致、部分一致の意味は各 API の
-仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
+すべて含まれる場合だけ一致します（大文字・小文字は区別しません）。通常のCKANとMLIT DPFは
+文字列を公式APIへ渡します。search.ckan.jpでは各語をリテラルとして明示的ANDで結び、
+`xckan_title`一致を優先しながら通常の全文検索も残します。STACとOGC API Featuresは現在
+`text`を受け取りません。
 
 G空間情報センターの専用Adapterでは、本文の空白区切りの各語をタイトル全体（title_string）・タグで
 部分一致検索し、語同士を明示的ANDで結びます。「川」は「河川」にも一致します。地域指定時はAPI側のarea・tags条件で、指定地域から含有する

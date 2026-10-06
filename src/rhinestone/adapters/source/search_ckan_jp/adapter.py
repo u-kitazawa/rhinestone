@@ -1,6 +1,7 @@
 """Discovery adapter for the Japanese cross-CKAN search service."""
 
-from typing import Any
+from itertools import zip_longest
+from typing import Any, cast
 
 from ....errors import (
     ConfigValidationError,
@@ -14,6 +15,19 @@ from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
 DEFAULT_ENDPOINT = "https://search.ckan.jp/backend/api"
+
+
+def _literal(value: str) -> str:
+    """Quote one user term without executing Solr operators or wildcards."""
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _search_query(text: str) -> str:
+    """Require every user term while boosting the guaranteed title field."""
+    terms = tuple(dict.fromkeys(text.split()))
+    return " AND ".join(
+        f"(xckan_title:{_literal(term)}^5 OR {_literal(term)})" for term in terms
+    )
 
 
 class SearchCkanJpAdapter(ProviderAdapter):
@@ -50,10 +64,11 @@ class SearchCkanJpAdapter(ProviderAdapter):
         if query.limit == 0:
             return ()
         endpoint = self._endpoint_from({}, DEFAULT_ENDPOINT)
-        params: dict[str, Any] = {"q": query.text}
+        params: dict[str, Any] = {"q": _search_query(query.text)}
         if query.limit is not None:
             params["rows"] = query.limit
         found: list[Result] = []
+        seen_resources: set[tuple[str, str]] = set()
         start = 0
         while True:
             page_params = dict(params)
@@ -64,12 +79,38 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 raise ProviderResponseError("search.ckan.jp search was not successful")
             result = self._object(response.get("result"), "search.ckan.jp result")
             packages = self._objects(result.get("results"), "search.ckan.jp results")
+            groups: list[list[Result]] = []
             for package in packages:
+                group: list[Result] = []
                 for item in self._package_results(package, endpoint, page_params):
                     if query.format is not None and not self._matches_query_formats(
                         item.formats, query
                     ):
                         continue
+                    group.append(item)
+                groups.append(group)
+            # Preserve package relevance while preventing one package's resources
+            # from occupying the whole result prefix.
+            for row in zip_longest(*groups, fillvalue=None):
+                for item in cast(tuple[Result | None, ...], row):
+                    if item is None:
+                        continue
+                    catalog = item.raw_metadata["catalog"]
+                    catalog_id = optional_string(catalog.get("xckan_id"))
+                    if catalog_id is None:
+                        catalog_id = "|".join(
+                            (
+                                optional_string(catalog.get("xckan_site_url")) or "",
+                                item.provenance.dataset_identifier or "",
+                            )
+                        )
+                    identity = (
+                        catalog_id,
+                        item.provenance.resource_identifier or "",
+                    )
+                    if identity in seen_resources:
+                        continue
+                    seen_resources.add(identity)
                     found.append(item)
                     if query.limit is not None and len(found) == query.limit:
                         return tuple(found)
@@ -97,7 +138,11 @@ class SearchCkanJpAdapter(ProviderAdapter):
         package_id = optional_string(package.get("xckan_original_id"))
         if package_id is None:
             package_id = optional_string(package.get("id"))
-        title = optional_string(package.get("title")) or package_id
+        title = (
+            optional_string(package.get("xckan_title"))
+            or optional_string(package.get("title"))
+            or package_id
+        )
         if title is None:
             return ()
         description = optional_string(package.get("notes"))

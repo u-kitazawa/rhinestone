@@ -14,6 +14,13 @@
 Resource がなければ、response の `count` を根拠に `start` で次 page を取得します。
 `limit=None` では provider の既定 page を超えて走査しません。
 
+`text`は空白区切りの各語を引用して明示的ANDで結び、横断検索が保証する
+`xckan_title`の一致をboostしながら通常の全文検索も残します。入力中のSolr演算子や
+wildcardはリテラルとして扱います。Backend APIが返したDatasetの関連度順は維持し、
+同一Datasetに多数のResourceがあっても結果の先頭を占有しないよう、1件ずつ巡回して
+展開します。同じ横断カタログID・Resource IDの重複は除外しますが、異なる元サイトに
+属する同一Resource IDは別の結果として保持します。
+
 ```python
 from rhinestone.catalogs import BUILTIN
 from rhinestone.catalogs import Catalog
@@ -34,6 +41,9 @@ results = app.search(text="河川", limit=10)
 ## 対応範囲
 
 - search.ckan.jpが返すpackage/resourceの識別情報と公式配布URLを利用します。
+- 公式APIが保証する`xckan_title`、`xckan_id`、元サイト情報を検索・表示・重複排除に利用します。
 - resourceの形式またはMIME typeが明示されている結果だけを返します。
 - HTMLの解析、配布URLの推測、検索結果からのprovider secretの取得は行いません。
 - 検索結果に含まれる元カタログURLは出典として保持しますが、検索専用Sourceから直接取得は行いません。
+- `area`は構造化fieldへ変換せず、Search Coordinatorが正式区域名を本文へ追加します。
+  元サイト由来の地域fieldは横断サービスで一様に保証されないためです。
