@@ -98,8 +98,10 @@ MLIT DPF は文字列を公式 API へそのまま渡すため、AND、完全一
 仕様に従います。STAC と OGC API Features は現在 `text` を受け取りません。
 
 G空間情報センターの専用Adapterでは、本文の空白区切りの各語をリテラルとして
-明示的ANDで検索し、地域タグ検索と通常検索を併用します。地域metadataによる優先順と
-Datasetを巡回するResource展開は、このProvider内に限定します。取得範囲とライブ検証の
+明示的ANDで検索します。地域指定時はAPI側のarea・tags条件で、指定地域から含有する
+都道府県・地方・全国へ段階的に検索し、地域無指定の通常検索を混ぜません。
+地域metadataによる優先順とDatasetを巡回するResource展開は、このProvider内に限定します。
+取得範囲とライブ検証の
 制限は[G空間情報センター](api/adapters/geospatial-jp.md)を参照してください。
 
 形式はcanonical vocabularyの`Format`またはRuntime向け集合の`FormatPreset`で検索できます。

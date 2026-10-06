@@ -114,3 +114,20 @@ Resource単位の結果、format、limit、paging、metadataとprovenanceの保�
 
 実装と合成fixture・公開文書を追加しました。実APIの利用可能fieldと検索品質の比較は未完了のため、
 Issue #182はこのPRではCloseしません。
+
+## Colab実API検証と追加修正（2026-10-06）
+
+上記は初回調査時点の記録です。その後ユーザー環境で、公開APIを認証なしで呼び出し、
+`q="河川"&fq=tags:"島根県"` の成功と `q="河川"&fq=area:"島根県"` の
+`success=true, count=5` を確認しました。返った島根県DEMのDatasetは `area="島根県"`、
+Resourceの宣言形式はPBFです。PYOGRIO presetの検索対象には入りません。
+
+Showcaseは古いcommitを固定インストールしていました。PR #183のcommitへ差し替えると
+Datasetの多様性は改善しましたが、島根県指定でも静岡県の候補が先頭に残りました。
+実Datasetの `area` にはカンマ区切りの複数都道府県・`都道府県_市区町村` が格納されています。
+初回実装はこの値を分割せず、地域無指定の通常検索も無条件に併用していました。
+
+追加修正では、API側のarea・tags条件を使い、指定地域、含有都道府県、地方、全国の順に
+検索します。無条件の通常検索は廃止し、複数地域を分割してpage内の地域比較にも使用します。
+OR式・市区町村prefix検索の現索引での挙動と、修正後のライブ検索品質は未検証です。
+Dataset地域と各Resourceの地理的範囲は別で、Resource名やファイル内容による推測は行いません。

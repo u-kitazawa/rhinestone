@@ -1,5 +1,7 @@
+import re
 from collections.abc import Mapping
-from typing import Any
+from fnmatch import fnmatchcase
+from typing import Any, cast
 
 import pytest
 
@@ -33,10 +35,28 @@ class Client:
         self.calls.append(dict(params))
         selected = self.packages
         if "fq" in params:
-            area = str(params["fq"])[6:-1]
-            selected = [
-                item for item in selected if {"name": area} in (item.get("tags") or ())
-            ]
+            clauses = re.findall(r'(area|tags):(?:"([^"]+)"|([^ ()]+))', params["fq"])
+
+            def matches(item: dict[str, Any]) -> bool:
+                for field, exact, pattern in clauses:
+                    values: list[str] = (
+                        [value.strip() for value in (item.get("area") or "").split(",")]
+                        if field == "area"
+                        else [
+                            cast(dict[str, Any], tag)["name"]
+                            for tag in (item.get("tags") or ())
+                            if isinstance(tag, dict)
+                            and isinstance(cast(dict[str, Any], tag).get("name"), str)
+                        ]
+                    )
+                    if any(
+                        value == exact if exact else fnmatchcase(value, pattern)
+                        for value in values
+                    ):
+                        return True
+                return False
+
+            selected = [item for item in selected if matches(item)]
         start = params.get("start", 0)
         return {
             "success": True,
@@ -73,14 +93,18 @@ def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -
     assert ids(results) == [
         "local-0",
         "municipal-0",
+        "local-1",
+        "local-2",
         "regional-0",
-        "national-0",
-        "incidental-0",
     ]
-    assert client.calls == [
-        {"q": '"河川"', "fq": 'tags:"神奈川県"', "rows": 100, "start": 0},
-        {"q": '"河川"', "rows": 100, "start": 0},
-    ]
+    assert len(client.calls) == 2
+    assert client.calls[0] == {
+        "q": '"河川"',
+        "fq": '(area:"神奈川県" OR tags:"神奈川県" OR area:神奈川県_* OR tags:神奈川県_*)',
+        "rows": 100,
+        "start": 0,
+    }
+    assert "関東地方" in client.calls[1]["fq"]
     assert results[0].raw_metadata["package"]["area"] == "神奈川県"
     assert results[0].provenance.query_parameters == client.calls[0]
     assert results[0].provenance.dataset_identifier == "local"
@@ -145,22 +169,21 @@ def test_explicit_region_metadata_retains_containing_and_contained_candidates(
     results = adapter(
         Client([package("fallback", "埼玉県"), package("match", matching)])
     ).search(SearchQuery(area=area))
-    assert ids(results) == ["match", "fallback"]
+    assert ids(results) == ["match"]
 
 
-def test_missing_metadata_and_unrelated_municipality_are_not_excluded() -> None:
+def test_missing_metadata_and_unrelated_municipality_are_not_added() -> None:
     rows = [
         package("other", "神奈川県_川崎市", None),
         package("unknown", tags=[None, {}, {"name": 5}]),
     ]
-    assert ids(adapter(Client(rows)).search(SearchQuery(area="神奈川県横浜市"))) == [
-        "other",
-        "unknown",
-    ]
+    client = Client(rows)
+    assert adapter(client).search(SearchQuery(area="神奈川県横浜市")) == ()
+    assert all("fq" in call for call in client.calls)
 
 
 def test_format_filter_pages_past_empty_and_duplicate_datasets_and_resources() -> None:
-    skipped = package("skip")
+    skipped = package("skip", "神奈川県")
     skipped["resources"].append(
         {"id": "undeclared", "url": "https://example.test/fake.geojson"}
     )
@@ -229,7 +252,7 @@ def test_public_area_search_resolves_alias_keeps_text_and_resolves_resource(
         text="河川", area="Kanagawa", format=(Format.GEOJSON,), limit=3
     )
     assert results.diagnostics == ()
-    assert ids(results["geospatial-jp"]) == ["local-0", "municipal-0", "regional-0"]
+    assert ids(results["geospatial-jp"]) == ["local-0", "municipal-0", "local-2"]
     resource = app.resolve(results["geospatial-jp"][0])
     assert resource.uri == "https://files.example/local-0"
     assert resource.format == "geojson"
@@ -257,4 +280,97 @@ def test_public_municipality_search_matches_provider_names_before_prefecture(
     )
     assert results.diagnostics == ()
     assert ids(results["geospatial-jp"]) == ["exact"]
-    assert client.calls[0]["fq"] == f'tags:"{prefecture}{municipality}"'
+    assert f'area:"{prefecture}_{municipality}"' in client.calls[0]["fq"]
+    assert f'tags:"{prefecture}{municipality}"' in client.calls[0]["fq"]
+
+
+def test_comma_separated_areas_and_tag_only_matches_precede_broader_tiers() -> None:
+    client = Client(
+        [
+            package("unrelated", "静岡県"),
+            package("national", "日本全国"),
+            package("regional", "中国地方"),
+            package("multi", "北海道, 島根県,島根県_松江市"),
+            package("tagged", None, [{"name": "島根県"}]),
+        ]
+    )
+    results = adapter(client).search(SearchQuery(text="河川", area="島根県", limit=20))
+    assert ids(results) == ["multi", "tagged", "regional", "national"]
+    assert results[0].raw_metadata["package"]["area"] == "北海道, 島根県,島根県_松江市"
+    assert len(client.calls) == 3
+    assert all("fq" in call for call in client.calls)
+    assert "中国地方" in client.calls[1]["fq"]
+    assert "日本全国" in client.calls[2]["fq"]
+
+
+def test_requested_area_pages_finish_before_broader_searches() -> None:
+    client = Client(
+        [
+            package("regional", "中国地方"),
+            package("first", "島根県"),
+            package("second", "島根県"),
+        ],
+        page_size=1,
+    )
+    results = adapter(client).search(SearchQuery(area="島根県", limit=2))
+    assert ids(results) == ["first", "second"]
+    assert [call["start"] for call in client.calls] == [0, 1]
+    assert all('area:"島根県"' in call["fq"] for call in client.calls)
+
+
+def test_none_limit_reads_first_page_of_each_area_tier_and_deduplicates() -> None:
+    client = Client(
+        [
+            package("multi", "島根県,中国地方,日本全国"),
+            package("local", "島根県"),
+        ],
+        page_size=1,
+    )
+    assert ids(adapter(client).search(SearchQuery(area="島根県"))) == ["multi"]
+    assert [call["start"] for call in client.calls] == [0, 0, 0]
+
+
+def test_no_regional_candidates_returns_empty_without_unrestricted_search() -> None:
+    client = Client([package("other", "静岡県")])
+    assert (
+        adapter(client).search(SearchQuery(text="河川", area="島根県", limit=20)) == ()
+    )
+    assert len(client.calls) == 3
+    assert all("fq" in call for call in client.calls)
+
+
+def test_municipality_prefecture_fallback_does_not_expand_to_sibling_municipalities() -> (
+    None
+):
+    client = Client(
+        [
+            package("sibling", "島根県_出雲市"),
+            package("broad", "島根県"),
+            package("exact", "島根県_松江市"),
+        ]
+    )
+    assert ids(adapter(client).search(SearchQuery(area="島根県松江市", limit=20))) == [
+        "exact",
+        "broad",
+    ]
+    assert len(client.calls) == 4
+    assert "_*" not in client.calls[1]["fq"]
+
+
+def test_filtered_response_with_incomplete_metadata_keeps_exact_area_first() -> None:
+    rows = [
+        package("missing", tags="not-a-tag-list"),
+        package("malformed", tags=[None, {}, {"name": 5}]),
+        package("child", "島根県_松江市"),
+        package("exact", "北海道,, 島根県 ,"),
+    ]
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        # Index fields can be present even when response metadata is incomplete.
+        assert "fq" in params
+        return {"success": True, "result": {"count": len(rows), "results": rows}}
+
+    results = GeospatialJpAdapter(get_json, endpoint="https://example.test").search(
+        SearchQuery(area="島根県", limit=1)
+    )
+    assert ids(results) == ["exact"]
