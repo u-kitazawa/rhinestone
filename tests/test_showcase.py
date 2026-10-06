@@ -4,10 +4,15 @@ Live Provider access and optional GIS runtimes remain outside the normal CI gate
 """
 
 import json
+import shlex
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+
+from rhinestone import Resource
+from rhinestone import api as rhinestone_api
 
 ROOT = Path(__file__).parents[1]
 SHOWCASE = ROOT / "showcase"
@@ -104,20 +109,20 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     assert "kernelspec" in notebook["metadata"]
     assert any(cell.get("cell_type") == "markdown" for cell in notebook_cells(notebook))
     source = notebook_source(notebook)
-    assert "@2364508f02f010f3fcc96c4677d133951524fa85" in source
+    assert "@2cd4e06576cdaa91e16931135314582df24b5d4c" in source
     assert "@develop" not in source
     for marker in (
-        'provider.id == "geospatial-jp"',
-        'app.search(text="河川"',
+        'text="河川"',
+        "format=(FormatPreset.PYOGRIO,)",
+        "providers=[ProviderId.GEOSPATIAL_JP]",
+        "result.resolve()",
         'resource.open("pyogrio", runtime=pyogrio)',
-        "PYOGRIO_VECTOR_FORMATS",
-        "item.format in PYOGRIO_VECTOR_FORMATS",
         "ZIP Shapefile",
         "GDAL VSI URI",
         "import folium",
         "folium.GeoJson",
         "map_view.fit_bounds",
-        "GSI_STANDARD_TILES",
+        "cyberjapandata.gsi.go.jp/xyz/std/",
     ):
         assert marker in source
     assert "item.access_plan.archive is None" not in source
@@ -136,6 +141,50 @@ def test_ckan_showcase_keeps_no_stale_execution_output() -> None:
         for cell in notebook_cells(notebook)
         if cell.get("cell_type") == "code"
     )
+
+
+def test_ckan_showcase_search_and_resolution_run_with_offline_responses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
+        assert url.startswith("https://www.geospatial.jp/ckan/api/3/action/")
+        action = url.rsplit("/", 1)[-1]
+        calls.append(action)
+        response = cast(
+            dict[str, Any],
+            json.loads((ROOT / "tests/fixtures/ckan" / f"{action}.json").read_text()),
+        )
+        if action == "package_search":
+            distribution = response["result"]["results"][0]["resources"][0]
+        elif action == "resource_show":
+            distribution = response["result"]
+        else:
+            return response
+        distribution["format"] = "GeoJSON"
+        distribution["mimetype"] = "application/geo+json"
+        distribution["url"] = "https://files.example/river.geojson"
+        return response
+
+    monkeypatch.setattr(rhinestone_api._http, "get_json", get_json)  # pyright: ignore[reportPrivateUsage]
+    rhinestone_api._default_application.cache_clear()  # pyright: ignore[reportPrivateUsage]
+    namespace: dict[str, Any] = {}
+    try:
+        notebook = load_notebook(MAP_NOTEBOOK)
+        for cell in notebook_cells(notebook)[4:7]:
+            if cell["cell_type"] == "code":
+                exec("".join(cell["source"]), namespace)
+        resource = cast(Resource, namespace["resource"])
+        assert resource.format == "geojson"
+        assert resource.uri == "https://files.example/river.geojson"
+        assert calls == ["package_search", "resource_show", "package_show"]
+    finally:
+        rhinestone_api._default_application.cache_clear()  # pyright: ignore[reportPrivateUsage]
 
 
 def test_stac_showcase_has_the_complete_explicit_flow() -> None:
@@ -189,6 +238,11 @@ def test_showcase_notebook_code_cells_compile() -> None:
             if cell.get("cell_type") != "code":
                 continue
             source = "".join(cell["source"])
+            if notebook_path == MAP_NOTEBOOK and source.startswith("%pip "):
+                command = shlex.split(source.removeprefix("%pip "))
+                assert command[:2] == ["install", "-q"]
+                assert len(command) == 6
+                continue
             compile(source, f"{notebook_path} cell {index}", "exec")
 
 

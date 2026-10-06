@@ -2,14 +2,38 @@
 
 `app.search()`は構成済みProviderを横断してResultを返します。検索したSourceと、結果を解決するSourceは同一である必要はありません。
 
+## 検索するProviderを選ぶ
+
+```python
+from rhinestone import FormatPreset, ProviderId, search
+
+results = search(
+    text="河川",
+    providers=[ProviderId.GEOSPATIAL_JP],
+    format=(FormatPreset.PYOGRIO,),
+    limit=20,
+)
+resource = results[0].resolve()
+```
+
+`providers`は結果の後処理ではなく、検索前の対象選択です。未選択Providerの検索や通信、
+そのProviderに関するdiagnostics / executionsは生成しません。対象順はCatalog順を維持し、
+重複指定は1回として扱います。指定配列はSearchQuery内で不変のtupleへコピーします。
+`providers=None`は全体、`providers=[]`は検索なしです。空配列ならareaの解決も実行しません。
+未知または未構成のIDは通信前に`ConfigValidationError`になります。
+
+`app.search()`と`SearchQuery(providers=[...])`でも同じ指定が使えます。
+Provider選択はSource固有の検索条件ではないため、Adapterへ投影するQueryには含めません。
+
 ## 文字列と検索パラメータ
 
 ```python
 results = app.search(text="人口", limit=10)
 ```
 
-`text`、`area`、`bbox`、`time`、`format`、`limit`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
+`text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
 
+- `providers`: `ProviderId` enumまたは独自Provider ID文字列の配列（list / tuple）
 - `text`: `str`または`None`
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
 - `limit`: `bool`を除く0以上の整数または`None`（Providerごとの上限）

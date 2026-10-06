@@ -55,6 +55,7 @@ def test_standard_application_is_lazy_cached_and_uses_builtin_catalog(
                 "time": (start, end),
                 "format": None,
                 "limit": 3,
+                "providers": None,
             },
         ),
         (
@@ -66,6 +67,7 @@ def test_standard_application_is_lazy_cached_and_uses_builtin_catalog(
                 "time": None,
                 "format": None,
                 "limit": None,
+                "providers": None,
             },
         ),
     ]

@@ -26,16 +26,18 @@ setup cell が公開パッケージを導入します。
 G 空間情報センターの公開 CKAN を検索し、明示的に広告されたベクター配布物（ZIP Shapefile を含む）を Rhinestone で解決してから、
 利用者所有の pyogrio / GeoPandas で開き、Folium の操作できるベクターレイヤーとして
 地理院タイル上に表示します。選択したデータの範囲へ自動で移動するため、検索結果が何を表すかを
-地図で確認できます。
+地図で確認できます。`providers=[ProviderId.GEOSPATIAL_JP]` で検索前に提供元を限定するため、
+Notebookで `Config` や `configure()` を組み立てる必要はありません。他のProviderへの検索・通信は行いません。
 
 ```text
-configure(pyogrio) -> search -> resolve -> vector Resource -> AccessPlan
+search(format=PYOGRIO) -> Result.resolve -> vector Resource -> AccessPlan
     -> open -> GeoDataFrame -> Folium map
 ```
 
 この Notebook は live Provider を利用します。検索結果、配布 URL、公開状態は提供元によって変わるため、
-通常 CI での完全実行は要求しません。検索結果に明示的なベクター候補がないときは、URL・形式・archive memberを
-推測せず、明示的に停止します。ZIP を開く場合は、確定済みの `archive` と任意の `entry_point` を pyogrio 用の
+通常 CI での完全実行は要求しません。検索結果の一覧から番号を指定し、解決後の形式・URL・AccessPlanを
+確認してからベクターデータを開きます。対象形式は検索時に `FormatPreset.PYOGRIO` で絞ります。
+URL・形式・archive memberは推測しません。ZIP を開く場合は、確定済みの `archive` と任意の `entry_point` を pyogrio 用の
 GDAL VSI URI に翻訳します。
 
 ## 03 — STAC の COG を縮小表示する

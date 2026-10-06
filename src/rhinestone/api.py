@@ -1,6 +1,6 @@
 """Public composition API."""
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
@@ -44,6 +44,7 @@ from .models import (
     DiscoveryRecord,
     LibraryName,
     Provider,
+    ProviderId,
     Resource,
     Result,
     SearchQuery,
@@ -302,6 +303,7 @@ class Rhinestone:
         time: tuple[datetime | None, datetime | None] | None = None,
         format: tuple[Format | FormatPreset, ...] | None = None,
         limit: int | None = None,
+        providers: Sequence[ProviderId | str] | None = None,
     ) -> SearchResults:
         """Search all configured searchable sources in configuration order.
 
@@ -313,6 +315,8 @@ class Rhinestone:
             time: ``(start, end)`` datetime interval; either endpoint may be
                 ``None``.
             limit: Non-negative result limit passed to capable sources.
+            providers: Provider IDs to search. None uses all configured Providers;
+                an empty array searches none. Catalog order is preserved.
 
         Returns:
             ``SearchResults`` grouped by source and traversable in deterministic
@@ -325,7 +329,7 @@ class Rhinestone:
             TypeError: If both ``query`` and shorthand search parameters are
                 supplied.
         """
-        supplied_parameters = (text, area, bbox, time, format, limit)
+        supplied_parameters = (text, area, bbox, time, format, limit, providers)
         if query is not None and any(
             parameter is not None for parameter in supplied_parameters
         ):
@@ -338,6 +342,7 @@ class Rhinestone:
                 time=time,
                 format=format,
                 limit=limit,
+                providers=providers,
             )
         elif isinstance(query, str):
             normalized_query = SearchQuery(text=query)
@@ -402,6 +407,7 @@ def search(
     time: tuple[datetime | None, datetime | None] | None = None,
     format: tuple[Format | FormatPreset, ...] | None = None,
     limit: int | None = None,
+    providers: Sequence[ProviderId | str] | None = None,
 ) -> SearchResults:
     """Search the built-in catalog without explicit application setup.
 
@@ -417,4 +423,5 @@ def search(
         time=time,
         format=format,
         limit=limit,
+        providers=providers,
     )
