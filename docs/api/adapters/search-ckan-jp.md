@@ -54,7 +54,7 @@ results = search(
     providers=[ProviderId.SEARCH_CKAN_JP],
     text="河川",
     area="神奈川県",
-    format=[FormatPreset.PYOGRIO],
+    format=(FormatPreset.PYOGRIO,),
     limit=10,
 )
 ```

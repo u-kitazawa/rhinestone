@@ -1,5 +1,6 @@
 import io
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, cast
 from urllib.request import Request
 
@@ -628,3 +629,33 @@ def test_cross_ckan_area_fallback_uses_a_verified_unique_municipality_name(
     resource = result.resolve()
     assert resource.discovery is not None
     assert resource.discovery.provenance.query_parameters == calls[0]
+
+
+def test_cross_ckan_documented_search_example_executes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
+        assert url == "https://search.ckan.jp/backend/api/package_search"
+        calls.append(dict(params))
+        return dict(fixture_json("search_ckan_jp/package_search.json"))
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    provider = next(p for p in BUILTIN if p.id == "search-ckan-jp")
+    app = configure(catalog=Catalog((provider,)))
+    monkeypatch.setattr("rhinestone.api._default_application", lambda: app)
+    path = Path(__file__).parents[1] / "docs/api/adapters/search-ckan-jp.md"
+    source = path.read_text().split("```python\n", 1)[1].split("\n```", 1)[0]
+    namespace: dict[str, Any] = {}
+    exec(compile(source, str(path), "exec"), namespace)
+    results = namespace["results"]
+    assert len(results) == 1
+    assert results[0].formats == frozenset({"geojson"})
+    assert results[0].resolve().discovery is not None
+    assert len(calls) == 1
+    assert calls[0]["rows"] == 10
