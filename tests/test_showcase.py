@@ -109,7 +109,7 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     assert "kernelspec" in notebook["metadata"]
     assert any(cell.get("cell_type") == "markdown" for cell in notebook_cells(notebook))
     source = notebook_source(notebook)
-    assert "@bb5d41bbf6b74604f2d0b8f0c97997cff7c5c1a9" in source
+    assert "@6a565afcb467c7edd571ea19c8a27439d02e2cfc" in source
     assert "@develop" not in source
     for marker in (
         'text="河川"',
