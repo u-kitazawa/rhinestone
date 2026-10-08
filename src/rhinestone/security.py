@@ -195,7 +195,21 @@ class DestinationPolicy:
         """
         if self.level == "none":
             return
-        urls = (plan.uri,) if redirect_url is None else (plan.uri, redirect_url)
+        urls = [plan.uri]
+        tile = plan.options.get("tile")
+        if tile is not None:
+            if not isinstance(tile, Mapping):
+                raise ConfigValidationError(
+                    "AccessPlan.options.tile must contain a string URL"
+                )
+            tile_url = cast(Mapping[str, Any], tile).get("url")
+            if not isinstance(tile_url, str):
+                raise ConfigValidationError(
+                    "AccessPlan.options.tile must contain a string URL"
+                )
+            urls.append(tile_url)
+        if redirect_url is not None:
+            urls.append(redirect_url)
         for url in urls:
             try:
                 scheme = urlsplit(url).scheme.lower()

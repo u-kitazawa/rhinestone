@@ -111,6 +111,7 @@ def test_resource_json_round_trip_excludes_opener_and_rebinds() -> None:
     detached = Resource.from_dict(json.loads(json.dumps(encoded)))
 
     assert encoded["schema"] == "rhinestone.resource"
+    assert encoded["version"] == 2
     assert "_opener" not in json.dumps(encoded)
     assert detached == original
     with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):

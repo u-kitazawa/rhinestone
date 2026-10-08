@@ -21,9 +21,11 @@ from .models import (
 )
 
 _ACCESS_PLAN_SCHEMA = "rhinestone.access-plan"
+_ACCESS_PLAN_VERSION = 1
 _RESULT_SCHEMA = "rhinestone.result"
+_RESULT_VERSION = 1
 _RESOURCE_SCHEMA = "rhinestone.resource"
-_SCHEMA_VERSION = 1
+_RESOURCE_VERSION = 2
 
 
 def _json_value(value: Any, path: str) -> Any:
@@ -170,7 +172,7 @@ def result_to_dict(value: Result) -> dict[str, Any]:
     """Return a versioned JSON-safe Result representation without its resolver."""
     return {
         "schema": _RESULT_SCHEMA,
-        "version": _SCHEMA_VERSION,
+        "version": _RESULT_VERSION,
         "title": value.title,
         "description": value.description,
         "discovered_by": value.discovered_by,
@@ -182,20 +184,20 @@ def result_to_dict(value: Result) -> dict[str, Any]:
     }
 
 
-def _check_envelope(data: Mapping[str, Any], schema: str) -> None:
+def _check_envelope(data: Mapping[str, Any], schema: str, version: int) -> None:
     if data.get("schema") != schema:
         raise ConfigValidationError(f"portable data schema must be {schema!r}")
-    version = data.get("version")
-    if type(version) is not int or version != _SCHEMA_VERSION:
+    actual_version = data.get("version")
+    if type(actual_version) is not int or actual_version != version:
         raise ConfigValidationError(
-            f"portable data version must be {_SCHEMA_VERSION}; got {version!r}"
+            f"portable data version must be {version}; got {actual_version!r}"
         )
 
 
 def result_from_dict(value: Mapping[str, Any]) -> Result:
     """Restore a detached Result from its versioned JSON representation."""
     data = _mapping(value, "result")
-    _check_envelope(data, _RESULT_SCHEMA)
+    _check_envelope(data, _RESULT_SCHEMA, _RESULT_VERSION)
     formats = data.get("formats", [])
     if not isinstance(formats, list):
         raise ConfigValidationError("result.formats must be a list of strings")
@@ -271,7 +273,7 @@ def access_plan_to_dict(value: AccessPlan) -> dict[str, Any]:
     """Return a versioned, JSON-safe standalone AccessPlan contract."""
     return {
         "schema": _ACCESS_PLAN_SCHEMA,
-        "version": _SCHEMA_VERSION,
+        "version": _ACCESS_PLAN_VERSION,
         "kind": value.kind,
         "uri": value.uri,
         "format": value.format,
@@ -286,7 +288,7 @@ def access_plan_to_dict(value: AccessPlan) -> dict[str, Any]:
 def access_plan_from_dict(value: Mapping[str, Any]) -> AccessPlan:
     """Validate and restore a standalone AccessPlan contract."""
     data = _mapping(value, "access_plan")
-    _check_envelope(data, _ACCESS_PLAN_SCHEMA)
+    _check_envelope(data, _ACCESS_PLAN_SCHEMA, _ACCESS_PLAN_VERSION)
     return AccessPlan(
         kind=_required_string(data, "kind", "access_plan"),
         uri=_required_string(data, "uri", "access_plan"),
@@ -332,7 +334,7 @@ def resource_to_dict(value: Resource) -> dict[str, Any]:
     """Return a versioned JSON-safe Resource representation without its opener."""
     return {
         "schema": _RESOURCE_SCHEMA,
-        "version": _SCHEMA_VERSION,
+        "version": _RESOURCE_VERSION,
         "uri": value.uri,
         "format": value.format,
         "media_type": value.media_type,
@@ -350,7 +352,7 @@ def resource_to_dict(value: Resource) -> dict[str, Any]:
 def resource_from_dict(value: Mapping[str, Any]) -> Resource:
     """Restore a detached Resource from its versioned JSON representation."""
     data = _mapping(value, "resource")
-    _check_envelope(data, _RESOURCE_SCHEMA)
+    _check_envelope(data, _RESOURCE_SCHEMA, _RESOURCE_VERSION)
     discovery = data.get("discovery")
     return Resource(
         uri=_required_string(data, "uri", "resource"),
