@@ -93,7 +93,7 @@ class OdptAdapter(ProviderAdapter):
         expected_uri = plan.options.get("endpoint")
         if (
             plan.kind != "service-query"
-            or plan.options.get("service") != OdptAdapter.adapter_type
+            or plan.service != OdptAdapter.adapter_type
             or not isinstance(expected_uri, str)
             or plan.uri != expected_uri
         ):
@@ -101,7 +101,7 @@ class OdptAdapter(ProviderAdapter):
                 "Credential destination is not an ODPT endpoint"
             )
         params_value = plan.options.get("params")
-        credential = plan.options.get("credential")
+        credential = plan.credential
         if not isinstance(params_value, Mapping) or not isinstance(credential, str):
             raise ConfigValidationError("ODPT service plan is incomplete")
         params: dict[str, Any] = dict(cast(Mapping[str, Any], params_value))

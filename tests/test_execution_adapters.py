@@ -12,10 +12,9 @@ from rhinestone.adapters.execution import (
 )
 from rhinestone.errors import ResourceAccessError
 from rhinestone.models import (
-    FileAccessPlan,
+    AccessPlan,
     Metadata,
     Provenance,
-    RemoteDatasetPlan,
     Resource,
     ResourceCandidate,
     Source,
@@ -43,9 +42,17 @@ def make_resource(
         raw_metadata={},
     )
     plan = (
-        RemoteDatasetPlan(uri=uri)
+        AccessPlan(kind="remote-dataset", uri=uri)
         if remote
-        else FileAccessPlan(uri=uri, archive=(attributes or {}).get("archive"))
+        else AccessPlan(
+            kind="file",
+            uri=uri,
+            options={
+                key: value
+                for key, value in (attributes or {}).items()
+                if key in {"archive", "encoding"}
+            },
+        )
     )
     return Resource(
         uri=uri,
@@ -152,7 +159,7 @@ class FakeRasterio:
 
 
 def test_rasterio_opens_cog_uri_directly() -> None:
-    """COGのRemoteDatasetPlanをdownloadせずRasterioへそのまま渡すために必要である。"""
+    """COGのAccessPlanをdownloadせずRasterioへそのまま渡すために必要である。"""
     resource = make_resource("https://files.example/image.tif", "cog", remote=True)
     runtime = FakeRasterio()
 
@@ -192,10 +199,14 @@ def test_pyogrio_translates_selected_remote_zip_shapefile() -> None:
     )
     resource = replace(
         resource,
-        access_plan=FileAccessPlan(
+        access_plan=AccessPlan(
+            kind="file",
             uri=resource.uri,
-            archive="zip",
-            options={"entry_point": "data/rivers.shp"},
+            options={
+                "archive": "zip",
+                "entry_point": "data/rivers.shp",
+                "encoding": "cp932",
+            },
         ),
     )
     runtime = FakePyogrio()
@@ -223,7 +234,7 @@ def test_pyogrio_selects_additional_explicit_vector_formats() -> None:
     runtime = FakePyogrio()
     resource = replace(
         make_resource("/data/boundaries.gml", "gml"),
-        access_plan=RemoteDatasetPlan(uri="/data/boundaries.gml"),
+        access_plan=AccessPlan(kind="remote-dataset", uri="/data/boundaries.gml"),
     )
 
     assert PyogrioAdapter().supports(resource) is True
@@ -257,7 +268,7 @@ def test_execution_adapter_preserves_runtime_failure_as_cause() -> None:
 def test_gdal_handles_local_archive_and_resources_without_options() -> None:
     """local ZIPと通常Resourceをremote扱いせず、不要なoptionを付加しないために必要である。"""
     local = make_resource("/data/rivers.zip", "shapefile", {"archive": "zip"})
-    local = replace(local, access_plan=FileAccessPlan(uri=local.uri))
+    local = replace(local, access_plan=AccessPlan(kind="file", uri=local.uri))
     plain = make_resource("/data/rivers.shp", "shapefile")
     remote = make_resource("https://files.example/a.tif", "cog", remote=True)
     runtime = FakeGdal()
@@ -267,7 +278,7 @@ def test_gdal_handles_local_archive_and_resources_without_options() -> None:
     GdalAdapter().open(remote, runtime)
 
     assert runtime.calls == [
-        ("/vsizip//data/rivers.zip", ()),
+        ("/data/rivers.zip", ()),
         ("/data/rivers.shp", ()),
         ("https://files.example/a.tif", ()),
     ]

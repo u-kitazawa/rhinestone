@@ -63,7 +63,7 @@ def test_deterministic_examples_run_without_network_or_optional_runtime(
 
 
 def test_service_examples_use_formats_known_to_create_service_plans() -> None:
-    """OGC Exampleが誤ってFileAccessPlanへ解決される退行を防ぐために必要である。"""
+    """OGC Exampleが誤ってAccessPlanへ解決される退行を防ぐために必要である。"""
     from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
     from rhinestone.resolution import Resolver
 

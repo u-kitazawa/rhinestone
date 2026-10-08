@@ -1,11 +1,9 @@
 from collections.abc import Mapping
-from typing import cast
 
 import pytest
 
 from rhinestone.errors import AmbiguousResourceError, UnsupportedAccessError
 from rhinestone.models import (
-    FileAccessPlan,
     Metadata,
     Provenance,
     ResourceCandidate,
@@ -124,7 +122,7 @@ def test_archive_knowledge_is_preserved_in_file_plan() -> None:
 
     resource = Resolver().resolve(make_source(candidate))
 
-    assert cast(FileAccessPlan, resource.access_plan).archive == "zip"
+    assert resource.access_plan.options["archive"] == "zip"
 
 
 @pytest.mark.parametrize("kind", ("file", "service-query"))
@@ -179,4 +177,25 @@ def test_file_plan_rejects_unsupported_or_unsafe_archive_metadata(
     )
 
     with pytest.raises(UnsupportedAccessError, match="archive|entry_point"):
+        Resolver().resolve(make_source(candidate))
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    (
+        {"access_options": {"service": 1}},
+        {"access_options": {"credential": 1}},
+    ),
+)
+def test_plan_rejects_non_string_logical_identifiers(
+    attributes: Mapping[str, object],
+) -> None:
+    candidate = ResourceCandidate(
+        "https://example.jp/resource",
+        "api",
+        "application/json",
+        attributes,
+    )
+
+    with pytest.raises(UnsupportedAccessError, match="service|credential"):
         Resolver().resolve(make_source(candidate))

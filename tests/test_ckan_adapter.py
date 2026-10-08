@@ -6,7 +6,7 @@ import pytest
 from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.errors import ProviderResponseError
-from rhinestone.models import Config, FileAccessPlan, SearchQuery
+from rhinestone.models import AccessPlan, Config, SearchQuery
 from rhinestone.resolution import Resolver
 from tests.provider_support import RecordingJsonClient, fixture_json
 
@@ -138,8 +138,8 @@ def test_ckan_records_zip_media_type_as_explicit_archive_evidence() -> None:
     resource = Resolver().resolve(source)
 
     assert source.candidates[0].attributes["archive"] == "zip"
-    assert isinstance(resource.access_plan, FileAccessPlan)
-    assert resource.access_plan.archive == "zip"
+    assert isinstance(resource.access_plan, AccessPlan)
+    assert resource.access_plan.options["archive"] == "zip"
 
 
 def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None:

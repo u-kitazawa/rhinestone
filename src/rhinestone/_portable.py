@@ -12,17 +12,15 @@ from .models import (
     AccessPlan,
     Config,
     DiscoveryRecord,
-    FileAccessPlan,
     Metadata,
     Provenance,
-    RemoteDatasetPlan,
     Resource,
     ResourceCandidate,
     Result,
-    ServiceQueryPlan,
     Source,
 )
 
+_ACCESS_PLAN_SCHEMA = "rhinestone.access-plan"
 _RESULT_SCHEMA = "rhinestone.result"
 _RESOURCE_SCHEMA = "rhinestone.resource"
 _SCHEMA_VERSION = 1
@@ -269,33 +267,44 @@ def _source_from_dict(value: Any) -> Source:
     )
 
 
-def _access_plan_to_dict(value: AccessPlan) -> dict[str, Any]:
-    result = {
+def access_plan_to_dict(value: AccessPlan) -> dict[str, Any]:
+    """Return a versioned, JSON-safe standalone AccessPlan contract."""
+    return {
+        "schema": _ACCESS_PLAN_SCHEMA,
+        "version": _SCHEMA_VERSION,
         "kind": value.kind,
         "uri": value.uri,
+        "format": value.format,
+        "media_type": value.media_type,
         "options": _json_value(value.options, "access_plan.options"),
+        "provider": value.provider,
+        "service": value.service,
+        "credential": value.credential,
     }
-    if isinstance(value, FileAccessPlan):
-        result["archive"] = value.archive
-    return result
+
+
+def access_plan_from_dict(value: Mapping[str, Any]) -> AccessPlan:
+    """Validate and restore a standalone AccessPlan contract."""
+    data = _mapping(value, "access_plan")
+    _check_envelope(data, _ACCESS_PLAN_SCHEMA)
+    return AccessPlan(
+        kind=_required_string(data, "kind", "access_plan"),
+        uri=_required_string(data, "uri", "access_plan"),
+        format=_optional_string(data, "format", "access_plan"),
+        media_type=_optional_string(data, "media_type", "access_plan"),
+        options=_mapping(data.get("options", {}), "access_plan.options"),
+        provider=_optional_string(data, "provider", "access_plan"),
+        service=_optional_string(data, "service", "access_plan"),
+        credential=_optional_string(data, "credential", "access_plan"),
+    )
+
+
+def _access_plan_to_dict(value: AccessPlan) -> dict[str, Any]:
+    return access_plan_to_dict(value)
 
 
 def _access_plan_from_dict(value: Any) -> AccessPlan:
-    data = _mapping(value, "access_plan")
-    kind = _required_string(data, "kind", "access_plan")
-    uri = _required_string(data, "uri", "access_plan")
-    options = _mapping(data.get("options", {}), "access_plan.options")
-    if kind == "file":
-        return FileAccessPlan(
-            uri=uri,
-            options=options,
-            archive=_optional_string(data, "archive", "access_plan"),
-        )
-    if kind == "remote-dataset":
-        return RemoteDatasetPlan(uri=uri, options=options)
-    if kind == "service-query":
-        return ServiceQueryPlan(uri=uri, options=options)
-    return AccessPlan(kind=kind, uri=uri, options=options)
+    return access_plan_from_dict(_mapping(value, "access_plan"))
 
 
 def _discovery_to_dict(value: DiscoveryRecord) -> dict[str, Any]:

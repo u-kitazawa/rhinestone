@@ -86,7 +86,7 @@ def test_offline_showcase_code_compiles_and_runs_offline(
     assert "Results: 1\n" in output
     assert "Title: 標準地図\n" in output
     assert "Provider / dataset: gsi / std\n" in output
-    assert "AccessPlan: RemoteDatasetPlan (remote-dataset)\n" in output
+    assert "AccessPlan: AccessPlan (remote-dataset)\n" in output
 
 
 def test_offline_showcase_outputs_are_small_and_contain_no_credentials() -> None:

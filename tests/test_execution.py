@@ -3,7 +3,7 @@ import pytest
 from rhinestone.errors import ExecutionAdapterUnavailableError
 from rhinestone.execution import ExecutionAdapterSelector
 from rhinestone.models import (
-    FileAccessPlan,
+    AccessPlan,
     Metadata,
     Provenance,
     Resource,
@@ -49,7 +49,7 @@ def resource(format_name: str = "shapefile") -> Resource:
         media_type=candidate.media_type,
         metadata=source.metadata,
         provenance=source.provenance,
-        access_plan=FileAccessPlan(uri=candidate.uri),
+        access_plan=AccessPlan(kind="file", uri=candidate.uri),
         source=source,
     )
 

@@ -3,7 +3,7 @@
 `JsonServiceAdapter` は選択済み JSON service query をHTTP runtimeへ渡します。標準の`configure()`経路ではRhinestoneの組み込みruntimeを使用します。
 
 - `name`: `json-service`、優先度: `10`
-- 対応条件: `ServiceQueryPlan`、`application/json`、一致する service 名
+- 対応条件: `kind="service-query"`の`AccessPlan`、`application/json`、一致するservice名
 - 注入: request を作る callback、service 名、任意の `CredentialRegistry`
 - Runtimeの契約: `get(uri, params=..., headers=..., timeout=30, allow_redirects=False)`
 

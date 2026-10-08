@@ -3,12 +3,15 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from posixpath import normpath
-from typing import Any, Literal, Optional, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 from urllib.parse import unquote, urlsplit
 
 from ._uri import is_valid_http_authority
 from .errors import ConfigValidationError, DestinationNotAllowedError
 from .models import Provider
+
+if TYPE_CHECKING:
+    from .models import AccessPlan
 
 NetworkPolicyLevel = Literal["none", "credentialed"]
 
@@ -180,6 +183,44 @@ class DestinationPolicy:
                 f"configured policy for provider {provider!r} and service "
                 f"{service!r}"
             )
+
+    def authorize_plan(
+        self, plan: "AccessPlan", *, redirect_url: str | None = None
+    ) -> None:
+        """Revalidate a received plan and an optional redirect destination.
+
+        Unlike ordinary public requests, a transferred plan is untrusted input,
+        so every network destination must match catalog-derived rules. Logical
+        credential references additionally require an exact credential rule.
+        """
+        if self.level == "none":
+            return
+        urls = (plan.uri,) if redirect_url is None else (plan.uri, redirect_url)
+        for url in urls:
+            try:
+                scheme = urlsplit(url).scheme.lower()
+            except ValueError:
+                scheme = "__invalid__"
+            if scheme in {"", "file"}:
+                continue
+            if plan.credential is not None:
+                authorized = self.credential_rules is not None and any(
+                    rule.matches(
+                        url,
+                        provider=plan.provider,
+                        service=plan.service,
+                        credential=plan.credential,
+                    )
+                    for rule in self.credential_rules
+                )
+            else:
+                authorized = any(rule.matches(url) for rule in self.rules)
+            if not authorized:
+                raise DestinationNotAllowedError(
+                    "AccessPlan network destination is not authorized by the "
+                    f"configured policy for provider {plan.provider!r} and "
+                    f"service {plan.service!r}"
+                )
 
 
 def _normalize_path(path: str) -> str:
