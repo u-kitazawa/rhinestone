@@ -15,9 +15,9 @@ from rhinestone.adapters.contracts import (
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import AdapterRegistrationError
 from rhinestone.models import (
+    AccessPlan,
     Metadata,
     Provenance,
-    Resource,
     ResourceCandidate,
     RuntimeFactory,
     Source,
@@ -51,17 +51,17 @@ class CustomExecution:
     name = "custom-runtime"
     priority = 100
 
-    def supports(self, resource: Resource) -> bool:
-        return resource.format == "custom"
+    def supports(self, plan: AccessPlan) -> bool:
+        return plan.format == "custom"
 
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: Any,
         *,
         destination_policy: Any = None,
     ) -> Any:
-        return runtime.open(resource.uri)
+        return runtime.open(plan.uri)
 
 
 def test_custom_source_and_execution_share_the_public_pipeline() -> None:

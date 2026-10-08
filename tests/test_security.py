@@ -250,7 +250,7 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
                 {"odpt": lambda: factory_calls.append(True) or "secret"}
             ),
             DestinationPolicy.from_catalog((BUILTIN[3],)),
-        ).open(tampered, SimpleNamespace(get=get_json))
+        ).open(tampered.access_plan, SimpleNamespace(get=get_json))
     assert factory_calls == []
 
 
@@ -480,7 +480,7 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
                 {"odpt": lambda: credential_calls.append(True) or "secret"}
             ),
             DestinationPolicy.from_catalog((BUILTIN[3], BUILTIN[2])),
-        ).open(tampered, Runtime())
+        ).open(tampered.access_plan, Runtime())
 
     assert credential_calls == []
     assert runtime_calls == []

@@ -5,10 +5,10 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from ..models import (
+    AccessPlan,
     Config,
     Provider,
     ProviderSearchResults,
-    Resource,
     Result,
     SearchQuery,
     Source,
@@ -43,18 +43,18 @@ class ExecutionAdapter(Protocol):
     name: str
     priority: int
 
-    def supports(self, resource: Resource) -> bool:
-        """Return whether this adapter supports the selected resource."""
+    def supports(self, plan: AccessPlan) -> bool:
+        """Return whether this adapter supports the selected plan."""
         ...
 
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: Any,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        """Open ``resource`` through the supplied runtime object."""
+        """Open ``plan`` through the supplied runtime object."""
         ...
 
 

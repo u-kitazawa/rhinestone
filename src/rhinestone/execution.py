@@ -5,7 +5,7 @@ from typing import Protocol, runtime_checkable
 
 from .adapters.contracts import ExecutionAdapter
 from .errors import ExecutionAdapterUnavailableError
-from .models import LibraryName, Resource
+from .models import AccessPlan, LibraryName
 from .security import DestinationPolicy
 
 
@@ -15,7 +15,7 @@ class AuthorizingExecutionAdapter(Protocol):
 
     def authorize(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
@@ -31,18 +31,16 @@ class ExecutionAdapterSelector:
 
     def select(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         requested: LibraryName | None = None,
     ) -> ExecutionAdapter:
-        """Select an adapter for a Resource and optional explicit library name.
+        """Select an adapter for an AccessPlan and optional explicit library name.
 
         A requested library is never silently replaced by another adapter. If
         no library is requested, priority and name determine a deterministic
         choice among compatible adapters.
         """
-        compatible = [
-            adapter for adapter in self._adapters if adapter.supports(resource)
-        ]
+        compatible = [adapter for adapter in self._adapters if adapter.supports(plan)]
         if requested is not None:
             compatible = [
                 adapter for adapter in compatible if adapter.name == requested
@@ -50,11 +48,11 @@ class ExecutionAdapterSelector:
             if not compatible:
                 raise ExecutionAdapterUnavailableError(
                     f"Execution adapter {requested!r} is unavailable or "
-                    "incompatible with the selected resource"
+                    "incompatible with the selected plan"
                 )
         if not compatible:
             raise ExecutionAdapterUnavailableError(
-                "No execution adapter supports the selected resource with the "
+                "No execution adapter supports the selected plan with the "
                 "registered adapters"
             )
         return max(

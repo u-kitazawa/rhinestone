@@ -111,7 +111,10 @@ def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> No
         captured["uri"] = uri
         return "city"
 
-    assert GdalAdapter().open(resource, SimpleNamespace(OpenEx=open_ex)) == "city"
+    assert (
+        GdalAdapter().open(resource.access_plan, SimpleNamespace(OpenEx=open_ex))
+        == "city"
+    )
     assert (
         captured["uri"]
         == "/vsizip//vsicurl/https://fixture.example/city.zip/udx/bldg/city.gml"
@@ -550,7 +553,7 @@ def test_json_service_errors_are_distinct_and_redacted(
 
     with pytest.raises(expected) as error:
         execution.open(
-            Resolver().resolve(item),
+            Resolver().resolve(item).access_plan,
             SimpleNamespace(get=get),
         )
     assert "secret-in-underlying-error" not in str(error.value)
@@ -573,7 +576,7 @@ def test_json_service_is_not_odpt_specific() -> None:
         ),
         "custom",
     )
-    assert adapter.supports(resource)
+    assert adapter.supports(resource.access_plan)
     response = SimpleNamespace(
         status_code=200, raise_for_status=lambda: None, json=lambda: {"ok": True}
     )
@@ -581,7 +584,7 @@ def test_json_service_is_not_odpt_specific() -> None:
     def get(url: str, **kwargs: Any) -> Any:
         return response
 
-    assert adapter.open(resource, SimpleNamespace(get=get)) == {"ok": True}
+    assert adapter.open(resource.access_plan, SimpleNamespace(get=get)) == {"ok": True}
 
 
 @pytest.mark.parametrize(
@@ -609,16 +612,23 @@ def test_gdal_null_result_is_an_access_failure() -> None:
         return None
 
     with pytest.raises(ResourceAccessError):
-        GdalAdapter().open(resource, SimpleNamespace(OpenEx=open_ex))
+        GdalAdapter().open(resource.access_plan, SimpleNamespace(OpenEx=open_ex))
 
 
-def test_execution_uses_selected_candidate_attributes_when_uri_is_shared() -> None:
-    from rhinestone.adapters.execution import resource_attributes
-
+def test_execution_uses_plan_options_when_uri_is_shared() -> None:
     rejected = ResourceCandidate("same", "gml", None, {"matches_config": False})
     selected = replace(
         rejected, attributes={"matches_config": True, "encoding": "utf8"}
     )
     resource = Resolver().resolve(make_source(rejected, selected))
-    assert resource_attributes(resource)["encoding"] == "utf8"
-    assert resource_attributes(replace(resource, uri="missing")) == {}
+    calls: list[Any] = []
+
+    def open_ex(uri: str, **kwargs: Any) -> bool:
+        calls.append((uri, kwargs))
+        return True
+
+    GdalAdapter().open(
+        AccessPlan.from_dict(resource.access_plan.to_dict()),
+        SimpleNamespace(OpenEx=open_ex),
+    )
+    assert calls == [("same", {"open_options": ("ENCODING=UTF8",)})]

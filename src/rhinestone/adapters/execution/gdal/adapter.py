@@ -1,11 +1,11 @@
-"""Built-in adapters that delegate selected Resources to user-owned runtimes."""
+"""Built-in adapters that delegate selected AccessPlans to user-owned runtimes."""
 
 from collections.abc import Mapping
 from typing import Any, cast
 from urllib.parse import urlparse
 
 from ....errors import ResourceAccessError
-from ....models import Resource
+from ....models import AccessPlan
 from ....representations import canonical_format
 from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
@@ -13,7 +13,7 @@ from .tile import tile_xml as build_tile_xml
 
 
 class GdalAdapter(ExecutionAdapter):
-    """Translate Resources into calls understood by a supplied GDAL module."""
+    """Translate AccessPlans into calls understood by a supplied GDAL module."""
 
     name = "gdal"
     priority = 20
@@ -24,25 +24,25 @@ class GdalAdapter(ExecutionAdapter):
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
 
-    def supports(self, resource: Resource) -> bool:
-        """Return whether GDAL and the Resource's format are compatible."""
-        tile = resource.access_plan.options.get("tile")
-        return canonical_format(resource.format) in self._formats or (
+    def supports(self, plan: AccessPlan) -> bool:
+        """Return whether GDAL and the AccessPlan's format are compatible."""
+        tile = plan.options.get("tile")
+        return canonical_format(plan.format) in self._formats or (
             isinstance(tile, Mapping)
             and cast(Mapping[str, Any], tile).get("scheme") == "xyz"
         )
 
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: Any,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        """Open the selected Resource with ``runtime.OpenEx``."""
-        uri = self._runtime_uri(resource)
+        """Open the selected AccessPlan with ``runtime.OpenEx``."""
+        uri = self._runtime_uri(plan)
         options: list[str] = []
-        encoding = resource.access_plan.options.get("encoding")
+        encoding = plan.options.get("encoding")
         if isinstance(encoding, str):
             options.append("ENCODING=" + encoding.upper())
         try:
@@ -50,19 +50,17 @@ class GdalAdapter(ExecutionAdapter):
             result = runtime.OpenEx(uri, **runtime_options)
             if result is None:
                 raise ResourceAccessError(
-                    "GDAL returned no dataset; verify the selected Resource and "
+                    "GDAL returned no dataset; verify the selected AccessPlan and "
                     "GDAL-supported format"
                 )
             return result
         except Exception as error:
-            raise ResourceAccessError(
-                f"GDAL could not open {resource.uri!r}"
-            ) from error
+            raise ResourceAccessError(f"GDAL could not open {plan.uri!r}") from error
 
     @staticmethod
-    def _runtime_uri(resource: Resource) -> str:
-        uri = resource.uri
-        tile = resource.access_plan.options.get("tile")
+    def _runtime_uri(plan: AccessPlan) -> str:
+        uri = plan.uri
+        tile = plan.options.get("tile")
         if tile is not None:
             if not isinstance(tile, Mapping):
                 raise ResourceAccessError(
@@ -76,14 +74,14 @@ class GdalAdapter(ExecutionAdapter):
                     "GDAL tile URL must be a string; provide a valid tile endpoint"
                 )
             uri = build_tile_xml(tile)
-        archive = resource.access_plan.options.get("archive")
+        archive = plan.options.get("archive")
         if archive == "zip":
             uri = (
                 "/vsizip//vsicurl/" + uri
                 if urlparse(uri).scheme.casefold() in {"http", "https"}
                 else "/vsizip/" + uri
             )
-            member = resource.access_plan.options.get("entry_point")
+            member = plan.options.get("entry_point")
             if member:
                 uri += "/" + member
         return uri

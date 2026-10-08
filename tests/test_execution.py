@@ -4,11 +4,6 @@ from rhinestone.errors import ExecutionAdapterUnavailableError
 from rhinestone.execution import ExecutionAdapterSelector
 from rhinestone.models import (
     AccessPlan,
-    Metadata,
-    Provenance,
-    Resource,
-    ResourceCandidate,
-    Source,
 )
 from rhinestone.security import DestinationPolicy
 
@@ -19,12 +14,12 @@ class FakeExecutionAdapter:
         self.priority = priority
         self.supported_format = supported_format
 
-    def supports(self, resource: Resource) -> bool:
-        return resource.format == self.supported_format
+    def supports(self, plan: AccessPlan) -> bool:
+        return plan.format == self.supported_format
 
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: object,
         *,
         destination_policy: DestinationPolicy | None = None,
@@ -32,26 +27,8 @@ class FakeExecutionAdapter:
         return runtime
 
 
-def resource(format_name: str = "shapefile") -> Resource:
-    candidate = ResourceCandidate(
-        "https://example.test/data", format_name, "application/octet-stream"
-    )
-    source = Source(
-        metadata=Metadata(raw={}),
-        candidates=(candidate,),
-        capabilities=frozenset(),
-        provenance=Provenance(provider="fixture", raw={}),
-        raw_metadata={},
-    )
-    return Resource(
-        uri=candidate.uri,
-        format=candidate.format,
-        media_type=candidate.media_type,
-        metadata=source.metadata,
-        provenance=source.provenance,
-        access_plan=AccessPlan(kind="file", uri=candidate.uri),
-        source=source,
-    )
+def resource(format_name: str = "shapefile") -> AccessPlan:
+    return AccessPlan(kind="file", uri="https://example.test/data", format=format_name)
 
 
 def test_execution_selection_is_deterministic_across_registration_order() -> None:

@@ -1,6 +1,6 @@
 # pyogrioの実行アダプター
 
-`PyogrioAdapter` は選択済み vector Resource を利用者提供の pyogrio runtime へ渡します。
+`PyogrioAdapter` は選択済み vector AccessPlan を利用者提供の pyogrio runtime へ渡します。
 
 - `name`: `pyogrio`、優先度: `10`
 - 対応形式: representation registry で `vector` と明示された Shapefile、GeoJSON、GeoPackage、FlatGeobuf、GML、KML、CityGML

@@ -39,6 +39,7 @@ from .errors import (
 )
 from .execution import ExecutionAdapterSelector
 from .models import (
+    AccessPlan,
     Config,
     DependencyValue,
     DiscoveryRecord,
@@ -267,7 +268,7 @@ class Rhinestone:
 
     def open(
         self,
-        value: Config | Result | Resource,
+        value: Config | Result | Resource | AccessPlan,
         library: LibraryName,
         *,
         runtime: object | None = None,
@@ -276,7 +277,7 @@ class Rhinestone:
 
         Args:
             value: An already resolved ``Resource``, a search ``Result``, or a
-                direct ``Config``.
+                direct ``Config``, or a standalone ``AccessPlan``.
             library: Execution adapter name such as ``"rasterio"`` or
                 ``"pyogrio"``.
             runtime: User-owned runtime object for external adapters.
@@ -287,6 +288,8 @@ class Rhinestone:
             ResourceAccessError: If the runtime cannot access the resource.
             DestinationNotAllowedError: If network policy rejects the URI.
         """
+        if isinstance(value, AccessPlan):
+            return self._pipeline.open_plan(value, library, runtime=runtime)
         if isinstance(value, Resource):
             return self._pipeline.open_resource(value, library, runtime=runtime)
         if isinstance(value, Config):

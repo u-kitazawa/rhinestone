@@ -10,7 +10,7 @@ from .errors import (
     RhinestoneError,
 )
 from .execution import AuthorizingExecutionAdapter, ExecutionAdapterSelector
-from .models import Config, LibraryName, Resource, RuntimeFactory
+from .models import AccessPlan, Config, LibraryName, Resource, RuntimeFactory
 from .registry import AdapterRegistry
 from .resolution import Resolver
 from .security import DestinationPolicy
@@ -58,8 +58,8 @@ class AccessPipeline:
         def open_resource(
             value: Resource, library: LibraryName, runtime: object | None
         ) -> object:
-            return AccessPipeline._open_resource(
-                value,
+            return AccessPipeline._open_plan(
+                value.access_plan,
                 library,
                 selector,
                 destination_policy,
@@ -86,8 +86,23 @@ class AccessPipeline:
                 "Execution pipeline is not configured; construct the public "
                 "application with configure() before opening a Resource"
             )
-        return self._open_resource(
-            resource,
+        return self._open_plan(
+            resource.access_plan,
+            library,
+            self._execution_adapter_selector,
+            self._destination_policy,
+            runtime,
+        )
+
+    def open_plan(
+        self, plan: AccessPlan, library: LibraryName, *, runtime: object | None = None
+    ) -> object:
+        """Execute a standalone plan without consulting a provider."""
+        if self._execution_adapter_selector is None:
+            raise ProviderMetadataError("Execution pipeline is not configured")
+        self._destination_policy.authorize_plan(plan)
+        return self._open_plan(
+            plan,
             library,
             self._execution_adapter_selector,
             self._destination_policy,
@@ -95,21 +110,20 @@ class AccessPipeline:
         )
 
     @staticmethod
-    def _open_resource(
-        resource: Resource,
+    def _open_plan(
+        plan: AccessPlan,
         library: LibraryName,
         selector: ExecutionAdapterSelector,
         destination_policy: DestinationPolicy,
         runtime: object | None,
     ) -> Any:
         selected = selector.select(
-            resource,
+            plan,
             requested=library,
         )
+        destination_policy.authorize(plan.uri)
         if isinstance(selected, AuthorizingExecutionAdapter):
-            selected.authorize(resource, destination_policy=destination_policy)
-        else:
-            destination_policy.authorize(resource.uri)
+            selected.authorize(plan, destination_policy=destination_policy)
         if selected.name == "json-service":
             if runtime is not None:
                 raise ExecutionAdapterUnavailableError(
@@ -121,7 +135,7 @@ class AccessPipeline:
                 f"Execution runtime for {selected.name!r} must be supplied as an object"
             )
         return selected.open(
-            resource,
+            plan,
             runtime,
             destination_policy=destination_policy,
         )
