@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from math import isfinite
+from pathlib import PurePosixPath
 from types import MappingProxyType
 from typing import (
     Any,
@@ -271,42 +272,124 @@ class Source:
         object.__setattr__(self, "raw_metadata", _freeze(self.raw_metadata))
 
 
+_SECRET_OPTION_KEYS = frozenset(
+    {"apikey", "authorization", "consumerkey", "password", "secret", "token"}
+)
+
+
+def _validate_plan_value(value: Any, path: str) -> None:
+    if value is None or isinstance(value, str | bool | int):
+        return
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ConfigValidationError(f"{path} must contain finite JSON numbers")
+        return
+    if isinstance(value, Mapping):
+        for key, item in cast(Mapping[Any, Any], value).items():
+            if not isinstance(key, str):
+                raise ConfigValidationError(f"{path} must contain only string keys")
+            normalized = key.casefold().replace("_", "").replace("-", "")
+            normalized = normalized.rsplit(":", 1)[-1]
+            if normalized in _SECRET_OPTION_KEYS:
+                raise ConfigValidationError(
+                    f"{path}.{key} must not contain a credential value; use "
+                    "AccessPlan.credential as a logical reference"
+                )
+            _validate_plan_value(item, f"{path}.{key}")
+        return
+    if isinstance(value, tuple | list):
+        for index, item in enumerate(cast(tuple[Any, ...] | list[Any], value)):
+            _validate_plan_value(item, f"{path}[{index}]")
+        return
+    raise ConfigValidationError(
+        f"{path} contains non-JSON value {type(value).__name__}"
+    )
+
+
 @dataclass(frozen=True)
 class AccessPlan:
-    """Explicit instructions describing how a selected resource is delivered.
+    """Portable instructions describing how a selected resource is delivered.
 
-    ``kind`` identifies the delivery shape and ``options`` carries safe,
-    adapter-specific execution values.
+    The plan is a standalone, versioned JSON contract. It contains only
+    representation metadata, logical identifiers, and JSON-safe execution
+    options; runtime objects and credential values never belong here.
     """
 
     kind: str
     uri: str
+    format: str | None = None
+    media_type: str | None = None
     options: Mapping[str, Any] = field(default_factory=_empty_mapping)
+    provider: str | None = None
+    service: str | None = None
+    credential: str | None = None
 
     def __post_init__(self) -> None:
+        if self.kind not in {"file", "remote-dataset", "service-query"}:
+            raise ConfigValidationError(
+                "AccessPlan.kind must be 'file', 'remote-dataset', or 'service-query'"
+            )
+        raw_uri = cast(object, self.uri)
+        if not isinstance(raw_uri, str) or not raw_uri.strip():
+            raise ConfigValidationError("AccessPlan.uri must be a non-empty string")
+        if not is_valid_http_authority(self.uri):
+            raise ConfigValidationError(
+                "AccessPlan.uri must not contain embedded credentials or an "
+                "invalid HTTP(S) authority"
+            )
+        for name in ("format", "media_type", "provider", "service", "credential"):
+            value = cast(object, getattr(self, name))
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ConfigValidationError(
+                    f"AccessPlan.{name} must be a non-empty string or None"
+                )
+        raw_options = cast(object, self.options)
+        if not isinstance(raw_options, Mapping):
+            raise ConfigValidationError("AccessPlan.options must be a mapping")
+        _validate_plan_value(self.options, "AccessPlan.options")
+        archive = self.options.get("archive")
+        if archive not in (None, "zip"):
+            raise ConfigValidationError("AccessPlan.options.archive must be 'zip'")
+        entry_point = self.options.get("entry_point")
+        if entry_point is not None:
+            if archive != "zip" or not isinstance(entry_point, str):
+                raise ConfigValidationError(
+                    "AccessPlan.options.entry_point requires archive='zip' and "
+                    "a string path"
+                )
+            path = PurePosixPath(entry_point)
+            if (
+                not entry_point.strip()
+                or not path.parts
+                or path.is_absolute()
+                or ".." in path.parts
+                or "\\" in entry_point
+            ):
+                raise ConfigValidationError(
+                    "AccessPlan.options.entry_point must be a safe relative "
+                    "archive path"
+                )
+        encoding = self.options.get("encoding")
+        if encoding is not None and (
+            not isinstance(encoding, str) or not encoding.strip()
+        ):
+            raise ConfigValidationError(
+                "AccessPlan.options.encoding must be a non-empty string"
+            )
         object.__setattr__(self, "options", _freeze(self.options))
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return the versioned JSON representation of this plan."""
+        from ._portable import access_plan_to_dict
 
-@dataclass(frozen=True)
-class FileAccessPlan(AccessPlan):
-    """Access plan for a downloadable file, optionally contained in an archive."""
+        return access_plan_to_dict(self)
 
-    archive: str | None = None
-    kind: str = field(default="file", init=False)
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> AccessPlan:
+        """Validate and restore a plan from its JSON representation."""
+        from ._portable import access_plan_from_dict
 
-
-@dataclass(frozen=True)
-class RemoteDatasetPlan(AccessPlan):
-    """Access plan for a remotely readable dataset such as a COG."""
-
-    kind: str = field(default="remote-dataset", init=False)
-
-
-@dataclass(frozen=True)
-class ServiceQueryPlan(AccessPlan):
-    """Access plan for a queryable service endpoint."""
-
-    kind: str = field(default="service-query", init=False)
+        return access_plan_from_dict(value)
 
 
 @dataclass(frozen=True)
@@ -692,14 +775,12 @@ __all__ = [
     "Dependencies",
     "DiscoveryRecord",
     "DependencyValue",
-    "FileAccessPlan",
     "LibraryName",
     "Metadata",
     "Provenance",
     "Provider",
     "ProviderId",
     "ProviderSearchResults",
-    "RemoteDatasetPlan",
     "Resource",
     "ResourceCandidate",
     "Result",
@@ -708,6 +789,5 @@ __all__ = [
     "SearchDiagnostic",
     "SearchExecution",
     "SearchQuery",
-    "ServiceQueryPlan",
     "Source",
 ]

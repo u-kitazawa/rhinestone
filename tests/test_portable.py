@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -11,13 +13,10 @@ from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailable
 from rhinestone.models import (
     AccessPlan,
     DiscoveryRecord,
-    FileAccessPlan,
     Metadata,
     Provenance,
-    RemoteDatasetPlan,
     Resource,
     ResourceCandidate,
-    ServiceQueryPlan,
     Source,
 )
 
@@ -112,6 +111,7 @@ def test_resource_json_round_trip_excludes_opener_and_rebinds() -> None:
     detached = Resource.from_dict(json.loads(json.dumps(encoded)))
 
     assert encoded["schema"] == "rhinestone.resource"
+    assert encoded["version"] == 2
     assert "_opener" not in json.dumps(encoded)
     assert detached == original
     with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
@@ -153,20 +153,23 @@ def test_resource_round_trip_preserves_a_second_source_shape() -> None:
     restored = Resource.from_dict(json.loads(json.dumps(original.to_dict())))
 
     assert restored == original
-    assert isinstance(restored.access_plan, RemoteDatasetPlan)
+    assert restored.access_plan.kind == "remote-dataset"
     assert restored.source.raw_metadata["metadata"]["title"] == "Static dataset"
 
 
 @pytest.mark.parametrize(
     "plan",
     [
-        FileAccessPlan(uri="https://example.test/data.zip", archive="zip"),
-        RemoteDatasetPlan(uri="https://example.test/data.tif"),
-        ServiceQueryPlan(uri="https://example.test/wfs"),
-        AccessPlan(kind="custom", uri="https://example.test/custom"),
+        AccessPlan(
+            kind="file",
+            uri="https://example.test/data.zip",
+            options={"archive": "zip"},
+        ),
+        AccessPlan(kind="remote-dataset", uri="https://example.test/data.tif"),
+        AccessPlan(kind="service-query", uri="https://example.test/wfs"),
     ],
 )
-def test_resource_round_trip_preserves_access_plan_subtypes(plan: AccessPlan) -> None:
+def test_resource_round_trip_preserves_access_plan(plan: AccessPlan) -> None:
     source = Source(
         metadata=Metadata(title="Dataset"),
         candidates=(ResourceCandidate(plan.uri, None, None),),
@@ -187,7 +190,115 @@ def test_resource_round_trip_preserves_access_plan_subtypes(plan: AccessPlan) ->
     restored = Resource.from_dict(resource.to_dict())
 
     assert restored.access_plan == plan
-    assert type(restored.access_plan) is type(plan)
+    assert type(restored.access_plan) is AccessPlan
+
+
+def test_access_plan_is_a_versioned_standalone_cross_process_contract() -> None:
+    plan = AccessPlan(
+        kind="service-query",
+        uri="https://api.example.test/v1/items",
+        format="api",
+        media_type="application/json",
+        options={
+            "params": {"limit": 10, "score": 0.5},
+            "response_type": "array",
+            "fields": ["id"],
+        },
+        provider="catalog",
+        service="items",
+        credential="items-key",
+    )
+
+    encoded = plan.to_dict()
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json,sys; from rhinestone.models import AccessPlan; "
+                "plan=AccessPlan.from_dict(json.load(sys.stdin)); "
+                "print(plan.kind, plan.uri, plan.credential)"
+            ),
+        ],
+        input=json.dumps(encoded),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    assert encoded["schema"] == "rhinestone.access-plan"
+    assert encoded["version"] == 1
+    assert process.stdout.strip() == (
+        "service-query https://api.example.test/v1/items items-key"
+    )
+    assert AccessPlan.from_dict(json.loads(json.dumps(encoded))) == plan
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"kind": "custom", "uri": "/data"}, "kind"),
+        ({"kind": "file", "uri": ""}, "uri"),
+        ({"kind": "file", "uri": 1}, "uri"),
+        ({"kind": "file", "uri": "https:///missing"}, "authority"),
+        ({"kind": "file", "uri": "/data", "format": ""}, "format"),
+        ({"kind": "file", "uri": "/data", "options": []}, "mapping"),
+        (
+            {"kind": "file", "uri": "/data", "options": {"archive": "tar"}},
+            "archive",
+        ),
+        (
+            {
+                "kind": "file",
+                "uri": "/data",
+                "options": {"entry_point": "data.shp"},
+            },
+            "entry_point",
+        ),
+        (
+            {
+                "kind": "file",
+                "uri": "/data",
+                "options": {"archive": "zip", "entry_point": "../data.shp"},
+            },
+            "safe relative",
+        ),
+        (
+            {"kind": "file", "uri": "/data", "options": {"encoding": ""}},
+            "encoding",
+        ),
+        (
+            {"kind": "file", "uri": "/data", "options": {"token": "secret"}},
+            "credential value",
+        ),
+        (
+            {"kind": "file", "uri": "/data", "options": {1: "bad"}},
+            "string keys",
+        ),
+        (
+            {"kind": "file", "uri": "/data", "options": {"bad": object()}},
+            "non-JSON",
+        ),
+        (
+            {"kind": "file", "uri": "/data", "options": {"bad": float("nan")}},
+            "finite",
+        ),
+    ],
+)
+def test_access_plan_rejects_invalid_or_nonportable_values(
+    kwargs: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigValidationError, match=message):
+        AccessPlan(**kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("field", ("schema", "version"))
+def test_access_plan_from_dict_rejects_unknown_envelope(field: str) -> None:
+    data = AccessPlan(kind="file", uri="/data").to_dict()
+    data[field] = "invalid"
+
+    with pytest.raises(ConfigValidationError, match=field):
+        AccessPlan.from_dict(data)
 
 
 @pytest.mark.parametrize(

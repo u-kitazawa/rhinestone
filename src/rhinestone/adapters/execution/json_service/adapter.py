@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import Any, cast
 
 from ....errors import ProviderResponseError, ResourceAccessError
-from ....models import AccessPlan, Resource, ServiceQueryPlan
+from ....models import AccessPlan, Resource
 from ....registry import CredentialRegistry
 from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
@@ -44,9 +44,9 @@ class JsonServiceAdapter(ExecutionAdapter):
     def supports(self, resource: Resource) -> bool:
         """Return whether this service and JSON response shape are compatible."""
         return (
-            isinstance(resource.access_plan, ServiceQueryPlan)
+            resource.access_plan.kind == "service-query"
             and resource.media_type == "application/json"
-            and resource.access_plan.options.get("service") == self._service
+            and resource.access_plan.service == self._service
         )
 
     def open(
@@ -109,11 +109,11 @@ class JsonServiceAdapter(ExecutionAdapter):
         resource: Resource,
         destination_policy: DestinationPolicy | None,
     ) -> None:
-        credential = resource.access_plan.options.get("credential")
+        credential = resource.access_plan.credential
         (destination_policy or self._destination_policy).authorize(
             resource.uri,
             credentialed=True,
-            provider=resource.provenance.provider,
+            provider=resource.access_plan.provider,
             service=self._service,
-            credential=credential if isinstance(credential, str) else None,
+            credential=credential,
         )

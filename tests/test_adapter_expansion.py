@@ -34,9 +34,9 @@ from rhinestone.errors import (
     UnsupportedSearchConditionError,
 )
 from rhinestone.models import (
+    AccessPlan,
     ResourceCandidate,
     SearchQuery,
-    ServiceQueryPlan,
 )
 from rhinestone.registry import CredentialRegistry
 from rhinestone.resolution import Resolver
@@ -487,19 +487,21 @@ def test_credential_errors_do_not_expose_factory_secrets() -> None:
 
 def test_odpt_rejects_incomplete_service_plan() -> None:
     endpoint = "https://api.odpt.org/api/v4/odpt:Station"
-    plan = ServiceQueryPlan(
+    plan = AccessPlan(
+        kind="service-query",
         uri=endpoint,
         options={
-            "service": "odpt",
             "endpoint": endpoint,
         },
+        service="odpt",
+        credential="odpt",
     )
     with pytest.raises(ConfigValidationError, match="incomplete"):
         OdptAdapter.prepare_request(plan, CredentialRegistry({}))
 
 
 def test_odpt_authentication_cannot_be_redirected_to_another_provider() -> None:
-    plan = ServiceQueryPlan(uri="https://evil.example", options={"service": "odpt"})
+    plan = AccessPlan(kind="service-query", uri="https://evil.example", service="odpt")
     with pytest.raises(ConfigValidationError):
         OdptAdapter.prepare_request(
             plan, CredentialRegistry({"odpt": lambda: "secret"})
@@ -619,3 +621,4 @@ def test_execution_uses_selected_candidate_attributes_when_uri_is_shared() -> No
     )
     resource = Resolver().resolve(make_source(rejected, selected))
     assert resource_attributes(resource)["encoding"] == "utf8"
+    assert resource_attributes(replace(resource, uri="missing")) == {}

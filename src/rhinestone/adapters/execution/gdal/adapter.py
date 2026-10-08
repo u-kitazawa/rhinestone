@@ -5,10 +5,9 @@ from typing import Any, cast
 from urllib.parse import urlparse
 
 from ....errors import ResourceAccessError
-from ....models import FileAccessPlan, Resource
+from ....models import Resource
 from ....representations import canonical_format
 from ....security import DestinationPolicy
-from .._resource import resource_attributes
 from ..base import ExecutionAdapter
 from .tile import tile_xml as build_tile_xml
 
@@ -42,9 +41,8 @@ class GdalAdapter(ExecutionAdapter):
     ) -> Any:
         """Open the selected Resource with ``runtime.OpenEx``."""
         uri = self._runtime_uri(resource)
-        attributes = resource_attributes(resource)
         options: list[str] = []
-        encoding = attributes.get("encoding")
+        encoding = resource.access_plan.options.get("encoding")
         if isinstance(encoding, str):
             options.append("ENCODING=" + encoding.upper())
         try:
@@ -63,7 +61,6 @@ class GdalAdapter(ExecutionAdapter):
 
     @staticmethod
     def _runtime_uri(resource: Resource) -> str:
-        attributes = resource_attributes(resource)
         uri = resource.uri
         tile = resource.access_plan.options.get("tile")
         if tile is not None:
@@ -79,9 +76,7 @@ class GdalAdapter(ExecutionAdapter):
                     "GDAL tile URL must be a string; provide a valid tile endpoint"
                 )
             uri = build_tile_xml(tile)
-        archive = attributes.get("archive")
-        if isinstance(resource.access_plan, FileAccessPlan):
-            archive = resource.access_plan.archive or archive
+        archive = resource.access_plan.options.get("archive")
         if archive == "zip":
             uri = (
                 "/vsizip//vsicurl/" + uri

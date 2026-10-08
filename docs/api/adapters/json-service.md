@@ -4,7 +4,8 @@
 
 [Execution Adapter 一覧](../execution-adapters.md) · 選択名: `json-service` · priority: `10`
 
-`ServiceQueryPlan`、`application/json`、一致する service 名が必要です。組み込みruntimeはAdapterが要求する次の`get`契約を実装します。
+`kind="service-query"`のAccessPlan、`application/json`、一致するservice名が必要です。
+組み込みruntimeはAdapterが要求する次の`get`契約を実装します。
 
 ```python
 get(uri, params=..., headers=..., timeout=30, allow_redirects=False)

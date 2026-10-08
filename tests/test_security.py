@@ -19,7 +19,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
 )
-from rhinestone.models import SearchQuery
+from rhinestone.models import AccessPlan, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from rhinestone.security import DestinationPolicy, DestinationRule
 from tests.provider_support import fixture_json
@@ -117,6 +117,100 @@ def test_policy_levels_control_when_authorization_is_applied() -> None:
 
     with pytest.raises(ConfigValidationError):
         DestinationPolicy(level="invalid")  # type: ignore[arg-type]
+
+
+def test_received_access_plan_revalidates_destination_and_redirects() -> None:
+    policy = DestinationPolicy.from_catalog(
+        (Provider("source", "static", {"endpoint": "https://known.example/api"}),)
+    )
+    plan = AccessPlan(
+        kind="remote-dataset",
+        uri="https://known.example/api/data.tif",
+        provider="source",
+    )
+
+    policy.authorize_plan(plan)
+    policy.authorize_plan(AccessPlan(kind="file", uri="/tmp/data"))
+    DestinationPolicy.unrestricted().authorize_plan(
+        replace(plan, uri="https://evil.example/data")
+    )
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(replace(plan, uri="https://evil.example/data"))
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(plan, redirect_url="https://evil.example/data")
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(plan, redirect_url="https://[invalid")
+
+
+def test_received_access_plan_revalidates_tile_destination() -> None:
+    policy = DestinationPolicy.from_catalog(
+        (
+            Provider(
+                "tiles",
+                "static",
+                {
+                    "endpoint": "https://known.example/catalog",
+                    "tile": {"url": "https://tiles.example/{z}/{x}/{y}.png"},
+                },
+            ),
+        )
+    )
+    plan = AccessPlan(
+        kind="remote-dataset",
+        uri="https://known.example/catalog",
+        options={
+            "tile": {
+                "url": "https://tiles.example/{z}/{x}/{y}.png",
+                "min_zoom": 0,
+                "max_zoom": 18,
+            }
+        },
+    )
+
+    policy.authorize_plan(plan)
+    tampered = replace(
+        plan,
+        options={
+            "tile": {
+                "url": "https://evil.example/{z}/{x}/{y}.png",
+                "min_zoom": 0,
+                "max_zoom": 18,
+            }
+        },
+    )
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(tampered)
+    invalid_tiles: tuple[object, ...] = ([], {})
+    for invalid_tile in invalid_tiles:
+        with pytest.raises(ConfigValidationError, match="tile"):
+            policy.authorize_plan(replace(plan, options={"tile": invalid_tile}))
+
+
+def test_received_credential_plan_requires_exact_logical_destination() -> None:
+    provider = Provider(
+        "private",
+        "ckan",
+        {
+            "endpoint": "https://catalog.example/api",
+            "credential": "catalog-key",
+        },
+    )
+    policy = DestinationPolicy.from_catalog((provider,))
+    plan = AccessPlan(
+        kind="service-query",
+        uri="https://catalog.example/api/action",
+        provider="private",
+        service="ckan",
+        credential="catalog-key",
+    )
+
+    policy.authorize_plan(plan)
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(replace(plan, credential="other-key"))
+    with pytest.raises(DestinationNotAllowedError):
+        DestinationPolicy(rules=policy.rules, credential_rules=None).authorize_plan(
+            plan
+        )
 
 
 def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:

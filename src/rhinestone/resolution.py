@@ -12,11 +12,8 @@ from .errors import (
 )
 from .models import (
     AccessPlan,
-    FileAccessPlan,
-    RemoteDatasetPlan,
     Resource,
     ResourceCandidate,
-    ServiceQueryPlan,
     Source,
 )
 from .representations import canonical_format
@@ -66,7 +63,7 @@ class Resolver:
                 "Resource format and media type are unknown; URI suffix is not "
                 "guessed, so provide an explicit representation"
             )
-        plan = self._select_plan(candidate)
+        plan = self._select_plan(candidate, provider=source.provenance.provider)
         return Resource(
             uri=candidate.uri,
             format=format_name,
@@ -77,7 +74,9 @@ class Resolver:
             source=source,
         )
 
-    def _select_plan(self, candidate: ResourceCandidate) -> AccessPlan:
+    def _select_plan(
+        self, candidate: ResourceCandidate, *, provider: str
+    ) -> AccessPlan:
         explicit = candidate.attributes.get("access_kind")
         if explicit is not None:
             if not isinstance(explicit, str):
@@ -85,7 +84,7 @@ class Resolver:
                     "access_kind must be a string naming file, remote-dataset, "
                     f"or service-query; got {type(explicit).__name__}"
                 )
-            return self._make_plan(explicit, candidate)
+            return self._make_plan(explicit, candidate, provider=provider)
         matches: list[tuple[int, str]] = []
         for rule in self._resolution_rules:
             result = rule(candidate)
@@ -93,29 +92,42 @@ class Resolver:
                 matches.append(result)
         if matches:
             _, kind = max(matches, key=lambda match: (match[0], match[1]))
-            return self._make_plan(kind, candidate)
+            return self._make_plan(kind, candidate, provider=provider)
 
         normalized = (candidate.format or "").lower()
         if normalized in {"cog"}:
-            return RemoteDatasetPlan(uri=candidate.uri)
+            return self._make_plan("remote-dataset", candidate, provider=provider)
         if normalized in {"wms", "wfs", "api", "ogc-api-features"}:
-            return ServiceQueryPlan(uri=candidate.uri)
+            return self._make_plan("service-query", candidate, provider=provider)
         if normalized:
-            return self._make_plan("file", candidate)
+            return self._make_plan("file", candidate, provider=provider)
         raise UnsupportedAccessError(
             f"No access plan supports media type {candidate.media_type!r}; "
             "provide a known format or explicit access_kind"
         )
 
     @staticmethod
-    def _make_plan(kind: str, candidate: ResourceCandidate) -> AccessPlan:
+    def _make_plan(
+        kind: str, candidate: ResourceCandidate, *, provider: str
+    ) -> AccessPlan:
         options = candidate.attributes.get("access_options", {})
         if not isinstance(options, Mapping):
             raise UnsupportedAccessError(
                 "access_options must be an object containing adapter options; "
                 f"got {type(options).__name__}"
             )
-        options = cast(Mapping[str, Any], options)
+        options = dict(cast(Mapping[str, Any], options))
+        service = options.pop("service", None)
+        credential = options.pop("credential", None)
+        if service is not None and not isinstance(service, str):
+            raise UnsupportedAccessError("access_options.service must be a string")
+        if credential is not None and not isinstance(credential, str):
+            raise UnsupportedAccessError(
+                "access_options.credential must be a logical credential name"
+            )
+        encoding = candidate.attributes.get("encoding")
+        if encoding is not None:
+            options.setdefault("encoding", encoding)
         if kind == "file":
             archive = candidate.attributes.get("archive")
             if archive is None and (candidate.format or "").lower() in {
@@ -145,15 +157,29 @@ class Resolver:
                     raise UnsupportedAccessError(
                         "entry_point must be a safe relative archive path"
                     )
-            return FileAccessPlan(
+            if archive is not None:
+                options["archive"] = archive
+            return AccessPlan(
+                kind=kind,
                 uri=candidate.uri,
-                archive=archive,
+                format=candidate.format,
+                media_type=candidate.media_type,
                 options=options,
+                provider=provider,
+                service=service,
+                credential=credential,
             )
-        if kind == "remote-dataset":
-            return RemoteDatasetPlan(uri=candidate.uri, options=options)
-        if kind == "service-query":
-            return ServiceQueryPlan(uri=candidate.uri, options=options)
+        if kind in {"remote-dataset", "service-query"}:
+            return AccessPlan(
+                kind=kind,
+                uri=candidate.uri,
+                format=candidate.format,
+                media_type=candidate.media_type,
+                options=options,
+                provider=provider,
+                service=service,
+                credential=credential,
+            )
         raise UnsupportedAccessError(
             f"Unknown access plan kind {kind!r}; expected file, remote-dataset, "
             "or service-query"

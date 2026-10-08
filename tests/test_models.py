@@ -5,8 +5,8 @@ import pytest
 
 from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailableError
 from rhinestone.models import (
+    AccessPlan,
     Config,
-    FileAccessPlan,
     Metadata,
     Provenance,
     Provider,
@@ -251,7 +251,9 @@ def test_resource_preserves_source_metadata_and_provenance() -> None:
         media_type=candidate.media_type,
         metadata=source.metadata,
         provenance=source.provenance,
-        access_plan=FileAccessPlan(uri=candidate.uri, archive="zip"),
+        access_plan=AccessPlan(
+            kind="file", uri=candidate.uri, options={"archive": "zip"}
+        ),
         source=source,
     )
 
@@ -295,7 +297,7 @@ def test_unbound_resource_cannot_open_without_execution_context() -> None:
         media_type=candidate.media_type,
         metadata=source.metadata,
         provenance=source.provenance,
-        access_plan=FileAccessPlan(uri=candidate.uri),
+        access_plan=AccessPlan(kind="file", uri=candidate.uri),
         source=source,
     )
 

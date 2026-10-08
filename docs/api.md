@@ -189,9 +189,20 @@ ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作�
 
 ### Portable Result / Resource
 
-`Result.to_dict()` / `Resource.to_dict()`はversion付きのJSON-safeな値を返します。credential、runtime、resolver、openerは含みません。`Result.from_dict()` / `Resource.from_dict()`で復元した値はdetachedなので、別のApplicationで`app.bind(value)`してから`result.resolve()`または`resource.open(...)`を利用します。未知のschema/versionやJSON-safeでないraw metadataは`ConfigValidationError`として拒否されます。
+`Result.to_dict()` / `Resource.to_dict()`はversion付きのJSON-safeな値を返します。
+現在の`rhinestone.result`はversion 1、単一AccessPlan契約を含む
+`rhinestone.resource`はversion 2です。credential、runtime、resolver、openerは
+含みません。`Result.from_dict()` / `Resource.from_dict()`で復元した値はdetachedなので、
+別のApplicationで`app.bind(value)`してから`result.resolve()`または
+`resource.open(...)`を利用します。未知のschema/versionやJSON-safeでないraw metadataは
+`ConfigValidationError`として拒否されます。
 
 `access_plan.kind`は`file`、`remote-dataset`、`service-query`のいずれかです。
+`AccessPlan`は派生型を持たない単一の値型で、`uri`、`format`、`media_type`、
+`options`、`provider`、`service`、論理credential参照を保持します。
+`to_dict()` / `from_dict()` は `rhinestone.access-plan` schema のversion付きJSON契約を
+生成・検証します。secretやruntime objectは含められません。受信側は実行前に
+`DestinationPolicy.authorize_plan()`でURI、tile URL、redirect先を再検証できます。
 `Resource.open()`はデータ解析を行わず、指定した利用者所有Runtimeへ処理を委譲します。
 
 `library`は必須です。外部Runtimeは`runtime=`へ実体を渡し、`RuntimeFactory`は
@@ -305,7 +316,6 @@ from rhinestone.models import RuntimeFactory
 
 ## 高度なモデル
 
-`Source`、`ResourceCandidate`、`AccessPlan`、`FileAccessPlan`、`RemoteDatasetPlan`、
-`ServiceQueryPlan`、`SearchQuery`、`SearchDiagnostic`は、
+`Source`、`ResourceCandidate`、`AccessPlan`、`SearchQuery`、`SearchDiagnostic`は、
 `rhinestone.models`経由で利用する拡張・Adapter向けモデルです。`Config`、`Provider`、
 `Result`、`Resource`は通常利用と拡張の両方で使う中核モデルです。
