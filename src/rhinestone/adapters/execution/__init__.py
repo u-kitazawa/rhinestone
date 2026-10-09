@@ -1,6 +1,5 @@
 """Built-in execution adapters."""
 
-from ._resource import resource_attributes
 from .base import ExecutionAdapter
 from .gdal import GdalAdapter
 from .json_service import JsonServiceAdapter
@@ -13,5 +12,4 @@ __all__ = [
     "JsonServiceAdapter",
     "PyogrioAdapter",
     "RasterioAdapter",
-    "resource_attributes",
 ]

@@ -202,7 +202,9 @@ ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作�
 `options`、`provider`、`service`、論理credential参照を保持します。
 `to_dict()` / `from_dict()` は `rhinestone.access-plan` schema のversion付きJSON契約を
 生成・検証します。secretやruntime objectは含められません。受信側は実行前に
-`DestinationPolicy.authorize_plan()`でURI、tile URL、redirect先を再検証できます。
+`app.open(plan, library, runtime=...)`が `DestinationPolicy.authorize_plan()`で
+URIとtile URLを再認可します。Providerへの問い合わせやResourceの復元は必要ありません。
+redirect先を別途処理する場合も同じpolicyで再認可してください。
 `Resource.open()`はデータ解析を行わず、指定した利用者所有Runtimeへ処理を委譲します。
 
 `library`は必須です。外部Runtimeは`runtime=`へ実体を渡し、`RuntimeFactory`は
@@ -210,6 +212,17 @@ ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作�
 `ExecutionAdapterUnavailableError`となり、別Runtimeへ自動で切り替えません。
 `json-service`はCoreのRuntimeを使うため`resource.open("json-service")`とし、
 `runtime=`を省略します。この契約は`Rhinestone.open()`にも共通です。
+
+```python
+from rhinestone.models import AccessPlan
+
+plan = AccessPlan.from_dict(received_json)
+data = app.open(plan, "pyogrio", runtime=pyogrio)
+```
+
+受信側のCatalogから許可された送信先とcredential参照を解決します。
+ローカルファイルはProviderなしで実行できます。ネットワーク宛先は受信側の許可設定が必要です。
+既存Resourceを開く経路は従来のnetwork policyを維持します。
 
 ## `Format` / `FormatPreset`（検索形式）
 

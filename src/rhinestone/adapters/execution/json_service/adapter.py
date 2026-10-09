@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import Any, cast
 
 from ....errors import ProviderResponseError, ResourceAccessError
-from ....models import AccessPlan, Resource
+from ....models import AccessPlan
 from ....registry import CredentialRegistry
 from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
@@ -41,27 +41,27 @@ class JsonServiceAdapter(ExecutionAdapter):
             self._destination_policy,
         )
 
-    def supports(self, resource: Resource) -> bool:
+    def supports(self, plan: AccessPlan) -> bool:
         """Return whether this service and JSON response shape are compatible."""
         return (
-            resource.access_plan.kind == "service-query"
-            and resource.media_type == "application/json"
-            and resource.access_plan.service == self._service
+            plan.kind == "service-query"
+            and plan.media_type == "application/json"
+            and plan.service == self._service
         )
 
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: Any,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
         """Execute the service request without following redirects."""
-        self._authorize_resource(resource, destination_policy)
-        params, headers = self._prepare_request(resource.access_plan, self._credentials)
+        self._authorize_plan(plan, destination_policy)
+        params, headers = self._prepare_request(plan, self._credentials)
         try:
             response = runtime.get(
-                resource.uri,
+                plan.uri,
                 params=params,
                 headers=headers,
                 timeout=30,
@@ -85,7 +85,7 @@ class JsonServiceAdapter(ExecutionAdapter):
             raise ProviderResponseError(
                 "Service returned invalid JSON; expected a JSON document"
             ) from None
-        if resource.access_plan.options.get("response_type") == "array" and (
+        if plan.options.get("response_type") == "array" and (
             not isinstance(data, list)
             or any(not isinstance(item, Mapping) for item in cast(list[Any], data))
         ):
@@ -97,23 +97,23 @@ class JsonServiceAdapter(ExecutionAdapter):
 
     def authorize(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
         """Authorize credential release before resolving the service runtime."""
-        self._authorize_resource(resource, destination_policy)
+        self._authorize_plan(plan, destination_policy)
 
-    def _authorize_resource(
+    def _authorize_plan(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         destination_policy: DestinationPolicy | None,
     ) -> None:
-        credential = resource.access_plan.credential
+        credential = plan.credential
         (destination_policy or self._destination_policy).authorize(
-            resource.uri,
+            plan.uri,
             credentialed=True,
-            provider=resource.access_plan.provider,
+            provider=plan.provider,
             service=self._service,
             credential=credential,
         )

@@ -183,19 +183,20 @@ URIや隣接する別データの形式から対象の形式を推測しませ�
 
 ## Execution Adapter（実行アダプター）
 
-Execution Adapter は Resource を選択せず、すでに Resolver が選んだ Resource を Runtime
-へ翻訳します。
+Execution Adapter は Resource を選択せず、すでに選択済みの AccessPlan を Runtime
+へ翻訳します。`supports` / `open` / 任意の `authorize` は `AccessPlan` を受け取ります。
+Source・Resource・provenanceへ戻って実行情報を探しません。
 
 ```python
 class ExampleExecution:
     name = "example-runtime"
     priority = 100
 
-    def supports(self, resource):
-        return resource.format == "geojson"
+    def supports(self, plan):
+        return plan.format == "geojson"
 
-    def open(self, resource, runtime, *, destination_policy=None):
-        return runtime.read(resource.uri)
+    def open(self, plan, runtime, *, destination_policy=None):
+        return runtime.read(plan.uri)
 
 
 app = configure(

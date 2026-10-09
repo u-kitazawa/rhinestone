@@ -3,14 +3,14 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ...models import Resource
+from ...models import AccessPlan
 from ...security import DestinationPolicy
 
 __all__ = ["ExecutionAdapter"]
 
 
 class ExecutionAdapter(ABC):
-    """Base for adapters that translate a selected ``Resource`` to an OSS call."""
+    """Base for adapters that translate a selected ``AccessPlan`` to an OSS call."""
 
     name: str
     """Stable dependency and selection name."""
@@ -24,24 +24,24 @@ class ExecutionAdapter(ABC):
         )
 
     @abstractmethod
-    def supports(self, resource: Resource) -> bool:
-        """Whether this adapter can open the already selected resource."""
+    def supports(self, plan: AccessPlan) -> bool:
+        """Whether this adapter can open the already selected plan."""
 
     @abstractmethod
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: Any,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        """Delegate the already selected resource to the supplied runtime."""
+        """Delegate the already selected plan to the supplied runtime."""
 
     def authorize(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
         """Authorize a resource before resolving its user-owned runtime."""
-        (destination_policy or self._destination_policy).authorize(resource.uri)
+        (destination_policy or self._destination_policy).authorize(plan.uri)

@@ -4,18 +4,18 @@ from typing import Any
 from urllib.parse import urlparse
 
 from ....errors import ResourceAccessError
-from ....models import Resource
+from ....models import AccessPlan
 from ....representations import FORMAT_CATEGORIES, canonical_format
 from ....security import DestinationPolicy
 from ..base import ExecutionAdapter
 
 
 class PyogrioAdapter(ExecutionAdapter):
-    """Delegate vector Resources to a supplied pyogrio module."""
+    """Delegate vector AccessPlans to a supplied pyogrio module."""
 
     name = "pyogrio"
     priority = 10
-    # Source adapters must declare ``Resource.format``; this registry never
+    # Source adapters must declare ``AccessPlan.format``; this registry never
     # infers a format from a URI or from an archive member.  Keeping the
     # compatibility boundary in the shared representation vocabulary lets new
     # explicitly supported vector formats reach the injected pyogrio runtime.
@@ -28,7 +28,7 @@ class PyogrioAdapter(ExecutionAdapter):
     def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
         super().__init__(destination_policy)
 
-    def supports(self, resource: Resource) -> bool:
+    def supports(self, plan: AccessPlan) -> bool:
         """Return whether pyogrio can be tried for an explicit vector format.
 
         Runtime driver availability is environment-specific.  This selection
@@ -36,35 +36,33 @@ class PyogrioAdapter(ExecutionAdapter):
         a missing driver or an unsupported geometry/field type is reported by
         :meth:`open` as :class:`~rhinestone.errors.ResourceAccessError`.
         """
-        return canonical_format(resource.format) in self._formats
+        return canonical_format(plan.format) in self._formats
 
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: Any,
         *,
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
-        """Read the selected vector Resource with ``runtime.read_dataframe``."""
+        """Read the selected vector AccessPlan with ``runtime.read_dataframe``."""
         options: dict[str, Any] = {}
-        encoding = resource.access_plan.options.get("encoding")
+        encoding = plan.options.get("encoding")
         if isinstance(encoding, str):
             options["encoding"] = encoding
         try:
-            return runtime.read_dataframe(self._runtime_uri(resource), **options)
+            return runtime.read_dataframe(self._runtime_uri(plan), **options)
         except Exception as error:
-            raise ResourceAccessError(
-                f"pyogrio could not open {resource.uri!r}"
-            ) from error
+            raise ResourceAccessError(f"pyogrio could not open {plan.uri!r}") from error
 
     @staticmethod
-    def _runtime_uri(resource: Resource) -> str:
+    def _runtime_uri(plan: AccessPlan) -> str:
         """Translate an explicit ZIP access plan to GDAL's VSI URI syntax."""
-        archive = resource.access_plan.options.get("archive")
+        archive = plan.options.get("archive")
         if archive != "zip":
-            return resource.uri
+            return plan.uri
 
-        uri = resource.uri
+        uri = plan.uri
         prefix = (
             "/vsizip//vsicurl/"
             if urlparse(uri).scheme.casefold()
@@ -74,5 +72,5 @@ class PyogrioAdapter(ExecutionAdapter):
             }
             else "/vsizip/"
         )
-        member = resource.access_plan.options.get("entry_point")
+        member = plan.options.get("entry_point")
         return prefix + uri + ("/" + member if isinstance(member, str) else "")

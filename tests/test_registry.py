@@ -5,7 +5,7 @@ from rhinestone.errors import (
     ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, Resource, Source
+from rhinestone.models import AccessPlan, Config, Source
 from rhinestone.registry import AdapterRegistry
 from rhinestone.security import DestinationPolicy
 
@@ -24,12 +24,12 @@ class ExecutionAdapter:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def supports(self, resource: Resource) -> bool:
+    def supports(self, plan: AccessPlan) -> bool:
         return False
 
     def open(
         self,
-        resource: Resource,
+        plan: AccessPlan,
         runtime: object,
         *,
         destination_policy: DestinationPolicy | None = None,
