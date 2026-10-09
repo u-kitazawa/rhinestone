@@ -1,6 +1,7 @@
 """Public composition API."""
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
 from typing import Protocol, runtime_checkable
@@ -225,7 +226,8 @@ class Rhinestone:
         if isinstance(value, Resource):
             if value.access_plan is not None:
                 return self.bind(value)
-            return self._pipeline.resolve(value.reference)
+            resource = self._pipeline.resolve(value.reference)
+            return replace(resource, discovery=value.discovery or resource.discovery)
         return self._pipeline.resolve(value)
 
     def bind(self, value: Resource) -> Resource:
@@ -257,7 +259,9 @@ class Rhinestone:
         if isinstance(value, AccessPlan):
             return self._pipeline.open_plan(value, library, runtime=runtime)
         if isinstance(value, Resource):
-            return self._pipeline.open_resource(value, library, runtime=runtime)
+            return self._pipeline.open_resource(
+                self.resolve(value), library, runtime=runtime
+            )
         return self._pipeline.open(value, library=library, runtime=runtime)
 
     def search(

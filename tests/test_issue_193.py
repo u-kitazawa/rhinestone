@@ -297,3 +297,42 @@ def test_stac_opaque_resource_id_uses_explicit_item_and_asset() -> None:
         )
     )
     assert resource.uri == "https://assets.example/scene-1.tif"
+
+
+@pytest.mark.parametrize("portable", [False, True])
+def test_deferred_discovery_survives_resolution_and_open(portable: bool) -> None:
+    from dataclasses import replace
+
+    from rhinestone.models import DiscoveryRecord
+
+    discovery = DiscoveryRecord(
+        source_id="mlit-dpf",
+        metadata=Metadata(title="Discovery title", raw={"catalog": "native"}),
+        provenance=Provenance(provider="mlit-dpf", dataset_identifier="discovered"),
+        raw_metadata={"record": {"id": "discovered"}},
+    )
+    resource = replace(
+        unresolved(
+            reference=Reference(
+                "direct",
+                resource_identifier="delivery",
+                parameters={"uri": "https://example.test/data.tif", "format": "cog"},
+            )
+        ),
+        discovery=discovery,
+    )
+    if portable:
+        resource = Resource.from_dict(resource.to_dict())
+    app = configure()
+    resolved = app.resolve(resource)
+    assert resolved.discovery == discovery
+    assert resolved.provenance.provider == "direct"
+    assert resolved.metadata != discovery.metadata
+    assert resolved.access_plan is not None
+
+    class Runtime:
+        def open(self, uri: str) -> str:
+            return uri
+
+    assert app.open(resource, "rasterio", runtime=Runtime()) == resolved.uri
+    assert app.open(resolved, "rasterio", runtime=Runtime()) == resolved.uri
