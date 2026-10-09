@@ -25,7 +25,7 @@ app = configure(
 )
 ```
 
-`acl:consumerKey` は open 時に credential factory から取得し、Reference や Source には保存しません。
+`acl:consumerKey` は open 時に credential factory から取得し、Reference や AccessPlan には保存しません。
 
 ## 駅を取得する例
 

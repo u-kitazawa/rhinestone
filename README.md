@@ -60,7 +60,7 @@ print(resource.uri)
 print(resource.metadata)
 ```
 
-`rs.search()`はRhinestoneが用意する提供元からデータ候補を返し、配信単位の`Resource`を返します。`resource.open(library, runtime=...)`で開けます。
+`rs.search()`は組み込みの提供元から配信単位の`Resource`を返します。`resource.open(library, runtime=...)`で開けます。
 複数の提供元を使う場合、結果の順番は設定した順番であり、提供元をまたいだ関連度順ではありません。詳細は[検索結果の順序](docs/search.md#結果の順序)を参照してください。
 
 形式を限定する場合は`rs.search(text="河川", format=(rs.FormatPreset.PYOGRIO,))`のように
