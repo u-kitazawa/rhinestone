@@ -69,7 +69,7 @@ def test_offline_showcase_has_portable_metadata_and_executed_cells() -> None:
     assert all("ci" in cell["metadata"].get("tags", []) for cell in code_cells)
 
     setup_source = "".join(code_cells[0]["source"])
-    assert "@fb673a0a0644333e2e4c0aad002973f817876d29" in setup_source
+    assert "@9ebdbf37126d264de0e38cc71e802b08516e376d" in setup_source
     assert "@develop" not in setup_source
 
 
@@ -117,7 +117,10 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
     assert "kernelspec" in notebook["metadata"]
     assert any(cell.get("cell_type") == "markdown" for cell in notebook_cells(notebook))
     source = notebook_source(notebook)
-    assert "git+https://github.com/u-kitazawa/rhinestone.git@develop" in source
+    assert (
+        "git+https://github.com/u-kitazawa/rhinestone.git@9ebdbf37126d264de0e38cc71e802b08516e376d"
+        in source
+    )
     for marker in (
         'text="国土数値 ダム"',
         'area="津市"',
@@ -274,7 +277,7 @@ def test_stac_showcase_pins_setup_and_keeps_no_stale_output() -> None:
     notebook = load_notebook(RASTER_NOTEBOOK)
     source = notebook_source(notebook)
 
-    assert "@2364508f02f010f3fcc96c4677d133951524fa85" in source
+    assert "@9ebdbf37126d264de0e38cc71e802b08516e376d" in source
     assert "@develop" not in source
     assert "rasterio==1.5.1" in source
     assert "access_token" not in serialized.casefold()

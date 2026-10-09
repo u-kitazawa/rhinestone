@@ -6,7 +6,7 @@ from rhinestone.errors import (
     ProviderMetadataError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, Metadata, Provenance, Reference, Resource
+from rhinestone.models import Metadata, Provenance, Reference, Resource
 from rhinestone.pipeline import AccessPipeline
 from rhinestone.registry import AdapterRegistry
 from rhinestone.resolution import resource_from_delivery
@@ -35,9 +35,9 @@ def test_access_pipeline_delegates_unique_resource_selection_to_provider() -> No
     pipeline = AccessPipeline(
         adapter_registry=AdapterRegistry((RecordingSourceAdapter(events),), ())
     )
-    config = Config(source_id="fixture", settings={"dataset": "data-1"})
+    config = Reference(provider_id="fixture", parameters={"dataset": "data-1"})
 
-    resource = pipeline.resolve(config)
+    resource = pipeline.load(config)
 
     assert events == ["source-adapter"]
     assert resource.metadata.raw == {"original": True}
@@ -49,7 +49,7 @@ def test_unconfigured_pipeline_cannot_open_an_existing_resource() -> None:
     pipeline = AccessPipeline(
         adapter_registry=AdapterRegistry((RecordingSourceAdapter([]),), ())
     )
-    resource = pipeline.resolve(Config(source_id="fixture", settings={}))
+    resource = pipeline.load(Reference(provider_id="fixture", parameters={}))
 
     with pytest.raises(ProviderMetadataError, match="Execution pipeline"):
         pipeline.open_resource(resource, "gdal")
@@ -59,7 +59,7 @@ def test_unknown_provider_has_a_specific_failure() -> None:
     pipeline = AccessPipeline(adapter_registry=AdapterRegistry((), ()))
 
     with pytest.raises(UnsupportedSourceError, match="unknown"):
-        pipeline.resolve(Reference("unknown"))
+        pipeline.load(Reference("unknown"))
 
 
 def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
@@ -74,7 +74,7 @@ def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
     pipeline = AccessPipeline(adapter_registry=AdapterRegistry((BrokenAdapter(),), ()))
 
     with pytest.raises(ProviderMetadataError) as captured:
-        pipeline.resolve(Reference("broken"))
+        pipeline.load(Reference("broken"))
 
     assert captured.value.__cause__ is provider_error
 
@@ -93,7 +93,7 @@ def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
     )
 
     with pytest.raises(ConfigValidationError) as captured:
-        pipeline.resolve(Reference("rejecting"))
+        pipeline.load(Reference("rejecting"))
 
     assert captured.value is expected
 

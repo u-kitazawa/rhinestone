@@ -4,16 +4,16 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, Provider, configure
+from rhinestone import Provider, Reference, configure
 from rhinestone.catalogs import Catalog
 
 app = configure(
     catalog=Catalog((Provider("gsi-fundamental", "gsi-fundamental"),)),
 )
-resource = app.resolve(
-    Config(
+resource = app.load(
+    Reference(
         "gsi-fundamental",
-        {
+        parameters={
             "dataset": "basic",
             "path": os.environ["RHINESTONE_GSI_FUNDAMENTAL_PATH"],
             "metadata": {

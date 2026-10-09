@@ -10,14 +10,14 @@ CKANの `resource_show` / `package_show` による解決処理を共有し、検
 
 Providerの `endpoint` はCatalogから渡されます。`credential`、`credential_header`、
 `credential_scheme` も設定できます。公開検索のためのAPIトークンは通常不要です。
-`Config.settings` は `resource_id` が必須で、任意の `endpoint` はProvider設定と一致する必要があります。
+`Reference.parameters` は `resource_id` が必須で、任意の `endpoint` はProvider設定と一致する必要があります。
 `spatial_search` はこのProviderの構成項目ではありません。
 
 検索条件は `text`、`area`、`format`、`limit` です。bboxとtimeは未対応diagnosticになります。
 共通処理は `area` をKnowledge Adapterで検証・正規化し、正式区域名として専用Adapterへ渡します。
 本文への連結やbboxへの変換は行いません。
 
-結果はResource単位の `Result` です。`target` は同じProviderの `resource_id` Configを指します。
+結果はResource単位の `Resource` です。`target` は同じProviderの `resource_id` Configを指します。
 packageとresourceのmetadataは `raw_metadata`、実際の検索APIパラメータは
 `provenance.query_parameters` に保持します。解決後の形式とURLはCKANの宣言を使います。
 
@@ -97,7 +97,7 @@ Providerが1pageで返す件数が100より少なくても、`count` に従っ�
 ## 例
 
 ```python
-from rhinestone import Config, Format, ProviderId, configure
+from rhinestone import Reference, Format, ProviderId, configure
 from rhinestone.catalogs import BUILTIN
 
 app = configure(catalog=BUILTIN)
@@ -112,7 +112,9 @@ for result in results[ProviderId.GEOSPATIAL_JP]:
     print(result.title, result.provenance.query_parameters)
 
 # resource_idは公式APIで取得した実際のIDに置き換える。
-resource = app.resolve(Config(ProviderId.GEOSPATIAL_JP, {"resource_id": "resource-uuid"}))
+resource = app.load(
+    Reference(ProviderId.GEOSPATIAL_JP, parameters={"resource_id": "resource-uuid"})
+)
 ```
 
 ## 検証範囲

@@ -25,9 +25,7 @@ from rhinestone import configure
 from rhinestone.models import RuntimeFactory
 
 app = configure(
-    dependencies={
-        "rdflib": RuntimeFactory(lambda: importlib.import_module("rdflib"))
-    }
+    dependencies={"rdflib": RuntimeFactory(lambda: importlib.import_module("rdflib"))}
 )
 ```
 
@@ -57,7 +55,7 @@ app = configure()
 dataset = app.open(resource, "rasterio", runtime=rasterio)
 ```
 
-`resource` は `app.resolve(result)` などで取得した、format が `cog` または `geotiff` の Resource です。Rhinestone は URI を `rasterio.open()` へそのまま渡し、archive の展開や形式変換を行いません。導入時の wheel、GDAL、PROJ などの組み合わせは [Rasterio の installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) を確認してください。
+`resource` は `app.load(result)` などで取得した、format が `cog` または `geotiff` の Resource です。Rhinestone は URI を `rasterio.open()` へそのまま渡し、archive の展開や形式変換を行いません。導入時の wheel、GDAL、PROJ などの組み合わせは [Rasterio の installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) を確認してください。
 
 ### GDAL
 
@@ -121,11 +119,15 @@ import rdflib
 from rhinestone import Provider, configure
 
 app = configure(
-    catalog=Catalog((Provider(
-        id="my-dcat",
-        adapter_type="dcat",
-        settings={"catalog_uri": "https://example.test/catalog.ttl"},
-    ),)),
+    catalog=Catalog(
+        (
+            Provider(
+                id="my-dcat",
+                adapter_type="dcat",
+                settings={"catalog_uri": "https://example.test/catalog.ttl"},
+            ),
+        )
+    ),
     dependencies={"rdflib": rdflib},
 )
 results = app.search(text="dataset")

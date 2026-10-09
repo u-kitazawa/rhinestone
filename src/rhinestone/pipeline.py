@@ -12,7 +12,6 @@ from .errors import (
 from .execution import AuthorizingExecutionAdapter, ExecutionAdapterSelector
 from .models import (
     AccessPlan,
-    Config,
     LibraryName,
     Reference,
     Resource,
@@ -37,13 +36,8 @@ class AccessPipeline:
             destination_policy or DestinationPolicy.unrestricted()
         )
 
-    def resolve(self, value: Config | Reference) -> Resource:
-        """Load the unique Resource identified by a Reference.
-
-        Config remains a temporary public entry point until the API integration
-        change; Provider adapters receive only Reference values.
-        """
-        reference = Reference.from_config(value) if isinstance(value, Config) else value
+    def load(self, reference: Reference) -> Resource:
+        """Load the unique Resource identified by a Reference."""
         adapter = self._adapter_registry.source(reference.provider_id)
         try:
             resource = adapter.load(reference)
@@ -62,10 +56,13 @@ class AccessPipeline:
             return resource
         selector = self._execution_adapter_selector
         destination_policy = self._destination_policy
+        loader = self.load if resource.access_plan is None else None
 
         def open_resource(
             value: Resource, library: LibraryName, runtime: object | None
         ) -> object:
+            if loader is not None:
+                value = loader(value.reference)
             if value.access_plan is None:
                 raise ExecutionAdapterUnavailableError(
                     "Resource has no AccessPlan; load its Reference through the "
@@ -86,13 +83,13 @@ class AccessPipeline:
 
     def open(
         self,
-        config: Config | Reference,
+        reference: Reference,
         library: LibraryName,
         *,
         runtime: object | None = None,
     ) -> object:
-        """Resolve ``config`` and open its Resource through ``library``."""
-        return self.resolve(config).open(library, runtime=runtime)
+        """Load ``reference`` and open its Resource through ``library``."""
+        return self.load(reference).open(library, runtime=runtime)
 
     def open_resource(
         self, resource: Resource, library: LibraryName, *, runtime: object | None = None

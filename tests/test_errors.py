@@ -15,7 +15,7 @@ from rhinestone.errors import (
     UnsupportedSearchConditionError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, Provider, SearchQuery
+from rhinestone.models import Provider, Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
 
 
@@ -66,6 +66,6 @@ def test_public_errors_explain_recovery_without_exposing_secrets() -> None:
 def test_public_models_and_operations_have_actionable_pydocs() -> None:
     """The public IDE-facing objects should document their contract."""
     assert "configured data provider" in (Provider.__doc__ or "")
-    assert "configured source" in (Config.__doc__ or "")
+    assert "configured Provider" in (Reference.__doc__ or "")
     assert "pipeline" in (RhinestoneError.__doc__ or "").lower()
     assert "runtime" in (ResourceAccessError.__doc__ or "").lower()

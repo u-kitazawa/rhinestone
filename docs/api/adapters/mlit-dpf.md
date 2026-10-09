@@ -8,7 +8,7 @@
 ## 構成
 
 組み込み定義 `BUILTIN`内の`mlit-dpf` Provider はendpointと論理Credential名だけを持ちます。APIキーは
-`credentials` から遅延取得され、`Provider`、`Result`、`Resource`、例外には保存されません。
+`credentials` から遅延取得され、`Provider`、`Resource`、`Resource`、例外には保存されません。
 `MLIT_DPF` は組み込みCatalogに含まれますが、APIキーを登録せず横断検索した場合はDPFだけが
 `failure_type="credential"` のdiagnosticとして隔離され、他のSourceの検索は継続します。
 
@@ -43,7 +43,9 @@ dpf = Provider(
 )
 
 app = configure(
-    catalog=Catalog((dpf, Provider("plateau", "plateau", {"endpoint": "https://example.test/ckan"}))),
+    catalog=Catalog(
+        (dpf, Provider("plateau", "plateau", {"endpoint": "https://example.test/ckan"}))
+    ),
     credentials={"mlit-dpf": lambda: load_api_key()},
 )
 ```
@@ -83,7 +85,7 @@ metadataに安全な `DPF:downloadURLs` がある結果を `direct` Configへ変
   1回の取得は最大50レコードです。形式条件とResource展開を適用してから返却上限を判定します。
   全件を取得してから並び替える方式ではありません。空ページ・同じレコードしか返らないページで
   続行不能なら `ProviderResponseError` として診断します。
-- Direct結果には明示されたrepresentationの形式を `Result.formats` に保持します。
+- Direct結果には明示されたrepresentationの形式を `Resource.formats` に保持します。
   Native委譲結果の形式は検索段階では未確定なので、`format=(Format.UNKNOWN,)` の対象です。
   URLやDPFの自由記述から形式を推測しません。
 - provenanceには利用者の条件、`first`、`size`、`phraseMatch`、解決可能な検索範囲を保持します。
@@ -101,7 +103,7 @@ G空間の地域タグによる包含関係をDPFに流用していません。
 ```python
 results = app.search(text="道路", bbox=(139.5, 35.5, 140.0, 36.0), limit=10)
 result = results[0]
-resource = app.resolve(result)
+resource = app.load(result)
 data = resource.open("pyogrio", runtime=pyogrio)
 ```
 

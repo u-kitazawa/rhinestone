@@ -17,7 +17,7 @@ results = rs.search(
     providers=[rs.ProviderId.GEOSPATIAL_JP],
     limit=10,
 )
-resource = results[0].resolve()
+resource = results[0]
 ```
 
 `text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`の意味と診断は`Rhinestone.search()`と同じです。
@@ -60,21 +60,24 @@ provider = Provider(
 `adapter_type`と`settings`はProviderを構成する拡張向け情報です。secretやRuntimeは保持しません。
 `Provider`は不変なので、設定を変更する場合は新しいProviderまたはCatalogを作成します。
 
-## `Config`（解決設定）
+## `Reference`（配信対象の識別子）
 
-`Config`は、構成済みProviderを選び、そのAdapterへ渡す解決条件です。
-`source_id`はCatalog内のProvider IDと一致している必要があります。Provider固有の例として、
-CKANなら`resource_id`、STACなら`collection_id`・`item_id`・`asset_key`を指定します。
+`provider_id` は構成済みProviderのIDです。`dataset_identifier` と
+`resource_identifier` はDatasetと配信単位を区別し、`parameters` はProvider固有の
+非秘密JSON値を保持します。Runtimeやsecretは入れられません。
 
 ```python
-from rhinestone import Config
+from rhinestone import Reference
 
-config = Config("my-stac", {
-    "collection_id": "sentinel-2",
-    "item_id": "scene-1",
-    "asset_key": "visual",
-})
-resource = app.resolve(config)
+reference = Reference(
+    "my-stac",
+    parameters={
+        "collection_id": "sentinel-2",
+        "item_id": "scene-1",
+        "asset_key": "visual",
+    },
+)
+resource = app.load(reference)
 ```
 
 ## `configure()`（アプリケーションを作る）
@@ -108,7 +111,7 @@ Source Runtimeの遅延読み込みには`RuntimeFactory(factory)`を指定し�
 
 Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
 などの HTTP Source へ Credential factory を遅延注入できます。secret 自体は
-Provider、Catalog、Result、Resource には保存されません。`credentialed` では、factory の
+Provider、Catalog、Reference、Resource には保存されません。`credentialed` では、factory の
 評価前に Catalog 由来の endpoint へ送信できることを検証します。
 
 ## `Rhinestone.search()`（データを検索する）
@@ -136,93 +139,75 @@ result = results[0]
 横断した関連度rankingではありません。Provider固有のrankingを扱う場合は
 `results.items()`または`results["provider-id"]`でgroupごとに参照します。
 
-## `Result`（検索結果）
+## 検索結果のResource
 
-検索で見つかった候補です。通常は次のようにResourceへ解決します。
+検索は配信単位の`Resource`を返します。Datasetに複数の配信がある場合は別々の
+Resourceになります。通常は`app.open(resource, library, runtime=...)`、または
+検索コンテキストが付いた`resource.open(library, runtime=...)`を使います。
 
-```python
-resource = result.resolve()
-```
+`title`、`description`、`formats`、`reference`、`metadata`、`provenance`を参照できます。
+発見側の情報は`discovery`に保存され、配信対象の`reference`やtarget metadataと区別されます。
+形式不明や問い合わせが必要な対象は`access_plan=None`です。`open()`はReferenceを
+loadしてから実行し、計画を作れない場合は`ExecutionAdapterUnavailableError`になります。
+URIの拡張子から形式を推測しません。
 
-`title`、`description`、`discovered_by`、`target`、`metadata`、`raw_metadata`、`provenance`、
-`formats`を参照できます。`target`は解決先の`Config`で、`to_config()`でも取得できます。
-`formats`は検索時に宣言された形式の`frozenset[str]`です。`Resource.format`の保証ではありません。
-Coordinatorによる形式照合では、空の場合や`Format`の値へ正規化できない場合に不明として
-扱います。一方、CKAN、PLATEAU、search.ckan.jpのAdapter内照合では、非空の未登録形式
-（例：`xlsx`）は`Format.UNKNOWN`に一致しません。こうした形式を取得する場合は`format`を
-省略して検索し、`result.formats`を確認してください。詳しくは
-[検索能力の対照表](search-capabilities.md)を参照してください。
-
-検索結果の一部条件がSourceで適用されなかった場合や、必須条件不足でSourceがskipされた場合は、`SearchResults.diagnostics`でSourceごとの診断を確認できます。`reason`と`missing_conditions`も参照できます。Providerの通信・metadata・response障害は`reason="provider_failure"`、`failure_type`（`metadata`または`response`）として診断され、他のSourceの結果は継続して返されます。必要なCredentialが未登録の場合は`failure_type="credential"`です。Credential factoryの失敗や予期しないプログラムエラーはこの診断へ変換されません。
-
-`Result.metadata`、`Result.raw_metadata`、`Result.provenance`は検索時の情報です。`app.resolve(result)`は
-cross-source解決後もこれらを`resource.discovery`へ保持し、target Sourceが生成した
-`resource.metadata`、`resource.provenance`、`resource.source.raw_metadata`を上書きしません。
-アプリケーションから独立して作成したResultでは
-`result.resolve()`を使えないため、`app.resolve(result)`を使用してください。
+Provider障害、未対応条件、認証不足などは`SearchResults.diagnostics`で確認できます。
 
 ## `SearchResults`（提供元別の検索結果）
 
-整数index・iterationはProvider順の結果列、sliceは`tuple[Result, ...]`、文字列indexは
+整数index・iterationはProvider順の結果列、sliceは`tuple[Resource, ...]`、文字列indexは
 該当Providerの結果tupleを返します。`keys()`、`values()`、`items()`、`get()`で
 Provider別に参照できます。条件の診断は`diagnostics`、実行したProviderの
 `source_id`・`elapsed_ms`・`result_count`は`executions`で確認できます。
 結果が空でも、Provider障害などの理由を診断から調べられます。
 
-## `Rhinestone.resolve()`（Resourceを確定する）
+## `Rhinestone.load()`（直接参照を読み込む）
 
-`Result`または高度な`Config`をResourceへ解決します。
+`Reference`または計画がまだない`Resource`を読み込みます。既にAccessPlanを持つResourceは
+Providerへ再問い合わせせず、現在のアプリケーションへbindします。発見側の情報は保持します。
 
 ```python
-resource = app.resolve(result)
+resource = app.load(reference)
 ```
 
 ## `Resource`（利用するデータ）
 
-解決済みの具体的なデータです。`uri`、`format`、`media_type`、`metadata`、`provenance`を持ち、Runtimeを明示して開きます。cross-source解決では、発見側の`metadata`、`raw_metadata`、`provenance`が`discovery`に入り、target側の記録と分離されます。
+`uri`、`format`、`media_type`、`metadata`、`provenance`、`reference`、`access_plan`、
+`discovery`を持つ不変の値です。1つのResourceは1つの配信対象を表します。
 
 ```python
 data = resource.open("rasterio", runtime=rasterio)
 ```
 
-ResourceはResolverが候補を一意に選び、明示的な`AccessPlan`を作成した後の値です。
+### Portable Resource
 
-### Portable Result / Resource
+`Resource.to_dict()`は`rhinestone.resource` schema version 3のJSON-safeな値を返します。
+`Resource.from_dict()`の復元値はdetachedです。`app.open(resource, ...)`で実行するか、
+`app.bind(resource)`でコンテキストを付けます。secret、Runtime、openerは転送しません。
+未知のschema/versionやJSON-safeでない値は`ConfigValidationError`になります。
 
-`Result.to_dict()` / `Resource.to_dict()`はversion付きのJSON-safeな値を返します。
-現在の`rhinestone.result`はversion 1、単一AccessPlan契約を含む
-`rhinestone.resource`はversion 2です。credential、runtime、resolver、openerは
-含みません。`Result.from_dict()` / `Resource.from_dict()`で復元した値はdetachedなので、
-別のApplicationで`app.bind(value)`してから`result.resolve()`または
-`resource.open(...)`を利用します。未知のschema/versionやJSON-safeでないraw metadataは
-`ConfigValidationError`として拒否されます。
+## `Rhinestone.plan()`（転送用の実行契約を取得する）
 
-`access_plan.kind`は`file`、`remote-dataset`、`service-query`のいずれかです。
-`AccessPlan`は派生型を持たない単一の値型で、`uri`、`format`、`media_type`、
-`options`、`provider`、`service`、論理credential参照を保持します。
-`to_dict()` / `from_dict()` は `rhinestone.access-plan` schema のversion付きJSON契約を
-生成・検証します。secretやruntime objectは含められません。受信側は実行前に
-`app.open(plan, library, runtime=...)`が `DestinationPolicy.authorize_plan()`で
-URIとtile URLを再認可します。Providerへの問い合わせやResourceの復元は必要ありません。
-redirect先を別途処理する場合も同じpolicyで再認可してください。
-`Resource.open()`はデータ解析を行わず、指定した利用者所有Runtimeへ処理を委譲します。
-
-`library`は必須です。外部Runtimeは`runtime=`へ実体を渡し、`RuntimeFactory`は
-受け付けません。未登録・非互換のAdapterやRuntime不足は
-`ExecutionAdapterUnavailableError`となり、別Runtimeへ自動で切り替えません。
-`json-service`はCoreのRuntimeを使うため`resource.open("json-service")`とし、
-`runtime=`を省略します。この契約は`Rhinestone.open()`にも共通です。
+通常のopenでは明示的なplan取得は不要です。実行を別プロセスへ移す場合は次を使います。
 
 ```python
-from rhinestone.models import AccessPlan
+from rhinestone import AccessPlan
 
-plan = AccessPlan.from_dict(received_json)
-data = app.open(plan, "pyogrio", runtime=pyogrio)
+plan = app.plan(resource)
+payload = plan.to_dict()
+received = AccessPlan.from_dict(payload)
+data = receiving_app.open(received, "pyogrio", runtime=pyogrio)
 ```
 
-受信側のCatalogから許可された送信先とcredential参照を解決します。
-ローカルファイルはProviderなしで実行できます。ネットワーク宛先は受信側の許可設定が必要です。
-既存Resourceを開く経路は従来のnetwork policyを維持します。
+`AccessPlan`は単一の値型で、`kind`（`file`、`remote-dataset`、`service-query`）、
+`uri`、`format`、`media_type`、`options`、`provider`、`service`、論理credential参照を保持します。
+ZIP、entry point、encodingもoptionsに含まれます。secretやRuntimeは入れられません。
+受信側はProviderへ問い合わせず、実行前にURIやtile URLを自身のDestinationPolicyで再認可し、
+論理credential参照を自身のfactoryから解決します。
+
+`library`は必須です。外部Runtimeは`runtime=`へ実体を渡します。非互換・不足の場合は
+`ExecutionAdapterUnavailableError`になり、自動で別Runtimeへ切り替えません。
+`json-service`はCoreのRuntimeを使うため`runtime=`を省略します。
 
 ## `Format` / `FormatPreset`（検索形式）
 
@@ -245,14 +230,24 @@ open成功を保証しません。検索時に形式が設定されないProvide
 利用者へ案内したり再試行したりします。
 
 ```python
+from rhinestone import Reference
 from rhinestone.errors import (
     AmbiguousResourceError,
     ProviderMetadataError,
     ResourceNotFoundError,
 )
 
+reference = Reference(
+    "my-stac",
+    parameters={
+        "collection_id": "sentinel-2",
+        "item_id": "scene-1",
+        "asset_key": "visual",
+    },
+)
+
 try:
-    resource = app.resolve(config)
+    resource = app.load(reference)
 except ResourceNotFoundError:
     print("selection did not match a resource; check provider identifiers")
 except AmbiguousResourceError:
@@ -263,7 +258,7 @@ except ProviderMetadataError:
 
 主な分類は次のとおりです。
 
-- `ConfigValidationError`: Config、検索条件、Catalog、Adapter定義の入力不正
+- `ConfigValidationError`: Reference、検索条件、Catalog、Adapter定義の入力不正
 - `UnsupportedSourceError`: 未構成のSource ID
 - `ProviderMetadataError` / `ProviderResponseError`: 通信・Provider応答の失敗
 - `ResourceNotFoundError` / `AmbiguousResourceError`: Resource選択の失敗
@@ -279,14 +274,11 @@ except ProviderMetadataError:
 
 ## 拡張・Adapter向けAPI
 
-通常利用のトップレベルAPIは、`search`、`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
-`Format`、`FormatPreset`、
-`Result`、`SearchResults`、`Resource`に限定しています。
-Provider固有のSourceを実装したり、実行Adapter・Knowledge Adapterを追加したりする場合は、
-次のサブモジュールを正式な拡張surfaceとして利用してください。
+通常利用のトップレベルAPIは、`search`、`configure`、`Rhinestone`、`Catalog`、`Provider`、
+`ProviderId`、`Reference`、`AccessPlan`、`Format`、`FormatPreset`、`SearchResults`、`Resource`です。
+旧`Config`、`Result`、`Source`、`ResourceCandidate`、`resolve`の互換aliasは提供しません。
 
-- `rhinestone.models`: `Source`、`ResourceCandidate`、`AccessPlan`系、`Metadata`、`Provenance`、
-  `SearchQuery`、`SearchDiagnostic`、`RuntimeFactory`、`Dependencies`などのドメイン型
+- `rhinestone.models`: `Metadata`、`Provenance`、`DiscoveryRecord`、`SearchQuery`、`SearchDiagnostic`、`RuntimeFactory`など
 - `rhinestone.adapters.contracts`: Adapter Definition、Context、Factory、Protocol
 - `rhinestone.adapters.knowledge`: Knowledge AdapterのDefinition、Context、Registry、型
 - `rhinestone.security`: `DestinationPolicy`と宛先ルール
@@ -313,7 +305,7 @@ Execution Adapter がどの format を実行できるかは、各 Adapter の ca
 
 ## `Rhinestone.open()`（データを開く）
 
-Resourceを渡すか、Result/Configを渡して解決とopenを一度に行えます。
+Resourceを渡すか、Resource/Referenceを渡して解決とopenを一度に行えます。
 
 ```python
 data = app.open(result, "rasterio", runtime=rasterio)
@@ -329,6 +321,4 @@ from rhinestone.models import RuntimeFactory
 
 ## 高度なモデル
 
-`Source`、`ResourceCandidate`、`AccessPlan`、`SearchQuery`、`SearchDiagnostic`は、
-`rhinestone.models`経由で利用する拡張・Adapter向けモデルです。`Config`、`Provider`、
-`Result`、`Resource`は通常利用と拡張の両方で使う中核モデルです。
+検索条件や診断、メタデータ、RuntimeFactoryなどは`rhinestone.models`から利用できます。

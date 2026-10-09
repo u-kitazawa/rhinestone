@@ -18,36 +18,38 @@ ZIP 配布物は `archive="zip"` と安全な相対 `entry_point` を明示し�
 
 ```python
 from rhinestone.catalogs import Catalog
-from rhinestone import Config, Provider, configure
+from rhinestone import Reference, Provider, configure
 
 app = configure(
-    catalog=Catalog((
-        Provider(
-            "estat",
-            "estat-gis",
-            {
-                "distributions": [
-                    {
-                        "distribution_id": "census-2020-tokyo-gml",
-                        "dataset_id": "census-2020",
-                        "boundary_kind": "municipality",
-                        "survey_year": 2020,
-                        "level": "municipality",
-                        "region_code": "13",
-                        "format": "GML",
-                        "uri": "https://www.e-stat.go.jp/gis/download/example.gml",
-                        "title": "国勢調査 2020 東京都",
-                    }
-                ]
-            },
-        ),
-    ))
+    catalog=Catalog(
+        (
+            Provider(
+                "estat",
+                "estat-gis",
+                {
+                    "distributions": [
+                        {
+                            "distribution_id": "census-2020-tokyo-gml",
+                            "dataset_id": "census-2020",
+                            "boundary_kind": "municipality",
+                            "survey_year": 2020,
+                            "level": "municipality",
+                            "region_code": "13",
+                            "format": "GML",
+                            "uri": "https://www.e-stat.go.jp/gis/download/example.gml",
+                            "title": "国勢調査 2020 東京都",
+                        }
+                    ]
+                },
+            ),
+        )
+    )
 )
 
-resource = app.resolve(
-    Config(
+resource = app.load(
+    Reference(
         "estat",
-        {
+        parameters={
             "dataset_id": "census-2020",
             "survey_year": 2020,
             "level": "municipality",
@@ -60,11 +62,11 @@ resource = app.resolve(
 
 利用できる selector は `distribution_id`、`dataset_id`、`boundary_kind`、
 `survey_year`、`time`、`time_kind="survey_year"`、`level`、`region_code`、`format` です。
-複数候補が残る場合は Resolver が曖昧さとして扱います。`time` を指定すると共有 Time
+複数候補が残る場合はSource Adapterが曖昧さとして扱います。`time` を指定すると共有 Time
 Knowledge Adapter で解決し、統計調査年として候補を絞ります。
 
 Adapterの`search()`は渡されたインデックス内の`text`と`limit`を扱います。
-`app.search(format=...)`はCoordinatorで絞り込みますが、現行Adapterは`Result.formats`を
+`app.search(format=...)`はCoordinatorで絞り込みますが、現行Adapterは`Resource.formats`を
 設定しないため、形式検索では不明として扱います。特定形式の配布物を解決する場合は
-上記の`Config.settings["format"]`を使ってください。詳細は
+上記の`Reference.parameters["format"]`を使ってください。詳細は
 [検索能力の対照表](../../search-capabilities.md)の「形式検索の適用段階」を参照してください。

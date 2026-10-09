@@ -160,7 +160,7 @@ class CredentialUnavailableError(RhinestoneError):
 
     Register a factory under the exact logical name in
     ``configure(credentials=...)``.  The secret itself is never stored in the
-    Provider, Config, Result, or Resource.
+    Provider, Reference, AccessPlan, or Resource.
     """
 
 

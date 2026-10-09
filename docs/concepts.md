@@ -1,71 +1,42 @@
 # 用語と概念
 
-Rhinestoneの公開メンタルモデルは次のとおりです。
+通常の流れは `search → Resource → open → Data` です。
 
-```text
-Catalog -> Provider -> Result -> Resource
-```
+## CatalogとProvider
 
-## 最初に覚える4つの言葉
+`Catalog`は構成するProviderの一覧です。`Provider`は接続先やサービス固有の設定を持ちます。
+標準構成は`search()`から利用でき、`providers=[ProviderId.GSI]`のように検索対象を限定できます。
+独自の接続先・認証・Adapterを使う場合は`configure()`を使います。
 
-### Catalog（一覧）
+## ResourceとReference
 
-`Catalog`は、Rhinestoneが使う提供元の一覧です。組み込みの一覧と、利用者が追加する提供元を同じ形で扱います。
+検索は配信単位の`Resource`を返します。Datasetの複数の配信は別々のResourceになります。
+ResourceはURI、形式、metadata、provenance、Reference、任意のAccessPlanを保持します。
+`Reference`はProvider、Dataset、配信単位を識別する非秘密の値です。
+既知の対象は`app.load(reference)`で直接読み込めます。
 
-```python
-from rhinestone import configure
-from rhinestone.catalogs import BUILTIN
+発見した場所と配信する場所は同じとは限りません。発見側の記録は`resource.discovery`、
+配信対象は`resource.reference`で区別します。target metadataを読み込んでもdiscoveryは保持します。
 
-app = configure(catalog=BUILTIN)
-```
+## AccessPlan
 
-`BUILTIN`はリポジトリ管理のCatalogです。ProviderはこのCatalogから取得します。
+`AccessPlan`は1つの配信を実行するための契約です。形式、配信方式、ZIPやencodingなどの
+options、論理credential参照を保持します。検索時点で計画がない場合は、open時に
+Referenceから読み込みます。形式が確定しなければ明示的に失敗し、URLから推測しません。
 
-### Provider（提供元）
+通常は計画を意識する必要はありません。別プロセスで実行する場合だけ
+`app.plan(resource) → to_dict() → AccessPlan.from_dict() → receiving_app.open(plan, ...)`
+を使います。受信側が自身の宛先制限と認証設定で再検証します。
 
-`Provider`はデータを提供するサービスや組織です。接続先やサービス固有の設定を持ち、`Catalog`から選びます。
+## RuntimeとCredential
 
-Providerは、利用する提供元の定義です。`Source`とは異なり、通常利用の公開APIではProviderを使います。
+Runtimeは利用者所有の外部ライブラリです。RDFLibなど検索・load用のRuntimeは
+`configure(dependencies=...)`、GDAL、Rasterio、pyogrioなど実行用のRuntimeは
+`open(..., runtime=...)`へ渡します。
+Credentialはsecretを返すfactoryとして構成します。ReferenceやAccessPlanにはsecretを保存しません。
 
-### Result（検索結果）
+## Adapter
 
-`Result`は検索で見つかったデータ候補です。タイトルなどの表示情報と、次に解決するための情報を持ちます。
-
-```python
-result = app.search(text="河川")[0]
-resource = app.resolve(result)
-```
-
-`result.discovered_by`や`result.target`は高度な情報です。提供元をまたいで検索する場合に、検索した場所と実際のデータの場所が異なることを表します。
-
-`SearchQuery`、`to_config()`は高度な内部パイプラインを扱うための名前です。通常の利用では検索パラメータと`Result`だけを使います。
-
-### Resource（利用するデータ）
-
-`Resource`は、URI、形式、メタデータ、アクセス方法が確定したデータです。`open()`でGDALやRasterioなどへ渡せます。
-
-### Runtime（外部ライブラリ）
-
-Runtimeは、Rhinestoneが処理を任せる利用者所有の外部ライブラリです。RDFLibは検索・解決用の
-Source Runtimeで、`configure(dependencies=...)`へ渡します。Source Runtimeを遅延読み込み
-する場合は`RuntimeFactory`を使います。GDAL、Rasterio、pyogrioはデータを開くExecution
-Runtimeで、`open(..., runtime=...)`へ実体を渡します。
-
-### Credential（認証情報）
-
-CredentialはAPI keyやtokenなどの秘密情報です。ProviderやResultへ埋め込まず、アプリケーション構成時にfactoryとして渡します。
-
-## 内部の仕組み
-
-内部では、ProviderをAdapterが解釈して`Source`を作り、`Resolver`が候補から`AccessPlan`と`Resource`を決定します。`Config`は高度な直接解決に使う公開モデルで、`ResourceCandidate`、Resolver、AccessPlan、Execution Adapter Selector、Registryは責務分離のための内部概念です。
-
-```text
-Provider
-  -> Config
-  -> Source
-  -> Resolver
-  -> internal AccessPlan
-  -> Resource
-```
-
-これらはAdapterを追加する場合などに必要ですが、通常の利用では意識する必要はありません。
+Source AdapterはProvider固有の識別子・配信情報をResourceへ変換します。
+Execution AdapterはAccessPlanを解釈して利用者のRuntimeへ渡します。
+CoreはProvider固有の候補選択やデータ解析を行いません。

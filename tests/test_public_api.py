@@ -10,7 +10,6 @@ import rhinestone
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
     Catalog,
-    Config,
     Provider,
     Reference,
     Resource,
@@ -46,7 +45,7 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
         "Catalog",
         "Provider",
         "ProviderId",
-        "Config",
+        "AccessPlan",
         "Reference",
         "SearchResults",
         "Resource",
@@ -57,7 +56,8 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
         "Source",
         "ResourceCandidate",
         "Result",
-        "AccessPlan",
+        "resolve",
+        "Config",
         "Metadata",
         "Provenance",
         "SearchQuery",
@@ -75,10 +75,10 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
     assert all(not hasattr(rhinestone, name) for name in removed)
 
 
-def direct_config() -> Config:
-    return Config(
+def direct_config() -> Reference:
+    return Reference(
         "direct",
-        {
+        parameters={
             "uri": "https://example.test/dataset.tif",
             "format": "geotiff",
             "media_type": "image/tiff",
@@ -90,7 +90,7 @@ def test_direct_and_execution_adapters_are_built_in() -> None:
     runtime = FakeRasterio("opened")
     app = configure()
 
-    resource = app.resolve(direct_config())
+    resource = app.load(direct_config())
 
     assert (
         resource.open("rasterio", runtime=runtime)
@@ -102,7 +102,7 @@ def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
     rasterio = FakeRasterio("rasterio")
     app = configure()
 
-    resource = app.resolve(direct_config())
+    resource = app.load(direct_config())
 
     assert resource.open("rasterio", runtime=rasterio).startswith("rasterio:")
     assert rasterio.calls == ["https://example.test/dataset.tif"]
@@ -134,10 +134,10 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
     app = configure(
         catalog=Catalog((Provider("imagery", "stac", {"endpoint": endpoint}),)),
     )
-    resource = app.resolve(
-        Config(
+    resource = app.load(
+        Reference(
             "imagery",
-            {
+            parameters={
                 "collection_id": "sentinel-2",
                 "item_id": "scene-1",
                 "asset_key": "visual",
@@ -192,10 +192,13 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
 def test_configure_one_source_only_enables_that_source_and_direct() -> None:
     app = configure(catalog=Catalog((BUILTIN[2],)))
 
-    assert app.resolve(Config("gsi", {"id": "std"})).provenance.provider == "gsi"
-    assert app.resolve(direct_config()).provenance.provider == "direct"
+    assert (
+        app.load(Reference("gsi", parameters={"id": "std"})).provenance.provider
+        == "gsi"
+    )
+    assert app.load(direct_config()).provenance.provider == "direct"
     with pytest.raises(UnsupportedSourceError, match="geospatial-jp"):
-        app.resolve(Config("geospatial-jp", {"resource_id": "x"}))
+        app.load(Reference("geospatial-jp", parameters={"resource_id": "x"}))
 
 
 def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
@@ -270,7 +273,7 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
         parameters={"resource_id": "first-resource"},
     )
     assert "endpoint" not in result.reference.parameters
-    resolved = app.resolve(result.reference)
+    resolved = app.load(result.reference)
     assert resolved.provenance.provider == "catalog-a"
     assert resolved.provenance.adapter == "ckan"
     assert any(url.startswith("https://first.test") for url in requests)
@@ -311,7 +314,7 @@ def test_discovery_result_resolves_through_a_different_target_source(
     app = configure(catalog=Catalog((BUILTIN[5],)))
 
     result = app.search(text="river", limit=1)[0]
-    resource = app.resolve(result)
+    resource = app.load(result)
     bound_resource = result
 
     assert result.discovered_by == "search-ckan-jp"
@@ -475,12 +478,12 @@ def test_open_calls_use_the_supplied_runtime_instance() -> None:
     second = configure()
 
     assert (
-        first.resolve(direct_config())
+        first.load(direct_config())
         .open("rasterio", runtime=first_runtime)
         .startswith("first:")
     )
     assert (
-        second.resolve(direct_config())
+        second.load(direct_config())
         .open("rasterio", runtime=second_runtime)
         .startswith("second:")
     )
@@ -490,7 +493,7 @@ def test_concrete_runtime_object_is_accepted_at_open() -> None:
     runtime = FakeRasterio("direct")
     app = configure()
 
-    resource = app.resolve(direct_config())
+    resource = app.load(direct_config())
 
     assert (
         resource.open("rasterio", runtime=runtime)
@@ -505,7 +508,7 @@ def test_configure_rejects_execution_runtime_dependencies(name: str) -> None:
 
 
 def test_open_requires_an_execution_runtime_object() -> None:
-    resource = configure().resolve(direct_config())
+    resource = configure().load(direct_config())
     with pytest.raises(ExecutionAdapterUnavailableError, match="must be supplied"):
         resource.open("rasterio")
     with pytest.raises(ExecutionAdapterUnavailableError, match="must be supplied"):
@@ -523,14 +526,14 @@ def test_callable_dependency_object_is_accepted_without_invoking_it() -> None:
     app = configure()
 
     assert (
-        app.resolve(direct_config()).open("rasterio", runtime=runtime)
+        app.load(direct_config()).open("rasterio", runtime=runtime)
         == "callable:https://example.test/dataset.tif"
     )
 
 
 def test_resource_open_requires_a_library_name() -> None:
     app = configure()
-    resource = app.resolve(direct_config())
+    resource = app.load(direct_config())
 
     with pytest.raises(TypeError):
         resource.open()  # type: ignore[call-arg]
@@ -548,7 +551,7 @@ def test_catalog_provider_and_result_are_the_short_public_path() -> None:
     assert isinstance(BUILTIN[2], Provider)
     assert tuple(catalog) == (BUILTIN[2],)
     result = app.search(text="標準", limit=1)[0]
-    resource = app.resolve(result)
+    resource = app.load(result)
 
     assert result.title == "標準地図"
     assert resource.provenance.provider == "gsi"
@@ -567,7 +570,7 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
     with pytest.raises(TypeError, match="either query or search parameters"):
         app.search("dataset", text="dataset")
 
-    resource = app.resolve(direct_config())
+    resource = app.load(direct_config())
     assert (
         app.open(resource, "rasterio", runtime=runtime)
         == "runtime:https://example.test/dataset.tif"
@@ -577,7 +580,7 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
         == "runtime:https://example.test/dataset.tif"
     )
 
-    result: Resource = app.resolve(direct_config())
+    result: Resource = app.load(direct_config())
     assert (
         app.open(result, "rasterio", runtime=runtime)
         == "runtime:https://example.test/dataset.tif"

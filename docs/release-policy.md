@@ -15,7 +15,7 @@ Rhinestoneは現在`0.1.x`のAlphaです。この文書は、利用者がアッ�
 - [対応状況](compatibility.md)および各Adapterリファレンスに記載された利用方法
 
 `src/rhinestone/`に存在することだけでは、公開APIであることを意味しません。`_`で始まるmoduleや名前、
-Resolver、Registry、Adapterの内部実装は、公開ドキュメントで明示されない限り内部APIです。`Config`などの
+Registry、Adapterの内部実装は、公開ドキュメントで明示されない限り内部APIです。`Reference`などの
 トップレベル中核APIと、各サブモジュールの`__all__`に含まれる拡張APIは、それぞれのsurfaceの契約に従います。
 内部実装を直接利用したコードの互換性は保証しません。
 
@@ -147,3 +147,11 @@ adapter = CkanAdapter(
     credentials=CredentialRegistry({"catalog-key": lambda: token}),
 )
 ```
+
+## developのReference / Resource移行
+
+通常フローは`search → open(Resource)`です。旧`Config`、`Result`、`Source`、
+`ResourceCandidate`、`resolve()`は削除し、互換aliasを提供しません。
+直接指定は`app.load(Reference(...))`、転送は`app.plan(resource)`と
+`AccessPlan.to_dict()` / `from_dict()`を使います。`AccessPlan`はトップレベルからimportできます。
+Resourceのportable schemaはversion 3です。旧versionは拒否します。

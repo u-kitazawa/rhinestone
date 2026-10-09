@@ -47,7 +47,7 @@ for index, result in enumerate(results):
     print("    formats:", sorted(result.formats))
 
 selected = results[int(os.environ.get("RHINESTONE_CKAN_RESULT_INDEX", "0"))]
-resource = app.resolve(selected)
+resource = app.load(selected)
 frame = resource.open("pyogrio", runtime=pyogrio)
 
 print("resource:", resource.uri)
@@ -60,7 +60,7 @@ CKANのpackage検索はdataset単位の結果をdistributionごとに展開し�
 `FormatPreset.PYOGRIO`で、対象Resourceが宣言するベクター形式だけを選びます。
 raw metadataを利用者側で解釈したり、別Resourceの形式を流用したりする必要はありません。
 CKAN Adapterは形式照合後の結果に`limit=20`を適用し、必要なら次のpackage pageを取得します。
-`Result.formats`で検索時の形式を確認できます。その後の `app.resolve(selected)`で配布URLを取得し、
+`Resource.formats`で検索時の形式を確認できます。その後の `app.load(selected)`で配布URLを取得し、
 `resource.open("pyogrio", runtime=pyogrio)`が選択済みURIをpyogrioへ渡します。ZIP の場合は、選択済みの
 `archive` と任意の `entry_point` から GDAL VSI URI を組み立てます。
 利用者が所有する実体は`resource.open("pyogrio", runtime=pyogrio)`へ明示的に渡します。導入方法と

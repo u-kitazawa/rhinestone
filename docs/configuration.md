@@ -19,24 +19,30 @@ app = configure(catalog=BUILTIN)
 from rhinestone import Catalog, configure
 from rhinestone.catalogs import BUILTIN
 
-app = configure(catalog=Catalog((
-    BUILTIN.providers[0],
-    BUILTIN.providers[2],
-)))
+app = configure(
+    catalog=Catalog(
+        (
+            BUILTIN.providers[0],
+            BUILTIN.providers[2],
+        )
+    )
+)
 ```
 
 ## 独自の提供元を追加する
 
 ```python
-from rhinestone import Catalog, Provider, configure
+from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
 
-catalog = Catalog((
-    Provider(
-        id="my-stac",
-        adapter_type="stac",
-        settings={"endpoint": "https://stac.example/api"},
-    ),
-))
+catalog = Catalog(
+    (
+        Provider(
+            id="my-stac",
+            adapter_type="stac",
+            settings={"endpoint": "https://stac.example/api"},
+        ),
+    )
+)
 app = configure(catalog=catalog)
 ```
 
@@ -57,15 +63,18 @@ from rhinestone.adapters.contracts import (
 
 catalog = Catalog((Provider("example", "example-source"),))
 
+
 class ExampleSource:
-    def load(self, config):
-        ...  # Source を返す
+    def load(self, reference: Reference) -> Resource: ...
+
 
 class ExampleExecution:
     name = "example-runtime"
     priority = 100
-    def supports(self, resource): ...
-    def open(self, resource, runtime, *, destination_policy=None): ...
+
+    def supports(self, plan: AccessPlan) -> bool: ...
+    def open(self, plan: AccessPlan, runtime, *, destination_policy=None): ...
+
 
 app = configure(
     catalog=catalog,
@@ -92,7 +101,10 @@ DestinationPolicyを渡します。Execution Runtimeは`open(..., runtime=...)`�
 
 ```python
 from rhinestone import configure
-from rhinestone.adapters.knowledge import KnowledgeAdapterDefinition, StandardTimeAdapter
+from rhinestone.adapters.knowledge import (
+    KnowledgeAdapterDefinition,
+    StandardTimeAdapter,
+)
 
 app = configure(
     adapters=(
@@ -158,6 +170,7 @@ secretはCatalogやProviderに保存せず、Credential factoryとして渡し�
 
 ```python
 from rhinestone.catalogs import BUILTIN
+
 app = configure(
     catalog=BUILTIN,
     credentials={
@@ -170,14 +183,18 @@ app = configure(
 指定します。
 
 ```python
-catalog = Catalog((Provider(
-    id="private-stac",
-    adapter_type="stac",
-    settings={
-        "endpoint": "https://stac.example/api",
-        "credential": "stac-token",
-    },
-),))
+catalog = Catalog(
+    (
+        Provider(
+            id="private-stac",
+            adapter_type="stac",
+            settings={
+                "endpoint": "https://stac.example/api",
+                "credential": "stac-token",
+            },
+        ),
+    )
+)
 app = configure(
     catalog=catalog,
     credentials={"stac-token": lambda: os.environ["STAC_TOKEN"]},
@@ -196,4 +213,4 @@ CredentialRegistryへ登録したfactoryから取得します。`api_token`／`a
 
 ## 高度なAPI
 
-`Config`、Source Adapter、Resolver、AccessPlanは内部パイプラインを直接扱う高度なAPIです。通常の検索・解決では`Result`を`app.resolve()`へ渡してください。
+通常は検索したResourceを`app.open()`へ渡します。既知の対象は`app.load(Reference(...))`、実行契約の転送は`app.plan(resource)`を使います。

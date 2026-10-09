@@ -83,7 +83,7 @@ class SearchResults(Sequence[Resource]):
         diagnostics: Iterable[SearchDiagnostic] = (),
         executions: Iterable[SearchExecution] = (),
     ) -> "SearchResults":
-        """Build immutable results from source-grouped Result tuples."""
+        """Build immutable results from source-grouped Resource tuples."""
         return cls(grouped, diagnostics, executions)
 
     @property

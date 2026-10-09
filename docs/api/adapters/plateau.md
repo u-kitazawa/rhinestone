@@ -14,6 +14,6 @@ G空間情報センター全体を検索します。endpointの共有は、検�
 
 Adapterを直接構築する内部テストや再利用用途では、transport callbackをconstructorへ注入できます。標準の`configure()`経路で利用者がHTTP callbackを登録する必要はありません。
 
-ZIP の `entry_point` は安全な相対パスでなければなりません。候補の選択は Resolver が行い、市区町村・年度から配布物を推測しません。
+ZIP の `entry_point` は安全な相対パスでなければなりません。候補の選択はSource Adapterが行い、市区町村・年度から配布物を推測しません。
 
 CityGML の ZIP member を明示して GDAL で開く例は、リポジトリ checkout の `examples/09_plateau_citygml/README.md` にあります。

@@ -1,7 +1,7 @@
 # SearchCkanJpAdapter（横断CKAN検索アダプター）
 
 `SearchCkanJpAdapter` は search.ckan.jp Backend API を使って複数のCKANカタログを検索し、
-元の配布物を解決する `Result` を返します。
+元の配布物を解決する `Resource` を返します。
 
 [Source Adapter 一覧](../source-adapters.md) · source type: `search-ckan-jp`
 
@@ -63,8 +63,8 @@ results = search(
 記載しています。通信先のメタデータ、収集時期、索引によって検索結果は変わります。
 
 このSourceはDiscovery専用です。検索結果の `target` は元の配布URL、形式、metadataを持つ
-`direct` Configに設定されるため、通常どおり `app.resolve(result)` または `result.resolve()`
-でResourceへ解決できます。`Config("search-ckan-jp", ...)` を直接解決することはできません。
+`direct` Configに設定されるため、通常どおり `app.load(result)` または `resource.open(...)`
+でResourceへ解決できます。`Reference("search-ckan-jp", ...)` を直接解決することはできません。
 
 検索結果には検索元の `metadata`、`raw_metadata`、`provenance` が保持されます。解決先が
 `direct` の場合、これらは `Resource.discovery` に保存され、配布物側のmetadataやprovenance

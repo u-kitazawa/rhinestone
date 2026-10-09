@@ -18,10 +18,14 @@ URL、形式、runtime は推測しません。
 ## 最小例
 
 ```python
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
+
 app = configure()
-resource = app.resolve(
-    Config("direct", {"uri": "https://example.invalid/data.geojson", "format": "geojson"})
+resource = app.load(
+    Reference(
+        "direct",
+        parameters={"uri": "https://example.invalid/data.geojson", "format": "geojson"},
+    )
 )
 ```
 

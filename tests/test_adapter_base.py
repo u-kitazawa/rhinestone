@@ -26,7 +26,7 @@ from rhinestone.errors import (
     ProviderMetadataError,
     ProviderResponseError,
 )
-from rhinestone.models import Config, Reference, Resource
+from rhinestone.models import Reference, Resource
 
 ADAPTER_PACKAGES = (
     "source/ckan",
@@ -52,8 +52,8 @@ class ProbeAdapter(ProviderAdapter):
     def load(self, reference: Reference) -> Resource:
         raise NotImplementedError
 
-    def settings(self, config: Config) -> Mapping[str, Any]:
-        return self._reference_parameters(Reference.from_config(config))
+    def settings(self, config: Reference) -> Mapping[str, Any]:
+        return self._reference_parameters(config)
 
     def endpoint(self, settings: Mapping[str, Any]) -> str:
         return self._endpoint_from(settings)
@@ -80,9 +80,12 @@ def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
 
     assert adapter.endpoint({}) == "https://example.test"
     assert adapter.required({"id": "known"}, "id") == "known"
-    assert adapter.settings(Config("probe", {"id": "known"}))["id"] == "known"
+    assert (
+        adapter.settings(Reference("probe", parameters={"id": "known"}))["id"]
+        == "known"
+    )
     with pytest.raises(ConfigValidationError, match="Provider"):
-        adapter.settings(Config("other", {}))
+        adapter.settings(Reference("other", parameters={}))
     with pytest.raises(ConfigValidationError, match="endpoint"):
         ProbeAdapter(lambda url, params: {}).endpoint({})
     for endpoint in ("https://exa mple/api", "https://%ZZ/api"):

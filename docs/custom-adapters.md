@@ -1,6 +1,6 @@
 # Custom Adapter を作る
 
-Rhinestone の Adapter は、Provider 固有の情報を共通の `Source` へ変換する Source
+Rhinestone の Adapter は、Provider 固有の情報を配信単位の `Resource` へ変換する Source
 Adapter と、解決済みの `Resource` を外部 Runtime へ渡す Execution Adapter に分かれます。
 どちらも `configure(adapters=...)` へ明示登録します。組み込み Adapter も
 「あらかじめ登録された Definition」として同じ Registry に追加されるため、Custom Adapter
@@ -8,11 +8,11 @@ Adapter と、解決済みの `Resource` を外部 Runtime へ渡す Execution A
 な登録は行いません。
 
 ```text
-Provider / Config
+Provider / Reference
       ↓
 SourceAdapter
       ↓
-Source → Resolver → Resource
+Resource (Reference + AccessPlan)
                          ↓
                   ExecutionAdapter → user runtime
 ```
@@ -23,12 +23,12 @@ Source → Resolver → Resource
 Source Adapter を複数の Provider に再利用できます。
 
 ```python
-from rhinestone import Catalog, Config, Provider, configure
+from rhinestone import Catalog, Reference, Provider, configure
 from rhinestone.adapters.contracts import (
     ExecutionAdapterDefinition,
     SourceAdapterDefinition,
 )
-from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
+from rhinestone.models import AccessPlan, Metadata, Provenance, Resource
 
 
 class ExampleSource:
@@ -36,40 +36,42 @@ class ExampleSource:
         self.provider = provider
         self.context = context
 
-    def load(self, config):
-        # Config.settings を検証し、provider の応答を Source に変換する。
-        return Source(
-            metadata=Metadata(title=config.settings["title"]),
-            candidates=(ResourceCandidate(
-                uri="https://data.example/items/example.geojson",
+    def load(self, reference):
+        uri = "https://data.example/items/example.geojson"
+        return Resource(
+            reference=reference,
+            uri=uri,
+            format="geojson",
+            media_type="application/geo+json",
+            metadata=Metadata(title=reference.parameters["title"]),
+            provenance=Provenance(provider=self.provider.id),
+            access_plan=AccessPlan(
+                kind="file",
+                uri=uri,
                 format="geojson",
-                media_type="application/geo+json",
-            ),),
-            capabilities=frozenset(),
-            provenance=Provenance(
                 provider=self.provider.id,
-                adapter="example-source",
-                original_url="https://data.example/items/example.geojson",
+                media_type="application/geo+json",
             ),
-            raw_metadata={"title": config.settings["title"]},
         )
 
 
 catalog = Catalog((Provider("example", "example-source"),))
 app = configure(
     catalog=catalog,
-    adapters=(SourceAdapterDefinition(
-        "example-source",
-        lambda provider, context: ExampleSource(provider, context),
-    ),),
+    adapters=(
+        SourceAdapterDefinition(
+            "example-source",
+            lambda provider, context: ExampleSource(provider, context),
+        ),
+    ),
 )
 
-resource = app.resolve(Config("example", {"title": "Example"}))
+resource = app.load(Reference("example", parameters={"title": "Example"}))
 ```
 
-Source Adapter は `load(config) -> Source` を必ず実装します。Source の候補が複数ある
-場合の選択は Adapter ではなく Resolver の責務です。Adapter は URL や形式を推測せず、
-判断できない場合は専用のエラーを送出してください。
+Source Adapter は `load(reference) -> Resource` を必ず実装します。選択と配信形式の
+解釈はAdapterの責務です。複数候補が残る場合は`AmbiguousResourceError`、0件なら
+`ResourceNotFoundError`を返します。URLや形式を推測しません。
 
 ## SourceAdapterContext（提供元アダプターへ渡す情報）
 
@@ -107,7 +109,7 @@ app = configure(
 
 Runtime Factory は `configure()` 時には評価されず、Adapter が
 `context.dependencies.get("rdflib")` を呼んだ時に初めて評価されます。Runtime 実体と
-Credential secret は `Provider`、`Config`、`Source`、`Resource` に保存しません。
+Credential secret は `Provider`、`Reference`、`AccessPlan`、`Resource` に保存しません。
 
 外部 Adapter の安定した拡張境界は `rhinestone.adapters.contracts` の Definition と
 Context、および `rhinestone.adapters.ports` の Port です。内部 Registry の storage、
@@ -154,13 +156,13 @@ class SearchableExampleSource(ExampleSource):
     required_search_conditions = frozenset()
 
     def search(self, query: SearchQuery):
-        # provider の公式検索 API を呼び、Result の tuple を返す。
+        # provider の公式検索 API を呼び、Resource の tuple を返す。
         # Item 単位の診断がある場合は ProviderSearchResults を返す。
         ...
 ```
 
-`SearchableSourceAdapter.search()` の戻り値は `tuple[Result, ...] | ProviderSearchResults` です。
-`ProviderSearchResults(results=(...), diagnostics=(...))` により、取得できたResultと
+`SearchableSourceAdapter.search()` の戻り値は `tuple[Resource, ...] | ProviderSearchResults` です。
+`ProviderSearchResults(results=(...), diagnostics=(...))` により、取得できたResourceと
 Item単位の診断を同じ呼び出しで返せます。例えば対象Itemに選択可能な配布物がない場合は、
 `SearchDiagnostic(source_id="adapter-type", skipped_conditions=frozenset(),
 reason="item_skipped", resource_identifier="item-id", detail="missing_data_asset")`
@@ -172,10 +174,10 @@ reason="item_skipped", resource_identifier="item-id", detail="missing_data_asset
 場合だけ、そのProviderをskipします。Provider 横断の
 ranking は行わないため、Adapter は provider 固有の結果順を保ちます。
 
-検索結果の `target` は通常の `Config` に戻せる形にし、`metadata` と `provenance` を
+検索結果の `target` は通常の `Reference` に戻せる形にし、`metadata` と `provenance` を
 失わないようにします。検索を実装しない Adapter は `load()` だけで利用できます。
 
-形式検索に対応するには、対象データの宣言済み形式を`Result.formats`へ保持します。
+形式検索に対応するには、対象データの宣言済み形式を`Resource.formats`へ保持します。
 `search_conditions`に`format`を宣言しなければ、Coordinatorが結果を絞り込み、
 その後に`limit`を適用します。`format`を宣言する場合は、AdapterがOR照合、Preset展開、
 `Format.UNKNOWN`の明示指定、照合後の`limit`を扱います。
@@ -201,10 +203,12 @@ class ExampleExecution:
 
 app = configure(
     catalog=catalog,
-    adapters=(ExecutionAdapterDefinition(
-        "example-runtime",
-        lambda context: ExampleExecution(),
-    ),),
+    adapters=(
+        ExecutionAdapterDefinition(
+            "example-runtime",
+            lambda context: ExampleExecution(),
+        ),
+    ),
 )
 
 data = app.open(resource, "example-runtime", runtime=example_runtime)

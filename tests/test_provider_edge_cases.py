@@ -6,7 +6,7 @@ from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
 from rhinestone.adapters.source.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
-from rhinestone.models import Config, Reference, SearchQuery
+from rhinestone.models import Reference, SearchQuery
 from tests.provider_support import RecordingJsonClient
 
 
@@ -20,7 +20,7 @@ def test_ckan_rejects_missing_result_and_nonstandard_conditions() -> None:
     )
 
     with pytest.raises(ProviderResponseError, match="result"):
-        adapter.load(Reference.from_config(Config("ckan", {"resource_id": "one"})))
+        adapter.load(Reference("ckan", parameters={"resource_id": "one"}))
     with pytest.raises(ConfigValidationError, match="bbox"):
         adapter.search(SearchQuery(bbox=(0.0, 0.0, 1.0, 1.0)))
 
@@ -37,9 +37,7 @@ def test_ckan_handles_unstructured_error_and_optional_metadata() -> None:
     )
     with pytest.raises(ProviderResponseError, match="unknown"):
         failure.load(
-            Reference.from_config(
-                Config("ckan", {"endpoint": endpoint, "resource_id": "one"})
-            )
+            Reference("ckan", parameters={"endpoint": endpoint, "resource_id": "one"})
         )
 
     client = RecordingJsonClient(
@@ -52,9 +50,7 @@ def test_ckan_handles_unstructured_error_and_optional_metadata() -> None:
         }
     )
     source = CkanAdapter(get_json=client).load(
-        Reference.from_config(
-            Config("ckan", {"endpoint": endpoint, "resource_id": "one"})
-        )
+        Reference("ckan", parameters={"endpoint": endpoint, "resource_id": "one"})
     )
     assert source.metadata.publisher is None
     assert source.format is None
@@ -121,16 +117,14 @@ def test_stac_asset_without_media_type_remains_explicitly_unknown() -> None:
     )
 
     source = StacAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "stac",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": "c",
-                    "item_id": "i",
-                    "asset_key": "data",
-                },
-            )
+        Reference(
+            "stac",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": "c",
+                "item_id": "i",
+                "asset_key": "data",
+            },
         )
     )
 
@@ -152,16 +146,14 @@ def test_stac_plain_tiff_media_type_maps_to_geotiff() -> None:
     )
 
     source = StacAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "stac",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": "c",
-                    "item_id": "i",
-                    "asset_key": "data",
-                },
-            )
+        Reference(
+            "stac",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": "c",
+                "item_id": "i",
+                "asset_key": "data",
+            },
         )
     )
 
@@ -186,11 +178,13 @@ def test_ogc_serializes_interval_and_preserves_explicit_feature_id() -> None:
         endpoint=endpoint, collection_id="rivers", get_json=client
     )
     source = adapter.load(
-        Reference.from_config(
-            Config(
-                "ogc-features",
-                {"endpoint": endpoint, "collection_id": "rivers", "feature_id": "r1"},
-            )
+        Reference(
+            "ogc-features",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": "rivers",
+                "feature_id": "r1",
+            },
         )
     )
     assert source.uri == items_url + "/r1"

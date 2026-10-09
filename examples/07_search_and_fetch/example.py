@@ -20,7 +20,7 @@ for source_id, results in grouped.items():
 
 source_id = "geospatial-jp"
 selected = grouped[source_id][0]
-resource = selected.resolve()
+resource = selected
 print("selected resource:", resource.uri)
 print("metadata:", resource.metadata)
 print("provenance:", resource.provenance)

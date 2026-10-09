@@ -1,12 +1,12 @@
 """Inspect the knowledge retained by a resolved Resource."""
 
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
 
 app = configure()
-resource = app.resolve(
-    Config(
-        source_id="direct",
-        settings={
+resource = app.load(
+    Reference(
+        provider_id="direct",
+        parameters={
             "uri": "https://example.invalid/rivers.zip",
             "format": "shapefile",
             "media_type": "application/zip",

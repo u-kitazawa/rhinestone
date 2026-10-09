@@ -6,7 +6,7 @@
 
 ## 設定と検索
 
-Provider の `settings` へ `endpoint`、Config へ `collection_id`、`item_id`、`asset_key` を指定します。検索には `bbox`、`time`、`limit` を使えます。
+Provider の `settings` へ `endpoint`、Reference へ `collection_id`、`item_id`、`asset_key` を指定します。検索には `bbox`、`time`、`limit` を使えます。
 
 `collection_id` と `item_id` は未エンコードの論理IDとして指定します。RhinestoneはHTTP requestを組み立てる際に各IDを1つのpath segmentとしてpercent-encodeします。既にエンコードされたように見える値も推測で復号しないため、例えば論理IDの`%2F`はrequest pathでは`%252F`になります。`.`と`..`だけのIDもpath traversalとして正規化されないようエンコードします。Metadataとprovenanceには元の論理IDを保持します。
 
@@ -22,23 +22,28 @@ Assetの`href`がrelative URI referenceの場合は、そのAssetを含むItem r
 from rhinestone.catalogs import Catalog
 import rasterio
 
-from rhinestone import Config, Provider, configure
+from rhinestone import Reference, Provider, configure
 
 app = configure(
-    catalog=Catalog((
-        Provider(
-            id="imagery",
-            adapter_type="stac",
-            settings={"endpoint": "https://stac.example/api"},
-        ),
-    )),
+    catalog=Catalog(
+        (
+            Provider(
+                id="imagery",
+                adapter_type="stac",
+                settings={"endpoint": "https://stac.example/api"},
+            ),
+        )
+    ),
 )
-resource = app.resolve(
-    Config("imagery", {
-        "collection_id": "collection-id",
-        "item_id": "item-id",
-        "asset_key": "asset-key",
-    })
+resource = app.load(
+    Reference(
+        "imagery",
+        parameters={
+            "collection_id": "collection-id",
+            "item_id": "item-id",
+            "asset_key": "asset-key",
+        },
+    )
 )
 with resource.open("rasterio", runtime=rasterio) as dataset:
     print(dataset.width, dataset.height)

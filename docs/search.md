@@ -83,12 +83,20 @@ CKANに`ckanext-spatial`の`spatial_query`が導入されていることを確�
 from rhinestone.catalogs import Catalog
 from rhinestone import Provider, configure
 
-app = configure(catalog=Catalog((
-    Provider("spatial-catalog", "ckan", {
-        "endpoint": "https://example.org",
-        "spatial_search": True,
-    }),
-)))
+app = configure(
+    catalog=Catalog(
+        (
+            Provider(
+                "spatial-catalog",
+                "ckan",
+                {
+                    "endpoint": "https://example.org",
+                    "spatial_search": True,
+                },
+            ),
+        )
+    )
+)
 results = app.search(text="河川", area="神奈川県")
 ```
 
@@ -193,7 +201,7 @@ data = app.open(resource, "rasterio", runtime=rasterio)
 
 国交DPFのnative targetは、取得先ProviderのReferenceと`access_plan=None`を返します。
 `app.open(resource, ...)`はReferenceから対象を取得して実行し、DPFのDiscoveryRecordを保持します。
-取得先への明示的な問い合わせには`app.resolve(resource)`を使えます。
+取得先への明示的な問い合わせには`app.load(resource)`を使えます。
 解決後のResourceや、検索時点でAccessPlanが確定したResourceは
 `resource.open("rasterio", runtime=rasterio)`でも開けます。
 未確定Resourceの`resource.open()`は取得先へ問い合わせず、明示的に失敗します。

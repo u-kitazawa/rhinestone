@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
 from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailableError
 from rhinestone.models import AccessPlan, DiscoveryRecord, Resource
 
@@ -15,10 +15,10 @@ class FakeRasterio:
         return "opened:" + uri
 
 
-def direct_config() -> Config:
-    return Config(
+def direct_config() -> Reference:
+    return Reference(
         "direct",
-        {
+        parameters={
             "uri": "https://example.test/data.tif",
             "format": "geotiff",
             "media_type": "image/tiff",
@@ -27,7 +27,7 @@ def direct_config() -> Config:
 
 
 def portable_resource() -> Resource:
-    original = configure().resolve(direct_config())
+    original = configure().load(direct_config())
     return replace(
         original,
         local_path="/tmp/cache/data.tif",

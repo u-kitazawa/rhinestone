@@ -7,8 +7,8 @@ import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
-    Config,
     Provider,
+    Reference,
     configure,
 )
 from rhinestone.adapters.execution.json_service import JsonServiceAdapter
@@ -19,7 +19,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
 )
-from rhinestone.models import AccessPlan, Reference, SearchQuery
+from rhinestone.models import AccessPlan, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from rhinestone.security import DestinationPolicy, DestinationRule
 from tests.provider_support import fixture_json
@@ -229,7 +229,9 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
             "odpt": lambda: factory_calls.append(True) or "secret",
         },
     )
-    resource = app.resolve(Config("odpt", {"dataset": "station", "credential": "odpt"}))
+    resource = app.load(
+        Reference("odpt", parameters={"dataset": "station", "credential": "odpt"})
+    )
     plan = resource.access_plan
     assert plan is not None
     tampered_plan = replace(
@@ -279,8 +281,10 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry(
         credentials={"key": lambda: "secret"},
     )
 
-    resource = app.resolve(
-        Config("private-odpt", {"dataset": "station", "credential": "key"})
+    resource = app.load(
+        Reference(
+            "private-odpt", parameters={"dataset": "station", "credential": "key"}
+        )
     )
 
     assert resource.open("json-service") == []
@@ -457,7 +461,9 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
             "odpt": lambda: credential_calls.append(True) or "secret",
         },
     )
-    resource = app.resolve(Config("odpt", {"dataset": "station", "credential": "odpt"}))
+    resource = app.load(
+        Reference("odpt", parameters={"dataset": "station", "credential": "odpt"})
+    )
     metadata_url = "https://maps.gsi.go.jp/development/ichiran.html"
     assert resource.access_plan is not None
     tampered = replace(
@@ -579,10 +585,13 @@ def test_configured_source_endpoint_cannot_be_overridden(
     )
 
     with pytest.raises(ConfigValidationError, match="managed"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "protected",
-                {"endpoint": "https://evil.example", "resource_id": "resource-1"},
+                parameters={
+                    "endpoint": "https://evil.example",
+                    "resource_id": "resource-1",
+                },
             )
         )
     assert calls == []
@@ -620,18 +629,14 @@ def test_source_credential_configuration_is_validated() -> None:
         get_json=lambda url, params: {}, endpoint="https://known.example"
     )
     with pytest.raises(ConfigValidationError, match="should be non-empty"):
-        adapter.load(
-            Reference.from_config(Config("ckan", {"endpoint": "", "resource_id": "x"}))
-        )
+        adapter.load(Reference("ckan", parameters={"endpoint": "", "resource_id": "x"}))
     with pytest.raises(ConfigValidationError, match="non-empty string"):
         adapter._endpoint_from({"endpoint": 1})  # type: ignore[reportPrivateUsage]
     with pytest.raises(ConfigValidationError, match="managed"):
         adapter.load(
-            Reference.from_config(
-                Config(
-                    "ckan",
-                    {"endpoint": "https://evil.example", "resource_id": "x"},
-                )
+            Reference(
+                "ckan",
+                parameters={"endpoint": "https://evil.example", "resource_id": "x"},
             )
         )
 
@@ -641,9 +646,9 @@ def test_configure_supports_none_network_policy() -> None:
         def open(self, uri: str, driver: str | None = None) -> str:
             return uri
 
-    config = Config(
+    config = Reference(
         "direct",
-        {"uri": "https://unlisted.example/data.tif", "format": "geotiff"},
+        parameters={"uri": "https://unlisted.example/data.tif", "format": "geotiff"},
     )
     unrestricted = configure(network_policy="none")
     assert (

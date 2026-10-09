@@ -43,7 +43,7 @@ def test_lineage_showcase_keeps_discovery_and_resolution_records_separate() -> N
     for marker in (
         'provider.id == "search-ckan-jp"',
         "item.discovered_by != item.reference.provider_id",
-        "resource = app.resolve(result)",
+        "resource = app.load(result)",
         "resource.discovery is None",
         "discovery.provenance.provider",
         "resource.provenance.provider",
@@ -59,7 +59,7 @@ def test_lineage_showcase_pins_setup_compiles_and_keeps_no_output() -> None:
     notebook = load_notebook()
     source = notebook_source(notebook)
 
-    assert "@697e70d812c06e9a0417d1eb86014c0b18e4a8a5" in source
+    assert "@9ebdbf37126d264de0e38cc71e802b08516e376d" in source
     assert "@develop" not in source
     assert "access_token" not in serialized.casefold()
     assert "authorization" not in serialized.casefold()
