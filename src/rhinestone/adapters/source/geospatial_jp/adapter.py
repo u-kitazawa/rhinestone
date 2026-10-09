@@ -6,7 +6,7 @@ from itertools import zip_longest
 from typing import Any, cast
 
 from ....errors import ConfigValidationError, ProviderResponseError
-from ....models import Config, Result, SearchQuery, Source
+from ....models import Reference, Resource, SearchQuery
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
 from ..base import JsonObject
 from ..ckan import CkanAdapter
@@ -189,16 +189,23 @@ class GeospatialJpAdapter(CkanAdapter):
     adapter_type = "geospatial-jp"
     search_conditions = frozenset({"text", "area", "format", "limit"})
 
-    def load(self, config: Config) -> Source:
-        source = super().load(config)
+    def load(self, reference: Reference) -> Resource:
+        resource = super().load(reference)
         return replace(
-            source,
+            resource,
             provenance=replace(
-                source.provenance, provider=self.adapter_type, adapter=self.adapter_type
+                resource.provenance,
+                provider=self.adapter_type,
+                adapter=self.adapter_type,
+            ),
+            access_plan=(
+                None
+                if resource.access_plan is None
+                else replace(resource.access_plan, provider=self.adapter_type)
             ),
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
         if unsupported:
@@ -220,7 +227,7 @@ class GeospatialJpAdapter(CkanAdapter):
         )
         seen_packages: set[str] = set()
         seen_resources: set[str] = set()
-        found: list[Result] = []
+        found: list[Resource] = []
         for stage in stages:
             offsets = [0] * len(stage)
             active = [True] * len(stage)
@@ -262,9 +269,9 @@ class GeospatialJpAdapter(CkanAdapter):
                         -len(_tags(item[0]) & set(terms)),
                     )
                 )
-                groups: list[list[Result]] = []
+                groups: list[list[Resource]] = []
                 for package, request in candidates:
-                    group: list[Result] = []
+                    group: list[Resource] = []
                     for resource in self._objects(
                         package.get("resources"), "CKAN resources"
                     ):
@@ -284,11 +291,18 @@ class GeospatialJpAdapter(CkanAdapter):
                                     adapter=self.adapter_type,
                                     query_parameters=request,
                                 ),
+                                access_plan=(
+                                    None
+                                    if item.access_plan is None
+                                    else replace(
+                                        item.access_plan, provider=self.adapter_type
+                                    )
+                                ),
                             )
                         )
                     groups.append(group)
                 for row in zip_longest(*groups, fillvalue=None):
-                    for item in cast(tuple[Result | None, ...], row):
+                    for item in cast(tuple[Resource | None, ...], row):
                         if item is None:
                             continue
                         found.append(item)

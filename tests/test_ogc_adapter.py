@@ -2,7 +2,7 @@ import pytest
 
 from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
-from rhinestone.models import Config, SearchQuery
+from rhinestone.models import Config, Reference, SearchQuery
 from tests.provider_support import (
     RecordingJsonClient,
     ResponseJsonClient,
@@ -16,20 +16,20 @@ def test_ogc_collection_items_link_becomes_service_resource() -> None:
     client = RecordingJsonClient({collection_url: fixture_json("ogc/collection.json")})
     adapter = OgcFeaturesAdapter(get_json=client)
     source = adapter.load(
-        Config(
-            "ogc-features",
-            {"endpoint": endpoint, "collection_id": "rivers"},
+        Reference.from_config(
+            Config(
+                "ogc-features",
+                {"endpoint": endpoint, "collection_id": "rivers"},
+            )
         )
     )
     assert client.calls == [(collection_url, {})]
     assert source.metadata.title == "Rivers"
-    assert (
-        source.candidates[0].uri == "https://features.example/collections/rivers/items"
-    )
-    assert source.candidates[0].media_type == "application/geo+json"
-    assert source.candidates[0].format == "ogc-api-features"
+    assert source.uri == "https://features.example/collections/rivers/items"
+    assert source.media_type == "application/geo+json"
+    assert source.format == "ogc-api-features"
     assert source.provenance.dataset_identifier == "rivers"
-    assert source.raw_metadata["extent"]["spatial"]["bbox"][0] == (
+    assert source.metadata.raw["extent"]["spatial"]["bbox"][0] == (
         139.0,
         35.0,
         140.0,
@@ -50,11 +50,13 @@ def test_ogc_search_uses_items_endpoint_and_standard_query_parameters() -> None:
     results = adapter.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0), limit=10))
     assert client.calls == [(items_url, {"bbox": "139.0,35.0,140.0,36.0", "limit": 10})]
     assert results[0].title == "Example River"
-    assert results[0].to_config() == Config(
+    assert results[0].reference == Reference(
         "ogc-features",
+        "rivers",
+        "river-1",
         {"collection_id": "rivers", "feature_id": "river-1"},
     )
-    assert "endpoint" not in results[0].target.settings
+    assert "endpoint" not in results[0].reference.parameters
     assert results[0].metadata.raw["geometry"]["type"] == "LineString"
 
 
@@ -80,9 +82,11 @@ def test_ogc_collection_without_items_link_is_rejected() -> None:
     )
     with pytest.raises(ProviderResponseError, match="items"):
         OgcFeaturesAdapter(get_json=client).load(
-            Config(
-                "ogc-features",
-                {"endpoint": endpoint, "collection_id": "rivers"},
+            Reference.from_config(
+                Config(
+                    "ogc-features",
+                    {"endpoint": endpoint, "collection_id": "rivers"},
+                )
             )
         )
 
@@ -101,22 +105,24 @@ def test_ogc_resolves_relative_items_href_against_collection_response_uri() -> N
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Config(
-            "ogc-features",
-            {
-                "endpoint": endpoint,
-                "collection_id": "rivers",
-                "feature_id": "river-1",
-            },
+        Reference.from_config(
+            Config(
+                "ogc-features",
+                {
+                    "endpoint": endpoint,
+                    "collection_id": "rivers",
+                    "feature_id": "river-1",
+                },
+            )
         )
     )
 
     resolved_uri = (
         "https://features.example/collections/rivers/items/river-1?f=json#items"
     )
-    assert source.candidates[0].uri == resolved_uri
+    assert source.uri == resolved_uri
     assert source.provenance.original_url == resolved_uri
-    assert source.raw_metadata["links"][0]["href"] == ("rivers/items?f=json#items")
+    assert source.metadata.raw["links"][0]["href"] == ("rivers/items?f=json#items")
 
 
 def test_ogc_relative_href_uses_rfc3986_query_and_fragment_rules() -> None:
@@ -129,14 +135,16 @@ def test_ogc_relative_href_uses_rfc3986_query_and_fragment_rules() -> None:
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Config(
-            "ogc-features",
-            {"endpoint": endpoint, "collection_id": "rivers"},
+        Reference.from_config(
+            Config(
+                "ogc-features",
+                {"endpoint": endpoint, "collection_id": "rivers"},
+            )
         )
     )
 
-    assert source.candidates[0].uri == collection_url + "?f=json#items"
-    assert source.provenance.original_url == source.candidates[0].uri
+    assert source.uri == collection_url + "?f=json#items"
+    assert source.provenance.original_url == source.uri
 
 
 def test_ogc_resolves_relative_href_against_final_redirect_uri() -> None:
@@ -151,19 +159,19 @@ def test_ogc_resolves_relative_href_against_final_redirect_uri() -> None:
     )
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Config(
-            "ogc-features",
-            {
-                "endpoint": "https://features.example",
-                "collection_id": "rivers",
-                "feature_id": "river-1",
-            },
+        Reference.from_config(
+            Config(
+                "ogc-features",
+                {
+                    "endpoint": "https://features.example",
+                    "collection_id": "rivers",
+                    "feature_id": "river-1",
+                },
+            )
         )
     )
 
-    assert (
-        source.candidates[0].uri == "https://features-cdn.example/catalog/items/river-1"
-    )
+    assert source.uri == "https://features-cdn.example/catalog/items/river-1"
 
 
 def test_ogc_load_encodes_identifiers_and_keeps_logical_provenance() -> None:
@@ -179,19 +187,22 @@ def test_ogc_load_encodes_identifiers_and_keeps_logical_provenance() -> None:
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Config(
-            "ogc-features",
-            {
-                "endpoint": endpoint,
-                "collection_id": collection_id,
-                "feature_id": feature_id,
-            },
+        Reference.from_config(
+            Config(
+                "ogc-features",
+                {
+                    "endpoint": endpoint,
+                    "collection_id": collection_id,
+                    "feature_id": feature_id,
+                },
+            )
         )
     )
 
     assert client.calls == [(collection_url, {})]
-    assert source.candidates[0].uri == items_url + "/already%252Fencoded"
-    assert source.candidates[0].attributes == {
+    assert source.uri == items_url + "/already%252Fencoded"
+    assert source.reference.parameters == {
+        "endpoint": endpoint,
         "collection_id": collection_id,
         "feature_id": feature_id,
     }
@@ -210,18 +221,20 @@ def test_ogc_load_escapes_dot_only_identifier_segments() -> None:
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Config(
-            "ogc-features",
-            {
-                "endpoint": endpoint,
-                "collection_id": "..",
-                "feature_id": ".",
-            },
+        Reference.from_config(
+            Config(
+                "ogc-features",
+                {
+                    "endpoint": endpoint,
+                    "collection_id": "..",
+                    "feature_id": ".",
+                },
+            )
         )
     )
 
     assert client.calls == [(collection_url, {})]
-    assert source.candidates[0].uri == items_url + "/%2E"
+    assert source.uri == items_url + "/%2E"
     assert source.provenance.dataset_identifier == ".."
     assert source.provenance.resource_identifier == "."
 
@@ -251,13 +264,13 @@ def test_ogc_search_result_keeps_logical_identifiers_for_encoded_load() -> None:
     )
 
     result = adapter.search(SearchQuery(limit=1))[0]
-    source = adapter.load(result.to_config())
+    source = adapter.load(result.reference)
 
-    assert result.target.settings["collection_id"] == collection_id
-    assert result.target.settings["feature_id"] == feature_id
+    assert result.reference.parameters["collection_id"] == collection_id
+    assert result.reference.parameters["feature_id"] == feature_id
     assert result.provenance.dataset_identifier == collection_id
     assert result.provenance.resource_identifier == feature_id
     assert client.calls == [(items_url, {"limit": 1}), (collection_url, {})]
-    assert source.candidates[0].uri == items_url + "/station%3Frevision%231%25"
+    assert source.uri == items_url + "/station%3Frevision%231%25"
     assert source.provenance.dataset_identifier == collection_id
     assert source.provenance.resource_identifier == feature_id

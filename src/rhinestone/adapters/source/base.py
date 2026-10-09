@@ -15,7 +15,7 @@ from ...errors import (
     ProviderMetadataError,
     ProviderResponseError,
 )
-from ...models import Config, Source
+from ...models import Reference, Resource
 from ...registry import CredentialRegistry
 from ...security import DestinationPolicy
 
@@ -40,7 +40,7 @@ __all__ = [
 
 
 class ProviderAdapter(ABC):
-    """Base for adapters that translate provider metadata into a ``Source``.
+    """Base for adapters that translate provider metadata into a ``Resource``.
 
     Subclasses own provider-specific configuration and response interpretation.
     The base class only standardizes validation and the injected JSON transport.
@@ -86,21 +86,33 @@ class ProviderAdapter(ABC):
             self._credential_prefix = f"{scheme} " if scheme else ""
 
     @abstractmethod
-    def load(self, config: Config) -> Source:
-        """Interpret a provider config and return its knowledge-preserving source."""
+    def load(self, reference: Reference) -> Resource:
+        """Load the unique delivery identified by ``reference``."""
 
-    def _config_settings(self, config: Config) -> Mapping[str, Any]:
-        if config.source_id != self.adapter_type:
+    def _reference_parameters(
+        self,
+        reference: Reference,
+        *,
+        dataset_key: str | None = None,
+        resource_key: str | None = None,
+    ) -> Mapping[str, Any]:
+        expected_provider = self._provider_id or self.adapter_type
+        if reference.provider_id not in {expected_provider, self.adapter_type}:
             raise ConfigValidationError(
-                f"Expected adapter type {self.adapter_type!r}; got "
-                f"{config.source_id!r}; construct Config with the adapter's "
-                "source type"
+                f"Expected Provider {expected_provider!r}; got "
+                f"{reference.provider_id!r}; construct Reference with the "
+                "configured Provider ID"
             )
+        parameters = dict(reference.parameters)
+        if dataset_key is not None and reference.dataset_identifier is not None:
+            parameters.setdefault(dataset_key, reference.dataset_identifier)
+        if resource_key is not None and reference.resource_identifier is not None:
+            parameters.setdefault(resource_key, reference.resource_identifier)
         schema = self.config_schema()
         if schema is not None:
             try:
                 validator: Any = Draft202012Validator(schema)
-                validator.validate(_json_value(config.settings))
+                validator.validate(_json_value(parameters))
             except ValidationError as error:
                 location = ".".join(str(item) for item in error.absolute_path)
                 detail = f"{location}: " if location else ""
@@ -108,7 +120,7 @@ class ProviderAdapter(ABC):
                     f"Invalid {self.adapter_type} configuration: {detail}"
                     f"{error.message}"
                 ) from None
-        return config.settings
+        return parameters
 
     def config_schema(self) -> Mapping[str, Any] | None:
         """Return this built-in adapter's JSON Schema, if it provides one."""

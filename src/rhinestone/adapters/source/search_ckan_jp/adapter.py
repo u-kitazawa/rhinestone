@@ -8,7 +8,15 @@ from ....errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from ....models import Config, Metadata, Provenance, Result, SearchQuery, Source
+from ....models import (
+    DiscoveryRecord,
+    Metadata,
+    Provenance,
+    Reference,
+    Resource,
+    SearchQuery,
+)
+from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
 from .._uri import has_embedded_credentials
@@ -37,13 +45,13 @@ class SearchCkanJpAdapter(ProviderAdapter):
             destination_policy=destination_policy,
         )
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Reject direct loading because this adapter is discovery-only."""
         raise UnsupportedSourceError(
             "search-ckan-jp is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         """Search the official search.ckan.jp endpoint using text criteria."""
         if query.text is None:
             raise ConfigValidationError(
@@ -59,7 +67,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         params: dict[str, Any] = {"q": _text_query(terms)}
         if query.limit is not None:
             params["rows"] = min(100, max(10, query.limit))
-        found: list[Result] = []
+        found: list[Resource] = []
         start = 0
         seen: set[tuple[str | None, str | None, str | None, str | None, str | None]] = (
             set()
@@ -73,9 +81,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 raise ProviderResponseError("search.ckan.jp search was not successful")
             result = self._object(response.get("result"), "search.ckan.jp result")
             packages = self._objects(result.get("results"), "search.ckan.jp results")
-            batches: list[deque[Result]] = []
+            batches: list[deque[Resource]] = []
             for package in packages:
-                items: deque[Result] = deque()
+                items: deque[Resource] = deque()
                 for item in self._package_results(package, endpoint, page_params):
                     if query.format is not None and not self._matches_query_formats(
                         item.formats, query
@@ -87,7 +95,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                         optional_string(package.get("xckan_site_url")),
                         item.provenance.dataset_identifier,
                         item.provenance.resource_identifier,
-                        optional_string(item.target.settings.get("uri")),
+                        item.uri,
                     )
                     if identity in seen:
                         continue
@@ -106,7 +114,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                     )
             # Keep native Dataset relevance while giving each Dataset a turn.
             while batches:
-                remaining: list[deque[Result]] = []
+                remaining: list[deque[Resource]] = []
                 for items in batches:
                     found.append(items.popleft())
                     if query.limit is not None and len(found) == query.limit:
@@ -134,7 +142,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         package: JsonObject,
         endpoint: str,
         params: dict[str, Any],
-    ) -> tuple[Result, ...]:
+    ) -> tuple[Resource, ...]:
         package_id = optional_string(package.get("xckan_original_id"))
         if package_id is None:
             package_id = optional_string(package.get("id"))
@@ -150,7 +158,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         license_name = optional_string(package.get("license_title"))
         site_url = optional_string(package.get("xckan_site_url"))
         resources = self._objects(package.get("resources"), "search.ckan.jp resources")
-        found: list[Result] = []
+        found: list[Resource] = []
         for resource in resources:
             resource_id = optional_string(resource.get("id"))
             uri = optional_string(resource.get("url"))
@@ -179,7 +187,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 adapter=self.adapter_type,
                 raw={"catalog": package, "resource": resource},
             )
-            target_settings: dict[str, Any] = {
+            target_parameters: dict[str, Any] = {
                 "uri": uri,
                 "format": format_name,
                 "metadata": {
@@ -192,17 +200,41 @@ class SearchCkanJpAdapter(ProviderAdapter):
             }
             media_type = optional_string(resource.get("mimetype"))
             if media_type is not None:
-                target_settings["media_type"] = media_type
+                target_parameters["media_type"] = media_type
+            target_metadata = Metadata(
+                title=title,
+                description=description,
+                publisher=publisher,
+                license=license_name,
+                raw=package,
+            )
+            target_provenance = Provenance(
+                provider="direct",
+                dataset_identifier=package_id,
+                resource_identifier=resource_id,
+                original_url=uri,
+                adapter="direct",
+                raw={"catalog": package, "resource": resource},
+            )
             found.append(
-                Result(
-                    title=title,
-                    description=description,
-                    discovered_by=self.adapter_type,
-                    target=Config("direct", target_settings),
-                    metadata=metadata,
-                    provenance=provenance,
-                    formats=frozenset({format_name}),
-                    raw_metadata={"catalog": package, "resource": resource},
+                resource_from_delivery(
+                    reference=Reference(
+                        "direct",
+                        dataset_identifier=package_id,
+                        resource_identifier=resource_id,
+                        parameters=target_parameters,
+                    ),
+                    uri=uri,
+                    format=format_name,
+                    media_type=media_type,
+                    metadata=target_metadata,
+                    provenance=target_provenance,
+                    discovery=DiscoveryRecord(
+                        source_id=self.adapter_type,
+                        metadata=metadata,
+                        provenance=provenance,
+                        raw_metadata={"catalog": package, "resource": resource},
+                    ),
                 )
             )
         return tuple(found)
@@ -267,9 +299,10 @@ def _text_query(terms: tuple[str, ...]) -> str:
     return " AND ".join(clauses)
 
 
-def _resource_priority(item: Result, terms: tuple[str, ...]) -> tuple[int, int]:
+def _resource_priority(item: Resource, terms: tuple[str, ...]) -> tuple[int, int]:
     """Prefer declared Resource names matching the query inside each Dataset."""
-    resource = item.raw_metadata["resource"]
+    assert item.discovery is not None
+    resource = item.discovery.raw_metadata["resource"]
     name = (optional_string(resource.get("name")) or "").casefold()
     description = (optional_string(resource.get("description")) or "").casefold()
     return (

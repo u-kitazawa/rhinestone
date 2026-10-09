@@ -18,10 +18,11 @@ from rhinestone.models import (
     AccessPlan,
     Metadata,
     Provenance,
-    ResourceCandidate,
+    Reference,
+    Resource,
     RuntimeFactory,
-    Source,
 )
+from rhinestone.resolution import resource_from_delivery
 from rhinestone.security import DestinationPolicy
 
 
@@ -29,19 +30,17 @@ def custom_source(provider: Provider, context: Any) -> Any:
     assert context.provider_id == provider.id
 
     class Adapter:
-        def load(self, config: Config) -> Source:
-            return Source(
-                metadata=Metadata(title=config.settings["title"]),
-                candidates=(
-                    ResourceCandidate(
-                        uri="https://data.example/item.bin",
-                        format="custom",
-                        media_type="application/octet-stream",
-                    ),
+        def load(self, reference: Reference) -> Resource:
+            return resource_from_delivery(
+                reference=reference,
+                uri="https://data.example/item.bin",
+                format="custom",
+                media_type="application/octet-stream",
+                metadata=Metadata(
+                    title=reference.parameters["title"],
+                    raw={"provider": provider.id},
                 ),
-                capabilities=frozenset(),
                 provenance=Provenance(provider=provider.id, adapter="custom"),
-                raw_metadata={"provider": provider.id},
             )
 
     return Adapter()
@@ -83,7 +82,7 @@ def test_custom_source_and_execution_share_the_public_pipeline() -> None:
 
     assert resource.metadata.title == "Example"
     assert resource.provenance.provider == "custom"
-    assert resource.source.raw_metadata["provider"] == "custom"
+    assert resource.metadata.raw["provider"] == "custom"
     assert app.open(
         Config("custom", {"title": "Example"}), "custom-runtime", runtime=runtime
     ) == (

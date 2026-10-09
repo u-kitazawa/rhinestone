@@ -5,15 +5,14 @@ from typing import Any
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
-    Config,
     Metadata,
     Provenance,
-    ResourceCandidate,
-    Result,
+    Reference,
+    Resource,
     SearchQuery,
-    Source,
 )
 from ....registry import CredentialRegistry
+from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from .._uri import append_path_segment, resolve_response_href
 from ..base import JsonObject, JsonTransport, ProviderAdapter
@@ -49,9 +48,11 @@ class OgcFeaturesAdapter(ProviderAdapter):
         )
         self._collection_id = collection_id
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Load one OGC collection and its explicit items endpoint."""
-        settings = self._config_settings(config)
+        settings = self._reference_parameters(
+            reference, dataset_key="collection_id", resource_key="feature_id"
+        )
         endpoint = self._endpoint_from(settings)
         collection_id = self._required_string(settings, "collection_id")
         collection_path = self._encode_path_segment(collection_id)
@@ -62,12 +63,6 @@ class OgcFeaturesAdapter(ProviderAdapter):
         uri = resolve_response_href(response_uri, items_link["href"])
         if isinstance(feature_id, str) and feature_id:
             uri = append_path_segment(uri, feature_id)
-        candidate = ResourceCandidate(
-            uri=uri,
-            format="ogc-api-features",
-            media_type=_optional_string(items_link.get("type")),
-            attributes={"collection_id": collection_id, "feature_id": feature_id},
-        )
         provenance = Provenance(
             provider="ogc-features",
             dataset_identifier=collection_id,
@@ -77,19 +72,29 @@ class OgcFeaturesAdapter(ProviderAdapter):
             adapter="ogc-features",
             raw=collection,
         )
-        return Source(
+        return resource_from_delivery(
+            reference=Reference(
+                reference.provider_id,
+                dataset_identifier=collection_id,
+                resource_identifier=feature_id
+                if isinstance(feature_id, str)
+                else collection_id,
+                parameters=reference.parameters,
+            ),
+            uri=uri,
+            format="ogc-api-features",
+            media_type=_optional_string(items_link.get("type")),
             metadata=Metadata(
                 title=_optional_string(collection.get("title")) or collection_id,
                 description=_optional_string(collection.get("description")),
                 raw=collection,
             ),
-            candidates=(candidate,),
-            capabilities=frozenset({"service-query", "search"}),
             provenance=provenance,
-            raw_metadata=collection,
+            kind="service-query",
+            options={"collection_id": collection_id, "feature_id": feature_id},
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         """Search one configured OGC collection using standard parameters."""
         endpoint = self._endpoint_from({}, self._endpoint)
         if not self._collection_id:
@@ -104,35 +109,44 @@ class OgcFeaturesAdapter(ProviderAdapter):
         items_url = f"{endpoint}/collections/{collection_path}/items"
         response = self._request(items_url, params)
         features = self._objects(response.get("features"), "OGC features")
-        found: list[Result] = []
+        found: list[Resource] = []
         for feature in features:
             feature_id = self._required_string(feature, "id")
             properties = self._object(feature.get("properties"), "OGC properties")
             title = _feature_title(properties, feature_id)
+            uri = append_path_segment(items_url, feature_id)
+            provenance = Provenance(
+                provider="ogc-features",
+                dataset_identifier=self._collection_id,
+                resource_identifier=feature_id,
+                api_endpoint=endpoint,
+                original_url=uri,
+                query_parameters=params,
+                adapter="ogc-features",
+                raw=feature,
+            )
             found.append(
-                Result(
-                    title=title,
-                    description=_optional_string(properties.get("description")),
-                    discovered_by=self.adapter_type,
-                    target=Config(
+                resource_from_delivery(
+                    reference=Reference(
                         self.adapter_type,
-                        {
+                        dataset_identifier=self._collection_id,
+                        resource_identifier=feature_id,
+                        parameters={
                             "collection_id": self._collection_id,
                             "feature_id": feature_id,
                         },
                     ),
-                    metadata=Metadata(title=title, raw=feature),
-                    provenance=Provenance(
-                        provider="ogc-features",
-                        dataset_identifier=self._collection_id,
-                        resource_identifier=feature_id,
-                        api_endpoint=endpoint,
-                        query_parameters=params,
-                        adapter="ogc-features",
+                    uri=uri,
+                    format="ogc-api-features",
+                    media_type="application/geo+json",
+                    metadata=Metadata(
+                        title=title,
+                        description=_optional_string(properties.get("description")),
                         raw=feature,
                     ),
-                    formats=frozenset({"ogc-api-features"}),
-                    raw_metadata=feature,
+                    provenance=provenance,
+                    kind="service-query",
+                    options={"query": params},
                 )
             )
         return tuple(found)

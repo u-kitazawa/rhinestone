@@ -15,9 +15,8 @@ from rhinestone.models import (
     AccessPlan,
     Metadata,
     Provenance,
+    Reference,
     Resource,
-    ResourceCandidate,
-    Source,
 )
 from rhinestone.security import DestinationPolicy
 
@@ -28,19 +27,8 @@ def make_resource(
     attributes: dict[str, Any] | None = None,
     remote: bool = False,
 ) -> Resource:
-    candidate = ResourceCandidate(
-        uri=uri,
-        format=format_name,
-        media_type="application/octet-stream",
-        attributes=attributes or {},
-    )
-    source = Source(
-        metadata=Metadata(title="Data", raw={}),
-        candidates=(candidate,),
-        capabilities=frozenset({"download"}),
-        provenance=Provenance(provider="direct", raw={}),
-        raw_metadata={},
-    )
+    metadata = Metadata(title="Data", raw={})
+    provenance = Provenance(provider="direct", raw={})
     plan = (
         AccessPlan(
             kind="remote-dataset",
@@ -65,10 +53,10 @@ def make_resource(
         uri=uri,
         format=format_name,
         media_type="application/octet-stream",
-        metadata=source.metadata,
-        provenance=source.provenance,
+        metadata=metadata,
+        provenance=provenance,
         access_plan=plan,
-        source=source,
+        reference=Reference("direct", resource_identifier=uri),
     )
 
 
@@ -111,6 +99,7 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
     )
     runtime = FakeGdal()
 
+    assert resource.access_plan is not None
     data = GdalAdapter().open(resource.access_plan, runtime)
 
     assert runtime.calls == [
@@ -120,6 +109,7 @@ def test_gdal_translates_remote_zip_and_encoding_without_selecting_resource() ->
         )
     ]
     assert data["runtime"] == "gdal"
+    assert resource.access_plan is not None
     assert GdalAdapter().supports(resource.access_plan) is True
 
 
@@ -129,6 +119,7 @@ def test_gdal_translates_uppercase_https_remote_zip() -> None:
     )
     runtime = FakeGdal()
 
+    assert resource.access_plan is not None
     GdalAdapter().open(resource.access_plan, runtime)
 
     assert runtime.calls == [("/vsizip//vsicurl/HTTPS://files.example/rivers.zip", ())]
@@ -145,12 +136,14 @@ def test_gdal_exposes_tile_xml_translation() -> None:
 @pytest.mark.parametrize("tile", ([], {"url": 1}))
 def test_gdal_rejects_invalid_tile_options(tile: object) -> None:
     resource = make_resource("/data/tile", "custom")
+    assert resource.access_plan is not None
     resource = replace(
         resource,
         access_plan=replace(resource.access_plan, options={"tile": tile}),
     )
 
     with pytest.raises(ResourceAccessError):
+        assert resource.access_plan is not None
         GdalAdapter().open(resource.access_plan, FakeGdal())
 
 
@@ -170,6 +163,7 @@ def test_rasterio_opens_cog_uri_directly() -> None:
     resource = make_resource("https://files.example/image.tif", "cog", remote=True)
     runtime = FakeRasterio()
 
+    assert resource.access_plan is not None
     assert RasterioAdapter().open(resource.access_plan, runtime) == {
         "runtime": "rasterio"
     }
@@ -191,6 +185,7 @@ def test_pyogrio_receives_explicit_encoding() -> None:
     resource = make_resource("/data/rivers.shp", "shapefile", {"encoding": "cp932"})
     runtime = FakePyogrio()
 
+    assert resource.access_plan is not None
     assert PyogrioAdapter().open(resource.access_plan, runtime) == {
         "runtime": "pyogrio"
     }
@@ -213,6 +208,8 @@ def test_pyogrio_translates_selected_remote_zip_shapefile() -> None:
         access_plan=AccessPlan(
             kind="file",
             uri=resource.uri,
+            format=resource.format,
+            media_type=resource.media_type,
             options={
                 "archive": "zip",
                 "entry_point": "data/rivers.shp",
@@ -222,6 +219,7 @@ def test_pyogrio_translates_selected_remote_zip_shapefile() -> None:
     )
     runtime = FakePyogrio()
 
+    assert resource.access_plan is not None
     assert PyogrioAdapter().open(resource.access_plan, runtime) == {
         "runtime": "pyogrio"
     }
@@ -237,6 +235,7 @@ def test_pyogrio_translates_selected_local_zip_shapefile() -> None:
     resource = make_resource("/data/rivers.zip", "shapefile", {"archive": "zip"})
     runtime = FakePyogrio()
 
+    assert resource.access_plan is not None
     PyogrioAdapter().open(resource.access_plan, runtime)
 
     assert runtime.calls == [("/vsizip//data/rivers.zip", {})]
@@ -248,11 +247,16 @@ def test_pyogrio_selects_additional_explicit_vector_formats() -> None:
     resource = replace(
         make_resource("/data/boundaries.gml", "gml"),
         access_plan=AccessPlan(
-            kind="remote-dataset", uri="/data/boundaries.gml", format="gml"
+            kind="remote-dataset",
+            uri="/data/boundaries.gml",
+            format="gml",
+            media_type="application/octet-stream",
         ),
     )
 
+    assert resource.access_plan is not None
     assert PyogrioAdapter().supports(resource.access_plan) is True
+    assert resource.access_plan is not None
     assert PyogrioAdapter().open(resource.access_plan, runtime) == {
         "runtime": "pyogrio"
     }
@@ -263,6 +267,7 @@ def test_pyogrio_rejects_explicit_non_vector_formats() -> None:
     """An explicit format alone must not route a table through the vector runtime."""
     resource = make_resource("/data/records.csv", "csv")
 
+    assert resource.access_plan is not None
     assert PyogrioAdapter().supports(resource.access_plan) is False
 
 
@@ -277,6 +282,7 @@ def test_execution_adapter_preserves_runtime_failure_as_cause() -> None:
     resource = make_resource("https://files.example/image.tif", "cog", remote=True)
 
     with pytest.raises(ResourceAccessError) as captured:
+        assert resource.access_plan is not None
         RasterioAdapter().open(resource.access_plan, BrokenRasterio())
 
     assert captured.value.__cause__ is runtime_error
@@ -285,13 +291,24 @@ def test_execution_adapter_preserves_runtime_failure_as_cause() -> None:
 def test_gdal_handles_local_archive_and_resources_without_options() -> None:
     """local ZIPと通常Resourceをremote扱いせず、不要なoptionを付加しないために必要である。"""
     local = make_resource("/data/rivers.zip", "shapefile", {"archive": "zip"})
-    local = replace(local, access_plan=AccessPlan(kind="file", uri=local.uri))
+    local = replace(
+        local,
+        access_plan=AccessPlan(
+            kind="file",
+            uri=local.uri,
+            format=local.format,
+            media_type=local.media_type,
+        ),
+    )
     plain = make_resource("/data/rivers.shp", "shapefile")
     remote = make_resource("https://files.example/a.tif", "cog", remote=True)
     runtime = FakeGdal()
 
+    assert local.access_plan is not None
     GdalAdapter().open(local.access_plan, runtime)
+    assert plain.access_plan is not None
     GdalAdapter().open(plain.access_plan, runtime)
+    assert remote.access_plan is not None
     GdalAdapter().open(remote.access_plan, runtime)
 
     assert runtime.calls == [
@@ -306,10 +323,15 @@ def test_execution_support_depends_on_resource_format() -> None:
     raster = make_resource("/data/a.tif", "cog", remote=True)
     vector = make_resource("/data/a.shp", "shapefile")
 
+    assert raster.access_plan is not None
     assert RasterioAdapter().supports(raster.access_plan) is True
+    assert vector.access_plan is not None
     assert RasterioAdapter().supports(vector.access_plan) is False
+    assert vector.access_plan is not None
     assert PyogrioAdapter().supports(vector.access_plan) is True
+    assert raster.access_plan is not None
     assert PyogrioAdapter().supports(raster.access_plan) is False
+    assert vector.access_plan is not None
     assert GdalAdapter().supports(vector.access_plan) is True
 
 
@@ -328,8 +350,10 @@ def test_gdal_and_pyogrio_failures_are_classified() -> None:
     resource = make_resource("/data/a.shp", "shapefile")
 
     with pytest.raises(ResourceAccessError) as gdal_error:
+        assert resource.access_plan is not None
         GdalAdapter().open(resource.access_plan, BrokenGdal())
     with pytest.raises(ResourceAccessError) as pyogrio_error:
+        assert resource.access_plan is not None
         PyogrioAdapter().open(resource.access_plan, BrokenPyogrio())
     assert gdal_error.value.__cause__ is failure
     assert pyogrio_error.value.__cause__ is failure
@@ -345,35 +369,21 @@ def test_pyogrio_driver_or_geometry_failures_are_resource_access_errors() -> Non
 
     resource = make_resource("/data/boundaries.gml", "gml")
 
+    assert resource.access_plan is not None
     assert PyogrioAdapter().supports(resource.access_plan) is True
     with pytest.raises(ResourceAccessError) as captured:
+        assert resource.access_plan is not None
         PyogrioAdapter().open(resource.access_plan, UnsupportedGmlPyogrio())
     assert captured.value.__cause__ is failure
 
 
-def test_execution_uses_empty_attributes_when_candidate_is_not_retained() -> None:
-    """不整合SourceでもExecution Adapterが別候補を選び直さず選択済みURIだけを使うために必要である。"""
+def test_execution_uses_only_the_selected_resource_plan() -> None:
+    """Execution Adapterが別候補を選び直さず選択済みURIだけを使う。"""
     resource = make_resource("/data/selected.shp", "shapefile")
-    other = ResourceCandidate("/data/other.shp", "shapefile", None)
-    mismatched_source = Source(
-        metadata=resource.metadata,
-        candidates=(other,),
-        capabilities=frozenset(),
-        provenance=resource.provenance,
-        raw_metadata={},
-    )
-    mismatched = Resource(
-        uri=resource.uri,
-        format=resource.format,
-        media_type=resource.media_type,
-        metadata=resource.metadata,
-        provenance=resource.provenance,
-        access_plan=resource.access_plan,
-        source=mismatched_source,
-    )
     runtime = FakePyogrio()
 
-    PyogrioAdapter().open(mismatched.access_plan, runtime)
+    assert resource.access_plan is not None
+    PyogrioAdapter().open(resource.access_plan, runtime)
 
     assert runtime.calls == [("/data/selected.shp", {})]
 

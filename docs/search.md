@@ -1,6 +1,6 @@
 # データを検索する
 
-`app.search()`は構成済みProviderを横断してResultを返します。検索したSourceと、結果を解決するSourceは同一である必要はありません。
+`app.search()`は構成済みProviderを横断して、配信単位のResourceを返します。検索したProviderと、Resourceの`reference`が示すProviderは同一である必要はありません。
 
 ## 検索するProviderを選ぶ
 
@@ -13,7 +13,7 @@ results = search(
     format=(FormatPreset.PYOGRIO,),
     limit=20,
 )
-resource = results[0].resolve()
+resource = results[0]
 ```
 
 `providers`は結果の後処理ではなく、検索前の対象選択です。未選択Providerの検索や通信、
@@ -36,13 +36,18 @@ results = app.search(text="人口", limit=10)
 - `providers`: `ProviderId` enumまたは独自Provider ID文字列の配列（list / tuple）
 - `text`: `str`または`None`
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
-- `limit`: `bool`を除く0以上の整数または`None`（Providerごとの上限）
+- `limit`: `bool`を除く0以上の整数または`None`（ProviderごとのResource上限）
 - `bbox`: 数値4要素のtuple
 - `time`: `datetime`または`None`を2要素で保持するtuple
 - `format`: `Format`または`FormatPreset`を1つ以上保持するtuple（OR条件）
 
 不正な値はProviderへリクエストする前に`ConfigValidationError`になります。`area`と`bbox`は
 同時に指定できません。`bbox`の既存の4数値tuple契約は変更されません。
+
+`limit`はDatasetや検索応答Itemの件数ではなく、展開後のResource件数を数えます。例えば
+1つのSTAC Itemにdata assetが3件あれば3 Resource、1つのDCAT distributionにdownload URLが
+2件あれば2 Resourceです。Adapterは配信識別子で安定順序を作り、その順で上限まで返します。
+format filterも配信単位で適用されるため、同じDatasetの別形式を一緒に採用・除外しません。
 
 ```python
 results = app.search(text="河川", area="神奈川県", limit=10)
@@ -110,7 +115,7 @@ G空間情報センターの専用Adapterでは、本文の空白区切りの各
 候補形式をRhinestoneが検索後に絞り込みます。post-filter時の`limit`は絞り込み後に適用します。
 URI suffixから形式を推測しません。形式不明の結果を含めるには`Format.UNKNOWN`を明示します。
 ただし、CKAN系のAdapter内照合では、`XLSX`のような非空の未登録形式は
-`Format.UNKNOWN`に一致しません。取得する場合は`format`を省略し、`result.formats`を
+`Format.UNKNOWN`に一致しません。取得する場合は`format`を省略し、`resource.formats`を
 確認してください。Coordinatorによる照合との違いは
 [検索能力の対照表](search-capabilities.md)に記載しています。
 
@@ -125,7 +130,7 @@ unknown = app.search(format=(Format.UNKNOWN,))
 Presetは検索候補集合であり、Runtimeでのopen成功を保証しません。最終判定は解決後のExecution
 Adapterが行います。collection、asset、provider固有の詳細検索は共通引数にしていません。
 
-Coordinatorによる絞り込みは`Result.formats`だけを照合し、raw metadataやURIから形式を
+Coordinatorによる絞り込みは`Resource.formats`だけを照合し、raw metadataやURIから形式を
 補完しません。`limit=None`で取得したProviderの既定範囲を絞るため、指定件数に達するまで
 追加pageを取得するとは限りません。CKAN系はAdapter内で形式を照合し、件数が足りなければ
 次のpackage pageを取得します。検索時に形式を設定しないProviderもあります。
@@ -162,34 +167,37 @@ from rhinestone.models import SearchQuery
 results = app.search(SearchQuery(bbox=(139.5, 35.5, 140.0, 36.0), limit=10))
 ```
 
-## Resultを選んで解決する
+## Resourceを選んで開く
 
 ```python
-result = results[0]
-resource = app.resolve(result)
-
-print(result.title)
-print(result.metadata)
+resource = results[0]
+print(resource.title)
+print(resource.metadata)
 print(resource.uri)
+print(resource.reference)
+
+data = app.open(resource, "rasterio", runtime=rasterio)
 ```
 
-`Result`は検索で得た候補と解決先を保持する値です。Provider固有の対象指定に加えて、
-出典となるendpointはprovenanceやraw metadataに残る場合があります。
-CredentialのsecretやRuntime実体は保持しません。
+1つのResourceは1つの配信対象を表します。CredentialのsecretやRuntime実体は保持しません。
 
-Resultは次の情報を持ちます。
+- `reference`: 取得先Provider ID、dataset ID、distribution/resource ID、非秘密のparameters
+- `metadata` / `provenance`: 配信対象の情報と来歴
+- `format` / `media_type`: 明示された配信形式。`formats`はその1形式の集合（不明なら空集合）
+- `access_plan`: 配信の実行契約。検索時点で取得先への問い合わせが必要な場合は`None`
+- `discovery`: 発見元のmetadata、provenance、raw metadataを分離した記録
+- `discovered_by`: discoveryがある場合はそのProvider ID、それ以外はreferenceのProvider ID
 
-- `discovered_by`: 結果を発見したSource ID
-- `target`: `app.resolve()`へ渡す解決先の`Config`
-- `metadata` / `provenance`: 発見時に得られた知識
-- `raw_metadata`: 発見元が返した未加工の provider metadata
-- `formats`: 検索時に宣言された形式の集合。解決後の`Resource.format`とは別の情報
+横断CKAN検索では、`discovered_by="search-ckan-jp"`、`reference.provider_id="direct"`
+のようになります。配信側のmetadata/provenanceと検索元の`discovery`は別々に保持します。
 
-横断CKAN検索の結果は、`discovered_by="search-ckan-jp"`、`target.source_id="direct"` のようになります。`target`は`result.to_config()`で取得できます。解決先が発見元と異なる場合、target側の`resource.metadata` / `resource.provenance` / `resource.source.raw_metadata`を保持したまま、発見元の3つの記録は`resource.discovery`へ保持されます。
-
-国交DPFも同じDiscovery境界を使います。`discovered_by` は構成したDPF Source ID、`target` は
-委譲先Sourceまたは `direct` です。解決後もDPF由来情報は `resource.discovery` に分離して残り、
-Runtimeは `app.open(result, "gdal", runtime=gdal)` や `resource.open("rasterio", runtime=rasterio)` のように明示します。
+国交DPFのnative targetは、取得先ProviderのReferenceと`access_plan=None`を返します。
+`app.open(resource, ...)`はReferenceから対象を取得して実行し、DPFのDiscoveryRecordを保持します。
+取得先への明示的な問い合わせには`app.resolve(resource)`を使えます。
+解決後のResourceや、検索時点でAccessPlanが確定したResourceは
+`resource.open("rasterio", runtime=rasterio)`でも開けます。
+未確定Resourceの`resource.open()`は取得先へ問い合わせず、明示的に失敗します。
+未知形式の配信はURLから形式を推測せず、取得後もAccessPlanが生成できなければopenに失敗します。
 
 ## 結果の順序
 
@@ -212,7 +220,7 @@ iteration順は変わりません。Provider固有のrankingを扱う場合は�
 
 各Sourceは対応する条件だけを受け取ります。例えば`text`に対応するCKANと`bbox`に対応するSTACを構成している場合、両方を指定しても検索全体は失敗せず、各Sourceへ理解できる条件だけが渡されます。
 
-STAC検索では、`data` roleのassetが0件または複数件のItemを暗黙選択せず、Item単位でスキップします。`SearchResults.diagnostics`の`reason="item_skipped"`、`resource_identifier`、`detail`から対象Itemと理由を確認できます。
+STAC検索では、`data` roleのassetをそれぞれ別Resourceへ展開します。対象assetがないItemや不正な配信metadataはスキップします。`SearchResults.diagnostics`の`reason="item_skipped"`、`resource_identifier`、`detail`から対象Itemと理由を確認できます。
 
 適用されなかった条件は`results.diagnostics`で確認できます。
 
@@ -229,10 +237,6 @@ for diagnostic in results.diagnostics:
 指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。Sourceに必須条件がある場合、その条件が指定されていないSourceも検索せずスキップします。`diagnostic.reason`は通常`unsupported`または`missing_required`で、後者では`missing_conditions`に不足条件が入ります。地名を解決できなかった場合は`area_resolution_failed`です。
 
 Providerの通信・metadata取得・response解釈に失敗した場合は、失敗したSourceだけを隔離し、他のSourceの検索結果を返します。この場合は`reason="provider_failure"`となり、`failure_type`に`metadata`または`response`が入ります。検索に必要なCredentialが未登録の場合も同様に隔離し、`failure_type="credential"`を返します。これにより、APIキーを設定していない組み込みSourceがあっても、他のSourceの横断検索は継続します。Provider障害の診断には例外メッセージやtracebackを含めません。全Sourceがこの種の障害になった場合も、空の`SearchResults`と診断を返します。一方、検索クエリの検証失敗、Credential factoryの故障、予期しないプログラムエラーはProvider障害として握りつぶしません。
-
-検索結果は`app.resolve(result)`で直接Resourceへ解決できます。`app.search()`が返したResultでは
-`result.resolve()`も同じResourceを返し、発見元と解決先が異なる場合も両側のmetadata、raw metadata、
-provenanceを保持します。`result.to_config()`は内部パイプラインを調査する高度なAPIです。
 
 ## 実行時間と対応表
 

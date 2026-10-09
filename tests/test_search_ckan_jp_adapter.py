@@ -12,8 +12,7 @@ from rhinestone.errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, SearchQuery
-from rhinestone.resolution import Resolver
+from rhinestone.models import Config, Reference, SearchQuery
 
 from .provider_support import fixture_json
 
@@ -55,30 +54,29 @@ def test_search_ckan_jp_discovers_direct_resource_and_preserves_provenance() -> 
     assert len(results) == 2
     result, second = results
     assert result.discovered_by == "search-ckan-jp"
-    assert result.target == Config(
-        "direct",
-        {
-            "uri": "https://catalog.example/dataset/original-dataset/resource/resource-1/download/rivers.geojson",
-            "format": "geojson",
-            "media_type": "application/geo+json",
-            "metadata": {
-                "title": "Example Rivers",
-                "description": "Official river data",
-                "publisher": "Example Municipality",
-                "license": "CC BY 4.0",
-                "raw": result.metadata.raw,
-            },
+    assert result.reference.provider_id == "direct"
+    assert result.reference.parameters == {
+        "uri": "https://catalog.example/dataset/original-dataset/resource/resource-1/download/rivers.geojson",
+        "format": "geojson",
+        "media_type": "application/geo+json",
+        "metadata": {
+            "title": "Example Rivers",
+            "description": "Official river data",
+            "publisher": "Example Municipality",
+            "license": "CC BY 4.0",
+            "raw": result.metadata.raw,
         },
-    )
-    assert result.provenance.provider == "Example CKAN"
-    assert result.provenance.dataset_identifier == "original-dataset"
-    assert result.provenance.resource_identifier == "resource-1"
-    assert result.provenance.original_url == (
+    }
+    assert result.discovery is not None
+    assert result.discovery.provenance.provider == "Example CKAN"
+    assert result.discovery.provenance.dataset_identifier == "original-dataset"
+    assert result.discovery.provenance.resource_identifier == "resource-1"
+    assert result.discovery.provenance.original_url == (
         "https://catalog.example/dataset/original-dataset"
     )
-    assert result.provenance.raw["resource"]["id"] == "resource-1"
+    assert result.discovery.provenance.raw["resource"]["id"] == "resource-1"
     assert second.provenance.resource_identifier == "resource-2"
-    assert second.target.settings["format"] == "csv"
+    assert second.reference.parameters["format"] == "csv"
 
 
 def test_search_ckan_jp_limits_flattened_resources_and_preserves_unlimited_results() -> (
@@ -246,7 +244,7 @@ def test_search_ckan_jp_is_discovery_only() -> None:
     adapter = SearchCkanJpAdapter(get_json=lambda url, params: {})
 
     with pytest.raises(UnsupportedSourceError, match="discovery-only"):
-        adapter.load(Config("search-ckan-jp", {}))
+        adapter.load(Reference.from_config(Config("search-ckan-jp", {})))
 
 
 def test_search_ckan_jp_requires_text() -> None:
@@ -296,7 +294,7 @@ def test_search_ckan_jp_handles_minimal_package_metadata() -> None:
         endpoint,
         {},
     )
-    assert "media_type" not in csv_results[0].target.settings
+    assert "media_type" not in csv_results[0].reference.parameters
     assert (
         adapter._package_results(  # pyright: ignore[reportPrivateUsage]
             {"resources": []}, endpoint, {}
@@ -321,11 +319,13 @@ def test_search_ckan_jp_canonicalizes_geopackage_for_direct_resolution() -> None
         {"q": "gpkg"},
     )[0]
 
-    assert result.target.settings["format"] == "gpkg"
-    assert result.provenance.raw["resource"]["format"] == "GeoPackage"
+    assert result.reference.parameters["format"] == "gpkg"
+    assert result.discovery is not None
+    assert result.discovery.provenance.raw["resource"]["format"] == "GeoPackage"
 
-    resource = Resolver().resolve(DirectAdapter().load(result.target))
+    resource = DirectAdapter().load(result.reference)
     assert resource.format == "gpkg"
+    assert resource.access_plan is not None
     assert PyogrioAdapter().supports(resource.access_plan)
 
 
@@ -383,7 +383,8 @@ def test_search_ckan_jp_literal_and_query_and_actual_provenance() -> None:
             "rows": 100,
         }
     ]
-    assert results[0].provenance.query_parameters == calls[0]
+    assert results[0].discovery is not None
+    assert results[0].discovery.provenance.query_parameters == calls[0]
 
 
 @pytest.mark.parametrize("term", ["title:*", '"', "\\", "+-&|!(){}[]^~?:/"])
@@ -457,11 +458,11 @@ def test_search_ckan_jp_round_robin_filter_and_cross_site_resource_identity() ->
     limited = adapter.search(
         SearchQuery(text="河川", format=(Format.GEOJSON,), limit=2)
     )
-    assert [r.provenance.original_url for r in limited] == [
+    assert [r.discovery.provenance.original_url for r in limited if r.discovery] == [
         "https://a.example/dataset",
         "https://b.example/dataset",
     ]
-    resource = Resolver().resolve(DirectAdapter().load(results[0].target))
+    resource = DirectAdapter().load(results[0].reference)
     assert resource.uri == "https://a.example/1.json"
     assert results[0].metadata.raw["title"] == "old title"
 
@@ -495,7 +496,8 @@ def test_search_ckan_jp_deduplicates_across_pages_and_keeps_page_provenance() ->
         SearchQuery(text="河川", limit=3)
     )
     assert [r.provenance.resource_identifier for r in results] == ["one", "two"]
-    assert results[1].provenance.query_parameters == calls[1]
+    assert results[1].discovery is not None
+    assert results[1].discovery.provenance.query_parameters == calls[1]
     assert calls[1]["start"] == 1
 
 
@@ -537,8 +539,9 @@ def test_search_ckan_jp_observed_yokohama_resource_names_improve_first_result() 
         results[0].provenance.resource_identifier
         == "3348ebc3-e9d9-41a7-b652-0b6c7c2c1d1c"
     )
-    assert "指定避難所" in results[0].raw_metadata["resource"]["name"]
-    assert tuple(results[0].raw_metadata["catalog"]["resources"]) == tuple(
+    assert results[0].discovery is not None
+    assert "指定避難所" in results[0].discovery.raw_metadata["resource"]["name"]
+    assert tuple(results[0].discovery.raw_metadata["catalog"]["resources"]) == tuple(
         package["resources"]
     )
     assert results[0].metadata.raw["xckan_site_url"] == package["xckan_site_url"]

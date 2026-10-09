@@ -3,13 +3,18 @@
 from collections.abc import Mapping
 from typing import Any, cast
 
-from ....errors import ConfigValidationError
-from ....models import Config, ResourceCandidate, SearchQuery, Source
+from ....errors import (
+    AmbiguousResourceError,
+    ConfigValidationError,
+    ResourceNotFoundError,
+)
+from ....models import Metadata, Provenance, Reference, Resource, SearchQuery
 from ....registry import CredentialRegistry
 from ....representations import canonical_format
+from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge import KnowledgeAdapterRegistry
-from .._knowledge import entry_point, resolve_knowledge, source, string
+from .._knowledge import entry_point, resolve_knowledge, string
 from ..base import JsonTransport
 from ..ckan import CkanAdapter
 
@@ -51,9 +56,15 @@ class PlateauAdapter(CkanAdapter):
         params["fq"] = "tags:PLATEAU"
         return params
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Load one PLATEAU resource and preserve its CityGML metadata."""
-        settings = self._config_settings(config)
+        settings = self._reference_parameters(
+            reference,
+            dataset_key=(
+                None if reference.resource_identifier is not None else "dataset_id"
+            ),
+            resource_key="resource_id",
+        )
         endpoint = self._endpoint_from(settings)
         resource_id: str | None = None
         if "resource_id" in settings:
@@ -72,7 +83,7 @@ class PlateauAdapter(CkanAdapter):
         resources = self._objects(package.get("resources"), "CKAN resources")
         member = entry_point(settings)
         knowledge = resolve_knowledge(settings, self._knowledge)
-        candidates: list[ResourceCandidate] = []
+        selected: list[tuple[Mapping[str, Any], str]] = []
         for item in resources:
             identifier = string(item, "id")
             format_name = canonical_format(string(item, "format"))
@@ -82,33 +93,51 @@ class PlateauAdapter(CkanAdapter):
                 matches = matches and format_name == canonical_format(
                     string(settings, "format")
                 )
-            attributes: dict[str, Any] = dict(item)
-            attributes.update(
-                {
-                    "matches_config": matches,
-                    "access_kind": "file",
-                    "archive": settings.get("archive"),
-                    "access_options": {"entry_point": member},
-                    "knowledge": knowledge,
-                }
+            if matches:
+                selected.append((item, format_name))
+        if not selected:
+            raise ResourceNotFoundError("No PLATEAU distribution matches Reference")
+        if len(selected) != 1:
+            raise AmbiguousResourceError(
+                f"PLATEAU dataset has {len(selected)} matching distributions; "
+                "set Reference.resource_identifier or format"
             )
-            candidates.append(
-                ResourceCandidate(
-                    string(item, "url"), format_name, item.get("mimetype"), attributes
-                )
-            )
+        item, format_name = selected[0]
+        resource_identifier = string(item, "id")
+        uri = string(item, "url")
         raw: Mapping[str, Any] = {
             "package": package,
             "distribution_provider": "G Spatial Information Center",
         }
-        return source(
-            self.adapter_type,
-            package_id,
-            raw,
-            tuple(candidates),
+        metadata = Metadata(
             title=cast(str | None, package.get("title")),
             description=cast(str | None, package.get("notes")),
-            license_name=cast(str | None, package.get("license_title")),
-            endpoint=endpoint,
-            capabilities=("download", "search"),
+            publisher=self.adapter_type,
+            license=cast(str | None, package.get("license_title")),
+            raw={**raw, "knowledge": knowledge},
+        )
+        provenance = Provenance(
+            provider=self.adapter_type,
+            dataset_identifier=package_id,
+            resource_identifier=resource_identifier,
+            api_endpoint=endpoint,
+            original_url=uri,
+            adapter=self.adapter_type,
+            raw=raw,
+        )
+        return resource_from_delivery(
+            reference=Reference(
+                reference.provider_id,
+                dataset_identifier=package_id,
+                resource_identifier=resource_identifier,
+                parameters=reference.parameters,
+            ),
+            uri=uri,
+            format=format_name,
+            media_type=cast(str | None, item.get("mimetype")),
+            metadata=metadata,
+            provenance=provenance,
+            kind="file",
+            archive=cast(str | None, settings.get("archive")),
+            options={} if member is None else {"entry_point": member},
         )

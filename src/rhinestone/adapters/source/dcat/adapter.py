@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from ....errors import (
+    AmbiguousResourceError,
     ConfigValidationError,
     DependencyUnavailableError,
     ProviderMetadataError,
@@ -11,10 +12,11 @@ from ....errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from ....models import Config, ResourceCandidate, Result, SearchQuery, Source
+from ....models import Metadata, Provenance, Reference, Resource, SearchQuery
 from ....representations import canonical_format, format_from_media_type
+from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
-from .._knowledge import source, string
+from .._knowledge import string
 from ..base import ProviderAdapter
 
 _DCAT = "http://www.w3.org/ns/dcat#"
@@ -81,9 +83,9 @@ class DcatAdapter(ProviderAdapter):
         )
         return values[0] if values else None
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Load the configured Dataset URI and expose its distribution."""
-        settings = self._config_settings(config)
+        settings = self._reference_parameters(reference)
         rdf_runtime, catalog_graph, document, catalog_uri = self._load_catalog(settings)
         dataset_uri = string(settings, "dataset")
         dataset = rdf_runtime.URIRef(dataset_uri)
@@ -93,7 +95,62 @@ class DcatAdapter(ProviderAdapter):
             rdf_runtime.URIRef(_DCAT + "Dataset"),
         ) not in catalog_graph:
             raise ResourceNotFoundError("DCAT Dataset URI was not found")
-        candidates: list[ResourceCandidate] = []
+        resources = self._dataset_resources(
+            reference,
+            rdf_runtime,
+            catalog_graph,
+            dataset,
+            document,
+            catalog_uri,
+        )
+        selected_distribution = reference.resource_identifier or (
+            settings.get("distribution")
+            if isinstance(settings.get("distribution"), str)
+            else None
+        )
+        if selected_distribution is not None:
+            resources = tuple(
+                resource
+                for resource in resources
+                if resource.reference.resource_identifier == selected_distribution
+                or resource.reference.parameters.get("distribution")
+                == selected_distribution
+            )
+        if not resources:
+            raise ResourceNotFoundError("DCAT Dataset has no matching distribution")
+        if len(resources) != 1:
+            raise AmbiguousResourceError(
+                f"DCAT Dataset has {len(resources)} distributions; set "
+                "Reference.resource_identifier"
+            )
+        return resources[0]
+
+    def _dataset_resources(
+        self,
+        reference: Reference,
+        rdf_runtime: Any,
+        catalog_graph: Any,
+        dataset: Any,
+        document: str,
+        catalog_uri: str,
+    ) -> tuple[Resource, ...]:
+        dataset_uri = str(dataset)
+        title = self._value(rdf_runtime, catalog_graph, dataset, _DCT + "title")
+        description = self._value(
+            rdf_runtime, catalog_graph, dataset, _DCT + "description"
+        )
+        license_name = self._value(
+            rdf_runtime, catalog_graph, dataset, _DCT + "license"
+        )
+        raw = {"document": document, "catalog_uri": catalog_uri}
+        metadata = Metadata(
+            title=title or dataset_uri,
+            description=description,
+            publisher=self.adapter_type,
+            license=license_name,
+            raw=raw,
+        )
+        resources: list[Resource] = []
         for distribution in sorted(
             set(
                 catalog_graph.objects(
@@ -108,52 +165,54 @@ class DcatAdapter(ProviderAdapter):
             format_name = canonical_format(
                 self._value(rdf_runtime, catalog_graph, distribution, _DCT + "format")
             ) or format_from_media_type(media_type)
-            for url in sorted(
+            download_urls = sorted(
                 set(
                     catalog_graph.objects(
                         distribution, rdf_runtime.URIRef(_DCAT + "downloadURL")
                     )
                 ),
                 key=str,
-            ):
-                candidates.append(
-                    ResourceCandidate(
-                        str(url),
-                        format_name,
-                        media_type,
-                        {
-                            "distribution": str(distribution),
-                            "matches_config": settings.get(
-                                "distribution", str(distribution)
-                            )
-                            == str(distribution),
-                            "access_kind": "file",
-                            "license": self._value(
-                                rdf_runtime,
-                                catalog_graph,
-                                distribution,
-                                _DCT + "license",
-                            ),
-                        },
+            )
+            for index, url in enumerate(download_urls, start=1):
+                uri = str(url)
+                distribution_uri = str(distribution)
+                distribution_id = (
+                    distribution_uri
+                    if len(download_urls) == 1
+                    else f"{distribution_uri}#delivery-{index}"
+                )
+                provenance = Provenance(
+                    provider=self.adapter_type,
+                    dataset_identifier=dataset_uri,
+                    resource_identifier=distribution_id,
+                    api_endpoint=catalog_uri,
+                    original_url=uri,
+                    adapter=self.adapter_type,
+                    raw=raw,
+                )
+                resources.append(
+                    resource_from_delivery(
+                        reference=Reference(
+                            reference.provider_id,
+                            dataset_identifier=dataset_uri,
+                            resource_identifier=distribution_id,
+                            parameters={
+                                "uri": catalog_uri,
+                                "serialization": self._serialization,
+                                "dataset": dataset_uri,
+                                "distribution": distribution_uri,
+                            },
+                        ),
+                        uri=uri,
+                        format=format_name,
+                        media_type=media_type,
+                        metadata=metadata,
+                        provenance=provenance,
                     )
                 )
-        return source(
-            self.adapter_type,
-            dataset_uri,
-            {"document": document, "catalog_uri": catalog_uri},
-            tuple(candidates),
-            title=self._value(rdf_runtime, catalog_graph, dataset, _DCT + "title"),
-            description=self._value(
-                rdf_runtime, catalog_graph, dataset, _DCT + "description"
-            ),
-            license_name=self._value(
-                rdf_runtime, catalog_graph, dataset, _DCT + "license"
-            ),
-            endpoint=catalog_uri,
-            capabilities=("download", "search"),
-        )
+        return tuple(resources)
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         """Search Dataset subjects by text while preserving their distributions."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError("Unsupported DCAT search")
@@ -162,7 +221,7 @@ class DcatAdapter(ProviderAdapter):
             "serialization": self._serialization,
         }
         rdf_runtime, catalog_graph, document, catalog_uri = self._load_catalog(settings)
-        results: list[Result] = []
+        results: list[Resource] = []
         for dataset in sorted(
             set(
                 catalog_graph.subjects(
@@ -183,26 +242,21 @@ class DcatAdapter(ProviderAdapter):
             haystack = (title + " " + (description or "")).casefold()
             if any(term.casefold() not in haystack for term in query.text_terms):
                 continue
-            item = source(
+            reference = Reference(
                 self.adapter_type,
-                str(dataset),
-                {"document": document},
-                (),
-                title=title,
-                description=description,
-                endpoint=catalog_uri,
+                dataset_identifier=str(dataset),
+                parameters=dict(settings, dataset=str(dataset)),
             )
-            results.append(
-                Result(
-                    title=title,
-                    description=description,
-                    discovered_by=self.adapter_type,
-                    target=Config(
-                        self.adapter_type, dict(settings, dataset=str(dataset))
-                    ),
-                    metadata=item.metadata,
-                    provenance=item.provenance,
-                    raw_metadata=item.raw_metadata,
+            results.extend(
+                self._dataset_resources(
+                    reference,
+                    rdf_runtime,
+                    catalog_graph,
+                    dataset,
+                    document,
+                    catalog_uri,
                 )
             )
+            if query.limit is not None and len(results) >= query.limit:
+                return tuple(results[: query.limit])
         return tuple(results[: query.limit])

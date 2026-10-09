@@ -1,4 +1,4 @@
-"""Application pipeline from Config through Source to user-owned runtime."""
+"""Application pipeline from Reference through Resource to user-owned runtime."""
 
 from dataclasses import replace
 from typing import Any
@@ -10,42 +10,50 @@ from .errors import (
     RhinestoneError,
 )
 from .execution import AuthorizingExecutionAdapter, ExecutionAdapterSelector
-from .models import AccessPlan, Config, LibraryName, Resource, RuntimeFactory
+from .models import (
+    AccessPlan,
+    Config,
+    LibraryName,
+    Reference,
+    Resource,
+    RuntimeFactory,
+)
 from .registry import AdapterRegistry
-from .resolution import Resolver
 from .security import DestinationPolicy
 
 
 class AccessPipeline:
-    """Run Config through Source, resolution, and execution boundaries."""
+    """Load a Reference and execute its Resource's access plan."""
 
     def __init__(
         self,
         adapter_registry: AdapterRegistry,
-        resolver: Resolver,
         execution_selector: ExecutionAdapterSelector | None = None,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
         self._adapter_registry = adapter_registry
-        self._resolver = resolver
         self._execution_adapter_selector = execution_selector
         self._destination_policy = (
             destination_policy or DestinationPolicy.unrestricted()
         )
 
-    def resolve(self, config: Config) -> Resource:
-        """Load provider metadata and resolve ``config`` into a Resource."""
-        adapter = self._adapter_registry.source(config.source_id)
+    def resolve(self, value: Config | Reference) -> Resource:
+        """Load the unique Resource identified by a Reference.
+
+        Config remains a temporary public entry point until the API integration
+        change; Provider adapters receive only Reference values.
+        """
+        reference = Reference.from_config(value) if isinstance(value, Config) else value
+        adapter = self._adapter_registry.source(reference.provider_id)
         try:
-            source = adapter.load(config)
+            resource = adapter.load(reference)
         except RhinestoneError:
             raise
         except Exception as error:
             raise ProviderMetadataError(
-                f"Provider metadata for source {config.source_id!r} could not be "
+                f"Provider metadata for Provider {reference.provider_id!r} could not be "
                 "loaded; inspect the endpoint and provider availability"
             ) from error
-        resource = self._resolver.resolve(source)
         return self.bind(resource)
 
     def bind(self, resource: Resource) -> Resource:
@@ -58,6 +66,11 @@ class AccessPipeline:
         def open_resource(
             value: Resource, library: LibraryName, runtime: object | None
         ) -> object:
+            if value.access_plan is None:
+                raise ExecutionAdapterUnavailableError(
+                    "Resource has no AccessPlan; load its Reference through the "
+                    "target Provider before opening it"
+                )
             return AccessPipeline._open_plan(
                 value.access_plan,
                 library,
@@ -72,7 +85,11 @@ class AccessPipeline:
         )
 
     def open(
-        self, config: Config, library: LibraryName, *, runtime: object | None = None
+        self,
+        config: Config | Reference,
+        library: LibraryName,
+        *,
+        runtime: object | None = None,
     ) -> object:
         """Resolve ``config`` and open its Resource through ``library``."""
         return self.resolve(config).open(library, runtime=runtime)
@@ -85,6 +102,10 @@ class AccessPipeline:
             raise ProviderMetadataError(
                 "Execution pipeline is not configured; construct the public "
                 "application with configure() before opening a Resource"
+            )
+        if resource.access_plan is None:
+            raise ExecutionAdapterUnavailableError(
+                "Resource has no AccessPlan; resolve its Reference first"
             )
         return self._open_plan(
             resource.access_plan,

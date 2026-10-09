@@ -25,7 +25,6 @@ from .errors import (
 from .models import (
     ProviderSearchResults,
     Resource,
-    Result,
     SearchDiagnostic,
     SearchExecution,
     SearchQuery,
@@ -33,20 +32,19 @@ from .models import (
 from .representations import Format, canonical_format
 
 
-def _result_formats(result: Result) -> frozenset[Format]:
+def _result_formats(result: Resource) -> frozenset[Format]:
     """Return formats declared for the selected resource only."""
     found: set[Format] = set()
     for value in result.formats:
         normalized = canonical_format(value)
-        if normalized is not None:
-            try:
-                found.add(Format(normalized))
-            except ValueError:
-                pass
+        try:
+            found.add(Format(normalized))
+        except ValueError:
+            pass
     return frozenset(found)
 
 
-def _matches_format(result: Result, query: SearchQuery) -> bool:
+def _matches_format(result: Resource, query: SearchQuery) -> bool:
     requested = query.expanded_formats
     available = _result_formats(result)
     if available & requested:
@@ -54,7 +52,7 @@ def _matches_format(result: Result, query: SearchQuery) -> bool:
     return not available and Format.UNKNOWN in requested
 
 
-class SearchResults(Sequence[Result]):
+class SearchResults(Sequence[Resource]):
     """Provider-grouped results with deterministic sequence traversal.
 
     Integer indexing and iteration concatenate groups in their supplied order and
@@ -65,7 +63,7 @@ class SearchResults(Sequence[Result]):
 
     def __init__(
         self,
-        grouped: Mapping[str, tuple[Result, ...]],
+        grouped: Mapping[str, tuple[Resource, ...]],
         diagnostics: Iterable[SearchDiagnostic] = (),
         executions: Iterable[SearchExecution] = (),
     ) -> None:
@@ -81,7 +79,7 @@ class SearchResults(Sequence[Result]):
     @classmethod
     def from_grouped(
         cls,
-        grouped: Mapping[str, tuple[Result, ...]],
+        grouped: Mapping[str, tuple[Resource, ...]],
         diagnostics: Iterable[SearchDiagnostic] = (),
         executions: Iterable[SearchExecution] = (),
     ) -> "SearchResults":
@@ -100,15 +98,15 @@ class SearchResults(Sequence[Result]):
         return self._executions
 
     @overload
-    def __getitem__(self, index: int) -> Result: ...
+    def __getitem__(self, index: int) -> Resource: ...
 
     @overload
-    def __getitem__(self, index: slice) -> tuple[Result, ...]: ...
+    def __getitem__(self, index: slice) -> tuple[Resource, ...]: ...
 
     @overload
-    def __getitem__(self, index: str) -> tuple[Result, ...]: ...
+    def __getitem__(self, index: str) -> tuple[Resource, ...]: ...
 
-    def __getitem__(self, index: int | slice | str) -> Result | tuple[Result, ...]:
+    def __getitem__(self, index: int | slice | str) -> Resource | tuple[Resource, ...]:
         """Return a result, sequence slice, or source-specific result group."""
         if isinstance(index, str):
             return self._results_by_source[index]
@@ -122,32 +120,26 @@ class SearchResults(Sequence[Result]):
         """Return source IDs in sequence traversal order."""
         return tuple(self._results_by_source)
 
-    def values(self) -> tuple[tuple[Result, ...], ...]:
+    def values(self) -> tuple[tuple[Resource, ...], ...]:
         """Return result groups in sequence traversal order."""
         return tuple(self._results_by_source.values())
 
-    def items(self) -> tuple[tuple[str, tuple[Result, ...]], ...]:
+    def items(self) -> tuple[tuple[str, tuple[Resource, ...]], ...]:
         """Return source IDs and result groups in sequence traversal order."""
         return tuple(self._results_by_source.items())
 
     def get(
-        self, source_id: str, default: tuple[Result, ...] = ()
-    ) -> tuple[Result, ...]:
+        self, source_id: str, default: tuple[Resource, ...] = ()
+    ) -> tuple[Resource, ...]:
         """Get one source group without requiring the source to exist."""
         return self._results_by_source.get(source_id, default)
 
-    def bind_resolver(self, resolver: Callable[[Result], Resource]) -> "SearchResults":
-        """Bind direct Result resolution to an application context."""
+    def bind(self, binder: Callable[[Resource], Resource]) -> "SearchResults":
+        """Bind searched Resources to an application execution context."""
         grouped = OrderedDict(
             (
                 source_id,
-                tuple(
-                    replace(
-                        result,
-                        _resolver=lambda result=result: resolver(result),
-                    )
-                    for result in results
-                ),
+                tuple(binder(result) for result in results),
             )
             for source_id, results in self._results_by_source.items()
         )
@@ -188,7 +180,7 @@ class SearchCoordinator:
         ]
         if not searchable_adapters:
             return SearchResults.from_grouped({})
-        grouped_results: OrderedDict[str, tuple[Result, ...]] = OrderedDict()
+        grouped_results: OrderedDict[str, tuple[Resource, ...]] = OrderedDict()
         diagnostics: list[SearchDiagnostic] = []
         executions: list[SearchExecution] = []
         resolved_area: AdministrativeArea | None = None
@@ -236,7 +228,7 @@ class SearchCoordinator:
         resolved_area: AdministrativeArea | None,
     ) -> SearchResults:
         """Execute one provider with local diagnostics and timing state."""
-        grouped_results: OrderedDict[str, tuple[Result, ...]] = OrderedDict()
+        grouped_results: OrderedDict[str, tuple[Resource, ...]] = OrderedDict()
         diagnostics: list[SearchDiagnostic] = []
         executions: list[SearchExecution] = []
         supported_conditions = adapter.search_conditions
@@ -295,7 +287,7 @@ class SearchCoordinator:
         ):
             return SearchResults.from_grouped(grouped_results, diagnostics)
         started = perf_counter()
-        provider_results: tuple[Result, ...] = ()
+        provider_results: tuple[Resource, ...] = ()
         try:
             adapter_query = projected_query.project(supported_conditions)
             if query.format is not None and not native_format_search:

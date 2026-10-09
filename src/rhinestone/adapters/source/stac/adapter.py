@@ -5,18 +5,17 @@ from typing import Any
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
-    Config,
     Metadata,
     Provenance,
     ProviderSearchResults,
-    ResourceCandidate,
-    Result,
+    Reference,
+    Resource,
     SearchDiagnostic,
     SearchQuery,
-    Source,
 )
 from ....registry import CredentialRegistry
 from ....representations import format_from_media_type
+from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from .._uri import resolve_response_href
 from ..base import JsonObject, JsonTransport, ProviderAdapter
@@ -50,9 +49,23 @@ class StacAdapter(ProviderAdapter):
             provider_id=provider_id,
         )
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Load one STAC Item and its explicitly named Asset."""
-        settings = self._config_settings(config)
+        parameters = dict(reference.parameters)
+        if reference.resource_identifier is not None:
+            item_id, separator, asset_key = reference.resource_identifier.partition(":")
+            if separator:
+                parameters.setdefault("item_id", item_id)
+                parameters.setdefault("asset_key", asset_key)
+        settings = self._reference_parameters(
+            Reference(
+                reference.provider_id,
+                reference.dataset_identifier,
+                reference.resource_identifier,
+                parameters,
+            ),
+            dataset_key="collection_id",
+        )
         endpoint = self._endpoint_from(settings)
         collection_id = self._required_string(settings, "collection_id")
         item_id = self._required_string(settings, "item_id")
@@ -62,7 +75,7 @@ class StacAdapter(ProviderAdapter):
         item_url = f"{endpoint}/collections/{collection_path}/items/{item_path}"
         item, response_uri = self._request_with_uri(item_url, {})
         asset = self._asset(item, asset_key)
-        candidate = self._candidate(asset, asset_key, response_uri)
+        uri, format_name, media_type = self._delivery(asset, response_uri)
         properties = self._object(item.get("properties"), "STAC properties")
         metadata = Metadata(
             title=_optional_string(properties.get("title")) or item_id,
@@ -72,19 +85,25 @@ class StacAdapter(ProviderAdapter):
         provenance = Provenance(
             provider="stac",
             dataset_identifier=collection_id,
-            resource_identifier=item_id,
+            resource_identifier=f"{item_id}:{asset_key}",
             api_endpoint=endpoint,
-            original_url=candidate.uri,
+            original_url=uri,
             query_parameters={"asset_key": asset_key},
             adapter="stac",
             raw=item,
         )
-        return Source(
+        return resource_from_delivery(
+            reference=Reference(
+                reference.provider_id,
+                dataset_identifier=collection_id,
+                resource_identifier=f"{item_id}:{asset_key}",
+                parameters=reference.parameters,
+            ),
+            uri=uri,
+            format=format_name,
+            media_type=media_type,
             metadata=metadata,
-            candidates=(candidate,),
-            capabilities=frozenset({"download", "search"}),
             provenance=provenance,
-            raw_metadata=item,
         )
 
     def search(
@@ -102,61 +121,65 @@ class StacAdapter(ProviderAdapter):
             params["collections"] = ",".join(collections)
         response = self._request(f"{endpoint}/search", params)
         items = self._objects(response.get("features"), "STAC features")
-        found: list[Result] = []
+        found: list[Resource] = []
         diagnostics: list[SearchDiagnostic] = []
         for item in items:
             item_id = self._required_string(item, "id")
             collection_id = self._required_string(item, "collection")
             properties = self._object(item.get("properties"), "STAC properties")
-            asset_key, data_asset_count = self._single_data_asset_key(item)
-            if asset_key is None:
+            asset_keys = self._data_asset_keys(item)
+            if not asset_keys:
                 diagnostics.append(
                     SearchDiagnostic(
                         source_id=self.adapter_type,
                         skipped_conditions=frozenset(),
                         reason="item_skipped",
                         resource_identifier=item_id,
-                        detail=(
-                            "missing_data_asset"
-                            if data_asset_count == 0
-                            else "multiple_data_assets"
-                        ),
+                        detail="missing_data_asset",
                     )
                 )
                 continue
-            asset = self._asset(item, asset_key)
-            candidate = self._candidate(asset, asset_key, f"{endpoint}/search")
-            formats: frozenset[str] = (
-                frozenset({candidate.format}) if candidate.format else frozenset()
-            )
             title = _optional_string(properties.get("title")) or item_id
-            found.append(
-                Result(
-                    title=title,
-                    description=_optional_string(properties.get("description")),
-                    discovered_by=self.adapter_type,
-                    target=Config(
-                        self.adapter_type,
-                        {
-                            "collection_id": collection_id,
-                            "item_id": item_id,
-                            "asset_key": asset_key,
-                        },
-                    ),
-                    metadata=Metadata(title=title, raw=item),
-                    provenance=Provenance(
-                        provider="stac",
-                        dataset_identifier=collection_id,
-                        resource_identifier=item_id,
-                        api_endpoint=endpoint,
-                        query_parameters=params,
-                        adapter="stac",
-                        raw=item,
-                    ),
-                    formats=formats,
-                    raw_metadata=item,
+            for asset_key in asset_keys:
+                asset = self._asset(item, asset_key)
+                uri, format_name, media_type = self._delivery(
+                    asset, f"{endpoint}/search"
                 )
-            )
+                provenance = Provenance(
+                    provider="stac",
+                    dataset_identifier=collection_id,
+                    resource_identifier=f"{item_id}:{asset_key}",
+                    api_endpoint=endpoint,
+                    original_url=uri,
+                    query_parameters=params,
+                    adapter="stac",
+                    raw=item,
+                )
+                found.append(
+                    resource_from_delivery(
+                        reference=Reference(
+                            self.adapter_type,
+                            dataset_identifier=collection_id,
+                            resource_identifier=f"{item_id}:{asset_key}",
+                            parameters={
+                                "collection_id": collection_id,
+                                "item_id": item_id,
+                                "asset_key": asset_key,
+                            },
+                        ),
+                        uri=uri,
+                        format=format_name,
+                        media_type=media_type,
+                        metadata=Metadata(
+                            title=title,
+                            description=_optional_string(properties.get("description")),
+                            raw=item,
+                        ),
+                        provenance=provenance,
+                    )
+                )
+                if query.limit is not None and len(found) >= query.limit:
+                    return ProviderSearchResults(tuple(found), tuple(diagnostics))
         return ProviderSearchResults(tuple(found), tuple(diagnostics))
 
     @staticmethod
@@ -180,9 +203,9 @@ class StacAdapter(ProviderAdapter):
             raise ProviderResponseError(f"Requested STAC asset {key!r} is missing")
         return self._object(assets[key], f"STAC asset {key!r}")
 
-    def _candidate(
-        self, asset: JsonObject, key: str, response_uri: str
-    ) -> ResourceCandidate:
+    def _delivery(
+        self, asset: JsonObject, response_uri: str
+    ) -> tuple[str, str | None, str | None]:
         href = self._required_string(asset, "href")
         uri = resolve_response_href(response_uri, href)
         media_type = _optional_string(asset.get("type"))
@@ -191,14 +214,9 @@ class StacAdapter(ProviderAdapter):
             if media_type and "cloud-optimized" in media_type
             else format_from_media_type(media_type)
         )
-        return ResourceCandidate(
-            uri=uri,
-            format=format_name,
-            media_type=media_type,
-            attributes={"asset_key": key, "asset": asset},
-        )
+        return uri, format_name, media_type
 
-    def _single_data_asset_key(self, item: JsonObject) -> tuple[str | None, int]:
+    def _data_asset_keys(self, item: JsonObject) -> tuple[str, ...]:
         assets = self._object(item.get("assets"), "STAC assets")
         data_keys: list[str] = []
         for key, raw_asset in assets.items():
@@ -206,9 +224,7 @@ class StacAdapter(ProviderAdapter):
             roles = asset.get("roles", [])
             if isinstance(roles, list) and "data" in roles:
                 data_keys.append(key)
-        if len(data_keys) != 1:
-            return None, len(data_keys)
-        return data_keys[0], 1
+        return tuple(sorted(data_keys))
 
 
 def _optional_string(value: Any) -> str | None:

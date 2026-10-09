@@ -28,7 +28,8 @@ from rhinestone.errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import SearchQuery
+from rhinestone.models import Metadata, Provenance, Reference, Resource, SearchQuery
+from rhinestone.resolution import resource_from_delivery
 
 
 def municipality_records() -> tuple[MunicipalityRecord, ...]:
@@ -314,26 +315,21 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
         )
     )
     assert resource.format == "gml"
+    assert resource.access_plan is not None
     assert resource.access_plan.kind == "file"
     assert resource.provenance.adapter == "estat-gis"
-    assert resource.source.raw_metadata["distribution_index"][0]["format"] == "GML"
-    assert (
-        resource.source.raw_metadata["distribution_index"][0]["matches_config"] is False
-    )
-    assert resource.source.metadata.raw["distribution_index"][0]["format"] == "GML"
+    assert resource.metadata.raw["distribution"]["format"] == "GML"
     assert resource.provenance.raw["distribution"]["format"] == "GML"
-    assert (
-        resource.source.candidates[0].attributes["dataset_identity"]["dataset_id"]
-        == "census-2020"
-    )
-    assert "matches_config" not in resource.source.candidates[0].attributes
+    assert resource.metadata.raw["dataset_identity"]["dataset_id"] == "census-2020"
+    assert "matches_config" not in resource.metadata.raw
 
-    with pytest.raises(AmbiguousResourceError, match="exactly one"):
+    with pytest.raises(AmbiguousResourceError, match="2 distributions"):
         app.resolve(Config("estat", {"dataset_id": "census-2020"}))
 
     zip_resource = app.resolve(
         Config("estat", {"distribution_id": "census-2020-small-area-tokyo-shp"})
     )
+    assert zip_resource.access_plan is not None
     assert zip_resource.access_plan.options["entry_point"] == "tokyo.shp"
 
     timed = app.resolve(
@@ -396,20 +392,24 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
     assert len(adapter.search(SearchQuery(text="Shape", limit=1))) == 1
     assert len(adapter.search(SearchQuery(limit=1))) == 1
     app_results = app.search(text="Shape", limit=1)
-    assert app_results[0].target.source_id == "estat"
+    assert app_results[0].reference.provider_id == "estat"
     with pytest.raises(UnsupportedSearchConditionError):
         adapter.search(SearchQuery(bbox=(1, 2, 3, 4)))
 
     adapter.config_schema = lambda: None  # type: ignore[method-assign]
     with pytest.raises(ConfigValidationError, match="Unknown"):
-        adapter.load(Config("estat-gis", {"unexpected": "value"}))
+        adapter.load(
+            Reference.from_config(Config("estat-gis", {"unexpected": "value"}))
+        )
     calendar_adapter = EstatGisAdapter(
         distributions, knowledge=cast(Any, StandardTimeAdapter())
     )
     calendar_adapter.config_schema = lambda: None  # type: ignore[method-assign]
     with pytest.raises(ConfigValidationError, match="survey_year"):
         calendar_adapter.load(
-            Config("estat-gis", {"time": "2020", "time_kind": "calendar_year"})
+            Reference.from_config(
+                Config("estat-gis", {"time": "2020", "time_kind": "calendar_year"})
+            )
         )
 
 
@@ -503,11 +503,11 @@ def test_estat_gis_deep_copies_nested_raw_distribution_metadata() -> None:
     adapter = EstatGisAdapter([distribution])
     extension["tags"].append("mutated")
 
-    source = adapter.load(Config("estat-gis", {"distribution_id": "d1"}))
-
-    assert source.raw_metadata["distribution_index"][0]["extension"]["tags"] == (
-        "original",
+    source = adapter.load(
+        Reference.from_config(Config("estat-gis", {"distribution_id": "d1"}))
     )
+
+    assert source.metadata.raw["distribution"]["extension"]["tags"] == ("original",)
     assert source.provenance.raw["distribution"]["extension"]["tags"] == ("original",)
 
 
@@ -528,9 +528,9 @@ def test_estat_gis_accepts_provider_frozen_distribution_settings() -> None:
         Config("estat", {"distribution_id": "d1"})
     )
 
-    assert resource.source.raw_metadata["distribution_index"][0]["extension"]["nested"][
-        "tags"
-    ] == ("original",)
+    assert resource.metadata.raw["distribution"]["extension"]["nested"]["tags"] == (
+        "original",
+    )
 
 
 def test_custom_adapter_context_uses_public_ports_only() -> None:
@@ -542,22 +542,14 @@ def test_custom_adapter_context_uses_public_ports_only() -> None:
         )
 
         class Adapter:
-            def load(self, config: Config) -> Any:
-                from rhinestone.models import (
-                    Metadata,
-                    Provenance,
-                    ResourceCandidate,
-                    Source,
-                )
-
-                return Source(
+            def load(self, reference: Reference) -> Resource:
+                return resource_from_delivery(
+                    reference=reference,
+                    uri="https://example.test/a",
+                    format="gml",
+                    media_type=None,
                     metadata=Metadata(title="public"),
-                    candidates=(
-                        ResourceCandidate("https://example.test/a", "gml", None),
-                    ),
-                    capabilities=frozenset(),
                     provenance=Provenance(provider=provider.id),
-                    raw_metadata={},
                 )
 
         return Adapter()
@@ -644,7 +636,6 @@ def test_custom_source_receives_one_core_managed_transport_port(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import rhinestone._http as http
-    from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
 
     calls: list[tuple[str, object, object]] = []
 
@@ -669,19 +660,14 @@ def test_custom_source_receives_one_core_managed_transport_port(
         )
 
         class Adapter:
-            def load(self, config: Config) -> Any:
-                return Source(
+            def load(self, reference: Reference) -> Resource:
+                return resource_from_delivery(
+                    reference=reference,
+                    uri="https://custom.example/data",
+                    format="GeoPackage",
+                    media_type="application/octet-stream",
                     metadata=Metadata(title="target"),
-                    candidates=(
-                        ResourceCandidate(
-                            "https://custom.example/data",
-                            "GeoPackage",
-                            "application/octet-stream",
-                        ),
-                    ),
-                    capabilities=frozenset(),
                     provenance=Provenance(provider=provider.id),
-                    raw_metadata={},
                 )
 
         return Adapter()
@@ -718,7 +704,7 @@ def test_custom_transport_preserves_text_headers_and_normalizes_network_errors(
 
     def factory(provider: Provider, context: Any) -> Any:
         class Adapter:
-            def load(self, config: Config) -> Any:
+            def load(self, reference: Reference) -> Resource:
                 assert (
                     context.transport.get_text(
                         "https://custom.example/catalog",
@@ -727,23 +713,13 @@ def test_custom_transport_preserves_text_headers_and_normalizes_network_errors(
                     )
                     == "document"
                 )
-                from rhinestone.models import (
-                    Metadata,
-                    Provenance,
-                    ResourceCandidate,
-                    Source,
-                )
-
-                return Source(
+                return resource_from_delivery(
+                    reference=reference,
+                    uri="https://custom.example/data",
+                    format="geojson",
+                    media_type=None,
                     metadata=Metadata(title="target"),
-                    candidates=(
-                        ResourceCandidate(
-                            "https://custom.example/data", "geojson", None
-                        ),
-                    ),
-                    capabilities=frozenset(),
                     provenance=Provenance(provider=provider.id),
-                    raw_metadata={},
                 )
 
         return Adapter()

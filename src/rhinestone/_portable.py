@@ -10,22 +10,17 @@ from typing import Any, cast
 from .errors import ConfigValidationError
 from .models import (
     AccessPlan,
-    Config,
     DiscoveryRecord,
     Metadata,
     Provenance,
+    Reference,
     Resource,
-    ResourceCandidate,
-    Result,
-    Source,
 )
 
 _ACCESS_PLAN_SCHEMA = "rhinestone.access-plan"
 _ACCESS_PLAN_VERSION = 1
-_RESULT_SCHEMA = "rhinestone.result"
-_RESULT_VERSION = 1
 _RESOURCE_SCHEMA = "rhinestone.resource"
-_RESOURCE_VERSION = 2
+_RESOURCE_VERSION = 3
 
 
 def _json_value(value: Any, path: str) -> Any:
@@ -153,35 +148,23 @@ def _provenance_from_dict(value: Any, path: str = "provenance") -> Provenance:
     )
 
 
-def _config_to_dict(value: Config) -> dict[str, Any]:
+def _reference_to_dict(value: Reference) -> dict[str, Any]:
     return {
-        "source_id": value.source_id,
-        "settings": _json_value(value.settings, "target.settings"),
+        "provider_id": value.provider_id,
+        "dataset_identifier": value.dataset_identifier,
+        "resource_identifier": value.resource_identifier,
+        "parameters": _json_value(value.parameters, "reference.parameters"),
     }
 
 
-def _config_from_dict(value: Any, path: str = "target") -> Config:
-    data = _mapping(value, path)
-    return Config(
-        source_id=_required_string(data, "source_id", path),
-        settings=_mapping(data.get("settings", {}), f"{path}.settings"),
+def _reference_from_dict(value: Any) -> Reference:
+    data = _mapping(value, "reference")
+    return Reference(
+        provider_id=_required_string(data, "provider_id", "reference"),
+        dataset_identifier=_optional_string(data, "dataset_identifier", "reference"),
+        resource_identifier=_optional_string(data, "resource_identifier", "reference"),
+        parameters=_mapping(data.get("parameters", {}), "reference.parameters"),
     )
-
-
-def result_to_dict(value: Result) -> dict[str, Any]:
-    """Return a versioned JSON-safe Result representation without its resolver."""
-    return {
-        "schema": _RESULT_SCHEMA,
-        "version": _RESULT_VERSION,
-        "title": value.title,
-        "description": value.description,
-        "discovered_by": value.discovered_by,
-        "target": _config_to_dict(value.target),
-        "metadata": _metadata_to_dict(value.metadata),
-        "provenance": _provenance_to_dict(value.provenance),
-        "formats": sorted(value.formats),
-        "raw_metadata": _json_value(value.raw_metadata, "raw_metadata"),
-    }
 
 
 def _check_envelope(data: Mapping[str, Any], schema: str, version: int) -> None:
@@ -192,81 +175,6 @@ def _check_envelope(data: Mapping[str, Any], schema: str, version: int) -> None:
         raise ConfigValidationError(
             f"portable data version must be {version}; got {actual_version!r}"
         )
-
-
-def result_from_dict(value: Mapping[str, Any]) -> Result:
-    """Restore a detached Result from its versioned JSON representation."""
-    data = _mapping(value, "result")
-    _check_envelope(data, _RESULT_SCHEMA, _RESULT_VERSION)
-    formats = data.get("formats", [])
-    if not isinstance(formats, list):
-        raise ConfigValidationError("result.formats must be a list of strings")
-    format_items = cast(list[Any], formats)
-    if any(not isinstance(item, str) for item in format_items):
-        raise ConfigValidationError("result.formats must be a list of strings")
-    return Result(
-        title=_required_string(data, "title", "result"),
-        description=_optional_string(data, "description", "result"),
-        discovered_by=_required_string(data, "discovered_by", "result"),
-        target=_config_from_dict(data.get("target")),
-        metadata=_metadata_from_dict(data.get("metadata")),
-        provenance=_provenance_from_dict(data.get("provenance")),
-        formats=frozenset(cast(list[str], format_items)),
-        raw_metadata=_mapping(data.get("raw_metadata", {}), "result.raw_metadata"),
-    )
-
-
-def _candidate_to_dict(value: ResourceCandidate) -> dict[str, Any]:
-    return {
-        "uri": value.uri,
-        "format": value.format,
-        "media_type": value.media_type,
-        "attributes": _json_value(value.attributes, "source.candidate.attributes"),
-    }
-
-
-def _candidate_from_dict(value: Any, path: str) -> ResourceCandidate:
-    data = _mapping(value, path)
-    return ResourceCandidate(
-        uri=_required_string(data, "uri", path),
-        format=_optional_string(data, "format", path),
-        media_type=_optional_string(data, "media_type", path),
-        attributes=_mapping(data.get("attributes", {}), f"{path}.attributes"),
-    )
-
-
-def _source_to_dict(value: Source) -> dict[str, Any]:
-    return {
-        "metadata": _metadata_to_dict(value.metadata),
-        "candidates": [_candidate_to_dict(item) for item in value.candidates],
-        "capabilities": sorted(value.capabilities),
-        "provenance": _provenance_to_dict(value.provenance),
-        "raw_metadata": _json_value(value.raw_metadata, "source.raw_metadata"),
-    }
-
-
-def _source_from_dict(value: Any) -> Source:
-    data = _mapping(value, "source")
-    candidates = data.get("candidates", [])
-    capabilities = data.get("capabilities", [])
-    if not isinstance(candidates, list):
-        raise ConfigValidationError("source.candidates must be a list")
-    candidate_items = cast(list[Any], candidates)
-    if not isinstance(capabilities, list):
-        raise ConfigValidationError("source.capabilities must be a list of strings")
-    capability_items = cast(list[Any], capabilities)
-    if any(not isinstance(item, str) for item in capability_items):
-        raise ConfigValidationError("source.capabilities must be a list of strings")
-    return Source(
-        metadata=_metadata_from_dict(data.get("metadata"), "source.metadata"),
-        candidates=tuple(
-            _candidate_from_dict(item, f"source.candidates[{index}]")
-            for index, item in enumerate(candidate_items)
-        ),
-        capabilities=frozenset(cast(list[str], capability_items)),
-        provenance=_provenance_from_dict(data.get("provenance"), "source.provenance"),
-        raw_metadata=_mapping(data.get("raw_metadata", {}), "source.raw_metadata"),
-    )
 
 
 def access_plan_to_dict(value: AccessPlan) -> dict[str, Any]:
@@ -340,8 +248,12 @@ def resource_to_dict(value: Resource) -> dict[str, Any]:
         "media_type": value.media_type,
         "metadata": _metadata_to_dict(value.metadata),
         "provenance": _provenance_to_dict(value.provenance),
-        "access_plan": _access_plan_to_dict(value.access_plan),
-        "source": _source_to_dict(value.source),
+        "access_plan": (
+            None
+            if value.access_plan is None
+            else _access_plan_to_dict(value.access_plan)
+        ),
+        "reference": _reference_to_dict(value.reference),
         "local_path": value.local_path,
         "discovery": None
         if value.discovery is None
@@ -354,14 +266,17 @@ def resource_from_dict(value: Mapping[str, Any]) -> Resource:
     data = _mapping(value, "resource")
     _check_envelope(data, _RESOURCE_SCHEMA, _RESOURCE_VERSION)
     discovery = data.get("discovery")
+    access_plan = data.get("access_plan")
     return Resource(
         uri=_required_string(data, "uri", "resource"),
         format=_optional_string(data, "format", "resource"),
         media_type=_optional_string(data, "media_type", "resource"),
         metadata=_metadata_from_dict(data.get("metadata")),
         provenance=_provenance_from_dict(data.get("provenance")),
-        access_plan=_access_plan_from_dict(data.get("access_plan")),
-        source=_source_from_dict(data.get("source")),
+        access_plan=(
+            None if access_plan is None else _access_plan_from_dict(access_plan)
+        ),
+        reference=_reference_from_dict(data.get("reference")),
         local_path=_optional_string(data, "local_path", "resource"),
         discovery=None if discovery is None else _discovery_from_dict(discovery),
     )

@@ -6,12 +6,11 @@ from typing import Any, Protocol, runtime_checkable
 
 from ..models import (
     AccessPlan,
-    Config,
     Provider,
     ProviderSearchResults,
-    Result,
+    Reference,
+    Resource,
     SearchQuery,
-    Source,
 )
 from ..security import DestinationPolicy
 from .knowledge.base import KnowledgeAdapterDefinition, KnowledgePort
@@ -19,10 +18,10 @@ from .ports import CredentialPort, DependencyPort, TransportPort
 
 
 class SourceAdapter(Protocol):
-    """Minimal contract for an adapter that turns Config into Source."""
+    """Minimal contract for a Provider adapter that loads one Resource."""
 
-    def load(self, config: Config) -> Source:
-        """Load and normalize provider metadata for ``config``."""
+    def load(self, reference: Reference) -> Resource:
+        """Load the unique delivery identified by ``reference``."""
         ...
 
 
@@ -32,8 +31,10 @@ class SearchableSourceAdapter(SourceAdapter, Protocol):
 
     search_conditions: frozenset[str]
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...] | ProviderSearchResults:
-        """Return results and optional item diagnostics for the projected query."""
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
+        """Return delivery Resources and optional item diagnostics."""
         ...
 
 

@@ -104,7 +104,7 @@ def test_top_level_result_resolves_with_its_standard_context(
     monkeypatch.setattr(api, "_default_application", lambda: application)
 
     result = rhinestone.search(text="Standard", limit=1)[0]
-    resource = result.resolve()
+    resource = result
 
     assert resource.uri == "https://example.test/{z}/{x}/{y}.png"
     assert resource.provenance.provider == "gsi"

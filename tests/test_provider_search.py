@@ -88,7 +88,7 @@ def test_top_level_selection_avoids_all_remote_provider_calls(
         results = search(providers=[ProviderId.GSI])
         assert results.keys() == ("gsi",)
         assert not search(providers=[ProviderId.GSI], format=(Format.GEOJSON,))
-        assert results[0].resolve().provenance.provider == "gsi"
+        assert results[0].provenance.provider == "gsi"
         empty = search(providers=[], area="東京都")
         assert not empty
         assert not empty.diagnostics

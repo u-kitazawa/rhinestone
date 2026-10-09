@@ -12,9 +12,15 @@ from typing import Any, cast
 import pytest
 
 import rhinestone
-from rhinestone import Config, Resource, Result
+from rhinestone import Resource
 from rhinestone import api as rhinestone_api
-from rhinestone.models import Metadata, Provenance
+from rhinestone.models import (
+    AccessPlan,
+    DiscoveryRecord,
+    Metadata,
+    Provenance,
+    Reference,
+)
 
 ROOT = Path(__file__).parents[1]
 SHOWCASE = ROOT / "showcase"
@@ -117,7 +123,7 @@ def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
         'area="津市"',
         "format=(FormatPreset.PYOGRIO,)",
         "providers=[ProviderId.GEOSPATIAL_JP]",
-        "result.resolve()",
+        "result",
         'resource.open("pyogrio", runtime=pyogrio)',
         "ZIP Shapefile",
         "GDAL VSI URI",
@@ -140,20 +146,30 @@ def test_ckan_showcase_displays_mixed_provider_metadata(
         ("other", {"package": None}, "不明"),
     )
     results = tuple(
-        Result(
-            title="学校",
-            description=None,
-            discovered_by=provider,
-            target=Config("direct", {"uri": "https://example.org/school.geojson"}),
-            metadata=Metadata(),
+        Resource(
+            uri="https://example.org/school.geojson",
+            format="geojson",
+            media_type="application/geo+json",
+            metadata=Metadata(title="学校", raw=raw),
             provenance=Provenance(provider=provider),
-            formats=frozenset({"geojson"}),
-            raw_metadata=raw,
+            access_plan=AccessPlan(
+                kind="file",
+                uri="https://example.org/school.geojson",
+                format="geojson",
+                media_type="application/geo+json",
+            ),
+            reference=Reference("direct", resource_identifier="school"),
+            discovery=DiscoveryRecord(
+                source_id=provider,
+                metadata=Metadata(title="学校", raw=raw),
+                provenance=Provenance(provider=provider),
+                raw_metadata=raw,
+            ),
         )
         for provider, raw, _ in records
     )
 
-    def search(**kwargs: Any) -> tuple[Result, ...]:
+    def search(**kwargs: Any) -> tuple[Resource, ...]:
         return results
 
     monkeypatch.setattr(rhinestone, "search", search)
@@ -220,7 +236,7 @@ def test_ckan_showcase_search_and_resolution_run_with_offline_responses(
         resource = cast(Resource, namespace["resource"])
         assert resource.format == "geojson"
         assert resource.uri == "https://files.example/river.geojson"
-        assert calls == ["package_search"] * 8 + ["resource_show", "package_show"]
+        assert calls == ["package_search"] * 8
     finally:
         rhinestone_api._default_application.cache_clear()  # pyright: ignore[reportPrivateUsage]
 

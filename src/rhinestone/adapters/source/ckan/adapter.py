@@ -5,13 +5,11 @@ from typing import Any, cast
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
-    Config,
     Metadata,
     Provenance,
-    ResourceCandidate,
-    Result,
+    Reference,
+    Resource,
     SearchQuery,
-    Source,
 )
 from ....registry import CredentialRegistry
 from ....representations import (
@@ -19,6 +17,7 @@ from ....representations import (
     container_from_media_type,
     format_from_media_type,
 )
+from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
@@ -75,9 +74,9 @@ class CkanAdapter(ProviderAdapter):
             raise ProviderResponseError("CKAN response has no result")
         return response["result"]
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Load one CKAN resource and its parent package metadata."""
-        settings = self._config_settings(config)
+        settings = self._reference_parameters(reference, resource_key="resource_id")
         endpoint = self._endpoint_from(settings)
         resource_id = self._required_string(settings, "resource_id")
         resource = self._object(
@@ -89,7 +88,7 @@ class CkanAdapter(ProviderAdapter):
             self._action(endpoint, "package_show", {"id": package_id}),
             "CKAN package",
         )
-        candidate = self._candidate(resource)
+        uri, format_name, media_type, archive = self._delivery(resource)
         organization = package.get("organization")
         publisher = (
             cast(Mapping[str, Any], organization).get("title")
@@ -108,20 +107,22 @@ class CkanAdapter(ProviderAdapter):
             dataset_identifier=package_id,
             resource_identifier=resource_id,
             api_endpoint=endpoint,
-            original_url=candidate.uri,
+            original_url=uri,
             query_parameters={"resource_id": resource_id},
             adapter="ckan",
             raw={"resource": resource, "package": package},
         )
-        return Source(
+        return resource_from_delivery(
+            reference=replace_reference(reference, package_id, resource_id),
+            uri=uri,
+            format=format_name,
+            media_type=media_type,
             metadata=metadata,
-            candidates=(candidate,),
-            capabilities=frozenset({"download", "search"}),
             provenance=provenance,
-            raw_metadata={"resource": resource, "package": package},
+            archive=archive,
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         """Search CKAN packages and return their resource-level results."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
@@ -132,7 +133,7 @@ class CkanAdapter(ProviderAdapter):
         if query.limit == 0:
             return ()
         params = self._package_search_params(query)
-        found: list[Result] = []
+        found: list[Resource] = []
         start = 0
         while True:
             page_params = dict(params)
@@ -173,7 +174,7 @@ class CkanAdapter(ProviderAdapter):
         resource: JsonObject,
         endpoint: str,
         query: SearchQuery,
-    ) -> Result | None:
+    ) -> Resource | None:
         """Expand one declared CKAN resource without changing package metadata."""
         resource_id = self._required_string(resource, "id")
         media_type = _optional_string(resource.get("mimetype"))
@@ -185,25 +186,55 @@ class CkanAdapter(ProviderAdapter):
         )
         if query.format is not None and not self._matches_query_formats(formats, query):
             return None
-        return Result(
+        package_id = _optional_string(package.get("id"))
+        raw_uri = resource.get("url")
+        if isinstance(raw_uri, str) and raw_uri:
+            uri, selected_format, selected_media_type, archive = self._delivery(
+                resource
+            )
+        else:
+            uri = f"rhinestone-reference:{self.adapter_type}:{resource_id}"
+            selected_format = format_name
+            selected_media_type = media_type
+            archive = None
+        metadata = Metadata(
             title=_optional_string(package.get("title")) or resource_id,
             description=_optional_string(package.get("notes")),
-            discovered_by=self.adapter_type,
-            target=Config(self.adapter_type, {"resource_id": resource_id}),
-            metadata=Metadata(
-                title=_optional_string(package.get("title")),
-                raw=package,
-            ),
-            provenance=Provenance(
-                provider="ckan",
-                dataset_identifier=_optional_string(package.get("id")),
-                resource_identifier=resource_id,
-                api_endpoint=endpoint,
-                adapter="ckan",
-                raw=package,
-            ),
-            formats=formats,
-            raw_metadata={"package": package, "resource": resource},
+            raw=package,
+        )
+        provenance = Provenance(
+            provider="ckan",
+            dataset_identifier=package_id,
+            resource_identifier=resource_id,
+            api_endpoint=endpoint,
+            original_url=uri,
+            adapter="ckan",
+            raw={"package": package, "resource": resource},
+        )
+        reference = Reference(
+            self.adapter_type,
+            dataset_identifier=package_id,
+            resource_identifier=resource_id,
+            parameters={"resource_id": resource_id},
+        )
+        if not isinstance(raw_uri, str) or not raw_uri:
+            return Resource(
+                uri=uri,
+                format=selected_format,
+                media_type=selected_media_type,
+                metadata=metadata,
+                provenance=provenance,
+                access_plan=None,
+                reference=reference,
+            )
+        return resource_from_delivery(
+            reference=reference,
+            uri=uri,
+            format=selected_format,
+            media_type=selected_media_type,
+            metadata=metadata,
+            provenance=provenance,
+            archive=archive,
         )
 
     def _package_search_params(self, query: SearchQuery) -> dict[str, Any]:
@@ -217,19 +248,18 @@ class CkanAdapter(ProviderAdapter):
             params["rows"] = query.limit
         return params
 
-    def _candidate(self, resource: JsonObject) -> ResourceCandidate:
+    def _delivery(
+        self, resource: JsonObject
+    ) -> tuple[str, str | None, str | None, str | None]:
         uri = self._required_string(resource, "url")
         media_type = _optional_string(resource.get("mimetype"))
-        attributes = dict(resource)
         archive = container_from_media_type(media_type)
-        if archive is not None:
-            attributes["archive"] = archive
-        return ResourceCandidate(
-            uri=uri,
-            format=canonical_format(resource.get("format"))
+        return (
+            uri,
+            canonical_format(resource.get("format"))
             or format_from_media_type(media_type),
-            media_type=media_type,
-            attributes=attributes,
+            media_type,
+            archive,
         )
 
     @staticmethod
@@ -240,3 +270,14 @@ class CkanAdapter(ProviderAdapter):
 
 def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def replace_reference(
+    reference: Reference, dataset_identifier: str, resource_identifier: str
+) -> Reference:
+    return Reference(
+        reference.provider_id,
+        dataset_identifier=dataset_identifier,
+        resource_identifier=resource_identifier,
+        parameters=reference.parameters,
+    )

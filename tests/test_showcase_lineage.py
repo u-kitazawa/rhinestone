@@ -42,12 +42,12 @@ def test_lineage_showcase_keeps_discovery_and_resolution_records_separate() -> N
     source = notebook_source(notebook)
     for marker in (
         'provider.id == "search-ckan-jp"',
-        "item.discovered_by != item.target.source_id",
+        "item.discovered_by != item.reference.provider_id",
         "resource = app.resolve(result)",
         "resource.discovery is None",
         "discovery.provenance.provider",
         "resource.provenance.provider",
-        "resource.source.raw_metadata",
+        "resource.metadata.raw",
         "resource.access_plan.kind",
         "flat merge",
     ):

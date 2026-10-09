@@ -18,7 +18,6 @@ from rhinestone.errors import (
 from rhinestone.models import AccessPlan, RuntimeFactory
 from rhinestone.pipeline import AccessPipeline
 from rhinestone.registry import AdapterRegistry
-from rhinestone.resolution import Resolver
 
 
 @pytest.mark.parametrize(
@@ -161,7 +160,7 @@ print(app.open(AccessPlan.from_dict(json.loads(sys.stdin.read())), "rasterio", r
 
 
 def test_unconfigured_pipeline_rejects_plan_execution() -> None:
-    pipeline = AccessPipeline(AdapterRegistry((), ()), Resolver())
+    pipeline = AccessPipeline(AdapterRegistry((), ()))
     with pytest.raises(ProviderMetadataError, match="Execution pipeline"):
         pipeline.open_plan(
             AccessPlan(kind="file", uri="/a.tif", format="cog"), "rasterio"

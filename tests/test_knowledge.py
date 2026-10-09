@@ -30,8 +30,9 @@ from rhinestone.errors import (
     KnowledgeResolutionError,
     KnowledgeValidationError,
 )
-from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
+from rhinestone.models import Metadata, Provenance, Reference, Resource
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
+from rhinestone.resolution import resource_from_delivery
 from rhinestone.security import DestinationPolicy
 from tests.test_adapter_expansion import fundamental_settings, plateau_client
 
@@ -429,24 +430,26 @@ def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
         knowledge=registry,
     )
     plateau_source = plateau.load(
-        Config(
-            "plateau",
-            {
-                "dataset_id": "fixture",
-                "municipality": "横浜市",
-                "time": "2020年度",
-            },
+        Reference.from_config(
+            Config(
+                "plateau",
+                {
+                    "resource_id": "citygml",
+                    "municipality": "横浜市",
+                    "time": "2020年度",
+                },
+            )
         )
     )
-    plateau_knowledge = plateau_source.candidates[0].attributes["knowledge"]
+    plateau_knowledge = plateau_source.metadata.raw["knowledge"]
     assert plateau_knowledge["identity"]["code"] == "14100"
     assert plateau_knowledge["time"]["kind"] == "fiscal_year"
 
     gsi = GsiFundamentalAdapter(knowledge=registry)
     settings = fundamental_settings()
     settings.update({"municipality": "14100", "time": "令和2年"})
-    gsi_source = gsi.load(Config("gsi-fundamental", settings))
-    gsi_knowledge = gsi_source.candidates[0].attributes["knowledge"]
+    gsi_source = gsi.load(Reference.from_config(Config("gsi-fundamental", settings)))
+    gsi_knowledge = gsi_source.metadata.raw["knowledge"]
     assert gsi_knowledge["identity"]["name"] == "横浜市"
     assert gsi_knowledge["time"]["year"] == 2020
 
@@ -458,29 +461,25 @@ def test_source_adapters_preserve_explicit_time_kind() -> None:
         endpoint="https://fixture.example",
         knowledge=registry,
     ).load(
-        Config(
-            "plateau",
-            {
-                "dataset_id": "fixture",
-                "time": "2020年",
-                "time_kind": "survey_year",
-            },
+        Reference.from_config(
+            Config(
+                "plateau",
+                {
+                    "resource_id": "citygml",
+                    "time": "2020年",
+                    "time_kind": "survey_year",
+                },
+            )
         )
     )
-    assert (
-        plateau_source.candidates[0].attributes["knowledge"]["time"]["kind"]
-        == "survey_year"
-    )
+    assert plateau_source.metadata.raw["knowledge"]["time"]["kind"] == "survey_year"
 
     settings = fundamental_settings()
     settings.update({"time": "2020", "time_kind": "survey_year"})
     gsi_source = GsiFundamentalAdapter(knowledge=registry).load(
-        Config("gsi-fundamental", settings)
+        Reference.from_config(Config("gsi-fundamental", settings))
     )
-    assert (
-        gsi_source.candidates[0].attributes["knowledge"]["time"]["kind"]
-        == "survey_year"
-    )
+    assert gsi_source.metadata.raw["knowledge"]["time"]["kind"] == "survey_year"
 
 
 def test_source_knowledge_rejects_unknown_time_kind() -> None:
@@ -517,14 +516,14 @@ def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
         seen.append(context.knowledge)
 
         class Adapter:
-            def load(self, config: Config) -> Source:
-                candidate = ResourceCandidate("/data.csv", "csv", "text/csv")
-                return Source(
+            def load(self, reference: Reference) -> Resource:
+                return resource_from_delivery(
+                    reference=reference,
+                    uri="/data.csv",
+                    format="csv",
+                    media_type="text/csv",
                     metadata=Metadata(raw={}),
-                    candidates=(candidate,),
-                    capabilities=frozenset({"file"}),
                     provenance=Provenance(provider=provider.id, raw={}),
-                    raw_metadata={},
                 )
 
         return Adapter()
@@ -559,10 +558,7 @@ def test_public_builtin_source_receives_knowledge_adapters() -> None:
 
     resource = app.resolve(Config("fundamental", settings))
 
-    assert (
-        resource.source.candidates[0].attributes["knowledge"]["identity"]["code"]
-        == "14100"
-    )
+    assert resource.metadata.raw["knowledge"]["identity"]["code"] == "14100"
 
 
 def test_public_application_auto_registers_standard_time_adapter() -> None:
@@ -574,7 +570,7 @@ def test_public_application_auto_registers_standard_time_adapter() -> None:
 
     resource = app.resolve(Config("fundamental", settings))
 
-    assert resource.source.candidates[0].attributes["knowledge"]["time"] == {
+    assert resource.metadata.raw["knowledge"]["time"] == {
         "kind": "calendar_year",
         "year": 2020,
         "era": "令和",
@@ -601,7 +597,7 @@ def test_custom_time_definition_replaces_the_preinstalled_adapter() -> None:
 
     resource = app.resolve(Config("fundamental", settings))
 
-    assert resource.source.candidates[0].attributes["knowledge"]["time"]["year"] == 2099
+    assert resource.metadata.raw["knowledge"]["time"]["year"] == 2099
 
 
 def test_public_knowledge_definitions_reject_duplicate_kinds() -> None:

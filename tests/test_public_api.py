@@ -12,7 +12,8 @@ from rhinestone import (
     Catalog,
     Config,
     Provider,
-    Result,
+    Reference,
+    Resource,
     configure,
 )
 from rhinestone.catalogs import BUILTIN
@@ -22,7 +23,7 @@ from rhinestone.errors import (
     ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Metadata, Provenance, RuntimeFactory, SearchQuery
+from rhinestone.models import RuntimeFactory, SearchQuery
 
 from .provider_support import fixture_json
 
@@ -46,7 +47,7 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
         "Provider",
         "ProviderId",
         "Config",
-        "Result",
+        "Reference",
         "SearchResults",
         "Resource",
         "Format",
@@ -55,6 +56,7 @@ def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
     removed = (
         "Source",
         "ResourceCandidate",
+        "Result",
         "AccessPlan",
         "Metadata",
         "Provenance",
@@ -261,11 +263,14 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     assert tuple(grouped.keys()) == ("catalog-a", "catalog-b")
     result = grouped["catalog-a"][0]
     assert result.discovered_by == "catalog-a"
-    assert result.target == Config("catalog-a", {"resource_id": "first-resource"})
-    assert "endpoint" not in result.target.settings
-    config = result.to_config()
-    assert config == Config("catalog-a", {"resource_id": "first-resource"})
-    resolved = app.resolve(config)
+    assert result.reference == Reference(
+        "catalog-a",
+        dataset_identifier="first-dataset",
+        resource_identifier="first-resource",
+        parameters={"resource_id": "first-resource"},
+    )
+    assert "endpoint" not in result.reference.parameters
+    resolved = app.resolve(result.reference)
     assert resolved.provenance.provider == "catalog-a"
     assert resolved.provenance.adapter == "ckan"
     assert any(url.startswith("https://first.test") for url in requests)
@@ -281,7 +286,7 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
 
     simple = app.search("dataset")
     assert simple[0].title == "first"
-    assert simple[0].resolve().provenance.provider == "catalog-a"
+    assert simple[0].provenance.provider == "catalog-a"
 
 
 def test_discovery_result_resolves_through_a_different_target_source(
@@ -307,25 +312,23 @@ def test_discovery_result_resolves_through_a_different_target_source(
 
     result = app.search(text="river", limit=1)[0]
     resource = app.resolve(result)
-    bound_resource = result.resolve()
+    bound_resource = result
 
     assert result.discovered_by == "search-ckan-jp"
-    assert result.target.source_id == "direct"
+    assert result.reference.provider_id == "direct"
     assert resource.metadata.title == "Example Rivers"
     assert resource.provenance.provider == "direct"
     assert resource.discovery is not None
     assert resource.discovery.source_id == "search-ckan-jp"
     assert resource.discovery.provenance.provider == "Example CKAN"
     assert resource.discovery.provenance.resource_identifier == "resource-1"
-    assert resource.discovery.raw_metadata == result.raw_metadata
+    assert resource.discovery is not None
+    assert result.discovery is not None
+    assert resource.discovery.raw_metadata == result.discovery.raw_metadata
     assert resource.discovery.raw_metadata["resource"]["id"] == "resource-1"
-    assert resource.source.raw_metadata["uri"].endswith(
-        "resource-1/download/rivers.geojson"
-    )
-    assert resource.source.raw_metadata["metadata"]["raw"]["title"] == "Example Rivers"
+    assert resource.uri.endswith("resource-1/download/rivers.geojson")
+    assert resource.metadata.raw["title"] == "Example Rivers"
     assert bound_resource == resource
-    assert bound_resource.source.metadata is bound_resource.metadata
-    assert bound_resource.source.provenance is bound_resource.provenance
 
 
 def test_public_search_reports_unsupported_conditions_per_source() -> None:
@@ -574,14 +577,7 @@ def test_search_parameters_and_open_shortcuts_are_supported() -> None:
         == "runtime:https://example.test/dataset.tif"
     )
 
-    result = Result(
-        title="direct",
-        description=None,
-        discovered_by="direct",
-        target=direct_config(),
-        metadata=Metadata(),
-        provenance=Provenance(provider="direct"),
-    )
+    result: Resource = app.resolve(direct_config())
     assert (
         app.open(result, "rasterio", runtime=runtime)
         == "runtime:https://example.test/dataset.tif"
@@ -626,7 +622,7 @@ def test_cross_ckan_area_fallback_uses_a_verified_unique_municipality_name(
             "rows": 10,
         }
     ]
-    resource = result.resolve()
+    resource = result
     assert resource.discovery is not None
     assert resource.discovery.provenance.query_parameters == calls[0]
 
@@ -656,6 +652,6 @@ def test_cross_ckan_documented_search_example_executes(
     results = namespace["results"]
     assert len(results) == 1
     assert results[0].formats == frozenset({"geojson"})
-    assert results[0].resolve().discovery is not None
+    assert results[0].discovery is not None
     assert len(calls) == 1
     assert calls[0]["rows"] == 10

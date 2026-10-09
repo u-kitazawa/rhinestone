@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Any, cast
 
 from ....errors import ResourceNotFoundError
-from ....models import Config, ResourceCandidate, Source
+from ....models import Metadata, Provenance, Reference, Resource
+from ....resolution import resource_from_delivery
 from ...knowledge import KnowledgeAdapterRegistry
-from .._knowledge import entry_point, resolve_knowledge, source, string
+from .._knowledge import entry_point, resolve_knowledge, string
 from ..base import ProviderAdapter
 
 
@@ -20,9 +21,9 @@ class GsiFundamentalAdapter(ProviderAdapter):
         super().__init__(get_json=lambda url, params: None)
         self._knowledge = knowledge or KnowledgeAdapterRegistry()
 
-    def load(self, config: Config) -> Source:
-        """Build a Source for the configured local GML data file."""
-        settings = self._config_settings(config)
+    def load(self, reference: Reference) -> Resource:
+        """Build a Resource for the configured local GML data file."""
+        settings = self._reference_parameters(reference)
         path = Path(string(settings, "path")).absolute()
         if not path.is_file():
             raise ResourceNotFoundError("Local fundamental data file does not exist")
@@ -30,22 +31,32 @@ class GsiFundamentalAdapter(ProviderAdapter):
         archive = settings.get("archive")
         member = entry_point(settings)
         knowledge = resolve_knowledge(settings, self._knowledge)
-        candidate = ResourceCandidate(
-            str(path),
-            "gml",
-            "application/gml+xml",
-            {
-                "archive": archive,
-                "access_kind": "file",
-                "access_options": {"entry_point": member},
-                "metadata": metadata,
-                "knowledge": knowledge,
-            },
+        raw = {"metadata": metadata, "knowledge": knowledge}
+        identifier = str(metadata["mesh"])
+        provenance = Provenance(
+            provider=self.adapter_type,
+            dataset_identifier=identifier,
+            original_url=str(path),
+            adapter=self.adapter_type,
+            raw=raw,
         )
-        return source(
-            self.adapter_type,
-            metadata["mesh"],
-            metadata,
-            (candidate,),
-            capabilities=("file",),
+        return resource_from_delivery(
+            reference=Reference(
+                reference.provider_id,
+                dataset_identifier=identifier,
+                resource_identifier=str(path),
+                parameters=reference.parameters,
+            ),
+            uri=str(path),
+            format="gml",
+            media_type="application/gml+xml",
+            metadata=Metadata(
+                title=identifier,
+                publisher=self.adapter_type,
+                raw=raw,
+            ),
+            provenance=provenance,
+            kind="file",
+            archive=archive if isinstance(archive, str) else None,
+            options={} if member is None else {"entry_point": member},
         )
