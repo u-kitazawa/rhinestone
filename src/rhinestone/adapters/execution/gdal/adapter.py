@@ -40,12 +40,12 @@ class GdalAdapter(ExecutionAdapter):
         destination_policy: DestinationPolicy | None = None,
     ) -> Any:
         """Open the selected AccessPlan with ``runtime.OpenEx``."""
-        uri = self._runtime_uri(plan)
         options: list[str] = []
         encoding = plan.options.get("encoding")
         if isinstance(encoding, str):
             options.append("ENCODING=" + encoding.upper())
         try:
+            uri = self._runtime_uri(plan)
             runtime_options: dict[str, Any] = {"open_options": tuple(options)}
             result = runtime.OpenEx(uri, **runtime_options)
             if result is None:

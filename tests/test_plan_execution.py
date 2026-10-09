@@ -13,6 +13,7 @@ from rhinestone.errors import (
     DestinationNotAllowedError,
     ExecutionAdapterUnavailableError,
     ProviderMetadataError,
+    ResourceAccessError,
 )
 from rhinestone.models import AccessPlan, RuntimeFactory
 from rhinestone.pipeline import AccessPipeline
@@ -165,3 +166,31 @@ def test_unconfigured_pipeline_rejects_plan_execution() -> None:
         pipeline.open_plan(
             AccessPlan(kind="file", uri="/a.tif", format="cog"), "rasterio"
         )
+
+
+@pytest.mark.parametrize("missing", ["min_zoom", "max_zoom"])
+def test_received_tile_translation_failure_is_classified(missing: str) -> None:
+    tile = {
+        "scheme": "xyz",
+        "url": "https://tiles.example/{z}/{x}/{y}.png",
+        "min_zoom": 0,
+        "max_zoom": 18,
+    }
+    del tile[missing]
+    plan = AccessPlan.from_dict(
+        AccessPlan(
+            kind="remote-dataset", uri="https://tiles.example", options={"tile": tile}
+        ).to_dict()
+    )
+    calls: list[str] = []
+
+    def open_ex(uri: str, **kwargs: Any) -> bool:
+        calls.append(uri)
+        return True
+
+    # Authorization is independent of translation; this fixture explicitly opts out.
+    app = configure(catalog=Catalog(()), network_policy="none")
+    with pytest.raises(ResourceAccessError) as error:
+        app.open(plan, "gdal", runtime=SimpleNamespace(OpenEx=open_ex))
+    assert isinstance(error.value.__cause__, KeyError)
+    assert calls == []
