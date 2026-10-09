@@ -2,7 +2,7 @@
 
 from typing import Protocol, TypeGuard, runtime_checkable
 
-from .models import Config, ProviderSearchResults, Result, SearchQuery, Source
+from .models import ProviderSearchResults, Reference, Resource, SearchQuery
 
 
 class RegisteredSourceAdapter(Protocol):
@@ -10,8 +10,8 @@ class RegisteredSourceAdapter(Protocol):
 
     source_id: str
 
-    def load(self, config: Config) -> Source:
-        """Load the source selected by ``config``."""
+    def load(self, reference: Reference) -> Resource:
+        """Load the unique delivery selected by ``reference``."""
         ...
 
 
@@ -31,7 +31,9 @@ class SearchableRegisteredSourceAdapter(Protocol):
     required_search_conditions: frozenset[str]
     area_text_fallback: bool
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...] | ProviderSearchResults:
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
         """Search the configured provider."""
         ...
 

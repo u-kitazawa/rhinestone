@@ -3,7 +3,6 @@
 import importlib
 import json
 from collections.abc import Mapping
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -30,18 +29,18 @@ from rhinestone.errors import (
     ProviderResponseError,
     ResourceAccessError,
     ResourceNotFoundError,
-    UnsupportedAccessError,
     UnsupportedSearchConditionError,
 )
 from rhinestone.models import (
     AccessPlan,
-    ResourceCandidate,
+    Metadata,
+    Provenance,
+    Reference,
     SearchQuery,
 )
 from rhinestone.registry import CredentialRegistry
-from rhinestone.resolution import Resolver
+from rhinestone.resolution import resource_from_delivery
 from tests.provider_support import fixture_json
-from tests.test_resolution import make_source
 
 FIXTURES = Path(__file__).parent / "fixtures" / "expansion"
 
@@ -89,21 +88,20 @@ def test_plateau_accepts_provider_id() -> None:
     assert adapter is not None
 
 
-def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> None:
+def test_plateau_selects_one_explicit_distribution_and_preserves_archive() -> None:
     adapter = PlateauAdapter(plateau_client, endpoint="https://fixture.example")
     settings = {
         "resource_id": "citygml",
         "archive": "zip",
         "entry_point": "udx/bldg/city.gml",
     }
-    item = adapter.load(Config("plateau", settings))
-    assert len(item.candidates) == 2
-    assert item.candidates[1].attributes["matches_config"] is False
-    resource = Resolver().resolve(item)
+    resource = adapter.load(Reference.from_config(Config("plateau", settings)))
     assert resource.format == "citygml"
+    assert resource.access_plan is not None
     assert resource.access_plan.kind == "file"
+    assert resource.access_plan is not None
     assert resource.access_plan.options["entry_point"] == "udx/bldg/city.gml"
-    assert item.raw_metadata["package"]["extras"][0]["value"] == "2023"
+    assert resource.metadata.raw["package"]["extras"][0]["value"] == "2023"
     assert "distribution_provider" in resource.provenance.raw
     captured: dict[str, Any] = {}
 
@@ -111,6 +109,7 @@ def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> No
         captured["uri"] = uri
         return "city"
 
+    assert resource.access_plan is not None
     assert (
         GdalAdapter().open(resource.access_plan, SimpleNamespace(OpenEx=open_ex))
         == "city"
@@ -120,8 +119,8 @@ def test_plateau_preserves_all_candidates_and_explicit_archive_selection() -> No
         == "/vsizip//vsicurl/https://fixture.example/city.zip/udx/bldg/city.gml"
     )
     found = adapter.search(SearchQuery(text="都市"))
-    assert found[0].to_config().source_id == "plateau"
-    assert Resolver().resolve(adapter.load(found[0].to_config())).format == "citygml"
+    assert found[0].reference.provider_id == "plateau"
+    assert adapter.load(found[0].reference).format == "citygml"
 
 
 def test_plateau_search_uses_the_explicit_catalog_tag_filter() -> None:
@@ -139,12 +138,14 @@ def test_plateau_search_uses_the_explicit_catalog_tag_filter() -> None:
     assert calls == [{"q": "都市", "rows": 1, "fq": "tags:PLATEAU"}]
 
 
-def test_plateau_selection_is_decided_by_resolver() -> None:
+def test_plateau_selection_is_decided_by_provider() -> None:
     adapter = PlateauAdapter(plateau_client, endpoint="https://fixture.example")
     with pytest.raises(AmbiguousResourceError):
-        Resolver().resolve(adapter.load(Config("plateau", {"dataset_id": "fixture"})))
-    resource = Resolver().resolve(
         adapter.load(
+            Reference.from_config(Config("plateau", {"dataset_id": "fixture"}))
+        )
+    resource = adapter.load(
+        Reference.from_config(
             Config(
                 "plateau",
                 {
@@ -156,8 +157,8 @@ def test_plateau_selection_is_decided_by_resolver() -> None:
     )
     assert resource.format == "gpkg"
     with pytest.raises(ResourceNotFoundError):
-        Resolver().resolve(
-            adapter.load(
+        adapter.load(
+            Reference.from_config(
                 Config(
                     "plateau",
                     {
@@ -185,7 +186,9 @@ def test_plateau_rejects_unsafe_or_incomplete_archive_selection(
 ) -> None:
     with pytest.raises(ConfigValidationError):
         PlateauAdapter(plateau_client, endpoint="https://fixture.example").load(
-            Config("plateau", dict(settings, dataset_id="fixture"))
+            Reference.from_config(
+                Config("plateau", dict(settings, dataset_id="fixture"))
+            )
         )
 
 
@@ -208,13 +211,12 @@ def test_fundamental_local_source_preserves_explicit_crs() -> None:
     settings = fundamental_settings()
     config = Config("gsi-fundamental", settings)
     settings["metadata"]["crs"] = "changed-after-config"
-    item = GsiFundamentalAdapter().load(config)
-    resource = Resolver().resolve(item)
+    resource = GsiFundamentalAdapter().load(Reference.from_config(config))
+    assert resource.access_plan is not None
     assert resource.access_plan.kind == "file"
     assert resource.format == "gml"
-    assert resource.metadata.raw["crs"] == "EPSG:6668"
-    assert resource.source.raw_metadata["schema_version"] == "test-schema"
-    assert "search" not in item.capabilities
+    assert resource.metadata.raw["metadata"]["crs"] == "EPSG:6668"
+    assert resource.metadata.raw["metadata"]["schema_version"] == "test-schema"
 
 
 @pytest.mark.parametrize(
@@ -234,10 +236,12 @@ def test_fundamental_does_not_guess_missing_knowledge(
     settings = fundamental_settings()
     settings.update(changes)
     with pytest.raises(error):
-        GsiFundamentalAdapter().load(Config("gsi-fundamental", settings))
+        GsiFundamentalAdapter().load(
+            Reference.from_config(Config("gsi-fundamental", settings))
+        )
 
 
-def dcat_adapter(document: Any = None) -> DcatAdapter:
+def dcat_adapter(document: Any = None, serialization: str = "turtle") -> DcatAdapter:
     text = (
         (FIXTURES / "catalog.ttl").read_text(encoding="utf-8")
         if document is None
@@ -247,6 +251,7 @@ def dcat_adapter(document: Any = None) -> DcatAdapter:
         lambda uri: text,
         lambda: importlib.import_module("rdflib"),
         catalog_uri="https://fixture.example/catalog",
+        serialization=serialization,
     )
 
 
@@ -265,32 +270,38 @@ def dcat_config(**settings: Any) -> Config:
 
 def test_dcat_preserves_rdf_and_excludes_landing_pages() -> None:
     adapter = dcat_adapter()
-    item = adapter.load(dcat_config(distribution="https://fixture.example/geojson"))
-    assert len(item.candidates) == 2
-    resource = Resolver().resolve(item)
+    selected = adapter.load(
+        Reference.from_config(
+            dcat_config(distribution="https://fixture.example/geojson")
+        )
+    )
+    assert selected.format == "geojson"
+    found = adapter.search(SearchQuery(text="river"))
+    resource = found[0]
     assert resource.format == "geojson"
     assert resource.metadata.title == "河川"
     assert resource.metadata.license == "https://fixture.example/license"
-    assert "accessURL" in resource.source.raw_metadata["document"]
+    assert "accessURL" in resource.metadata.raw["document"]
     with pytest.raises(AmbiguousResourceError):
-        Resolver().resolve(adapter.load(dcat_config()))
-    found = adapter.search(SearchQuery(text="river", limit=1))
-    assert len(found) == 1
-    assert len(adapter.load(found[0].to_config()).candidates) == 2
+        adapter.load(Reference.from_config(dcat_config()))
+    assert len(found) == 2
+    assert adapter.load(found[0].reference) == found[0]
     assert adapter.search(SearchQuery(text="absent")) == ()
-    assert len(adapter.search(SearchQuery())) == 1
+    assert len(adapter.search(SearchQuery())) == 2
 
 
 @pytest.mark.parametrize("serialization", ["xml", "json-ld"])
-def test_dcat_serializations_have_equivalent_candidates(serialization: str) -> None:
+def test_dcat_serializations_have_equivalent_resources(serialization: str) -> None:
     rdf: Any = importlib.import_module("rdflib")
     graph = rdf.Graph().parse(
         data=(FIXTURES / "catalog.ttl").read_text(encoding="utf-8"),
         format="turtle",
     )
     document = graph.serialize(format=serialization)
-    result = dcat_adapter(document).load(dcat_config(serialization=serialization))
-    assert result.candidates == dcat_adapter().load(dcat_config()).candidates
+    result = dcat_adapter(document, serialization).search(SearchQuery())
+    assert tuple(item.uri for item in result) == tuple(
+        item.uri for item in dcat_adapter().search(SearchQuery())
+    )
 
 
 def test_dcat_optional_labels_formats_and_blank_nodes() -> None:
@@ -300,21 +311,22 @@ def test_dcat_optional_labels_formats_and_blank_nodes() -> None:
         dcat:downloadURL <https://fixture.example/file> ] ."""
     adapter = dcat_adapter(text)
     assert len(adapter.search(SearchQuery())) == 1
-    result = adapter.load(dcat_config())
+    result = adapter.load(Reference.from_config(dcat_config()))
     assert result.metadata.title == "https://fixture.example/dataset"
-    with pytest.raises(UnsupportedAccessError):
-        Resolver().resolve(result)
+    assert result.access_plan is None
 
 
 def test_dcat_distinguishes_bad_config_fetch_parse_and_missing_dataset() -> None:
     with pytest.raises(ConfigValidationError):
-        dcat_adapter().load(dcat_config(serialization="csv"))
+        dcat_adapter().load(Reference.from_config(dcat_config(serialization="csv")))
     with pytest.raises(ProviderMetadataError):
-        DcatAdapter(fail, lambda: None).load(dcat_config())
+        DcatAdapter(fail, lambda: None).load(Reference.from_config(dcat_config()))
     with pytest.raises(ProviderResponseError):
-        dcat_adapter("not valid turtle (").load(dcat_config())
+        dcat_adapter("not valid turtle (").load(Reference.from_config(dcat_config()))
     with pytest.raises(ResourceNotFoundError):
-        dcat_adapter().load(dcat_config(dataset="https://absent.example"))
+        dcat_adapter().load(
+            Reference.from_config(dcat_config(dataset="https://absent.example"))
+        )
 
 
 def test_dcat_wraps_direct_runtime_factory_failure() -> None:
@@ -324,7 +336,9 @@ def test_dcat_wraps_direct_runtime_factory_failure() -> None:
         raise cause
 
     with pytest.raises(DependencyUnavailableError, match="RDF runtime") as captured:
-        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(dcat_config())
+        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(
+            Reference.from_config(dcat_config())
+        )
 
     assert captured.value.__cause__ is cause
 
@@ -336,7 +350,9 @@ def test_dcat_preserves_dependency_error_from_runtime_factory() -> None:
         raise expected
 
     with pytest.raises(DependencyUnavailableError) as captured:
-        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(dcat_config())
+        DcatAdapter(lambda uri: "unused", unavailable_runtime).load(
+            Reference.from_config(dcat_config())
+        )
 
     assert captured.value is expected
 
@@ -361,7 +377,7 @@ def test_local_search_rejects_unsupported_conditions(adapter: Any) -> None:
 )
 def test_expansion_adapters_reject_wrong_source_type(adapter: Any) -> None:
     with pytest.raises(ConfigValidationError):
-        adapter.load(Config("wrong", {}))
+        adapter.load(Reference("wrong"))
 
 
 @pytest.mark.parametrize(
@@ -377,7 +393,7 @@ def test_expansion_adapters_reject_wrong_source_type(adapter: Any) -> None:
 )
 def test_odpt_rejects_unknown_or_secret_settings(settings: Mapping[str, Any]) -> None:
     with pytest.raises(ConfigValidationError):
-        odpt_adapter().load(Config("odpt", settings))
+        odpt_adapter().load(Reference.from_config(Config("odpt", settings)))
 
 
 def test_odpt_catalog_shapes_are_rejected() -> None:
@@ -415,13 +431,15 @@ def test_odpt_runtime_filters_are_validated() -> None:
     adapter.config_schema = lambda: None  # type: ignore[method-assign]
     with pytest.raises(ConfigValidationError, match="filters"):
         adapter.load(
-            Config(
-                "odpt",
-                {
-                    "dataset": "station",
-                    "credential": "odpt",
-                    "filters": [],
-                },
+            Reference.from_config(
+                Config(
+                    "odpt",
+                    {
+                        "dataset": "station",
+                        "credential": "odpt",
+                        "filters": [],
+                    },
+                )
             )
         )
 
@@ -458,6 +476,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource(
     )
     resource = app.resolve(config)
     assert not factory_calls
+    assert resource.access_plan is not None
     assert resource.access_plan.kind == "service-query"
     assert resource.open("json-service") == data
     with pytest.raises(ExecutionAdapterUnavailableError, match="core-owned"):
@@ -475,8 +494,12 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource(
     for dataset in ("railway", "train"):
         assert (
             odpt_adapter()
-            .load(Config("odpt", {"dataset": dataset, "credential": "odpt"}))
-            .candidates
+            .load(
+                Reference.from_config(
+                    Config("odpt", {"dataset": dataset, "credential": "odpt"})
+                )
+            )
+            .access_plan
         )
 
 
@@ -540,7 +563,9 @@ def test_json_service_errors_are_distinct_and_redacted(
     response: Any, expected: Any
 ) -> None:
     item = odpt_adapter().load(
-        Config("odpt", {"dataset": "station", "credential": "odpt"})
+        Reference.from_config(
+            Config("odpt", {"dataset": "station", "credential": "odpt"})
+        )
     )
     execution = JsonServiceAdapter(
         OdptAdapter.prepare_request,
@@ -552,23 +577,25 @@ def test_json_service_errors_are_distinct_and_redacted(
         return response
 
     with pytest.raises(expected) as error:
+        assert item.access_plan is not None
         execution.open(
-            Resolver().resolve(item).access_plan,
+            item.access_plan,
             SimpleNamespace(get=get),
         )
     assert "secret-in-underlying-error" not in str(error.value)
 
 
 def test_json_service_is_not_odpt_specific() -> None:
-    item = make_source(
-        ResourceCandidate(
-            "https://fixture.example",
-            "api",
-            "application/json",
-            {"access_kind": "service-query", "access_options": {"service": "custom"}},
-        )
+    resource = resource_from_delivery(
+        reference=Reference("custom", resource_identifier="item"),
+        uri="https://fixture.example",
+        format="api",
+        media_type="application/json",
+        metadata=Metadata(),
+        provenance=Provenance(provider="custom"),
+        kind="service-query",
+        service="custom",
     )
-    resource = Resolver().resolve(item)
     adapter = JsonServiceAdapter(
         lambda plan, credentials: (
             cast(Mapping[str, Any], {}),
@@ -576,6 +603,7 @@ def test_json_service_is_not_odpt_specific() -> None:
         ),
         "custom",
     )
+    assert resource.access_plan is not None
     assert adapter.supports(resource.access_plan)
     response = SimpleNamespace(
         status_code=200, raise_for_status=lambda: None, json=lambda: {"ok": True}
@@ -584,49 +612,45 @@ def test_json_service_is_not_odpt_specific() -> None:
     def get(url: str, **kwargs: Any) -> Any:
         return response
 
+    assert resource.access_plan is not None
     assert adapter.open(resource.access_plan, SimpleNamespace(get=get)) == {"ok": True}
 
 
-@pytest.mark.parametrize(
-    "attributes,error",
-    [
-        ({"matches_config": False}, ResourceNotFoundError),
-        ({"matches_config": "yes"}, UnsupportedAccessError),
-        ({"access_kind": 1}, UnsupportedAccessError),
-        ({"access_kind": "file", "access_options": []}, UnsupportedAccessError),
-    ],
-)
-def test_resolver_validates_explicit_candidate_contract(
-    attributes: Mapping[str, Any], error: Any
-) -> None:
-    with pytest.raises(error):
-        Resolver().resolve(
-            make_source(ResourceCandidate("file", "gml", None, attributes))
-        )
-
-
 def test_gdal_null_result_is_an_access_failure() -> None:
-    resource = Resolver().resolve(make_source(ResourceCandidate("file", "gml", None)))
+    resource = resource_from_delivery(
+        reference=Reference("fixture", resource_identifier="file"),
+        uri="file",
+        format="gml",
+        media_type=None,
+        metadata=Metadata(),
+        provenance=Provenance(provider="fixture"),
+    )
 
     def open_ex(uri: str, **kwargs: Any) -> None:
         return None
 
     with pytest.raises(ResourceAccessError):
+        assert resource.access_plan is not None
         GdalAdapter().open(resource.access_plan, SimpleNamespace(OpenEx=open_ex))
 
 
 def test_execution_uses_plan_options_when_uri_is_shared() -> None:
-    rejected = ResourceCandidate("same", "gml", None, {"matches_config": False})
-    selected = replace(
-        rejected, attributes={"matches_config": True, "encoding": "utf8"}
+    resource = resource_from_delivery(
+        reference=Reference("fixture", resource_identifier="same"),
+        uri="same",
+        format="gml",
+        media_type=None,
+        metadata=Metadata(),
+        provenance=Provenance(provider="fixture"),
+        encoding="utf8",
     )
-    resource = Resolver().resolve(make_source(rejected, selected))
     calls: list[Any] = []
 
     def open_ex(uri: str, **kwargs: Any) -> bool:
         calls.append((uri, kwargs))
         return True
 
+    assert resource.access_plan is not None
     GdalAdapter().open(
         AccessPlan.from_dict(resource.access_plan.to_dict()),
         SimpleNamespace(OpenEx=open_ex),

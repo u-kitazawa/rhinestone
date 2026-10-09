@@ -89,7 +89,7 @@ def adapter(client: Client) -> GeospatialJpAdapter:
 
 
 def ids(results: tuple[Any, ...]) -> list[str]:
-    return [item.target.settings["resource_id"] for item in results]
+    return [item.reference.resource_identifier for item in results]
 
 
 def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -> None:
@@ -123,11 +123,11 @@ def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -
     }
     assert client.calls[1]["q"] == '(title_string:*河川* OR tags:*河川*) AND "神奈川県"'
     assert "関東地方" in client.calls[2]["fq"]
-    assert results[0].raw_metadata["package"]["area"] == "神奈川県"
+    assert results[0].metadata.raw["area"] == "神奈川県"
     assert results[0].provenance.query_parameters == client.calls[0]
     assert results[0].provenance.dataset_identifier == "local"
     assert results[0].provenance.adapter == "geospatial-jp"
-    assert results[0].target.source_id == "geospatial-jp"
+    assert results[0].reference.provider_id == "geospatial-jp"
 
 
 @pytest.mark.parametrize(
@@ -187,7 +187,7 @@ def test_observed_river_title_is_requested_by_substring_with_area_independent(
     assert ids(found) == ["c21a87b6-9cf7-4829-961b-e7cc02e8dcec"]
     assert "河川" in found[0].title
     assert found[0].provenance.query_parameters == calls[0]
-    assert found[0].raw_metadata["package"]["name"] == "shimane-kasen-dem"
+    assert found[0].metadata.raw["name"] == "shimane-kasen-dem"
     assert ("fq" in calls[0]) == (area is not None)
 
 
@@ -358,7 +358,7 @@ def test_comma_separated_areas_and_tag_only_matches_precede_broader_tiers() -> N
     )
     results = adapter(client).search(SearchQuery(text="河川", area="島根県", limit=20))
     assert ids(results) == ["multi", "tagged", "regional", "national"]
-    assert results[0].raw_metadata["package"]["area"] == "北海道, 島根県,島根県_松江市"
+    assert results[0].metadata.raw["area"] == "北海道, 島根県,島根県_松江市"
     assert len(client.calls) == 6
     assert all("fq" in call or " AND " in call["q"] for call in client.calls)
     assert "中国地方" in client.calls[2]["fq"]
@@ -460,8 +460,8 @@ def test_observed_mie_dataset_is_found_when_area_field_is_not_indexed(
         "rows": 100,
         "start": 0,
     }
-    assert found[0].raw_metadata["package"]["area"] == "三重県"
-    assert found[0].raw_metadata["package"]["tags"] == ({"name": "国交DPF"},)
+    assert found[0].metadata.raw["area"] == "三重県"
+    assert found[0].metadata.raw["tags"] == ({"name": "国交DPF"},)
     assert found[0].provenance.query_parameters == client.calls[1]
     assert found[0].formats == frozenset({"geojson"})
 

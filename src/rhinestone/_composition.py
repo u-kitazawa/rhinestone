@@ -50,12 +50,11 @@ from .errors import (
     ProviderMetadataError,
 )
 from .models import (
-    Config,
     Provider,
     ProviderSearchResults,
-    Result,
+    Reference,
+    Resource,
     SearchQuery,
-    Source,
 )
 from .registry import CredentialRegistry, DependencyRegistry
 from .security import DestinationPolicy
@@ -98,32 +97,51 @@ class ConfiguredSourceAdapter:
         )
         self._source_adapter = source_adapter
 
-    def load(self, config: Config) -> Source:
-        source = self._source_adapter.load(Config(self.adapter_type, config.settings))
+    def load(self, reference: Reference) -> Resource:
+        adapter_reference = replace(reference, provider_id=self.adapter_type)
+        resource = self._source_adapter.load(adapter_reference)
         return replace(
-            source,
-            provenance=replace(source.provenance, provider=self.source_id),
+            resource,
+            reference=replace(resource.reference, provider_id=self.source_id),
+            provenance=replace(resource.provenance, provider=self.source_id),
+            access_plan=(
+                None
+                if resource.access_plan is None
+                else replace(resource.access_plan, provider=self.source_id)
+            ),
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...] | ProviderSearchResults:
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
         source_adapter = cast(SearchableSourceAdapter, self._source_adapter)
         raw_results = source_adapter.search(query)
         mapped_results = tuple(
             replace(
-                result,
-                discovered_by=self.source_id,
-                target=(
-                    Config(self.source_id, result.target.settings)
-                    if result.target.source_id == self.adapter_type
-                    else result.target
+                resource,
+                reference=(
+                    replace(resource.reference, provider_id=self.source_id)
+                    if resource.reference.provider_id == self.adapter_type
+                    else resource.reference
                 ),
                 provenance=(
-                    replace(result.provenance, provider=self.source_id)
-                    if result.target.source_id == self.adapter_type
-                    else result.provenance
+                    replace(resource.provenance, provider=self.source_id)
+                    if resource.reference.provider_id == self.adapter_type
+                    else resource.provenance
+                ),
+                access_plan=(
+                    replace(resource.access_plan, provider=self.source_id)
+                    if resource.reference.provider_id == self.adapter_type
+                    and resource.access_plan is not None
+                    else resource.access_plan
+                ),
+                discovery=(
+                    replace(resource.discovery, source_id=self.source_id)
+                    if resource.discovery is not None
+                    else None
                 ),
             )
-            for result in raw_results
+            for resource in raw_results
         )
         if not isinstance(raw_results, ProviderSearchResults):
             return mapped_results

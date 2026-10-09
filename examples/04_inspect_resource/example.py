@@ -17,12 +17,10 @@ resource = app.resolve(
         },
     )
 )
-candidate = resource.source.candidates[0]
-
 print("URI:", resource.uri)
 print("format/media type:", resource.format, resource.media_type)
-print("resource attributes:", candidate.attributes)
+print("reference:", resource.reference)
 print("metadata:", resource.metadata)
-print("source capabilities:", resource.source.capabilities)
 print("access plan:", resource.access_plan)
+print("access options:", resource.access_plan.options if resource.access_plan else {})
 print("provenance:", resource.provenance)

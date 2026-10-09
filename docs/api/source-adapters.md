@@ -1,6 +1,6 @@
 # Source Adapter（提供元アダプター）
 
-Source Adapter は provider 固有の Config と公式 API、またはリポジトリ管理の静的定義を解釈し、`Source` を作ります。
+Source Adapter は provider 固有の `Reference` と公式 API、またはリポジトリ管理の静的定義を解釈し、配信単位の `Resource` を作ります。
 利用者はAdapter classを直接import・登録せず、`Provider.adapter_type`で選びます。
 
 [API リファレンス](../api.md) · [Execution Adapter](execution-adapters.md)
@@ -29,24 +29,30 @@ Source Adapter は provider 固有の Config と公式 API、またはリポジ�
 
 Source Adapter は `SourceAdapterDefinition` として明示登録できます。Definition は
 `adapter_type` と `(provider, context) -> adapter` factory から構成され、同じ Definition を
-異なる source id へ複数割り当てられます。Adapter は `load(config) -> Source` を実装し、
+異なる source id へ複数割り当てられます。Adapter は `load(reference) -> Resource` を実装し、
 `search(query)` は任意です。検索を実装する場合、`SearchableSourceAdapter.search()`は
-`tuple[Result, ...] | ProviderSearchResults`を返します。後者はItem単位の
-`SearchDiagnostic`をResultと一緒に返すための型です。
+`tuple[Resource, ...] | ProviderSearchResults`を返します。後者はItem単位の
+`SearchDiagnostic`をResourceと一緒に返すための型です。
 Context には組み込み transport、読み取り専用の Credential /
 Runtime Port、DestinationPolicy、共有Knowledge Adapterを取得する`knowledge` Portが含まれます。
 
+1つの `Resource` は1つの配信URLと、対応する1つの `Reference` / `AccessPlan`だけを
+表します。Datasetに複数のdistribution、STAC asset、download URLがある場合、Adapterは
+それぞれを別Resourceへ展開します。`load(reference)`で複数候補が残る場合は
+`AmbiguousResourceError`、0件なら`ResourceNotFoundError`とし、Core側で候補を選び直しません。
+formatが不明な配信はURL suffixから推測せず、`access_plan=None`のResourceとして明示します。
+
 Source factory に渡される `SourceAdapterContext` の通信境界は `context.transport` に一本化
 されています。`context.transport.get_json()` / `get_text()` / `post_json()` は宛先認可と通信エラー分類を
-Core 側で適用します。Credential の secret を URL、header、`Provider`、`Result`、`Resource` に
+Core 側で適用します。Credential の secret を URL、header、`Provider`、`Reference`、`Resource` に
 保存せず、必要な論理名を `credential=` で指定してください。
 
 内部で注入する`JsonTransport`はdecoded JSON valueを返す契約です。transport自身がJSONをdecodeする場合、decode失敗は`ProviderResponseError`へ正規化してください。任意の`ValueError`や`Exception`をこのエラーへ変換せず、プログラムエラーはそのまま伝播させます。
 
-`search-ckan-jp` は検索専用のDiscovery Sourceです。検索結果の `target` は元のCKAN
-配布物を表す `direct` Config になるため、`search-ckan-jp` 自体を `Config` で解決する
+`search-ckan-jp` は検索専用のDiscovery Sourceです。検索結果の `reference` は元のCKAN
+配布物を表す `direct` Reference になるため、`search-ckan-jp` 自体を `Reference` で解決する
 ことはできません。
 
 `mlit-dpf` も検索専用です。明示的な `target_rules` で解決可能な既存Sourceへ委譲し、委譲不能かつ
-`DPF:downloadURLs` と `representations` が揃う場合だけ `direct` Configへfallbackします。
+`DPF:downloadURLs` と `representations` が揃う場合だけ `direct` Resourceへfallbackします。
 `target_rules` から `direct` または別の `mlit-dpf` Providerへ委譲する構成は拒否されます。

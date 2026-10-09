@@ -1,10 +1,9 @@
 """Public composition API."""
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
-from typing import Protocol, overload, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from . import _http
 from ._composition import (
@@ -42,18 +41,16 @@ from .models import (
     AccessPlan,
     Config,
     DependencyValue,
-    DiscoveryRecord,
     LibraryName,
     Provider,
     ProviderId,
+    Reference,
     Resource,
-    Result,
     SearchQuery,
 )
 from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .representations import Format, FormatPreset
-from .resolution import Resolver
 from .search import SearchCoordinator, SearchResults
 from .security import DestinationPolicy, NetworkPolicyLevel
 
@@ -209,7 +206,6 @@ class Rhinestone:
         )
         self._pipeline = AccessPipeline(
             adapter_registry=adapter_registry,
-            resolver=Resolver(),
             execution_selector=ExecutionAdapterSelector(
                 adapter_registry.execution_adapters
             ),
@@ -217,58 +213,28 @@ class Rhinestone:
         )
         self._search = SearchCoordinator(source_adapters, knowledge_registry)
 
-    def resolve(self, value: Config | Result) -> Resource:
-        """Resolve a Config or search Result into one concrete Resource.
-
-        ``Result`` metadata and provenance are preserved when discovery and
-        resolution use different source adapters. Resolution fails explicitly
-        when no candidate, multiple candidates, or no supported access plan is
-        available.
+    def resolve(self, value: Config | Reference | Resource) -> Resource:
+        """Load one concrete Resource from a Config or Reference.
 
         Raises:
             UnsupportedSourceError: If a Config names an unconfigured source.
             ProviderMetadataError: If provider metadata cannot be loaded.
-            ResourceNotFoundError: If no candidate matches the selection.
-            AmbiguousResourceError: If multiple candidates match.
-            UnsupportedAccessError: If the candidate has no supported access
-                plan.
-        """
-        if not isinstance(value, Result):
-            return self._pipeline.resolve(value)
-        resource = self._pipeline.resolve(value.to_config())
-        if value.discovered_by == value.target.source_id:
-            return resource
-        return replace(
-            resource,
-            discovery=DiscoveryRecord(
-                source_id=value.discovered_by,
-                metadata=value.metadata,
-                provenance=value.provenance,
-                raw_metadata=value.raw_metadata,
-            ),
-        )
-
-    @overload
-    def bind(self, value: Result) -> Result: ...
-
-    @overload
-    def bind(self, value: Resource) -> Resource: ...
-
-    def bind(self, value: Result | Resource) -> Result | Resource:
-        """Bind a detached portable value to this application context.
-
-        Values restored with ``Result.from_dict`` or ``Resource.from_dict`` do
-        not contain resolver, opener, credential, or runtime state. Binding is
-        explicit so the receiving application controls providers, execution
-        adapters, destination policy, and runtimes.
+            UnsupportedAccessError: If the Provider cannot produce a unique
+                portable access plan.
         """
         if isinstance(value, Resource):
-            return self._pipeline.bind(value)
-        return replace(value, _resolver=lambda: self.resolve(value))
+            if value.access_plan is not None:
+                return self.bind(value)
+            return self._pipeline.resolve(value.reference)
+        return self._pipeline.resolve(value)
+
+    def bind(self, value: Resource) -> Resource:
+        """Bind a detached portable Resource to this execution context."""
+        return self._pipeline.bind(value)
 
     def open(
         self,
-        value: Config | Result | Resource | AccessPlan,
+        value: Config | Reference | Resource | AccessPlan,
         library: LibraryName,
         *,
         runtime: object | None = None,
@@ -276,8 +242,8 @@ class Rhinestone:
         """Resolve and open a value through an explicitly named runtime.
 
         Args:
-            value: An already resolved ``Resource``, a search ``Result``, or a
-                direct ``Config``, or a standalone ``AccessPlan``.
+            value: A ``Resource``, direct ``Reference``/``Config``, or a
+                standalone ``AccessPlan``.
             library: Execution adapter name such as ``"rasterio"`` or
                 ``"pyogrio"``.
             runtime: User-owned runtime object for external adapters.
@@ -292,9 +258,7 @@ class Rhinestone:
             return self._pipeline.open_plan(value, library, runtime=runtime)
         if isinstance(value, Resource):
             return self._pipeline.open_resource(value, library, runtime=runtime)
-        if isinstance(value, Config):
-            return self._pipeline.open(value, library=library, runtime=runtime)
-        return self.resolve(value).open(library, runtime=runtime)
+        return self._pipeline.open(value, library=library, runtime=runtime)
 
     def search(
         self,
@@ -351,7 +315,7 @@ class Rhinestone:
             normalized_query = SearchQuery(text=query)
         else:
             normalized_query = query
-        return self._search.search(normalized_query).bind_resolver(self.resolve)
+        return self._search.search(normalized_query).bind(self.bind)
 
 
 def configure(
@@ -416,7 +380,7 @@ def search(
 
     The standard application is created lazily and cannot be modified through
     :func:`configure`. Results retain that application context, so callers can
-    continue with ``result.resolve()``.
+    open the returned Resource directly.
     """
     return _default_application().search(
         query,

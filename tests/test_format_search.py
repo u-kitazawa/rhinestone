@@ -91,7 +91,7 @@ def test_unregistered_explicit_format_counts_as_unknown() -> None:
     search_module = import_module("rhinestone.search")
 
     result = _app().search()[0]
-    result = replace(result, formats=frozenset({"", "vendor-format"}))
+    result = replace(result, format="vendor-format", access_plan=None)
     assert not search_module._result_formats(result)  # pyright: ignore[reportPrivateUsage]
 
 

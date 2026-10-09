@@ -6,8 +6,7 @@ import pytest
 from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.errors import ProviderResponseError
-from rhinestone.models import AccessPlan, Config, SearchQuery
-from rhinestone.resolution import Resolver
+from rhinestone.models import AccessPlan, Config, Reference, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json
 
 
@@ -23,7 +22,9 @@ def test_ckan_resource_and_package_responses_become_a_complete_source() -> None:
     )
     adapter = CkanAdapter(get_json=client)
     source = adapter.load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference.from_config(
+            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        )
     )
     assert client.calls == [
         (resource_url, {"id": "resource-1"}),
@@ -32,12 +33,12 @@ def test_ckan_resource_and_package_responses_become_a_complete_source() -> None:
     assert source.metadata.title == "River Dataset"
     assert source.metadata.publisher == "River Agency"
     assert source.metadata.license == "CC BY 4.0"
-    assert source.candidates[0].uri == "https://files.example/river.csv"
-    assert source.candidates[0].format == "csv"
+    assert source.uri == "https://files.example/river.csv"
+    assert source.format == "csv"
     assert source.provenance.dataset_identifier == "dataset-1"
     assert source.provenance.resource_identifier == "resource-1"
-    assert source.raw_metadata["resource"]["encoding"] == "utf-8"
-    assert source.raw_metadata["package"]["extras"][0]["key"] == "frequency"
+    assert source.provenance.raw["resource"]["encoding"] == "utf-8"
+    assert source.provenance.raw["package"]["extras"][0]["key"] == "frequency"
 
 
 @pytest.mark.parametrize(
@@ -74,15 +75,17 @@ def test_ckan_canonicalizes_formats_without_losing_provider_metadata(
     )
 
     source = CkanAdapter(get_json=client).load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference.from_config(
+            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        )
     )
 
-    assert source.candidates[0].format == expected
-    assert source.candidates[0].attributes["format"] == advertised
-    assert source.raw_metadata["resource"]["format"] == advertised
+    assert source.format == expected
+    assert source.provenance.raw["resource"]["format"] == advertised
     if expected is not None:
-        resource = Resolver().resolve(source)
+        resource = source
         assert resource.format == expected
+        assert resource.access_plan is not None
         assert PyogrioAdapter().supports(resource.access_plan)
 
 
@@ -106,10 +109,12 @@ def test_ckan_uses_media_type_when_format_is_missing() -> None:
     )
 
     source = CkanAdapter(get_json=client).load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference.from_config(
+            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        )
     )
 
-    assert source.candidates[0].format == "geojson"
+    assert source.format == "geojson"
 
 
 def test_ckan_records_zip_media_type_as_explicit_archive_evidence() -> None:
@@ -133,11 +138,12 @@ def test_ckan_records_zip_media_type_as_explicit_archive_evidence() -> None:
     )
 
     source = CkanAdapter(get_json=client).load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference.from_config(
+            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        )
     )
-    resource = Resolver().resolve(source)
+    resource = source
 
-    assert source.candidates[0].attributes["archive"] == "zip"
     assert isinstance(resource.access_plan, AccessPlan)
     assert resource.access_plan.options["archive"] == "zip"
 
@@ -150,8 +156,10 @@ def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None
     results = adapter.search(SearchQuery(text="river", limit=5))
     assert client.calls == [(search_url, {"q": "river", "rows": 5})]
     assert len(results) == 1
-    assert results[0].to_config() == Config("ckan", {"resource_id": "resource-1"})
-    assert "endpoint" not in results[0].target.settings
+    assert results[0].reference == Reference(
+        "ckan", "dataset-1", "resource-1", {"resource_id": "resource-1"}
+    )
+    assert "endpoint" not in results[0].reference.parameters
     assert results[0].metadata.raw["id"] == "dataset-1"
 
 
@@ -286,5 +294,7 @@ def test_ckan_unsuccessful_action_response_is_rejected() -> None:
     )
     with pytest.raises(ProviderResponseError, match="Not found"):
         CkanAdapter(get_json=client).load(
-            Config("ckan", {"endpoint": endpoint, "resource_id": "missing"})
+            Reference.from_config(
+                Config("ckan", {"endpoint": endpoint, "resource_id": "missing"})
+            )
         )

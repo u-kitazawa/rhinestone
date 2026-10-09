@@ -5,7 +5,6 @@ from pathlib import PurePosixPath
 from typing import Any, cast
 
 from ...errors import ConfigValidationError
-from ...models import Metadata, Provenance, ResourceCandidate, Source
 from ..knowledge import KnowledgeAdapterRegistry, TimeKind
 
 
@@ -27,38 +26,6 @@ def entry_point(settings: Mapping[str, Any]) -> str | None:
     if not path.parts or path.is_absolute() or ".." in path.parts or "\\" in value:
         raise ConfigValidationError("entry_point must be a relative archive path")
     return value
-
-
-def source(
-    provider: str,
-    identifier: str,
-    raw: Mapping[str, Any],
-    candidates: tuple[ResourceCandidate, ...],
-    title: str | None = None,
-    description: str | None = None,
-    license_name: str | None = None,
-    endpoint: str | None = None,
-    capabilities: tuple[str, ...] = (),
-) -> Source:
-    return Source(
-        metadata=Metadata(
-            title=title or identifier,
-            description=description,
-            publisher=provider,
-            license=license_name,
-            raw=raw,
-        ),
-        candidates=candidates,
-        capabilities=frozenset(capabilities),
-        provenance=Provenance(
-            provider=provider,
-            dataset_identifier=identifier,
-            api_endpoint=endpoint,
-            adapter=provider,
-            raw=raw,
-        ),
-        raw_metadata=raw,
-    )
 
 
 def resolve_knowledge(

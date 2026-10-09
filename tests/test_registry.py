@@ -5,7 +5,7 @@ from rhinestone.errors import (
     ExecutionAdapterUnavailableError,
     UnsupportedSourceError,
 )
-from rhinestone.models import AccessPlan, Config, Source
+from rhinestone.models import AccessPlan, Reference, Resource
 from rhinestone.registry import AdapterRegistry
 from rhinestone.security import DestinationPolicy
 
@@ -14,7 +14,7 @@ class SourceAdapter:
     def __init__(self, source_id: str) -> None:
         self.source_id = source_id
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         raise NotImplementedError
 
 

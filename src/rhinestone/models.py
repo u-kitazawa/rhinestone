@@ -141,6 +141,52 @@ class Config:
 
 
 @dataclass(frozen=True)
+class Reference:
+    """Identify one delivery target within a configured Provider.
+
+    Dataset and resource identifiers are separate so catalogs that expose
+    several distributions never collapse those distributions into one result.
+    ``parameters`` contains only non-secret provider-specific identifiers that
+    are needed to load the target directly.
+    """
+
+    provider_id: str
+    dataset_identifier: str | None = None
+    resource_identifier: str | None = None
+    parameters: Mapping[str, Any] = field(default_factory=_empty_mapping)
+
+    def __post_init__(self) -> None:
+        raw_provider_id = cast(object, self.provider_id)
+        if not isinstance(raw_provider_id, str) or not raw_provider_id.strip():
+            raise ConfigValidationError(
+                "Reference.provider_id must be a non-empty configured Provider ID"
+            )
+        for name in ("dataset_identifier", "resource_identifier"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ConfigValidationError(
+                    f"Reference.{name} must be a non-empty string or None"
+                )
+        raw_parameters = cast(object, self.parameters)
+        if not isinstance(raw_parameters, Mapping):
+            raise ConfigValidationError("Reference.parameters must be a mapping")
+        _validate_plan_value(self.parameters, "Reference.parameters")
+        object.__setattr__(self, "parameters", _freeze(self.parameters))
+
+    @classmethod
+    def from_config(cls, config: Config) -> Reference:
+        """Translate the temporary Config entry point to the Provider contract."""
+        dataset = config.settings.get("dataset_id")
+        resource = config.settings.get("resource_id")
+        return cls(
+            provider_id=config.source_id,
+            dataset_identifier=dataset if isinstance(dataset, str) else None,
+            resource_identifier=resource if isinstance(resource, str) else None,
+            parameters=config.settings,
+        )
+
+
+@dataclass(frozen=True)
 class Metadata:
     """Normalized human-readable metadata retained from a source response.
 
@@ -211,65 +257,6 @@ class DiscoveryRecord:
     def discovered_by(self) -> str:
         """Return the source id using the terminology of ``Result``."""
         return self.source_id
-
-
-@dataclass(frozen=True)
-class ResourceCandidate:
-    """One provider-advertised delivery option considered by the Resolver.
-
-    ``attributes`` carries explicit resolver hints such as ``matches_config``,
-    ``access_kind``, ``access_options``, and ``archive``. Candidates are not
-    opened directly; resolve the enclosing ``Source`` first.
-    """
-
-    uri: str
-    format: str | None
-    media_type: str | None
-    attributes: Mapping[str, Any] = field(default_factory=_empty_mapping)
-
-    def __post_init__(self) -> None:
-        uri = cast(object, self.uri)
-        if not isinstance(uri, str) or not uri.strip():
-            raise ConfigValidationError(
-                "ResourceCandidate.uri must be a non-empty string"
-            )
-        if not is_valid_http_authority(uri):
-            raise ConfigValidationError(
-                "ResourceCandidate.uri must not contain embedded credentials or "
-                "an invalid HTTP(S) authority"
-            )
-        for name in ("format", "media_type"):
-            value = cast(object, getattr(self, name))
-            if value is not None and not isinstance(value, str):
-                raise ConfigValidationError(
-                    f"ResourceCandidate.{name} must be a string or None"
-                )
-        attributes = cast(object, self.attributes)
-        if not isinstance(attributes, Mapping):
-            raise ConfigValidationError(
-                "ResourceCandidate.attributes must be a mapping"
-            )
-        object.__setattr__(self, "attributes", _freeze(self.attributes))
-
-
-@dataclass(frozen=True)
-class Source:
-    """Normalized provider output consumed by resource resolution.
-
-    The source retains metadata, all delivery candidates, capabilities,
-    provenance, and raw provider metadata for later pipeline stages.
-    """
-
-    metadata: Metadata
-    candidates: tuple[ResourceCandidate, ...]
-    capabilities: frozenset[str]
-    provenance: Provenance
-    raw_metadata: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "candidates", tuple(self.candidates))
-        object.__setattr__(self, "capabilities", frozenset(self.capabilities))
-        object.__setattr__(self, "raw_metadata", _freeze(self.raw_metadata))
 
 
 _SECRET_OPTION_KEYS = frozenset(
@@ -397,7 +384,7 @@ class Resource:
     """A uniquely selected, metadata-preserving data resource.
 
     A Resource contains the URI, normalized representation, provenance, and
-    explicit access plan selected by the Resolver. Use :meth:`open` with a
+    explicit access plan selected by its Provider. Use :meth:`open` with a
     named adapter and an explicit runtime, or pass it to ``Rhinestone.open``.
     """
 
@@ -406,13 +393,67 @@ class Resource:
     media_type: str | None
     metadata: Metadata
     provenance: Provenance
-    access_plan: AccessPlan
-    source: Source
+    access_plan: AccessPlan | None
+    reference: Reference
     local_path: str | None = None
     _opener: Callable[[Resource, LibraryName, object | None], object] | None = field(
         default=None, repr=False, compare=False
     )
     discovery: DiscoveryRecord | None = None
+
+    def __post_init__(self) -> None:
+        raw_uri = cast(object, self.uri)
+        if not isinstance(raw_uri, str) or not raw_uri.strip():
+            raise ConfigValidationError("Resource.uri must be a non-empty string")
+        if not is_valid_http_authority(self.uri):
+            raise ConfigValidationError(
+                "Resource.uri must not contain embedded credentials or an "
+                "invalid HTTP(S) authority"
+            )
+        for name in ("format", "media_type", "local_path"):
+            value = cast(object, getattr(self, name))
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ConfigValidationError(
+                    f"Resource.{name} must be a non-empty string or None"
+                )
+        if self.access_plan is None:
+            return
+        if self.uri != self.access_plan.uri:
+            raise ConfigValidationError(
+                "Resource.uri must equal Resource.access_plan.uri"
+            )
+        if self.format != self.access_plan.format:
+            raise ConfigValidationError(
+                "Resource.format must equal Resource.access_plan.format"
+            )
+        if self.media_type != self.access_plan.media_type:
+            raise ConfigValidationError(
+                "Resource.media_type must equal Resource.access_plan.media_type"
+            )
+
+    @property
+    def title(self) -> str:
+        """Return a stable display title for search result rendering."""
+        return self.metadata.title or self.reference.resource_identifier or self.uri
+
+    @property
+    def description(self) -> str | None:
+        """Return the normalized discovery description."""
+        return self.metadata.description
+
+    @property
+    def discovered_by(self) -> str:
+        """Return the Provider that discovered this delivery target."""
+        return (
+            self.discovery.source_id
+            if self.discovery is not None
+            else self.reference.provider_id
+        )
+
+    @property
+    def formats(self) -> frozenset[str]:
+        """Return this single delivery's normalized format, when known."""
+        return frozenset() if self.format is None else frozenset({self.format})
 
     @overload
     def open(
@@ -452,7 +493,7 @@ class Resource:
         if self._opener is None:
             raise ExecutionAdapterUnavailableError(
                 "Resource is not bound to an execution context; use "
-                "app.resolve(config_or_result) before calling Resource.open"
+                "app.bind(resource) before calling Resource.open"
             )
         return self._opener(self, library, runtime)
 
@@ -682,87 +723,26 @@ class SearchExecution:
 
 
 @dataclass(frozen=True)
-class Result:
-    """A searchable dataset result that can be resolved into a Resource.
-
-    The result preserves display metadata and provenance from discovery. Its
-    ``target`` is the configuration used by the normal resolution pipeline.
-    """
-
-    title: str
-    description: str | None
-    discovered_by: str
-    target: Config
-    metadata: Metadata
-    provenance: Provenance
-    formats: frozenset[str] = field(default_factory=frozenset)
-    _resolver: Callable[[], Resource] | None = field(
-        default=None, repr=False, compare=False
-    )
-    raw_metadata: Mapping[str, Any] = field(default_factory=_empty_mapping)
-
-    def __post_init__(self) -> None:
-        if not self.discovered_by:
-            raise ConfigValidationError(
-                "Result.discovered_by must be a non-empty string; identify the "
-                "source that discovered this result"
-            )
-        object.__setattr__(self, "raw_metadata", _freeze(self.raw_metadata))
-        object.__setattr__(self, "formats", frozenset(self.formats))
-
-    def to_config(self) -> Config:
-        """Return the immutable target configuration for resolution."""
-        return self.target
-
-    def resolve(self) -> Resource:
-        """Resolve this result in the application that returned it.
-
-        Raises:
-            ConfigValidationError: If this detached result is not bound to an
-                application context.
-        """
-        if self._resolver is None:
-            raise ConfigValidationError(
-                "Result is not bound to a Rhinestone application; use "
-                "app.resolve(result) with the application that produced it"
-            )
-        return self._resolver()
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a versioned JSON-safe representation without runtime state."""
-        from ._portable import result_to_dict
-
-        return result_to_dict(self)
-
-    @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> Result:
-        """Restore a detached Result from :meth:`to_dict` output."""
-        from ._portable import result_from_dict
-
-        return result_from_dict(value)
-
-
-@dataclass(frozen=True)
-class ProviderSearchResults(Sequence[Result]):
+class ProviderSearchResults(Sequence[Resource]):
     """Carry provider results and item-scoped diagnostics atomically."""
 
-    results: tuple[Result, ...]
+    results: tuple[Resource, ...]
     diagnostics: tuple[SearchDiagnostic, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "results", tuple(self.results))
         object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
 
-    def __iter__(self) -> Iterator[Result]:
+    def __iter__(self) -> Iterator[Resource]:
         return iter(self.results)
 
     @overload
-    def __getitem__(self, index: int) -> Result: ...
+    def __getitem__(self, index: int) -> Resource: ...
 
     @overload
-    def __getitem__(self, index: slice) -> tuple[Result, ...]: ...
+    def __getitem__(self, index: slice) -> tuple[Resource, ...]: ...
 
-    def __getitem__(self, index: int | slice) -> Result | tuple[Result, ...]:
+    def __getitem__(self, index: int | slice) -> Resource | tuple[Resource, ...]:
         return self.results[index]
 
     def __len__(self) -> int:
@@ -781,13 +761,11 @@ __all__ = [
     "Provider",
     "ProviderId",
     "ProviderSearchResults",
+    "Reference",
     "Resource",
-    "ResourceCandidate",
-    "Result",
     "Runtime",
     "RuntimeFactory",
     "SearchDiagnostic",
     "SearchExecution",
     "SearchQuery",
-    "Source",
 ]

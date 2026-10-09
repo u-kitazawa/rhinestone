@@ -3,7 +3,8 @@
 from collections.abc import Mapping
 from typing import Any, cast
 
-from ....models import Config, Metadata, Provenance, ResourceCandidate, Source
+from ....models import Metadata, Provenance, Reference, Resource
+from ....resolution import resource_from_delivery
 from ..base import ProviderAdapter
 
 
@@ -15,23 +16,22 @@ class DirectAdapter(ProviderAdapter):
     def __init__(self) -> None:
         super().__init__(get_json=lambda url, params: None)
 
-    def load(self, config: Config) -> Source:
-        """Build a Source from a complete, explicitly described resource."""
-        settings = self._config_settings(config)
+    def load(self, reference: Reference) -> Resource:
+        """Build a Resource from a complete, explicitly described delivery."""
+        settings = self._reference_parameters(reference)
         uri = self._required_string(settings, "uri")
         format_name = self._required_string(settings, "format")
         media_type = _optional_string(settings.get("media_type"))
         raw_metadata = cast(Mapping[str, Any], settings.get("metadata", {}))
-        attributes = {
-            key: settings[key]
-            for key in ("archive", "encoding", "layer", "subdataset")
-            if key in settings
+        options = {
+            key: settings[key] for key in ("layer", "subdataset") if key in settings
         }
-        candidate = ResourceCandidate(
-            uri=uri,
-            format=format_name,
-            media_type=media_type,
-            attributes=attributes,
+        metadata = Metadata(
+            title=_optional_string(raw_metadata.get("title")),
+            description=_optional_string(raw_metadata.get("description")),
+            publisher=_optional_string(raw_metadata.get("publisher")),
+            license=_optional_string(raw_metadata.get("license")),
+            raw=raw_metadata,
         )
         provenance = Provenance(
             provider="direct",
@@ -39,18 +39,16 @@ class DirectAdapter(ProviderAdapter):
             adapter="direct",
             raw=settings,
         )
-        return Source(
-            metadata=Metadata(
-                title=_optional_string(raw_metadata.get("title")),
-                description=_optional_string(raw_metadata.get("description")),
-                publisher=_optional_string(raw_metadata.get("publisher")),
-                license=_optional_string(raw_metadata.get("license")),
-                raw=raw_metadata,
-            ),
-            candidates=(candidate,),
-            capabilities=frozenset({"download"}),
+        return resource_from_delivery(
+            reference=reference,
+            uri=uri,
+            format=format_name,
+            media_type=media_type,
+            metadata=metadata,
             provenance=provenance,
-            raw_metadata=settings,
+            options=options,
+            archive=_optional_string(settings.get("archive")),
+            encoding=_optional_string(settings.get("encoding")),
         )
 
 

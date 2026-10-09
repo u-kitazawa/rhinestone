@@ -4,9 +4,10 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from ....errors import ConfigValidationError
-from ....models import AccessPlan, Config, ResourceCandidate, Source
+from ....models import AccessPlan, Metadata, Provenance, Reference, Resource
 from ....registry import CredentialRegistry
-from .._knowledge import source, string
+from ....resolution import resource_from_delivery
+from .._knowledge import string
 from ..base import ProviderAdapter
 from .validation import filter_mapping, required_string, string_mapping
 
@@ -40,9 +41,9 @@ class OdptAdapter(ProviderAdapter):
         self._spec_source = required_string(spec_source, "spec_source")
         self._terms_url = required_string(terms_url, "terms_url")
 
-    def load(self, config: Config) -> Source:
-        """Build a queryable Source from an ODPT dataset declaration."""
-        settings = self._config_settings(config)
+    def load(self, reference: Reference) -> Resource:
+        """Build a queryable Resource from an ODPT dataset declaration."""
+        settings = self._reference_parameters(reference)
         dataset = string(settings, "dataset")
         credential = string(settings, "credential")
         filters_value = settings.get("filters", {})
@@ -59,29 +60,39 @@ class OdptAdapter(ProviderAdapter):
             "spec_source": self._spec_source,
             "terms_url": self._terms_url,
         }
-        return source(
-            self.adapter_type,
-            self._resource_types[dataset],
-            raw,
-            (
-                ResourceCandidate(
-                    uri,
-                    "api",
-                    "application/json",
-                    {
-                        "access_kind": "service-query",
-                        "access_options": {
-                            "params": dict(filters),
-                            "credential": credential,
-                            "response_type": "array",
-                            "service": self.adapter_type,
-                            "endpoint": uri,
-                        },
-                    },
-                ),
+        identifier = self._resource_types[dataset]
+        provenance = Provenance(
+            provider=self.adapter_type,
+            dataset_identifier=identifier,
+            api_endpoint=uri,
+            original_url=uri,
+            adapter=self.adapter_type,
+            raw=raw,
+        )
+        return resource_from_delivery(
+            reference=Reference(
+                reference.provider_id,
+                dataset_identifier=identifier,
+                resource_identifier=identifier,
+                parameters=reference.parameters,
             ),
-            endpoint=uri,
-            capabilities=("service-query",),
+            uri=uri,
+            format="api",
+            media_type="application/json",
+            metadata=Metadata(
+                title=identifier,
+                publisher=self.adapter_type,
+                raw=raw,
+            ),
+            provenance=provenance,
+            kind="service-query",
+            options={
+                "params": dict(filters),
+                "response_type": "array",
+                "endpoint": uri,
+            },
+            service=self.adapter_type,
+            credential=credential,
         )
 
     @staticmethod

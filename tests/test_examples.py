@@ -64,19 +64,20 @@ def test_deterministic_examples_run_without_network_or_optional_runtime(
 
 def test_service_examples_use_formats_known_to_create_service_plans() -> None:
     """OGC Exampleが誤ってAccessPlanへ解決される退行を防ぐために必要である。"""
-    from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
-    from rhinestone.resolution import Resolver
+    from rhinestone.models import Metadata, Provenance, Reference
+    from rhinestone.resolution import resource_from_delivery
 
     for format_name in ("ogc-api-features",):
-        candidate = ResourceCandidate("https://api.example/data", format_name, None)
-        source = Source(
+        resource = resource_from_delivery(
+            reference=Reference("fixture", resource_identifier="data"),
+            uri="https://api.example/data",
+            format=format_name,
+            media_type=None,
             metadata=Metadata(raw={}),
-            candidates=(candidate,),
-            capabilities=frozenset({"service-query"}),
             provenance=Provenance(provider="fixture", raw={}),
-            raw_metadata={},
         )
-        assert Resolver().resolve(source).access_plan.kind == "service-query"
+        assert resource.access_plan is not None
+        assert resource.access_plan.kind == "service-query"
 
 
 @pytest.mark.parametrize(

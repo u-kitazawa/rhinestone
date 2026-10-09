@@ -19,7 +19,7 @@ from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
 )
-from rhinestone.models import AccessPlan, SearchQuery
+from rhinestone.models import AccessPlan, Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from rhinestone.security import DestinationPolicy, DestinationRule
 from tests.provider_support import fixture_json
@@ -231,6 +231,7 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
     )
     resource = app.resolve(Config("odpt", {"dataset": "station", "credential": "odpt"}))
     plan = resource.access_plan
+    assert plan is not None
     tampered_plan = replace(
         plan,
         uri="https://evil.example/service",
@@ -243,6 +244,7 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
     )
 
     with pytest.raises(DestinationNotAllowedError):
+        assert tampered.access_plan is not None
         JsonServiceAdapter(
             OdptAdapter.prepare_request,
             "odpt",
@@ -457,6 +459,7 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
     )
     resource = app.resolve(Config("odpt", {"dataset": "station", "credential": "odpt"}))
     metadata_url = "https://maps.gsi.go.jp/development/ichiran.html"
+    assert resource.access_plan is not None
     tampered = replace(
         resource,
         uri=metadata_url,
@@ -473,6 +476,7 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
             raise AssertionError("runtime must not be called")
 
     with pytest.raises(DestinationNotAllowedError):
+        assert tampered.access_plan is not None
         JsonServiceAdapter(
             OdptAdapter.prepare_request,
             "odpt",
@@ -616,14 +620,18 @@ def test_source_credential_configuration_is_validated() -> None:
         get_json=lambda url, params: {}, endpoint="https://known.example"
     )
     with pytest.raises(ConfigValidationError, match="should be non-empty"):
-        adapter.load(Config("ckan", {"endpoint": "", "resource_id": "x"}))
+        adapter.load(
+            Reference.from_config(Config("ckan", {"endpoint": "", "resource_id": "x"}))
+        )
     with pytest.raises(ConfigValidationError, match="non-empty string"):
         adapter._endpoint_from({"endpoint": 1})  # type: ignore[reportPrivateUsage]
     with pytest.raises(ConfigValidationError, match="managed"):
         adapter.load(
-            Config(
-                "ckan",
-                {"endpoint": "https://evil.example", "resource_id": "x"},
+            Reference.from_config(
+                Config(
+                    "ckan",
+                    {"endpoint": "https://evil.example", "resource_id": "x"},
+                )
             )
         )
 

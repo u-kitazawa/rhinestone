@@ -6,7 +6,7 @@ import pytest
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
 from rhinestone.adapters.source.stac import StacAdapter
-from rhinestone.models import Config, SearchQuery
+from rhinestone.models import Config, Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from tests.provider_support import fixture_json
 
@@ -44,7 +44,9 @@ def test_ckan_api_token_uses_authorization_header_without_provenance_leak() -> N
     )
 
     source = adapter.load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference.from_config(
+            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        )
     )
 
     assert client.calls[0][2] == {"Authorization": "ckan-secret"}

@@ -16,7 +16,7 @@ from rhinestone.errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, SearchQuery
+from rhinestone.models import Config, Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from rhinestone.representations import Format
 
@@ -89,13 +89,15 @@ def test_search_prefers_dataset_specific_native_target_and_builds_graphql() -> N
     )
 
     assert len(results) == 1
-    assert results[0].target == Config(
+    assert results[0].reference == Reference(
         "dataset-target",
-        {"dataset_id": "dataset-1", "resource_id": "resource-1"},
+        dataset_identifier="dataset-1",
+        resource_identifier="resource-1",
+        parameters={"dataset_id": "dataset-1", "resource_id": "resource-1"},
     )
     assert results[0].provenance.dataset_identifier == "dataset-1"
     assert results[0].provenance.resource_identifier == "data-1"
-    assert results[0].raw_metadata["catalog_id"] == "catalog-1"
+    assert results[0].metadata.raw["catalog_id"] == "catalog-1"
     endpoint, body, headers, options = calls[0]
     assert endpoint == "https://data-platform.mlit.go.jp/api/v1"
     assert headers == {"apikey": "top-secret"}
@@ -140,10 +142,12 @@ def test_missing_native_value_falls_back_to_explicit_download_representation() -
     results = adapter.search(SearchQuery(limit=1))
 
     assert len(results) == 1
-    assert results[0].target.source_id == "direct"
-    assert results[0].target.settings["uri"] == ("https://downloads.example/roads.gpkg")
-    assert results[0].target.settings["format"] == "gpkg"
-    assert results[0].target.settings["archive"] == "zip"
+    assert results[0].reference.provider_id == "direct"
+    assert results[0].reference.parameters["uri"] == (
+        "https://downloads.example/roads.gpkg"
+    )
+    assert results[0].reference.parameters["format"] == "gpkg"
+    assert results[0].reference.parameters["archive"] == "zip"
 
 
 def test_direct_fallback_accepts_case_insensitive_http_scheme() -> None:
@@ -156,7 +160,9 @@ def test_direct_fallback_accepts_case_insensitive_http_scheme() -> None:
 
     result = adapter.search(SearchQuery())[0]
 
-    assert result.target.settings["uri"] == "HTTPS://downloads.example/roads.gpkg"
+    assert result.reference.parameters["uri"] == (
+        "HTTPS://downloads.example/roads.gpkg"
+    )
 
 
 def test_landing_page_or_unknown_representation_is_omitted_and_zero_skips_post() -> (
@@ -264,7 +270,7 @@ def test_bbox_validation_rejects_unsafe_coordinates(
 
 def test_load_is_explicitly_unsupported() -> None:
     with pytest.raises(UnsupportedSourceError, match="discovery-only"):
-        _adapter(_response()).load(Config("mlit-dpf", {}))
+        _adapter(_response()).load(Reference.from_config(Config("mlit-dpf", {})))
 
 
 def test_time_is_reported_as_unsupported_search_diagnostic() -> None:
@@ -728,7 +734,11 @@ def test_paging_counts_resolvable_resources_and_preserves_request_provenance() -
     )
     results = adapter.search(SearchQuery(limit=2))
     assert [item.provenance.resource_identifier for item in results] == ["a", "b"]
-    assert [item.provenance.query_parameters["first"] for item in results] == [1, 2]
+    offsets: list[Any] = []
+    for item in results:
+        assert item.discovery is not None
+        offsets.append(item.discovery.provenance.query_parameters["first"])
+    assert offsets == [1, 2]
     assert all("size: 2" in request for request in calls)
     assert 'attributeName: "DPF:dataset_id", is: "dataset-1"' in calls[0]
     assert all(item.formats == frozenset({"geojson"}) for item in results)
@@ -753,8 +763,10 @@ def test_phrase_results_precede_broader_matches_and_overlap_is_deduplicated() ->
     assert "phraseMatch: true" in calls[0]
     assert "phraseMatch: false" in calls[1]
     assert 'term: "河川 洪水"' in calls[1]
-    assert results[0].provenance.query_parameters["phraseMatch"] is True
-    assert results[1].provenance.query_parameters["phraseMatch"] is False
+    assert results[0].discovery is not None
+    assert results[0].discovery.provenance.query_parameters["phraseMatch"] is True
+    assert results[1].discovery is not None
+    assert results[1].discovery.provenance.query_parameters["phraseMatch"] is False
 
 
 @pytest.mark.parametrize("empty", [False, True])
@@ -794,7 +806,8 @@ def test_format_filter_pages_beyond_nonmatching_resources() -> None:
     )
     results = adapter.search(SearchQuery(format=(Format.GEOJSON,), limit=1))
     assert results[0].provenance.resource_identifier == "right"
-    assert results[0].provenance.query_parameters["format"] == ("geojson",)
+    assert results[0].discovery is not None
+    assert results[0].discovery.provenance.query_parameters["format"] == ("geojson",)
 
 
 def test_native_target_keeps_unknown_format_and_scopes_specific_rules() -> None:
@@ -835,7 +848,8 @@ def test_area_uses_official_attribute_codes(area: str, field: str, code: str) ->
     assert f'attributeName: "DPF:{field}", is: {code}' in request
     assert "locationFilter" not in request
     assert 'term: ""' in request
-    assert result.provenance.query_parameters["area"] == area
+    assert result.discovery is not None
+    assert result.discovery.provenance.query_parameters["area"] == area
 
 
 def test_direct_adapter_rejects_unknown_canonical_area() -> None:

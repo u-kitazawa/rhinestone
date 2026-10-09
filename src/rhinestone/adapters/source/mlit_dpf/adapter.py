@@ -12,9 +12,17 @@ from ....errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from ....models import Config, Metadata, Provenance, Result, SearchQuery, Source
+from ....models import (
+    DiscoveryRecord,
+    Metadata,
+    Provenance,
+    Reference,
+    Resource,
+    SearchQuery,
+)
 from ....registry import CredentialRegistry
 from ....representations import Format, canonical_format
+from ....resolution import resource_from_delivery
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
 from ..base import ProviderAdapter
 
@@ -59,20 +67,20 @@ class MlitDpfAdapter(ProviderAdapter):
             {} if representations is None else representations
         )
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Reject resolution because DPF is only a discovery source."""
         raise UnsupportedSourceError(
             "mlit-dpf is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         """Search DPF, preferring explicit native-source delegation."""
         limit = DEFAULT_LIMIT if query.limit is None else query.limit
         if limit == 0:
             return ()
         scope = self._search_scope()
         headers: dict[str, str] | None = None
-        found: list[Result] = []
+        found: list[Resource] = []
         seen: set[tuple[str, ...]] = set()
         modes = (
             (True, False) if query.text and query.text.strip() and scope else (True,)
@@ -170,7 +178,7 @@ class MlitDpfAdapter(ProviderAdapter):
 
     def _record_results(
         self, record: JsonObject, parameters: Mapping[str, Any]
-    ) -> tuple[Result, ...]:
+    ) -> tuple[Resource, ...]:
         data_id = _required_record_string(record, "id")
         dataset_id = _required_record_string(record, "dataset_id")
         catalog_id = _required_record_string(record, "catalog_id")
@@ -196,15 +204,24 @@ class MlitDpfAdapter(ProviderAdapter):
         )
         target = self._native_target(record, metadata_values, catalog_id, dataset_id)
         if target is not None:
+            identity = (
+                target.resource_identifier or target.dataset_identifier or data_id
+            )
             return (
-                Result(
-                    title=title,
-                    description=None,
-                    discovered_by=self.adapter_type,
-                    target=target,
+                Resource(
+                    uri=f"rhinestone-reference:{target.provider_id}:{identity}",
+                    format=None,
+                    media_type=None,
                     metadata=metadata,
                     provenance=provenance,
-                    raw_metadata=record,
+                    access_plan=None,
+                    reference=target,
+                    discovery=DiscoveryRecord(
+                        source_id=self.adapter_type,
+                        metadata=metadata,
+                        provenance=provenance,
+                        raw_metadata=record,
+                    ),
                 ),
             )
         representation = self._representations.get(dataset_id)
@@ -219,7 +236,7 @@ class MlitDpfAdapter(ProviderAdapter):
             raise ProviderResponseError(
                 "MLIT DPF DPF:downloadURLs must be an array of URL strings"
             )
-        results: list[Result] = []
+        results: list[Resource] = []
         for uri in cast(list[str], urls):
             if not is_valid_http_authority(uri) or urlsplit(
                 uri
@@ -235,16 +252,35 @@ class MlitDpfAdapter(ProviderAdapter):
             for name in ("media_type", "archive"):
                 if name in representation:
                     settings[name] = representation[name]
+            target_metadata = Metadata(title=title, raw=record)
+            target_provenance = Provenance(
+                provider="direct",
+                dataset_identifier=dataset_id,
+                resource_identifier=data_id,
+                original_url=uri,
+                adapter="direct",
+                raw=record,
+            )
             results.append(
-                Result(
-                    title=title,
-                    description=None,
-                    discovered_by=self.adapter_type,
-                    target=Config("direct", settings),
-                    formats=frozenset({representation["format"]}),
-                    metadata=metadata,
-                    provenance=provenance,
-                    raw_metadata=record,
+                resource_from_delivery(
+                    reference=Reference(
+                        "direct",
+                        dataset_identifier=dataset_id,
+                        resource_identifier=f"{data_id}:{len(results)}",
+                        parameters=settings,
+                    ),
+                    uri=uri,
+                    format=representation["format"],
+                    media_type=representation.get("media_type"),
+                    metadata=target_metadata,
+                    provenance=target_provenance,
+                    archive=representation.get("archive"),
+                    discovery=DiscoveryRecord(
+                        source_id=self.adapter_type,
+                        metadata=metadata,
+                        provenance=provenance,
+                        raw_metadata=record,
+                    ),
                 )
             )
         return tuple(results)
@@ -255,7 +291,7 @@ class MlitDpfAdapter(ProviderAdapter):
         metadata: JsonObject,
         catalog_id: str,
         dataset_id: str,
-    ) -> Config | None:
+    ) -> Reference | None:
         for rule in self._target_rules:
             if rule["catalog_id"] != catalog_id:
                 continue
@@ -273,7 +309,22 @@ class MlitDpfAdapter(ProviderAdapter):
                     break
                 settings[name] = value
             else:
-                return Config(cast(str, rule["source_id"]), settings)
+                dataset_identifier = settings.get("dataset_id")
+                resource_identifier = settings.get("resource_id")
+                return Reference(
+                    cast(str, rule["source_id"]),
+                    dataset_identifier=(
+                        dataset_identifier
+                        if isinstance(dataset_identifier, str)
+                        else dataset_id
+                    ),
+                    resource_identifier=(
+                        resource_identifier
+                        if isinstance(resource_identifier, str)
+                        else None
+                    ),
+                    parameters=settings,
+                )
         return None
 
 

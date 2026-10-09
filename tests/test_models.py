@@ -10,14 +10,26 @@ from rhinestone.models import (
     Metadata,
     Provenance,
     Provider,
+    Reference,
     Resource,
-    ResourceCandidate,
-    Result,
     SearchDiagnostic,
     SearchExecution,
     SearchQuery,
-    Source,
 )
+
+
+def unresolved_resource(
+    uri: object, format_name: object = "csv", media_type: object = None
+) -> Resource:
+    return Resource(
+        uri=cast(Any, uri),
+        format=cast(Any, format_name),
+        media_type=cast(Any, media_type),
+        metadata=Metadata(),
+        provenance=Provenance(provider="fixture"),
+        access_plan=None,
+        reference=Reference("fixture"),
+    )
 
 
 @pytest.mark.parametrize(
@@ -76,9 +88,9 @@ def test_source_definition_and_config_ids_must_be_non_empty() -> None:
         Config("", {})
 
 
-def test_resource_candidate_rejects_embedded_http_credentials() -> None:
+def test_resource_rejects_embedded_http_credentials() -> None:
     with pytest.raises(ConfigValidationError, match="credentials"):
-        ResourceCandidate("https://user:password@example.jp/data.csv", "csv", None)
+        unresolved_resource("https://user:password@example.jp/data.csv")
 
 
 @pytest.mark.parametrize(
@@ -91,13 +103,13 @@ def test_resource_candidate_rejects_embedded_http_credentials() -> None:
         "https://[gggg::1]/data.csv",
     ),
 )
-def test_resource_candidate_rejects_malformed_http_hostnames(uri: str) -> None:
+def test_resource_rejects_malformed_http_hostnames(uri: str) -> None:
     with pytest.raises(ConfigValidationError, match="authority"):
-        ResourceCandidate(uri, "csv", None)
+        unresolved_resource(uri)
 
 
-def test_resource_candidate_accepts_valid_ipv6_http_authority() -> None:
-    candidate = ResourceCandidate("https://[2001:db8::1]/data.csv", "csv", None)
+def test_resource_accepts_valid_ipv6_http_authority() -> None:
+    candidate = unresolved_resource("https://[2001:db8::1]/data.csv")
 
     assert candidate.uri == "https://[2001:db8::1]/data.csv"
 
@@ -113,22 +125,15 @@ def test_resource_candidate_accepts_valid_ipv6_http_authority() -> None:
             {"uri": "https://example.jp/data", "format": "csv", "media_type": 1},
             "media_type",
         ),
-        (
-            {
-                "uri": "https://example.jp/data",
-                "format": "csv",
-                "media_type": None,
-                "attributes": [],
-            },
-            "attributes",
-        ),
     ),
 )
-def test_resource_candidate_validates_public_field_shapes(
+def test_resource_validates_public_field_shapes(
     kwargs: dict[str, Any], message: str
 ) -> None:
     with pytest.raises(ConfigValidationError, match=message):
-        ResourceCandidate(**cast(Any, kwargs))
+        unresolved_resource(
+            kwargs["uri"], kwargs.get("format"), kwargs.get("media_type")
+        )
 
 
 @pytest.mark.parametrize("limit", (-1, True, 1.5, "1"))
@@ -232,103 +237,67 @@ def test_resource_preserves_source_metadata_and_provenance() -> None:
         retrieved_at=datetime(2024, 1, 2, tzinfo=timezone.utc),
         raw={"request_id": "req-1"},
     )
-    candidate = ResourceCandidate(
+    resource = Resource(
         uri="https://example.jp/river.zip",
         format="shapefile",
         media_type="application/zip",
-    )
-    source = Source(
         metadata=metadata,
-        candidates=(candidate,),
-        capabilities=frozenset({"download"}),
         provenance=provenance,
-        raw_metadata=raw,
-    )
-
-    resource = Resource(
-        uri=candidate.uri,
-        format=candidate.format,
-        media_type=candidate.media_type,
-        metadata=source.metadata,
-        provenance=source.provenance,
         access_plan=AccessPlan(
-            kind="file", uri=candidate.uri, options={"archive": "zip"}
+            kind="file",
+            uri="https://example.jp/river.zip",
+            format="shapefile",
+            media_type="application/zip",
+            options={"archive": "zip"},
         ),
-        source=source,
+        reference=Reference("example-ckan", "dataset-1", "resource-1"),
     )
 
     assert resource.metadata is metadata
     assert resource.provenance is provenance
-    assert resource.source is source
-    assert resource.source.raw_metadata == raw
+    assert resource.metadata.raw == raw
 
 
-def test_search_result_returns_config_without_losing_knowledge() -> None:
+def test_resource_reference_retains_delivery_identity_without_losing_knowledge() -> (
+    None
+):
     metadata = Metadata(title="Dataset", raw={"table": "raw-value"})
     provenance = Provenance(provider="catalog", raw={"query": "dataset"})
-    result = Result(
-        title="Dataset",
-        description="Official dataset",
-        discovered_by="search-ckan-jp",
-        target=Config("catalog", {"resource_id": "resource-1"}),
+    resource = Resource(
+        uri="https://example.jp/data.csv",
+        format=None,
+        media_type=None,
         metadata=metadata,
         provenance=provenance,
+        access_plan=None,
+        reference=Reference("catalog", "dataset-1", "resource-1"),
     )
 
-    config = result.to_config()
-
-    assert config == Config(source_id="catalog", settings={"resource_id": "resource-1"})
-    assert result.metadata is metadata
-    assert result.provenance is provenance
+    assert resource.reference == Reference("catalog", "dataset-1", "resource-1")
+    assert resource.metadata is metadata
+    assert resource.provenance is provenance
 
 
 def test_unbound_resource_cannot_open_without_execution_context() -> None:
-    candidate = ResourceCandidate("/data/a.csv", "csv", "text/csv")
-    source = Source(
-        metadata=Metadata(title="A", raw={}),
-        candidates=(candidate,),
-        capabilities=frozenset(),
-        provenance=Provenance(provider="direct", raw={}),
-        raw_metadata={},
-    )
     resource = Resource(
-        uri=candidate.uri,
-        format=candidate.format,
-        media_type=candidate.media_type,
-        metadata=source.metadata,
-        provenance=source.provenance,
-        access_plan=AccessPlan(kind="file", uri=candidate.uri),
-        source=source,
+        uri="/data/a.csv",
+        format="csv",
+        media_type="text/csv",
+        metadata=Metadata(title="A", raw={}),
+        provenance=Provenance(provider="direct", raw={}),
+        access_plan=AccessPlan(
+            kind="file", uri="/data/a.csv", format="csv", media_type="text/csv"
+        ),
+        reference=Reference("direct", resource_identifier="/data/a.csv"),
     )
 
     with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
         resource.open("gdal")
 
 
-def test_unbound_search_result_cannot_resolve() -> None:
-    result = Result(
-        title="Dataset",
-        description=None,
-        discovered_by="catalog",
-        target=Config("direct", {}),
-        metadata=Metadata(raw={}),
-        provenance=Provenance(provider="direct", raw={}),
-    )
-
-    with pytest.raises(ConfigValidationError, match="not bound"):
-        result.resolve()
-
-
-def test_search_result_requires_a_discovery_source() -> None:
-    with pytest.raises(ConfigValidationError, match="discovered_by"):
-        Result(
-            title="Dataset",
-            description=None,
-            discovered_by="",
-            target=Config("direct", {}),
-            metadata=Metadata(raw={}),
-            provenance=Provenance(provider="direct", raw={}),
-        )
+def test_reference_requires_a_provider_id() -> None:
+    with pytest.raises(ConfigValidationError, match="provider_id"):
+        Reference("")
 
 
 def test_search_diagnostic_requires_a_source_id() -> None:

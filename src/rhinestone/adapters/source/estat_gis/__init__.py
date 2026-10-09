@@ -17,20 +17,20 @@ from urllib.parse import urlparse
 
 from ...._uri import is_valid_http_authority
 from ....errors import (
+    AmbiguousResourceError,
     ConfigValidationError,
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
 from ....models import (
-    Config,
     Metadata,
     Provenance,
-    ResourceCandidate,
-    Result,
+    Reference,
+    Resource,
     SearchQuery,
-    Source,
 )
 from ....representations import CANONICAL_FORMATS, canonical_format
+from ....resolution import resource_from_delivery
 from ...knowledge import KnowledgeAdapterRegistry
 from .._knowledge import entry_point, resolve_knowledge
 from ..base import ProviderAdapter
@@ -106,9 +106,13 @@ class EstatGisAdapter(ProviderAdapter):
             }
         )
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Resolve one distribution using explicit selectors only."""
-        settings = dict(self._config_settings(config))
+        settings = dict(self._reference_parameters(reference))
+        if reference.dataset_identifier is not None:
+            settings.setdefault("dataset_id", reference.dataset_identifier)
+        if reference.resource_identifier is not None:
+            settings.setdefault("distribution_id", reference.resource_identifier)
         unknown = set(settings) - _SELECTORS
         if unknown:
             raise ConfigValidationError(
@@ -129,39 +133,21 @@ class EstatGisAdapter(ProviderAdapter):
             raise ResourceNotFoundError(
                 "No e-Stat GIS distribution matches the explicit selectors"
             )
-        candidates = tuple(self._candidate(item, knowledge) for item in matches)
+        if len(matches) != 1:
+            raise AmbiguousResourceError(
+                f"e-Stat GIS selectors match {len(matches)} distributions; "
+                "set Reference.resource_identifier or distribution_id"
+            )
         first = matches[0]
-        raw_first = self._raw_distribution(first)
-        raw = {"distribution_index": self._raw_distributions}
-        return Source(
-            metadata=Metadata(
-                title=cast(str, first["title"]),
-                description=cast(str | None, first.get("description")),
-                publisher="e-Stat Statistics GIS",
-                raw=raw,
-            ),
-            candidates=candidates,
-            capabilities=frozenset({"download"}),
-            provenance=Provenance(
-                provider=self.adapter_type,
-                dataset_identifier=cast(str, first["dataset_id"]),
-                resource_identifier=(
-                    cast(str, first["distribution_id"]) if len(matches) == 1 else None
-                ),
-                query_parameters=dict(settings),
-                adapter=self.adapter_type,
-                raw={"distribution": raw_first, "knowledge": knowledge},
-            ),
-            raw_metadata=raw,
-        )
+        return self._resource(first, knowledge, settings, reference.provider_id)
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         """Search the supplied distribution index, without broadening selectors."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError(
                 "e-Stat GIS search supports only text and limit"
             )
-        results: list[Result] = []
+        results: list[Resource] = []
         terms = tuple(term.casefold() for term in query.text_terms)
         for item in self._distributions:
             if query.limit is not None and len(results) >= query.limit:
@@ -174,46 +160,32 @@ class EstatGisAdapter(ProviderAdapter):
             if any(term not in haystack for term in terms):
                 continue
             distribution_id = cast(str, item["distribution_id"])
-            raw_item = self._raw_distribution(item)
             results.append(
-                Result(
-                    title=cast(str, item["title"]),
-                    description=cast(str | None, item.get("description")),
-                    discovered_by=self.adapter_type,
-                    target=Config(
-                        self.adapter_type, {"distribution_id": distribution_id}
-                    ),
-                    metadata=Metadata(
-                        title=cast(str, item["title"]),
-                        description=cast(str | None, item.get("description")),
-                        publisher="e-Stat Statistics GIS",
-                        raw=raw_item,
-                    ),
-                    provenance=Provenance(
-                        provider=self.adapter_type,
-                        dataset_identifier=cast(str, item["dataset_id"]),
-                        resource_identifier=distribution_id,
-                        adapter=self.adapter_type,
-                        raw=raw_item,
-                    ),
-                    raw_metadata=raw_item,
+                self._resource(
+                    item,
+                    {},
+                    {"distribution_id": distribution_id},
+                    self.adapter_type,
                 )
             )
         return tuple(results[: query.limit])
 
-    def _candidate(
-        self, item: Mapping[str, Any], knowledge: Mapping[str, Mapping[str, object]]
-    ) -> ResourceCandidate:
+    def _resource(
+        self,
+        item: Mapping[str, Any],
+        knowledge: Mapping[str, Mapping[str, object]],
+        parameters: Mapping[str, Any],
+        provider_id: str,
+    ) -> Resource:
         archive = item.get("archive")
         candidate_settings: dict[str, Any] = {}
         if archive is not None:
             candidate_settings["entry_point"] = entry_point(
                 {"archive": archive, "entry_point": item.get("entry_point")}
             )
-        attributes = {
-            "access_kind": "file",
-            "archive": archive,
-            "access_options": candidate_settings,
+        raw_item = self._raw_distribution(item)
+        raw = {
+            "distribution": raw_item,
             "knowledge": knowledge,
             "dataset_identity": {
                 "dataset_id": item["dataset_id"],
@@ -222,11 +194,38 @@ class EstatGisAdapter(ProviderAdapter):
                 "level": item["level"],
             },
         }
-        return ResourceCandidate(
-            uri=cast(str, item["uri"]),
+        dataset_id = cast(str, item["dataset_id"])
+        distribution_id = cast(str, item["distribution_id"])
+        uri = cast(str, item["uri"])
+        provenance = Provenance(
+            provider=self.adapter_type,
+            dataset_identifier=dataset_id,
+            resource_identifier=distribution_id,
+            original_url=uri,
+            query_parameters=dict(parameters),
+            adapter=self.adapter_type,
+            raw=raw,
+        )
+        return resource_from_delivery(
+            reference=Reference(
+                provider_id,
+                dataset_identifier=dataset_id,
+                resource_identifier=distribution_id,
+                parameters=parameters,
+            ),
+            uri=uri,
             format=cast(str, item["format"]),
             media_type=cast(str | None, item.get("media_type")),
-            attributes=attributes,
+            metadata=Metadata(
+                title=cast(str, item["title"]),
+                description=cast(str | None, item.get("description")),
+                publisher="e-Stat Statistics GIS",
+                raw=raw,
+            ),
+            provenance=provenance,
+            kind="file",
+            archive=cast(str | None, archive),
+            options=candidate_settings,
         )
 
     def _raw_distribution(self, item: Mapping[str, Any]) -> Mapping[str, Any]:

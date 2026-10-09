@@ -6,10 +6,10 @@ from rhinestone.errors import (
     ProviderMetadataError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, Metadata, Provenance, ResourceCandidate, Source
+from rhinestone.models import Config, Metadata, Provenance, Reference, Resource
 from rhinestone.pipeline import AccessPipeline
 from rhinestone.registry import AdapterRegistry
-from rhinestone.resolution import Resolver
+from rhinestone.resolution import resource_from_delivery
 
 
 class RecordingSourceAdapter:
@@ -18,50 +18,36 @@ class RecordingSourceAdapter:
     def __init__(self, events: list[str]) -> None:
         self.events = events
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         self.events.append("source-adapter")
-        return Source(
+        return resource_from_delivery(
+            reference=reference,
+            uri="https://example.jp/data.csv",
+            format="csv",
+            media_type="text/csv",
             metadata=Metadata(title="Dataset", raw={"original": True}),
-            candidates=(
-                ResourceCandidate("https://example.jp/data.csv", "csv", "text/csv"),
-            ),
-            capabilities=frozenset({"download"}),
             provenance=Provenance(provider="fixture", raw={"request": "known"}),
-            raw_metadata={"original": True},
         )
 
 
-class RecordingResolver(Resolver):
-    def __init__(self, events: list[str]) -> None:
-        super().__init__()
-        self.events = events
-
-    def resolve(self, source: Source):
-        self.events.append("resolver")
-        return super().resolve(source)
-
-
-def test_access_pipeline_keeps_source_interpretation_before_resolution() -> None:
-    """Provider 解釈と Resource 選択の責務境界・処理順序を維持するために必要である。"""
+def test_access_pipeline_delegates_unique_resource_selection_to_provider() -> None:
     events: list[str] = []
     pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((RecordingSourceAdapter(events),), ()),
-        resolver=RecordingResolver(events),
+        adapter_registry=AdapterRegistry((RecordingSourceAdapter(events),), ())
     )
     config = Config(source_id="fixture", settings={"dataset": "data-1"})
 
     resource = pipeline.resolve(config)
 
-    assert events == ["source-adapter", "resolver"]
-    assert resource.source.raw_metadata == {"original": True}
+    assert events == ["source-adapter"]
+    assert resource.metadata.raw == {"original": True}
     assert resource.provenance.raw == {"request": "known"}
-    assert config == Config(source_id="fixture", settings={"dataset": "data-1"})
+    assert resource.reference.provider_id == "fixture"
 
 
 def test_unconfigured_pipeline_cannot_open_an_existing_resource() -> None:
     pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((RecordingSourceAdapter([]),), ()),
-        resolver=Resolver(),
+        adapter_registry=AdapterRegistry((RecordingSourceAdapter([]),), ())
     )
     resource = pipeline.resolve(Config(source_id="fixture", settings={}))
 
@@ -69,63 +55,54 @@ def test_unconfigured_pipeline_cannot_open_an_existing_resource() -> None:
         pipeline.open_resource(resource, "gdal")
 
 
-def test_unknown_source_type_has_a_specific_failure() -> None:
-    """未知 provider を別 Adapter や URL へ推測せず明示的に拒否するために必要である。"""
-    pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((), ()), resolver=Resolver()
-    )
+def test_unknown_provider_has_a_specific_failure() -> None:
+    pipeline = AccessPipeline(adapter_registry=AdapterRegistry((), ()))
 
     with pytest.raises(UnsupportedSourceError, match="unknown"):
-        pipeline.resolve(Config(source_id="unknown", settings={}))
+        pipeline.resolve(Reference("unknown"))
 
 
 def test_provider_failure_is_wrapped_without_losing_its_cause() -> None:
-    """外部 metadata 取得失敗を内部不変条件違反と区別し、原因も追跡するために必要である。"""
     provider_error = OSError("connection closed")
 
     class BrokenAdapter:
         source_id = "broken"
 
-        def load(self, config: Config) -> Source:
+        def load(self, reference: Reference) -> Resource:
             raise provider_error
 
-    pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((BrokenAdapter(),), ()), resolver=Resolver()
-    )
+    pipeline = AccessPipeline(adapter_registry=AdapterRegistry((BrokenAdapter(),), ()))
 
     with pytest.raises(ProviderMetadataError) as captured:
-        pipeline.resolve(Config(source_id="broken", settings={}))
+        pipeline.resolve(Reference("broken"))
 
     assert captured.value.__cause__ is provider_error
 
 
 def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
-    """Config 不正を metadata 通信失敗へ誤分類しないために必要である。"""
     expected = ConfigValidationError("dataset is required")
 
     class RejectingAdapter:
         source_id = "rejecting"
 
-        def load(self, config: Config) -> Source:
+        def load(self, reference: Reference) -> Resource:
             raise expected
 
     pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((RejectingAdapter(),), ()), resolver=Resolver()
+        adapter_registry=AdapterRegistry((RejectingAdapter(),), ())
     )
 
     with pytest.raises(ConfigValidationError) as captured:
-        pipeline.resolve(Config(source_id="rejecting", settings={}))
+        pipeline.resolve(Reference("rejecting"))
 
     assert captured.value is expected
 
 
 def test_duplicate_source_adapters_are_rejected_by_pipeline() -> None:
-    """同じ Source type の選択が登録順依存になることを防ぐために必要である。"""
     events: list[str] = []
     with pytest.raises(AdapterRegistrationError, match="fixture"):
         AccessPipeline(
             adapter_registry=AdapterRegistry(
                 (RecordingSourceAdapter(events), RecordingSourceAdapter(events)), ()
-            ),
-            resolver=Resolver(),
+            )
         )

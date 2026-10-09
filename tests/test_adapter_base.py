@@ -26,7 +26,7 @@ from rhinestone.errors import (
     ProviderMetadataError,
     ProviderResponseError,
 )
-from rhinestone.models import Config, Source
+from rhinestone.models import Config, Reference, Resource
 
 ADAPTER_PACKAGES = (
     "source/ckan",
@@ -49,11 +49,11 @@ ADAPTER_PACKAGES = (
 class ProbeAdapter(ProviderAdapter):
     adapter_type = "probe"
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         raise NotImplementedError
 
     def settings(self, config: Config) -> Mapping[str, Any]:
-        return self._config_settings(config)
+        return self._reference_parameters(Reference.from_config(config))
 
     def endpoint(self, settings: Mapping[str, Any]) -> str:
         return self._endpoint_from(settings)
@@ -81,7 +81,7 @@ def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
     assert adapter.endpoint({}) == "https://example.test"
     assert adapter.required({"id": "known"}, "id") == "known"
     assert adapter.settings(Config("probe", {"id": "known"}))["id"] == "known"
-    with pytest.raises(ConfigValidationError, match="adapter type"):
+    with pytest.raises(ConfigValidationError, match="Provider"):
         adapter.settings(Config("other", {}))
     with pytest.raises(ConfigValidationError, match="endpoint"):
         ProbeAdapter(lambda url, params: {}).endpoint({})

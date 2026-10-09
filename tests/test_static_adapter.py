@@ -16,7 +16,7 @@ from rhinestone.errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import Provider, SearchQuery, Source
+from rhinestone.models import Provider, Reference, Resource, SearchQuery
 
 
 def item(identifier: str = "one") -> Mapping[str, Any]:
@@ -49,12 +49,12 @@ def item(identifier: str = "one") -> Mapping[str, Any]:
 def test_static_adapter_restores_source_and_provenance() -> None:
     adapter = StaticAdapter({"one": item()})
 
-    source = adapter.load(Config("static", {"id": "one"}))
+    source = adapter.load(Reference.from_config(Config("static", {"id": "one"})))
 
-    assert isinstance(source, Source)
+    assert isinstance(source, Resource)
     assert source.metadata.title == "One"
     assert source.metadata.raw["checked"] is True
-    assert source.candidates[0].uri.endswith("/one")
+    assert source.uri.endswith("/one")
     assert source.provenance.dataset_identifier == "one"
     assert source.provenance.original_url == "https://example.test/one"
 
@@ -65,7 +65,7 @@ def test_static_adapter_search_is_deterministic_and_returns_configs() -> None:
     results = adapter.search(SearchQuery(text="a", limit=1))
 
     assert len(results) == 1
-    assert results[0].to_config() == Config("static", {"id": "a"})
+    assert results[0].reference == Reference("static", "a", "0", {"id": "a"})
     assert adapter.search(SearchQuery(text="absent")) == ()
 
 
@@ -92,7 +92,7 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
     adapter = StaticAdapter({"one": item()})
 
     with pytest.raises(ResourceNotFoundError):
-        adapter.load(Config("static", {"id": "missing"}))
+        adapter.load(Reference.from_config(Config("static", {"id": "missing"})))
     with pytest.raises(UnsupportedSearchConditionError):
         adapter.search(SearchQuery(bbox=(0, 0, 1, 1)))
     with pytest.raises(ConfigValidationError):
@@ -132,12 +132,16 @@ def test_static_adapter_rejects_invalid_metadata_and_query_parameters() -> None:
     metadata_item["metadata"] = dict(metadata_item["metadata"])
     metadata_item["metadata"]["raw"] = []
     with pytest.raises(ConfigValidationError):
-        StaticAdapter({"one": metadata_item}).load(Config("static", {"id": "one"}))
+        StaticAdapter({"one": metadata_item}).load(
+            Reference.from_config(Config("static", {"id": "one"}))
+        )
 
     query_item = dict(item())
     query_item["provenance"] = {"query_parameters": []}
     with pytest.raises(ConfigValidationError):
-        StaticAdapter({"one": query_item}).load(Config("static", {"id": "one"}))
+        StaticAdapter({"one": query_item}).load(
+            Reference.from_config(Config("static", {"id": "one"}))
+        )
 
 
 def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
@@ -152,6 +156,7 @@ def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
     )
     resource = app.resolve(Config("gsi", {"id": "std"}))
 
+    assert resource.access_plan is not None
     assert resource.access_plan.kind == "remote-dataset"
     assert resource.format == "png"
     assert resource.metadata.raw["attribution"] == "国土地理院"

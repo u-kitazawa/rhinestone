@@ -4,19 +4,19 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from ....errors import (
+    AmbiguousResourceError,
     ConfigValidationError,
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
 from ....models import (
-    Config,
     Metadata,
     Provenance,
-    ResourceCandidate,
-    Result,
+    Reference,
+    Resource,
     SearchQuery,
-    Source,
 )
+from ....resolution import resource_from_delivery
 from .._knowledge import string
 from ..base import ProviderAdapter
 
@@ -31,9 +31,9 @@ class StaticAdapter(ProviderAdapter):
         super().__init__(get_json=lambda url, params: None)
         self._resource_definitions = self._validate_items(items)
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         """Resolve one repository-managed item by its explicit identifier."""
-        settings = self._config_settings(config)
+        settings = self._reference_parameters(reference, dataset_key="id")
         identifier = string(settings, "id")
         try:
             item = self._resource_definitions[identifier]
@@ -41,20 +41,40 @@ class StaticAdapter(ProviderAdapter):
             raise ResourceNotFoundError(
                 f"Static source item {identifier!r} does not exist"
             ) from None
-        return self._build_source(identifier, item)
+        resources = self._build_resources(identifier, item)
+        selected = reference.resource_identifier
+        if selected is not None:
+            matches = tuple(
+                resource
+                for resource in resources
+                if resource.reference.resource_identifier == selected
+            )
+            if not matches:
+                raise ResourceNotFoundError(
+                    f"Static item {identifier!r} has no distribution {selected!r}"
+                )
+            return matches[0]
+        if len(resources) != 1:
+            raise AmbiguousResourceError(
+                f"Static item {identifier!r} has {len(resources)} distributions; "
+                "set Reference.resource_identifier"
+            )
+        return resources[0]
 
-    def search(self, query: SearchQuery) -> tuple[Result, ...]:
+    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
         """Search static item identifiers and metadata by text and limit."""
         if query.supplied_conditions - self.search_conditions:
             raise UnsupportedSearchConditionError(
                 "Unsupported static source search condition"
             )
 
-        results: list[Result] = []
+        results: list[Resource] = []
         for identifier in sorted(self._resource_definitions):
-            source = self.load(Config(self.adapter_type, {"id": identifier}))
-            title = source.metadata.title or identifier
-            description = source.metadata.description
+            resources = self._build_resources(
+                identifier, self._resource_definitions[identifier]
+            )
+            title = resources[0].metadata.title or identifier
+            description = resources[0].metadata.description
             haystack = " ".join(
                 value
                 for value in (identifier, title, description)
@@ -65,22 +85,9 @@ class StaticAdapter(ProviderAdapter):
                 term.casefold() not in normalized_haystack for term in query.text_terms
             ):
                 continue
-            results.append(
-                Result(
-                    title=title,
-                    description=description,
-                    discovered_by=self.adapter_type,
-                    target=Config(self.adapter_type, {"id": identifier}),
-                    metadata=source.metadata,
-                    provenance=source.provenance,
-                    formats=frozenset(
-                        candidate.format
-                        for candidate in source.candidates
-                        if candidate.format is not None
-                    ),
-                    raw_metadata=source.raw_metadata,
-                )
-            )
+            results.extend(resources)
+            if query.limit is not None and len(results) >= query.limit:
+                return tuple(results[: query.limit])
         return tuple(results[: query.limit])
 
     @classmethod
@@ -162,7 +169,9 @@ class StaticAdapter(ProviderAdapter):
                 f"static source item {identifier!r} candidate attributes must be an object"
             )
 
-    def _build_source(self, identifier: str, item: Mapping[str, Any]) -> Source:
+    def _build_resources(
+        self, identifier: str, item: Mapping[str, Any]
+    ) -> tuple[Resource, ...]:
         metadata_values = cast(Mapping[str, Any], item.get("metadata", {}))
         metadata_raw_value: Any = metadata_values.get("raw", metadata_values)
         if not isinstance(metadata_raw_value, Mapping):
@@ -171,21 +180,6 @@ class StaticAdapter(ProviderAdapter):
             )
         metadata_raw = cast(Mapping[str, Any], metadata_raw_value)
 
-        candidates: list[ResourceCandidate] = []
-        for candidate_value in item["candidates"]:
-            candidate = cast(Mapping[str, Any], candidate_value)
-            candidates.append(
-                ResourceCandidate(
-                    uri=cast(str, candidate["uri"]),
-                    format=_optional_string(candidate.get("format")),
-                    media_type=_optional_string(candidate.get("media_type")),
-                    attributes=cast(Mapping[str, Any], candidate.get("attributes", {})),
-                )
-            )
-
-        capabilities = frozenset(
-            cast(tuple[str, ...], tuple(item.get("capabilities", ())))
-        )
         provenance_values = cast(Mapping[str, Any], item.get("provenance", {}))
         query_parameters_value: Any = provenance_values.get("query_parameters", {})
         if not isinstance(query_parameters_value, Mapping):
@@ -195,34 +189,63 @@ class StaticAdapter(ProviderAdapter):
         query_parameters = cast(Mapping[str, Any], query_parameters_value)
 
         raw_item: Mapping[str, Any] = item
-        provenance = Provenance(
-            provider=self.adapter_type,
-            dataset_identifier=_optional_string(
-                provenance_values.get("dataset_identifier")
-            )
-            or identifier,
-            resource_identifier=_optional_string(
+        dataset_identifier = (
+            _optional_string(provenance_values.get("dataset_identifier")) or identifier
+        )
+        metadata = Metadata(
+            title=_optional_string(metadata_values.get("title")) or identifier,
+            description=_optional_string(metadata_values.get("description")),
+            publisher=_optional_string(metadata_values.get("publisher")),
+            license=_optional_string(metadata_values.get("license")),
+            raw=metadata_raw,
+        )
+        resources: list[Resource] = []
+        for index, candidate_value in enumerate(item["candidates"]):
+            candidate = cast(Mapping[str, Any], candidate_value)
+            attributes = cast(Mapping[str, Any], candidate.get("attributes", {}))
+            explicit_identifier = _optional_string(
                 provenance_values.get("resource_identifier")
-            ),
-            api_endpoint=_optional_string(provenance_values.get("api_endpoint")),
-            original_url=_optional_string(provenance_values.get("original_url")),
-            query_parameters=query_parameters,
-            adapter=self.adapter_type,
-            raw=raw_item,
-        )
-        return Source(
-            metadata=Metadata(
-                title=_optional_string(metadata_values.get("title")) or identifier,
-                description=_optional_string(metadata_values.get("description")),
-                publisher=_optional_string(metadata_values.get("publisher")),
-                license=_optional_string(metadata_values.get("license")),
-                raw=metadata_raw,
-            ),
-            candidates=tuple(candidates),
-            capabilities=capabilities,
-            provenance=provenance,
-            raw_metadata=raw_item,
-        )
+            )
+            resource_identifier = explicit_identifier or str(index)
+            uri = cast(str, candidate["uri"])
+            provenance = Provenance(
+                provider=self.adapter_type,
+                dataset_identifier=dataset_identifier,
+                resource_identifier=resource_identifier,
+                api_endpoint=_optional_string(provenance_values.get("api_endpoint")),
+                original_url=uri,
+                query_parameters=query_parameters,
+                adapter=self.adapter_type,
+                raw=raw_item,
+            )
+            access_options = attributes.get("access_options", {})
+            if not isinstance(access_options, Mapping):
+                raise ConfigValidationError("static access_options must be an object")
+            options = dict(cast(Mapping[str, Any], access_options))
+            service = options.pop("service", None)
+            credential = options.pop("credential", None)
+            resources.append(
+                resource_from_delivery(
+                    reference=Reference(
+                        self.adapter_type,
+                        dataset_identifier=dataset_identifier,
+                        resource_identifier=resource_identifier,
+                        parameters={"id": identifier},
+                    ),
+                    uri=uri,
+                    format=_optional_string(candidate.get("format")),
+                    media_type=_optional_string(candidate.get("media_type")),
+                    metadata=metadata,
+                    provenance=provenance,
+                    kind=_optional_string(attributes.get("access_kind")),
+                    options=options,
+                    encoding=_optional_string(attributes.get("encoding")),
+                    archive=_optional_string(attributes.get("archive")),
+                    service=service if isinstance(service, str) else None,
+                    credential=credential if isinstance(credential, str) else None,
+                )
+            )
+        return tuple(resources)
 
 
 def _optional_string(value: Any) -> str | None:

@@ -1,6 +1,6 @@
 # データを検索する
 
-`app.search()`は構成済みProviderを横断してResultを返します。検索したSourceと、結果を解決するSourceは同一である必要はありません。
+`app.search()`は構成済みProviderを横断して、配信単位のResourceを返します。検索したProviderと、Resourceの`reference`が示すProviderは同一である必要はありません。
 
 ## 検索するProviderを選ぶ
 
@@ -13,7 +13,7 @@ results = search(
     format=(FormatPreset.PYOGRIO,),
     limit=20,
 )
-resource = results[0].resolve()
+resource = results[0]
 ```
 
 `providers`は結果の後処理ではなく、検索前の対象選択です。未選択Providerの検索や通信、
@@ -36,13 +36,18 @@ results = app.search(text="人口", limit=10)
 - `providers`: `ProviderId` enumまたは独自Provider ID文字列の配列（list / tuple）
 - `text`: `str`または`None`
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
-- `limit`: `bool`を除く0以上の整数または`None`（Providerごとの上限）
+- `limit`: `bool`を除く0以上の整数または`None`（ProviderごとのResource上限）
 - `bbox`: 数値4要素のtuple
 - `time`: `datetime`または`None`を2要素で保持するtuple
 - `format`: `Format`または`FormatPreset`を1つ以上保持するtuple（OR条件）
 
 不正な値はProviderへリクエストする前に`ConfigValidationError`になります。`area`と`bbox`は
 同時に指定できません。`bbox`の既存の4数値tuple契約は変更されません。
+
+`limit`はDatasetや検索応答Itemの件数ではなく、展開後のResource件数を数えます。例えば
+1つのSTAC Itemにdata assetが3件あれば3 Resource、1つのDCAT distributionにdownload URLが
+2件あれば2 Resourceです。Adapterは配信識別子で安定順序を作り、その順で上限まで返します。
+format filterも配信単位で適用されるため、同じDatasetの別形式を一緒に採用・除外しません。
 
 ```python
 results = app.search(text="河川", area="神奈川県", limit=10)

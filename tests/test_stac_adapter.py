@@ -5,7 +5,7 @@ from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
 )
 from rhinestone.adapters.source.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
-from rhinestone.models import Config, SearchQuery
+from rhinestone.models import Config, Reference, SearchQuery
 from tests.provider_support import (
     RecordingJsonClient,
     ResponseJsonClient,
@@ -19,27 +19,28 @@ def test_stac_load_selects_only_the_explicit_asset_and_preserves_item() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
     adapter = StacAdapter(get_json=client)
     source = adapter.load(
-        Config(
-            "stac",
-            {
-                "endpoint": endpoint,
-                "collection_id": "sentinel-2",
-                "item_id": "scene-1",
-                "asset_key": "visual",
-            },
+        Reference.from_config(
+            Config(
+                "stac",
+                {
+                    "endpoint": endpoint,
+                    "collection_id": "sentinel-2",
+                    "item_id": "scene-1",
+                    "asset_key": "visual",
+                },
+            )
         )
     )
     assert client.calls == [(item_url, {})]
-    assert len(source.candidates) == 1
-    assert source.candidates[0].uri == "https://assets.example/scene-1.tif"
-    assert source.candidates[0].media_type is not None
-    assert source.candidates[0].media_type.startswith("image/tiff")
-    assert source.candidates[0].format == "cog"
-    assert source.candidates[0].attributes["asset_key"] == "visual"
+    assert source.uri == "https://assets.example/scene-1.tif"
+    assert source.media_type is not None
+    assert source.media_type.startswith("image/tiff")
+    assert source.format == "cog"
+    assert source.reference.parameters["asset_key"] == "visual"
     assert source.metadata.title == "Tokyo scene"
     assert source.provenance.dataset_identifier == "sentinel-2"
-    assert source.provenance.resource_identifier == "scene-1"
-    assert source.raw_metadata["assets"]["thumbnail"]["roles"] == ("thumbnail",)
+    assert source.provenance.resource_identifier == "scene-1:visual"
+    assert source.metadata.raw["assets"]["thumbnail"]["roles"] == ("thumbnail",)
 
 
 def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
@@ -63,15 +64,17 @@ def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
             },
         )
     ]
-    assert results[0].to_config() == Config(
+    assert results[0].reference == Reference(
         "stac",
+        "sentinel-2",
+        "scene-1:visual",
         {
             "collection_id": "sentinel-2",
             "item_id": "scene-1",
             "asset_key": "visual",
         },
     )
-    assert "endpoint" not in results[0].target.settings
+    assert "endpoint" not in results[0].reference.parameters
     assert results[0].metadata.raw["stac_version"] == "1.0.0"
 
 
@@ -113,15 +116,17 @@ def test_stac_search_isolates_items_without_one_data_asset() -> None:
         endpoint=endpoint, get_json=RecordingJsonClient({search_url: response})
     ).search(SearchQuery())
 
-    assert [result.title for result in results] == ["usable"]
-    assert results[0].target.settings["asset_key"] == "visual"
+    assert [result.title for result in results] == [
+        "usable",
+        "ambiguous",
+        "ambiguous",
+    ]
+    assert results[0].reference.parameters["asset_key"] == "visual"
     assert [diagnostic.resource_identifier for diagnostic in results.diagnostics] == [
         "missing",
-        "ambiguous",
     ]
     assert [diagnostic.detail for diagnostic in results.diagnostics] == [
         "missing_data_asset",
-        "multiple_data_assets",
     ]
 
 
@@ -157,13 +162,15 @@ def test_configured_stac_search_rebinds_item_diagnostic_source() -> None:
 def test_stac_requires_explicit_asset_key() -> None:
     with pytest.raises(ConfigValidationError, match="asset_key"):
         StacAdapter(get_json=RecordingJsonClient({})).load(
-            Config(
-                "stac",
-                {
-                    "endpoint": "https://stac.example",
-                    "collection_id": "sentinel-2",
-                    "item_id": "scene-1",
-                },
+            Reference.from_config(
+                Config(
+                    "stac",
+                    {
+                        "endpoint": "https://stac.example",
+                        "collection_id": "sentinel-2",
+                        "item_id": "scene-1",
+                    },
+                )
             )
         )
 
@@ -174,14 +181,16 @@ def test_stac_missing_requested_asset_is_a_response_error() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
     with pytest.raises(ProviderResponseError, match="missing"):
         StacAdapter(get_json=client).load(
-            Config(
-                "stac",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": "sentinel-2",
-                    "item_id": "scene-1",
-                    "asset_key": "missing",
-                },
+            Reference.from_config(
+                Config(
+                    "stac",
+                    {
+                        "endpoint": endpoint,
+                        "collection_id": "sentinel-2",
+                        "item_id": "scene-1",
+                        "asset_key": "missing",
+                    },
+                )
             )
         )
 
@@ -198,14 +207,16 @@ def test_stac_resolves_relative_asset_href_against_item_response_uri() -> None:
     client = RecordingJsonClient({item_url: item})
 
     source = StacAdapter(get_json=client).load(
-        Config(
-            "stac",
-            {
-                "endpoint": endpoint,
-                "collection_id": "sentinel-2",
-                "item_id": "scene-1",
-                "asset_key": "visual",
-            },
+        Reference.from_config(
+            Config(
+                "stac",
+                {
+                    "endpoint": endpoint,
+                    "collection_id": "sentinel-2",
+                    "item_id": "scene-1",
+                    "asset_key": "visual",
+                },
+            )
         )
     )
 
@@ -213,22 +224,21 @@ def test_stac_resolves_relative_asset_href_against_item_response_uri() -> None:
         "https://stac.example/collections/sentinel-2/items/"
         "assets/image.tif?download=1#visual"
     )
-    assert source.candidates[0].uri == resolved_uri
+    assert source.uri == resolved_uri
     assert source.provenance.original_url == resolved_uri
-    assert source.raw_metadata["assets"]["visual"]["href"] == (
+    assert source.metadata.raw["assets"]["visual"]["href"] == (
         "./assets/image.tif?download=1#visual"
     )
 
 
 def test_stac_relative_href_uses_rfc3986_query_and_fragment_rules() -> None:
     adapter = StacAdapter(get_json=RecordingJsonClient({}))
-    candidate = adapter._candidate(  # pyright: ignore[reportPrivateUsage]
+    uri, _, _ = adapter._delivery(  # pyright: ignore[reportPrivateUsage]
         {"href": "./asset.tif", "type": "image/tiff"},
-        "visual",
         "https://stac.example/items/scene-1?token=x#old",
     )
 
-    assert candidate.uri == "https://stac.example/items/asset.tif"
+    assert uri == "https://stac.example/items/asset.tif"
 
 
 def test_stac_resolves_relative_href_against_final_redirect_uri() -> None:
@@ -245,29 +255,30 @@ def test_stac_resolves_relative_href_against_final_redirect_uri() -> None:
     )
 
     source = StacAdapter(get_json=client).load(
-        Config(
-            "stac",
-            {
-                "endpoint": "https://stac.example",
-                "collection_id": "sentinel-2",
-                "item_id": "scene-1",
-                "asset_key": "visual",
-            },
+        Reference.from_config(
+            Config(
+                "stac",
+                {
+                    "endpoint": "https://stac.example",
+                    "collection_id": "sentinel-2",
+                    "item_id": "scene-1",
+                    "asset_key": "visual",
+                },
+            )
         )
     )
 
-    assert source.candidates[0].uri == "https://stac-cdn.example/items/assets/image.tif"
+    assert source.uri == "https://stac-cdn.example/items/assets/image.tif"
 
 
 def test_stac_preserves_absolute_non_http_asset_href() -> None:
     adapter = StacAdapter(get_json=RecordingJsonClient({}))
-    candidate = adapter._candidate(  # pyright: ignore[reportPrivateUsage]
+    uri, _, _ = adapter._delivery(  # pyright: ignore[reportPrivateUsage]
         {"href": "s3://bucket/asset.tif", "type": "image/tiff"},
-        "visual",
         "https://stac.example/items/scene-1",
     )
 
-    assert candidate.uri == "s3://bucket/asset.tif"
+    assert uri == "s3://bucket/asset.tif"
 
 
 def test_stac_load_encodes_identifiers_as_individual_path_segments() -> None:
@@ -280,20 +291,22 @@ def test_stac_load_encodes_identifiers_as_individual_path_segments() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
 
     source = StacAdapter(get_json=client).load(
-        Config(
-            "stac",
-            {
-                "endpoint": endpoint,
-                "collection_id": collection_id,
-                "item_id": item_id,
-                "asset_key": "visual",
-            },
+        Reference.from_config(
+            Config(
+                "stac",
+                {
+                    "endpoint": endpoint,
+                    "collection_id": collection_id,
+                    "item_id": item_id,
+                    "asset_key": "visual",
+                },
+            )
         )
     )
 
     assert client.calls == [(item_url, {})]
     assert source.provenance.dataset_identifier == collection_id
-    assert source.provenance.resource_identifier == item_id
+    assert source.provenance.resource_identifier == f"{item_id}:visual"
 
 
 def test_stac_load_escapes_dot_only_identifier_segments() -> None:
@@ -302,20 +315,22 @@ def test_stac_load_escapes_dot_only_identifier_segments() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
 
     source = StacAdapter(get_json=client).load(
-        Config(
-            "stac",
-            {
-                "endpoint": endpoint,
-                "collection_id": ".",
-                "item_id": "..",
-                "asset_key": "visual",
-            },
+        Reference.from_config(
+            Config(
+                "stac",
+                {
+                    "endpoint": endpoint,
+                    "collection_id": ".",
+                    "item_id": "..",
+                    "asset_key": "visual",
+                },
+            )
         )
     )
 
     assert client.calls == [(item_url, {})]
     assert source.provenance.dataset_identifier == "."
-    assert source.provenance.resource_identifier == ".."
+    assert source.provenance.resource_identifier == "..:visual"
 
 
 def test_stac_search_result_keeps_logical_identifiers_for_encoded_load() -> None:
@@ -337,12 +352,12 @@ def test_stac_search_result_keeps_logical_identifiers_for_encoded_load() -> None
     adapter = StacAdapter(endpoint=endpoint, get_json=client)
 
     result = adapter.search(SearchQuery(limit=1))[0]
-    source = adapter.load(result.to_config())
+    source = adapter.load(result.reference)
 
-    assert result.target.settings["collection_id"] == collection_id
-    assert result.target.settings["item_id"] == item_id
+    assert result.reference.parameters["collection_id"] == collection_id
+    assert result.reference.parameters["item_id"] == item_id
     assert result.provenance.dataset_identifier == collection_id
-    assert result.provenance.resource_identifier == item_id
+    assert result.provenance.resource_identifier == f"{item_id}:visual"
     assert client.calls == [(search_url, {"limit": 1}), (item_url, {})]
     assert source.provenance.dataset_identifier == collection_id
-    assert source.provenance.resource_identifier == item_id
+    assert source.provenance.resource_identifier == f"{item_id}:visual"
