@@ -230,14 +230,24 @@ open成功を保証しません。検索時に形式が設定されないProvide
 利用者へ案内したり再試行したりします。
 
 ```python
+from rhinestone import Reference
 from rhinestone.errors import (
     AmbiguousResourceError,
     ProviderMetadataError,
     ResourceNotFoundError,
 )
 
+reference = Reference(
+    "my-stac",
+    parameters={
+        "collection_id": "sentinel-2",
+        "item_id": "scene-1",
+        "asset_key": "visual",
+    },
+)
+
 try:
-    resource = app.load(config)
+    resource = app.load(reference)
 except ResourceNotFoundError:
     print("selection did not match a resource; check provider identifiers")
 except AmbiguousResourceError:

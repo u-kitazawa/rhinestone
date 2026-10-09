@@ -32,7 +32,7 @@ app = configure(
 ## 独自の提供元を追加する
 
 ```python
-from rhinestone import Catalog, Provider, configure
+from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
 
 catalog = Catalog(
     (
@@ -65,15 +65,15 @@ catalog = Catalog((Provider("example", "example-source"),))
 
 
 class ExampleSource:
-    def load(self, config): ...  # Source を返す
+    def load(self, reference: Reference) -> Resource: ...
 
 
 class ExampleExecution:
     name = "example-runtime"
     priority = 100
 
-    def supports(self, resource): ...
-    def open(self, resource, runtime, *, destination_policy=None): ...
+    def supports(self, plan: AccessPlan) -> bool: ...
+    def open(self, plan: AccessPlan, runtime, *, destination_policy=None): ...
 
 
 app = configure(
