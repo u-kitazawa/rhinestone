@@ -43,7 +43,7 @@ def test_lineage_showcase_keeps_discovery_and_resolution_records_separate() -> N
     for marker in (
         'provider.id == "search-ckan-jp"',
         "item.discovered_by != item.reference.provider_id",
-        "resource = app.resolve(result)",
+        "resource = app.load(result)",
         "resource.discovery is None",
         "discovery.provenance.provider",
         "resource.provenance.provider",

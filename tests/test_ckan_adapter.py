@@ -6,7 +6,7 @@ import pytest
 from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.errors import ProviderResponseError
-from rhinestone.models import AccessPlan, Config, Reference, SearchQuery
+from rhinestone.models import AccessPlan, Reference, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json
 
 
@@ -22,8 +22,8 @@ def test_ckan_resource_and_package_responses_become_a_complete_source() -> None:
     )
     adapter = CkanAdapter(get_json=client)
     source = adapter.load(
-        Reference.from_config(
-            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
         )
     )
     assert client.calls == [
@@ -75,8 +75,8 @@ def test_ckan_canonicalizes_formats_without_losing_provider_metadata(
     )
 
     source = CkanAdapter(get_json=client).load(
-        Reference.from_config(
-            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
         )
     )
 
@@ -109,8 +109,8 @@ def test_ckan_uses_media_type_when_format_is_missing() -> None:
     )
 
     source = CkanAdapter(get_json=client).load(
-        Reference.from_config(
-            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
         )
     )
 
@@ -138,8 +138,8 @@ def test_ckan_records_zip_media_type_as_explicit_archive_evidence() -> None:
     )
 
     source = CkanAdapter(get_json=client).load(
-        Reference.from_config(
-            Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
         )
     )
     resource = source
@@ -294,7 +294,7 @@ def test_ckan_unsuccessful_action_response_is_rejected() -> None:
     )
     with pytest.raises(ProviderResponseError, match="Not found"):
         CkanAdapter(get_json=client).load(
-            Reference.from_config(
-                Config("ckan", {"endpoint": endpoint, "resource_id": "missing"})
+            Reference(
+                "ckan", parameters={"endpoint": endpoint, "resource_id": "missing"}
             )
         )

@@ -96,7 +96,7 @@ def _empty_mapping() -> Mapping[str, Any]:
 class Provider:
     """Describe one configured data provider.
 
-    ``id`` is the application-local identifier used by ``Config`` and search
+    ``id`` is the application-local identifier used by ``Reference`` and search
     diagnostics. ``adapter_type`` selects the Source Adapter that interprets
     ``settings``. Runtime objects and secrets belong in ``configure`` inputs,
     not in this immutable value.
@@ -116,26 +116,6 @@ class Provider:
             raise ConfigValidationError(
                 "adapter_type must be a non-empty string; choose a "
                 "registered source adapter type"
-            )
-        object.__setattr__(self, "settings", _freeze(self.settings))
-
-
-@dataclass(frozen=True)
-class Config:
-    """Select one configured source and provide its resolution settings.
-
-    ``source_id`` must refer to a Provider configured in the application;
-    ``settings`` are interpreted by that source's adapter and frozen on input.
-    """
-
-    source_id: str
-    settings: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        if not self.source_id:
-            raise ConfigValidationError(
-                "source_id must be a non-empty string; identify the "
-                "configured source to resolve"
             )
         object.__setattr__(self, "settings", _freeze(self.settings))
 
@@ -172,18 +152,6 @@ class Reference:
             raise ConfigValidationError("Reference.parameters must be a mapping")
         _validate_plan_value(self.parameters, "Reference.parameters")
         object.__setattr__(self, "parameters", _freeze(self.parameters))
-
-    @classmethod
-    def from_config(cls, config: Config) -> Reference:
-        """Translate the temporary Config entry point to the Provider contract."""
-        dataset = config.settings.get("dataset_id")
-        resource = config.settings.get("resource_id")
-        return cls(
-            provider_id=config.source_id,
-            dataset_identifier=dataset if isinstance(dataset, str) else None,
-            resource_identifier=resource if isinstance(resource, str) else None,
-            parameters=config.settings,
-        )
 
 
 @dataclass(frozen=True)
@@ -255,7 +223,7 @@ class DiscoveryRecord:
 
     @property
     def discovered_by(self) -> str:
-        """Return the source id using the terminology of ``Result``."""
+        """Return the source id using the discovery terminology."""
         return self.source_id
 
 
@@ -751,7 +719,6 @@ class ProviderSearchResults(Sequence[Resource]):
 
 __all__ = [
     "AccessPlan",
-    "Config",
     "Dependencies",
     "DiscoveryRecord",
     "DependencyValue",

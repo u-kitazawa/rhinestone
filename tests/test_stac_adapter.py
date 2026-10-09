@@ -5,7 +5,7 @@ from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
 )
 from rhinestone.adapters.source.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
-from rhinestone.models import Config, Reference, SearchQuery
+from rhinestone.models import Reference, SearchQuery
 from tests.provider_support import (
     RecordingJsonClient,
     ResponseJsonClient,
@@ -19,16 +19,14 @@ def test_stac_load_selects_only_the_explicit_asset_and_preserves_item() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
     adapter = StacAdapter(get_json=client)
     source = adapter.load(
-        Reference.from_config(
-            Config(
-                "stac",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": "sentinel-2",
-                    "item_id": "scene-1",
-                    "asset_key": "visual",
-                },
-            )
+        Reference(
+            "stac",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": "sentinel-2",
+                "item_id": "scene-1",
+                "asset_key": "visual",
+            },
         )
     )
     assert client.calls == [(item_url, {})]
@@ -162,15 +160,13 @@ def test_configured_stac_search_rebinds_item_diagnostic_source() -> None:
 def test_stac_requires_explicit_asset_key() -> None:
     with pytest.raises(ConfigValidationError, match="asset_key"):
         StacAdapter(get_json=RecordingJsonClient({})).load(
-            Reference.from_config(
-                Config(
-                    "stac",
-                    {
-                        "endpoint": "https://stac.example",
-                        "collection_id": "sentinel-2",
-                        "item_id": "scene-1",
-                    },
-                )
+            Reference(
+                "stac",
+                parameters={
+                    "endpoint": "https://stac.example",
+                    "collection_id": "sentinel-2",
+                    "item_id": "scene-1",
+                },
             )
         )
 
@@ -181,16 +177,14 @@ def test_stac_missing_requested_asset_is_a_response_error() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
     with pytest.raises(ProviderResponseError, match="missing"):
         StacAdapter(get_json=client).load(
-            Reference.from_config(
-                Config(
-                    "stac",
-                    {
-                        "endpoint": endpoint,
-                        "collection_id": "sentinel-2",
-                        "item_id": "scene-1",
-                        "asset_key": "missing",
-                    },
-                )
+            Reference(
+                "stac",
+                parameters={
+                    "endpoint": endpoint,
+                    "collection_id": "sentinel-2",
+                    "item_id": "scene-1",
+                    "asset_key": "missing",
+                },
             )
         )
 
@@ -207,16 +201,14 @@ def test_stac_resolves_relative_asset_href_against_item_response_uri() -> None:
     client = RecordingJsonClient({item_url: item})
 
     source = StacAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "stac",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": "sentinel-2",
-                    "item_id": "scene-1",
-                    "asset_key": "visual",
-                },
-            )
+        Reference(
+            "stac",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": "sentinel-2",
+                "item_id": "scene-1",
+                "asset_key": "visual",
+            },
         )
     )
 
@@ -255,16 +247,14 @@ def test_stac_resolves_relative_href_against_final_redirect_uri() -> None:
     )
 
     source = StacAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "stac",
-                {
-                    "endpoint": "https://stac.example",
-                    "collection_id": "sentinel-2",
-                    "item_id": "scene-1",
-                    "asset_key": "visual",
-                },
-            )
+        Reference(
+            "stac",
+            parameters={
+                "endpoint": "https://stac.example",
+                "collection_id": "sentinel-2",
+                "item_id": "scene-1",
+                "asset_key": "visual",
+            },
         )
     )
 
@@ -291,16 +281,14 @@ def test_stac_load_encodes_identifiers_as_individual_path_segments() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
 
     source = StacAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "stac",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": collection_id,
-                    "item_id": item_id,
-                    "asset_key": "visual",
-                },
-            )
+        Reference(
+            "stac",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": collection_id,
+                "item_id": item_id,
+                "asset_key": "visual",
+            },
         )
     )
 
@@ -315,16 +303,14 @@ def test_stac_load_escapes_dot_only_identifier_segments() -> None:
     client = RecordingJsonClient({item_url: fixture_json("stac/item.json")})
 
     source = StacAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "stac",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": ".",
-                    "item_id": "..",
-                    "asset_key": "visual",
-                },
-            )
+        Reference(
+            "stac",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": ".",
+                "item_id": "..",
+                "asset_key": "visual",
+            },
         )
     )
 

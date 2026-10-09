@@ -32,7 +32,7 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 | `estat-gis` | e-Stat Statistics GIS の利用者管理 distribution index | 明示された GML / KML / Shapefile 配布物 | HTML scraping、安定 API とみなした URL 発見、selector の推測は非対応。 |
 | `gsi-fundamental` | 基盤地図情報の取得済み basic vector | ローカル GML、ZIP 内の明示 entry point | DEM、ログイン、ダウンロード自動化、ZIP 以外の archive は非対応。 |
 | `static` | Catalog または利用者が管理する静的定義（組み込み GSI は `sources.json` の `gsi`） | HTTPS / XYZ / EPSG:3857 / 256 px の PNG・JPEG tile など、定義済み Resource | 定義外 item、未定義のアクセス方式、仕様の推測は非対応。 |
-| `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Config 内の secret、他 resource type は非対応。 |
+| `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Reference 内の secret、他 resource type は非対応。 |
 | `ogc-features` | OGC API Features 1.0 | collection または feature の service query | WFS、他 OGC API、built-in data reader は非対応。 |
 | `plateau` | G 空間情報センター CKAN Action API | 指定 dataset / resource の配布物 | 市区町村・年度からの配布物推測、ZIP 以外の archive は非対応。 |
 | `mlit-dpf` | 国土交通DPF GraphQL API v1 | 明示規則で解決可能な既存Sourceへ委譲できる検索結果、または形式宣言済みの恒久download URL | Discovery専用。Direct・別DPFへの規則委譲、`time`、署名付きfile download、半径・属性検索、landing page利用、ID・形式推測は非対応。 |
@@ -48,7 +48,7 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 | `pyogrio` | representation registry で `vector` と明示された `shapefile`、`geojson`、`gpkg`、`flatgeobuf`、`gml`、`kml`、`citygml` | URI と encoding を `read_dataframe()` へ渡す。明示された ZIP AccessPlan は GDAL VSI URI に変換する。URI suffix や archive内容から形式・memberを推測せず、環境に対応 driver がない場合は `ResourceAccessError`。 |
 | `json-service` | `application/json` の ODPT service query | 組み込みHTTP runtimeとODPT用request preparerを使用する。他providerのJSON APIを汎用的に実行しない。 |
 
-STAC は Cloud-Optimized GeoTIFF media type を `cog` として扱う。その他 asset は format が明示できないため、Resolver が失敗する場合がある。DCAT、CKAN、PLATEAU、Direct の配布物も、format が上表の Execution Adapter に一致した場合だけ `open()` できる。
+STAC は Cloud-Optimized GeoTIFF media type を `cog` として扱う。その他 asset は format が明示できないため、open時に明示的に失敗する場合がある。DCAT、CKAN、PLATEAU、Direct の配布物も、format が上表の Execution Adapter に一致した場合だけ `open()` できる。
 
 共通の representation 定義は `rhinestone.representations` にあり、format の alias と既知の
 media type 対応を Source Adapter 間で共有する。format が明示されている場合は media type

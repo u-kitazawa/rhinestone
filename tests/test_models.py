@@ -6,7 +6,6 @@ import pytest
 from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailableError
 from rhinestone.models import (
     AccessPlan,
-    Config,
     Metadata,
     Provenance,
     Provider,
@@ -70,13 +69,13 @@ def test_config_is_immutable_and_copies_nested_settings() -> None:
         "resource_id": "resource-1",
         "filters": {"year": 2024},
     }
-    config = Config(source_id="ckan", settings=settings)
+    config = Reference(provider_id="ckan", parameters=settings)
 
     cast(dict[str, int], settings["filters"])["year"] = 2025
 
-    assert config.settings["filters"]["year"] == 2024
+    assert config.parameters["filters"]["year"] == 2024
     with pytest.raises(TypeError):
-        cast(dict[str, Any], config.settings)["resource_id"] = "changed"
+        cast(dict[str, Any], config.parameters)["resource_id"] = "changed"
 
 
 def test_source_definition_and_config_ids_must_be_non_empty() -> None:
@@ -84,8 +83,8 @@ def test_source_definition_and_config_ids_must_be_non_empty() -> None:
         Provider("", "ckan")
     with pytest.raises(ConfigValidationError, match="adapter_type"):
         Provider("catalog", "")
-    with pytest.raises(ConfigValidationError, match="source_id"):
-        Config("", {})
+    with pytest.raises(ConfigValidationError, match="provider_id"):
+        Reference("", parameters={})
 
 
 def test_resource_rejects_embedded_http_credentials() -> None:
@@ -216,16 +215,18 @@ def test_source_definition_is_deeply_immutable() -> None:
 
 
 def test_config_freezes_all_mutable_container_shapes() -> None:
-    config = Config(
-        source_id="fixture",
-        settings={"list": [1], "tuple": ({"nested": True},), "set": {1, 2}},
+    config = Reference(
+        provider_id="fixture",
+        parameters={"list": [1], "tuple": ({"nested": True},)},
     )
 
-    assert config.settings == {
+    assert config.parameters == {
         "list": (1,),
         "tuple": ({"nested": True},),
-        "set": frozenset({1, 2}),
     }
+
+    with pytest.raises(ConfigValidationError, match="non-JSON"):
+        Reference("fixture", parameters={"set": {1, 2}})
 
 
 def test_resource_preserves_source_metadata_and_provenance() -> None:

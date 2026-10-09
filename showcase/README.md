@@ -1,7 +1,7 @@
 # Rhinestone Showcase
 
 `showcase/` は、Rhinestone の主要フローを実行済みの Jupyter Notebook として確認するための入口です。
-各 Notebook は上から順に実行でき、保存された出力から `Result`、`Resource`、`AccessPlan` を
+各 Notebook は上から順に実行でき、保存された出力から `Resource`、`Resource`、`AccessPlan` を
 確認できます。短い使い方は [`examples/`](../examples/README.md)、手順中心の解説は
 [`docs/tutorials/`](../docs/tutorials/index.md) を参照してください。
 
@@ -9,7 +9,7 @@
 
 | Notebook | 内容 | 外部通信 | 追加 Runtime |
 | --- | --- | --- | --- |
-| [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Result` を `Resource` へ解決して来歴と AccessPlan を確認 | 不要 | 不要 |
+| [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Resource` を `Resource` へ解決して来歴と AccessPlan を確認 | 不要 | 不要 |
 | [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から明示的なベクター配布物（ZIP Shapefile を含む）を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
 | [03 STAC COG Preview](03_stac_cog_preview.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_stac_cog_preview.ipynb) | 明示した STAC Item / asset を COG Resource へ解決し、Rasterio で縮小プレビューを表示 | 必要 | Rasterio、Matplotlib |
 | [04 Discovery Lineage](04_discovery_lineage.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_discovery_lineage.ipynb) | search.ckan.jp の発見 record と `direct` target の解決 record を分離して確認 | 必要 | 不要 |
@@ -27,10 +27,10 @@ G 空間情報センターの公開 CKAN を検索し、明示的に広告され
 利用者所有の pyogrio / GeoPandas で開き、Folium の操作できるベクターレイヤーとして
 地理院タイル上に表示します。選択したデータの範囲へ自動で移動するため、検索結果が何を表すかを
 地図で確認できます。`providers=[ProviderId.GEOSPATIAL_JP]` で検索前に提供元を限定するため、
-Notebookで `Config` や `configure()` を組み立てる必要はありません。他のProviderへの検索・通信は行いません。
+Notebookで `Reference` や `configure()` を組み立てる必要はありません。他のProviderへの検索・通信は行いません。
 
 ```text
-search(format=PYOGRIO) -> Result.resolve -> vector Resource -> AccessPlan
+search(format=PYOGRIO) -> Resource.resolve -> vector Resource -> AccessPlan
     -> open -> GeoDataFrame -> Folium map
 ```
 
@@ -53,7 +53,7 @@ AccessPlan を解決します。選択済み URI は利用者所有の Rasterio 
 原寸で取得せず、最大 512 × 512 の縮小データだけを読み込んで Matplotlib で表示します。
 
 ```text
-configure(rasterio) -> explicit STAC Item / asset -> resolve -> COG Resource
+configure() -> explicit STAC Item / asset -> load -> COG Resource
     -> AccessPlan -> open -> Rasterio dataset -> bounded preview
 ```
 
@@ -65,13 +65,13 @@ Item、asset URL、media type は Provider 側で変わり得ます。Notebook �
 [GitHub で Notebook を読む](04_discovery_lineage.ipynb) ·
 [Colab で開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_discovery_lineage.ipynb)
 
-search.ckan.jp の横断検索で得た `Result` が、発見元とは異なる `direct` target へ解決される流れを示します。
+search.ckan.jp の横断検索で得た `Resource` が、発見元とは異なる `direct` target へ解決される流れを示します。
 発見側と解決側の metadata / provenance / raw record を flat merge せず、`Resource.discovery` と
 `Resource` 本体へ分離して保持することを確認します。データ本体は開きません。
 
 ```text
-search.ckan.jp -> Result(discovered_by=search-ckan-jp)
-    -> Config(source_id=direct) -> Resource + DiscoveryRecord
+search.ckan.jp -> Resource(discovered_by=search-ckan-jp)
+    -> Reference(provider_id=direct) -> Resource + DiscoveryRecord
 ```
 
 この Notebook は live Provider を利用します。検索結果が変化して cross-source result が得られない場合は、

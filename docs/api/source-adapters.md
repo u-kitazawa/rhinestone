@@ -9,7 +9,7 @@ Source Adapter は provider 固有の `Reference` と公式 API、またはリ�
 
 初めてproviderを構成する場合は、先に[アプリケーションを構成する](../configuration.md)
 を読んでください。HTTPを使うproviderはRhinestoneの組み込みtransportを使用します。各ページの
-`Config.settings` は Adapter が検証する値であり、認証 secret 自体を入れる場所ではありません。
+`Reference.parameters` は Adapter が検証する値であり、認証 secret 自体を入れる場所ではありません。
 
 | アダプター | 種類 | API／配布元 |
 | --- | --- | --- |

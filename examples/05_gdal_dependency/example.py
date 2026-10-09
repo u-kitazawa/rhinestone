@@ -4,15 +4,15 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
 
 data_uri = os.environ["RHINESTONE_GDAL_URI"]
 data_format = os.environ.get("RHINESTONE_GDAL_FORMAT", "geotiff")
 app = configure()
-resource = app.resolve(
-    Config(
-        source_id="direct",
-        settings={"uri": data_uri, "format": data_format},
+resource = app.load(
+    Reference(
+        provider_id="direct",
+        parameters={"uri": data_uri, "format": data_format},
     )
 )
 

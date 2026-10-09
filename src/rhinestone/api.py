@@ -36,11 +36,11 @@ from .catalogs import Catalog
 from .errors import (
     AdapterRegistrationError,
     ConfigValidationError,
+    ExecutionAdapterUnavailableError,
 )
 from .execution import ExecutionAdapterSelector
 from .models import (
     AccessPlan,
-    Config,
     DependencyValue,
     LibraryName,
     Provider,
@@ -66,7 +66,7 @@ class _CredentialBindableExecutionAdapter(Protocol):
 
 
 class Rhinestone:
-    """An isolated application context for discovery, resolution, and access.
+    """An isolated application context for discovery, planning, and access.
 
     Each instance owns its configured Providers, Source runtimes, credential
     factories, network policy, and adapter registry. It is safe to create
@@ -74,8 +74,8 @@ class Rhinestone:
     same process.
 
     Use :func:`configure` for the usual construction path. The public workflow
-    is ``search -> resolve -> open``; known Provider selections can start with
-    ``resolve(Config(...))`` instead.
+    is ``search -> open``; known Provider selections can start with
+    ``load(Reference(...))`` instead. Use ``plan(resource)`` for transfer.
     """
 
     def __init__(
@@ -214,11 +214,11 @@ class Rhinestone:
         )
         self._search = SearchCoordinator(source_adapters, knowledge_registry)
 
-    def resolve(self, value: Config | Reference | Resource) -> Resource:
-        """Load one concrete Resource from a Config or Reference.
+    def load(self, value: Reference | Resource) -> Resource:
+        """Load one concrete Resource from a Reference or deferred Resource.
 
         Raises:
-            UnsupportedSourceError: If a Config names an unconfigured source.
+            UnsupportedSourceError: If a Reference names an unconfigured Provider.
             ProviderMetadataError: If provider metadata cannot be loaded.
             UnsupportedAccessError: If the Provider cannot produce a unique
                 portable access plan.
@@ -226,9 +226,19 @@ class Rhinestone:
         if isinstance(value, Resource):
             if value.access_plan is not None:
                 return self.bind(value)
-            resource = self._pipeline.resolve(value.reference)
+            resource = self._pipeline.load(value.reference)
             return replace(resource, discovery=value.discovery or resource.discovery)
-        return self._pipeline.resolve(value)
+        return self._pipeline.load(value)
+
+    def plan(self, value: Resource) -> AccessPlan:
+        """Return a portable execution plan, loading a deferred Reference if needed."""
+        resource = self.load(value)
+        if resource.access_plan is None:
+            raise ExecutionAdapterUnavailableError(
+                "Resource has no AccessPlan; the Provider must declare its format "
+                "or access kind"
+            )
+        return resource.access_plan
 
     def bind(self, value: Resource) -> Resource:
         """Bind a detached portable Resource to this execution context."""
@@ -236,7 +246,7 @@ class Rhinestone:
 
     def open(
         self,
-        value: Config | Reference | Resource | AccessPlan,
+        value: Reference | Resource | AccessPlan,
         library: LibraryName,
         *,
         runtime: object | None = None,
@@ -244,7 +254,7 @@ class Rhinestone:
         """Resolve and open a value through an explicitly named runtime.
 
         Args:
-            value: A ``Resource``, direct ``Reference``/``Config``, or a
+            value: A ``Resource``, direct ``Reference``, or a
                 standalone ``AccessPlan``.
             library: Execution adapter name such as ``"rasterio"`` or
                 ``"pyogrio"``.
@@ -260,7 +270,7 @@ class Rhinestone:
             return self._pipeline.open_plan(value, library, runtime=runtime)
         if isinstance(value, Resource):
             return self._pipeline.open_resource(
-                self.resolve(value), library, runtime=runtime
+                self.load(value), library, runtime=runtime
             )
         return self._pipeline.open(value, library=library, runtime=runtime)
 
@@ -344,7 +354,7 @@ def configure(
             definitions.
 
     Returns:
-        A configured application whose ``search``, ``resolve``, and ``open``
+        A configured application whose ``search``, ``load``, ``plan``, and ``open``
         methods share the same registries and security policy.
 
     Raises:

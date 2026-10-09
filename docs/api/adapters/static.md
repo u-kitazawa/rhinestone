@@ -7,10 +7,10 @@
 
 ## 設定
 
-`Config.settings` には定義済みitemの `id` を指定します。
+`Reference.parameters` には定義済みitemの `id` を指定します。
 
 ```python
-Config("gsi", {"id": "std"})
+Reference("gsi", parameters={"id": "std"})
 ```
 
 定義はHTTP通信、runtime dependency、credentialを使わず、同じ設定から常に同じ

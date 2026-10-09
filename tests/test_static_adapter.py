@@ -6,7 +6,7 @@ from xml.etree.ElementTree import fromstring
 import pytest
 
 from rhinestone import (
-    Config,
+    Reference,
     configure,
 )
 from rhinestone.adapters import StaticAdapter
@@ -16,7 +16,7 @@ from rhinestone.errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import Provider, Reference, Resource, SearchQuery
+from rhinestone.models import Provider, Resource, SearchQuery
 
 
 def item(identifier: str = "one") -> Mapping[str, Any]:
@@ -49,7 +49,7 @@ def item(identifier: str = "one") -> Mapping[str, Any]:
 def test_static_adapter_restores_source_and_provenance() -> None:
     adapter = StaticAdapter({"one": item()})
 
-    source = adapter.load(Reference.from_config(Config("static", {"id": "one"})))
+    source = adapter.load(Reference("static", parameters={"id": "one"}))
 
     assert isinstance(source, Resource)
     assert source.metadata.title == "One"
@@ -92,7 +92,7 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
     adapter = StaticAdapter({"one": item()})
 
     with pytest.raises(ResourceNotFoundError):
-        adapter.load(Reference.from_config(Config("static", {"id": "missing"})))
+        adapter.load(Reference("static", parameters={"id": "missing"}))
     with pytest.raises(UnsupportedSearchConditionError):
         adapter.search(SearchQuery(bbox=(0, 0, 1, 1)))
     with pytest.raises(ConfigValidationError):
@@ -133,14 +133,14 @@ def test_static_adapter_rejects_invalid_metadata_and_query_parameters() -> None:
     metadata_item["metadata"]["raw"] = []
     with pytest.raises(ConfigValidationError):
         StaticAdapter({"one": metadata_item}).load(
-            Reference.from_config(Config("static", {"id": "one"}))
+            Reference("static", parameters={"id": "one"})
         )
 
     query_item = dict(item())
     query_item["provenance"] = {"query_parameters": []}
     with pytest.raises(ConfigValidationError):
         StaticAdapter({"one": query_item}).load(
-            Reference.from_config(Config("static", {"id": "one"}))
+            Reference("static", parameters={"id": "one"})
         )
 
 
@@ -154,7 +154,7 @@ def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
     app = configure(
         catalog=Catalog((BUILTIN[2],)),
     )
-    resource = app.resolve(Config("gsi", {"id": "std"}))
+    resource = app.load(Reference("gsi", parameters={"id": "std"}))
 
     assert resource.access_plan is not None
     assert resource.access_plan.kind == "remote-dataset"
@@ -170,7 +170,7 @@ def test_static_source_composes_through_public_api() -> None:
     source = Provider("catalog", "static", {"items": {"one": item()}})
     app = configure(catalog=Catalog((source,)))
 
-    resource = app.resolve(Config("catalog", {"id": "one"}))
+    resource = app.load(Reference("catalog", parameters={"id": "one"}))
 
     assert resource.provenance.provider == "catalog"
     assert resource.provenance.adapter == "static"

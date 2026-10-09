@@ -4,7 +4,7 @@ import os
 
 import rasterio
 
-from rhinestone import Config, Provider, configure
+from rhinestone import Provider, Reference, configure
 from rhinestone.catalogs import Catalog
 
 endpoint = os.environ["RHINESTONE_STAC_ENDPOINT"]
@@ -14,10 +14,10 @@ asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
 app = configure(
     catalog=Catalog((Provider("earth-search", "stac", {"endpoint": endpoint}),)),
 )
-resource = app.resolve(
-    Config(
-        source_id="earth-search",
-        settings={
+resource = app.load(
+    Reference(
+        provider_id="earth-search",
+        parameters={
             "collection_id": collection_id,
             "item_id": item_id,
             "asset_key": asset_key,

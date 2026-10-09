@@ -5,7 +5,7 @@ Rhinestoneは、日本の公的・地理空間データを探し、使えるデ�
 まずは次の流れだけ覚えれば使い始められます。
 
 ```text
-search -> resolve -> open
+search -> open
 ```
 
 検索結果を選び、開くまでの最小例は[はじめに](docs/getting-started.md)にあります。
@@ -54,13 +54,13 @@ python -m pip install "rhinestone @ git+https://github.com/u-kitazawa/rhinestone
 import rhinestone as rs
 
 results = rs.search(text="河川")
-resource = results[0].resolve()
+resource = results[0]
 
 print(resource.uri)
 print(resource.metadata)
 ```
 
-`rs.search()`はRhinestoneが用意する提供元からデータ候補を返し、検索結果は`result.resolve()`で使えるデータ情報へ解決できます。
+`rs.search()`はRhinestoneが用意する提供元からデータ候補を返し、配信単位の`Resource`を返します。`resource.open(library, runtime=...)`で開けます。
 複数の提供元を使う場合、結果の順番は設定した順番であり、提供元をまたいだ関連度順ではありません。詳細は[検索結果の順序](docs/search.md#結果の順序)を参照してください。
 
 形式を限定する場合は`rs.search(text="河川", format=(rs.FormatPreset.PYOGRIO,))`のように
@@ -71,13 +71,15 @@ print(resource.metadata)
 ```python
 from rhinestone import Catalog, Provider, configure
 
-catalog = Catalog((
-    Provider(
-        id="my-stac",
-        adapter_type="stac",
-        settings={"endpoint": "https://stac.example/api"},
-    ),
-))
+catalog = Catalog(
+    (
+        Provider(
+            id="my-stac",
+            adapter_type="stac",
+            settings={"endpoint": "https://stac.example/api"},
+        ),
+    )
+)
 app = configure(catalog=catalog)
 ```
 
@@ -101,13 +103,10 @@ HTTP通信はRhinestoneに組み込まれています。
 
 ## APIの段階
 
-通常の利用では、トップレベルの`search`を使います。高度な構成では`configure`、`Rhinestone`、`Catalog`、`Provider`、`Config`、
-`Result`、`SearchResults`、`Resource`、`Format`、`FormatPreset`を使います。`Source`、`AccessPlan`、
-`Metadata`、`Provenance`、Runtime、Adapter、Registryなどを扱う拡張コードは、用途別の
-サブモジュールからimportします。詳しくは[APIリファレンス](docs/api.md)の
-[拡張・Adapter向けAPI](docs/api.md#拡張-adapter向けapi)を参照してください。
-
-RhinestoneはGIS I/O、形式変換、空間演算、データ解析を実装せず、解決済みResourceを既存の専門Runtimeへ渡します。
+通常は`search()`でResourceを取得し、`open()`で利用者のRuntimeへ渡します。
+独自Providerや認証を使う場合は`configure()`でアプリケーションを構成します。
+既知の対象は`app.load(Reference(...))`、別プロセスへ実行契約を渡す場合は
+`app.plan(resource)`と`AccessPlan.to_dict()` / `from_dict()`を使います。
 
 ## 次に読む
 

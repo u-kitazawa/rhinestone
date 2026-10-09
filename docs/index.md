@@ -5,7 +5,7 @@ Rhinestoneは、日本の公的・地理空間データを探し、使えるデ�
 基本の使い方は次のとおりです。
 
 ```text
-Catalog -> Provider -> search -> Result -> resolve -> Resource -> open -> Data
+Catalog -> Provider -> search -> Resource -> open -> Data
 ```
 
 ## まず動かす
@@ -32,7 +32,7 @@ app = configure(
 )
 results = app.search(SearchQuery(text="標準地図", limit=1))
 result = results[0]
-resource = app.resolve(result)
+resource = result
 
 dataset = resource.open("gdal", runtime=gdal)
 print("URI:", resource.uri)
@@ -50,12 +50,11 @@ print("raster size:", dataset.RasterXSize, dataset.RasterYSize)
 | --- | --- |
 | `Catalog` | 利用可能なProviderの集合 |
 | `Provider` | データを提供するサービスや組織 |
-| `Result` | 検索で見つかった候補 |
 | `Resource` | URIや形式が確定した、利用できるデータ |
 | `Runtime` | Resourceを開くために利用者が用意する外部ライブラリ |
 | `Credential` | API keyやtokenなどの認証情報 |
 
-`Config`は既知のProviderを直接解決するための高度な公開モデルです。`Source`、`AccessPlan`、`Resolver`、Adapter、Registryは内部または高度な拡張向けの概念で、最初から覚える必要はありません。詳しくは[用語と概念](concepts.md)を参照してください。
+`Reference`は既知の配信対象を直接指定するモデルです。`AccessPlan`は実行契約を別プロセスへ転送する場合に使います。詳しくは[用語と概念](concepts.md)を参照してください。
 
 ## 次に読む
 

@@ -17,7 +17,7 @@ from rhinestone.catalogs import BUILTIN
 from rhinestone.catalogs import Catalog
 import os
 
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
 
 app = configure(
     catalog=Catalog(provider for provider in BUILTIN if provider.id == "odpt"),
@@ -25,20 +25,21 @@ app = configure(
 )
 ```
 
-`acl:consumerKey` は open 時に credential factory から取得し、Config や Source には保存しません。
+`acl:consumerKey` は open 時に credential factory から取得し、Reference や Source には保存しません。
 
 ## 駅を取得する例
 
 ```python
 records = app.open(
-    Config(
+    Reference(
         "odpt",
-        {
+        parameters={
             "dataset": "station",
             "credential": "odpt",
             "filters": {"dc:title": "東京"},
         },
-    )
+    ),
+    "json-service",
 )
 ```
 

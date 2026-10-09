@@ -31,7 +31,7 @@ import os
 
 import rasterio
 
-from rhinestone import Config, Provider, configure
+from rhinestone import Reference, Provider, configure
 
 
 endpoint = os.environ["RHINESTONE_STAC_ENDPOINT"]
@@ -39,18 +39,20 @@ collection_id = os.environ["RHINESTONE_STAC_COLLECTION_ID"]
 item_id = os.environ["RHINESTONE_STAC_ITEM_ID"]
 asset_key = os.environ["RHINESTONE_STAC_ASSET_KEY"]
 app = configure(
-    catalog=Catalog((
-        Provider(
-            id="imagery",
-            adapter_type="stac",
-            settings={"endpoint": endpoint},
-        ),
-    )),
+    catalog=Catalog(
+        (
+            Provider(
+                id="imagery",
+                adapter_type="stac",
+                settings={"endpoint": endpoint},
+            ),
+        )
+    ),
 )
-resource = app.resolve(
-    Config(
-        source_id="imagery",
-        settings={
+resource = app.load(
+    Reference(
+        provider_id="imagery",
+        parameters={
             "collection_id": collection_id,
             "item_id": item_id,
             "asset_key": asset_key,
@@ -65,7 +67,7 @@ with resource.open("rasterio", runtime=rasterio) as dataset:
     print("bands:", dataset.count)
 ```
 
-`app.resolve()`は指定したItemを取得し、明示したasset keyのURLとmedia typeを検証します。
+`app.load()`は指定したItemを取得し、明示したasset keyのURLとmedia typeを検証します。
 `.tif` のようなファイル名からCOGであることは推測しません。
 `resource.open("rasterio", runtime=rasterio)`は、検証済みの選択済みURIをRasterioへ渡します。
 
@@ -78,7 +80,7 @@ with resource.open("rasterio", runtime=rasterio) as dataset:
 
 そのようなItemを扱う場合は、この例のように利用するItemとasset keyを明示してください。
 単一 `data` assetに制約され、かつそのassetがCOG media typeを広告するcollectionでのみ
-このRasterioフローへ検索結果をそのまま `app.resolve(result)` で渡せます。単一assetでも
+このRasterioフローへ検索結果をそのまま `app.load(result)` で渡せます。単一assetでも
 media typeが未指定または非対応の場合、検索結果は返りますが解決時に
 `UnsupportedAccessError` となります。
 

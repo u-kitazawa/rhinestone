@@ -9,7 +9,7 @@ import rdflib
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
-    Config,
+    Reference,
     configure,
 )
 from rhinestone.catalogs import BUILTIN, Catalog
@@ -107,10 +107,10 @@ def test_dcat_dependencies_are_lazy_and_source_scoped(
         },
     )
     assert dependency_calls == []
-    resource = app.resolve(
-        Config(
+    resource = app.load(
+        Reference(
             "catalog",
-            {
+            parameters={
                 "uri": "https://fixture.example/catalog",
                 "dataset": "https://fixture.example/dataset",
                 "distribution": "https://fixture.example/geojson",
@@ -146,10 +146,10 @@ def test_configured_dcat_rejects_tampered_catalog_uri_before_fetch(
     )
 
     with pytest.raises(ConfigValidationError, match="catalog URI"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "catalog",
-                {
+                parameters={
                     "uri": "https://unlisted.example/catalog",
                     "dataset": "https://trusted.example/dataset",
                 },
@@ -206,10 +206,10 @@ def test_dcat_missing_runtime_is_not_reported_as_provider_metadata(
     app = configure(catalog=Catalog((Provider("catalog", "dcat"),)))
 
     with pytest.raises(DependencyUnavailableError, match="rdflib"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "catalog",
-                {
+                parameters={
                     "uri": "https://fixture.example/catalog",
                     "dataset": "https://fixture.example/dataset",
                 },
@@ -241,10 +241,10 @@ def test_resolved_resource_does_not_retain_source_runtime(
         catalog=Catalog((Provider("catalog", "dcat"),)),
         dependencies={"rdflib": RuntimeFactory(factory)},
     )
-    resource = app.resolve(
-        Config(
+    resource = app.load(
+        Reference(
             "catalog",
-            {
+            parameters={
                 "uri": "https://fixture.example/catalog",
                 "dataset": "https://fixture.example/dataset",
                 "distribution": "https://fixture.example/geojson",
@@ -273,10 +273,10 @@ def test_dcat_document_failure_remains_provider_metadata_error(
     )
 
     with pytest.raises(ProviderMetadataError, match="RDF catalog"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "catalog",
-                {
+                parameters={
                     "uri": "https://fixture.example/catalog",
                     "dataset": "https://fixture.example/dataset",
                 },

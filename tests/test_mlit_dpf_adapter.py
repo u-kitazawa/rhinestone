@@ -16,7 +16,7 @@ from rhinestone.errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, Reference, SearchQuery
+from rhinestone.models import Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from rhinestone.representations import Format
 
@@ -270,7 +270,7 @@ def test_bbox_validation_rejects_unsafe_coordinates(
 
 def test_load_is_explicitly_unsupported() -> None:
     with pytest.raises(UnsupportedSourceError, match="discovery-only"):
-        _adapter(_response()).load(Reference.from_config(Config("mlit-dpf", {})))
+        _adapter(_response()).load(Reference("mlit-dpf", parameters={}))
 
 
 def test_time_is_reported_as_unsupported_search_diagnostic() -> None:
@@ -336,7 +336,7 @@ def test_direct_result_resolves_with_discovery_and_requires_explicit_runtime(
     )
 
     result = app.search(text="道路", limit=1)[0]
-    resource = app.resolve(result)
+    resource = app.load(result)
 
     assert result.discovered_by == "dpf"
     assert resource.discovery is not None
@@ -950,7 +950,7 @@ def test_public_format_query_retains_declared_formats(
     results = app.search(text="河川", format=(Format.GEOJSON,), limit=1)
     assert len(results) == 1
     assert results[0].formats == frozenset({"geojson"})
-    assert app.resolve(results[0]).uri == "https://example.test/a"
+    assert app.load(results[0]).uri == "https://example.test/a"
 
 
 @pytest.mark.parametrize(

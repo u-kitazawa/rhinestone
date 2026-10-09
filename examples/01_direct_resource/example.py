@@ -1,12 +1,12 @@
 """Resolve a fully described direct resource without network access."""
 
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
 
 app = configure()
-resource = app.resolve(
-    Config(
-        source_id="direct",
-        settings={
+resource = app.load(
+    Reference(
+        provider_id="direct",
+        parameters={
             "uri": "https://example.invalid/data.geojson",
             "format": "geojson",
             "media_type": "application/geo+json",

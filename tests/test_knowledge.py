@@ -6,8 +6,8 @@ from typing import Any, cast
 import pytest
 
 from rhinestone import (
-    Config,
     Provider,
+    Reference,
     configure,
 )
 from rhinestone.adapters.contracts import SourceAdapterDefinition
@@ -30,7 +30,7 @@ from rhinestone.errors import (
     KnowledgeResolutionError,
     KnowledgeValidationError,
 )
-from rhinestone.models import Metadata, Provenance, Reference, Resource
+from rhinestone.models import Metadata, Provenance, Resource
 from rhinestone.registry import CredentialRegistry, DependencyRegistry
 from rhinestone.resolution import resource_from_delivery
 from rhinestone.security import DestinationPolicy
@@ -430,15 +430,13 @@ def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
         knowledge=registry,
     )
     plateau_source = plateau.load(
-        Reference.from_config(
-            Config(
-                "plateau",
-                {
-                    "resource_id": "citygml",
-                    "municipality": "横浜市",
-                    "time": "2020年度",
-                },
-            )
+        Reference(
+            "plateau",
+            parameters={
+                "resource_id": "citygml",
+                "municipality": "横浜市",
+                "time": "2020年度",
+            },
         )
     )
     plateau_knowledge = plateau_source.metadata.raw["knowledge"]
@@ -448,7 +446,7 @@ def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
     gsi = GsiFundamentalAdapter(knowledge=registry)
     settings = fundamental_settings()
     settings.update({"municipality": "14100", "time": "令和2年"})
-    gsi_source = gsi.load(Reference.from_config(Config("gsi-fundamental", settings)))
+    gsi_source = gsi.load(Reference("gsi-fundamental", parameters=settings))
     gsi_knowledge = gsi_source.metadata.raw["knowledge"]
     assert gsi_knowledge["identity"]["name"] == "横浜市"
     assert gsi_knowledge["time"]["year"] == 2020
@@ -461,15 +459,13 @@ def test_source_adapters_preserve_explicit_time_kind() -> None:
         endpoint="https://fixture.example",
         knowledge=registry,
     ).load(
-        Reference.from_config(
-            Config(
-                "plateau",
-                {
-                    "resource_id": "citygml",
-                    "time": "2020年",
-                    "time_kind": "survey_year",
-                },
-            )
+        Reference(
+            "plateau",
+            parameters={
+                "resource_id": "citygml",
+                "time": "2020年",
+                "time_kind": "survey_year",
+            },
         )
     )
     assert plateau_source.metadata.raw["knowledge"]["time"]["kind"] == "survey_year"
@@ -477,7 +473,7 @@ def test_source_adapters_preserve_explicit_time_kind() -> None:
     settings = fundamental_settings()
     settings.update({"time": "2020", "time_kind": "survey_year"})
     gsi_source = GsiFundamentalAdapter(knowledge=registry).load(
-        Reference.from_config(Config("gsi-fundamental", settings))
+        Reference("gsi-fundamental", parameters=settings)
     )
     assert gsi_source.metadata.raw["knowledge"]["time"]["kind"] == "survey_year"
 
@@ -505,7 +501,11 @@ def test_knowledge_factory_is_not_loaded_until_source_uses_it() -> None:
             KnowledgeAdapterDefinition("official", identity_factory, "identity"),
         ),
     )
-    app.resolve(Config("direct", {"uri": str(Path("/tmp/data.csv")), "format": "csv"}))
+    app.load(
+        Reference(
+            "direct", parameters={"uri": str(Path("/tmp/data.csv")), "format": "csv"}
+        )
+    )
     assert calls == []
 
 
@@ -538,7 +538,7 @@ def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
             registry_definition,
         ),
     )
-    app.resolve(Config("custom", {}))
+    app.load(Reference("custom", parameters={}))
     assert len(seen) == 1
     assert seen[0].available == ("area", "time")
 
@@ -556,7 +556,7 @@ def test_public_builtin_source_receives_knowledge_adapters() -> None:
         ),
     )
 
-    resource = app.resolve(Config("fundamental", settings))
+    resource = app.load(Reference("fundamental", parameters=settings))
 
     assert resource.metadata.raw["knowledge"]["identity"]["code"] == "14100"
 
@@ -568,7 +568,7 @@ def test_public_application_auto_registers_standard_time_adapter() -> None:
         catalog=Catalog((Provider("fundamental", "gsi-fundamental"),)),
     )
 
-    resource = app.resolve(Config("fundamental", settings))
+    resource = app.load(Reference("fundamental", parameters=settings))
 
     assert resource.metadata.raw["knowledge"]["time"] == {
         "kind": "calendar_year",
@@ -595,7 +595,7 @@ def test_custom_time_definition_replaces_the_preinstalled_adapter() -> None:
     settings = fundamental_settings()
     settings["time"] = "任意の時点"
 
-    resource = app.resolve(Config("fundamental", settings))
+    resource = app.load(Reference("fundamental", parameters=settings))
 
     assert resource.metadata.raw["knowledge"]["time"]["year"] == 2099
 

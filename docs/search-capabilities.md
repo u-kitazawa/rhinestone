@@ -1,7 +1,7 @@
 # 検索能力の対照表
 
 この表は現行の `SearchQuery(text, area, bbox, time, format, limit)` が各 Source Adapter でどこまで
-適用されるかを示します。検索結果はすべて既存の `Result` であり、`resolve()` への経路、
+適用されるかを示します。検索結果はすべて既存の `Resource` であり、`resolve()` への経路、
 discovery provenance、provider ごとの順序は変わりません。
 
 `area`は検索前に行政区域Knowledge Adapterで解決されます。`area`対応Adapterには正式区域名を直接渡し、G空間情報センターでは独立した地域条件、MLIT DPFでは行政コードの属性条件として扱います。STAC、OGC API Featuresと、空間検索を明示的に有効化したCKANにはbboxとして、通常のCKAN、PLATEAU、search.ckan.jp、DCAT、Staticには正式区域名のtextとして投影されます。e-Stat GISでは未対応diagnosticになります。未知区域は全Providerの呼び出し前に失敗します。
@@ -16,7 +16,7 @@ discovery provenance、provider ごとの順序は変わりません。
 | STAC | `bbox`、`time`、`limit` を `/search` に渡し、Item の data asset を Resource として返す | provider の `limit` に従う。next link の追跡はしない | collection は Provider 設定内部の絞り込みで、共通条件ではない。data asset が一意でない Item は失敗として診断される |
 | OGC API Features | 設定済み collection の `/items` に `bbox`、`datetime`、`limit` を渡す | provider の `limit` に従う。next link の追跡はしない | collection は Provider 設定で必須。`text` は共通条件ではない |
 | DCAT | ローカル RDF graph 上で `text` の全語を title / description に照合する | `limit` は照合後 Dataset 数。文書は検索ごとに一度だけ読み込む | RDF catalog の全件を読むため、大きな remote catalog の索引 API にはならない。bbox / time は未対応 |
-| Static | ローカル定義の id / title / description に `text` の全語を照合する | `limit` は照合後 Result 数。通信はしない | bbox / time は未対応 |
+| Static | ローカル定義の id / title / description に `text` の全語を照合する | `limit` は照合後 Resource 数。通信はしない | bbox / time は未対応 |
 | e-Stat GIS | 利用者が与えた distribution index の id / title / dataset / level に `text` の全語を照合する | `limit` は照合後 Resource 数。通信はしない | `load()` の selector（survey year、region など）は検索条件に昇格しない。共通の形式検索は下記の制限がある。UI の HTML は検索しない |
 
 ## 形式検索の適用段階
@@ -31,7 +31,7 @@ discovery provenance、provider ごとの順序は変わりません。
 | OGC API Features | Search Coordinatorが取得済み結果を絞り込む | `ogc-api-features` |
 | Static | Search Coordinatorが取得済み結果を絞り込む | 静的定義の候補に明示されたformat |
 | MLIT DPF | Adapter内。必要件数まで次pageを取得する | Directは明示representation。Native委譲は不明として扱う |
-| DCAT / e-Stat GIS | Search Coordinatorが取得済み結果を絞り込む | 現行Adapterは`Result.formats`を設定しないため、形式検索では不明として扱う |
+| DCAT / e-Stat GIS | Search Coordinatorが取得済み結果を絞り込む | 現行Adapterは`Resource.formats`を設定しないため、形式検索では不明として扱う |
 
 Search Coordinatorで絞り込む場合、Adapterへは`format`を渡さず、`limit=None`で取得した
 結果を形式照合してからProviderごとに`limit`を適用します。取得範囲は各Adapterが

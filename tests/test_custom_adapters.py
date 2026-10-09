@@ -4,8 +4,8 @@ from typing import Any
 import pytest
 
 from rhinestone import (
-    Config,
     Provider,
+    Reference,
     configure,
 )
 from rhinestone.adapters.contracts import (
@@ -14,14 +14,7 @@ from rhinestone.adapters.contracts import (
 )
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import AdapterRegistrationError
-from rhinestone.models import (
-    AccessPlan,
-    Metadata,
-    Provenance,
-    Reference,
-    Resource,
-    RuntimeFactory,
-)
+from rhinestone.models import AccessPlan, Metadata, Provenance, Resource, RuntimeFactory
 from rhinestone.resolution import resource_from_delivery
 from rhinestone.security import DestinationPolicy
 
@@ -78,13 +71,15 @@ def test_custom_source_and_execution_share_the_public_pipeline() -> None:
         ),
     )
 
-    resource = app.resolve(Config("custom", {"title": "Example"}))
+    resource = app.load(Reference("custom", parameters={"title": "Example"}))
 
     assert resource.metadata.title == "Example"
     assert resource.provenance.provider == "custom"
     assert resource.metadata.raw["provider"] == "custom"
     assert app.open(
-        Config("custom", {"title": "Example"}), "custom-runtime", runtime=runtime
+        Reference("custom", parameters={"title": "Example"}),
+        "custom-runtime",
+        runtime=runtime,
     ) == (
         "opened",
         "https://data.example/item.bin",
@@ -109,7 +104,7 @@ def test_source_definition_can_declare_a_lazy_source_dependency() -> None:
         dependencies={"custom-source-runtime": RuntimeFactory(factory)},
     )
     assert loaded == []
-    app.resolve(Config("custom", {"title": "Example"}))
+    app.load(Reference("custom", parameters={"title": "Example"}))
     assert loaded == []
 
 
@@ -138,7 +133,7 @@ def test_source_dependencies_are_scoped_to_each_definition() -> None:
         dependencies={"first-runtime": object(), "second-runtime": object()},
     )
 
-    app.resolve(Config("first", {"title": "First"}))
+    app.load(Reference("first", parameters={"title": "First"}))
     assert seen == {
         "first": frozenset({"first-runtime"}),
         "second": frozenset({"second-runtime"}),
@@ -172,8 +167,8 @@ def test_source_dependency_instances_are_cached_across_provider_contexts() -> No
         dependencies={"shared-runtime": RuntimeFactory(load_runtime)},
     )
 
-    app.resolve(Config("first", {"title": "First"}))
-    app.resolve(Config("second", {"title": "Second"}))
+    app.load(Reference("first", parameters={"title": "First"}))
+    app.load(Reference("second", parameters={"title": "Second"}))
     assert len(calls) == 1
 
 

@@ -12,7 +12,7 @@ from rhinestone.errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Config, Reference, SearchQuery
+from rhinestone.models import Reference, SearchQuery
 
 from .provider_support import fixture_json
 
@@ -244,7 +244,7 @@ def test_search_ckan_jp_is_discovery_only() -> None:
     adapter = SearchCkanJpAdapter(get_json=lambda url, params: {})
 
     with pytest.raises(UnsupportedSourceError, match="discovery-only"):
-        adapter.load(Reference.from_config(Config("search-ckan-jp", {})))
+        adapter.load(Reference("search-ckan-jp", parameters={}))
 
 
 def test_search_ckan_jp_requires_text() -> None:

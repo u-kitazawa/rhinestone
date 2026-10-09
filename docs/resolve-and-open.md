@@ -1,62 +1,54 @@
-# Resourceを解決して開く
+# Resourceを開く
 
-Rhinestoneの通常フローは`Result -> Resource -> Data`です。
-
-## ResultをResourceへ解決する
+通常は検索結果のResourceをそのまま開けます。
 
 ```python
-result = app.search(text="河川")[0]
-resource = app.resolve(result)
-```
-
-`Resource`にはURIだけでなく、format、metadata、provenance、アクセス方法が含まれます。検索結果を解決するためにConfigを組み立てる必要はありません。
-
-Sourceによってはprovider metadataを解釈するためのSource Runtimeが検索・解決時に
-必要です。たとえばDCATは`rdflib`を`search()`または`resolve()`で遅延評価します。
-解決済みResourceとAccessPlanはSource Runtimeの実体やfactoryを保持しません。
-
-## Runtimeで開く
-
-開くRuntimeを明示します。
-
-```python
-from rhinestone.catalogs import BUILTIN
 import rasterio
+from rhinestone import ProviderId, search
 
-app = configure(
-    catalog=BUILTIN,
-)
-resource = app.resolve(result)
+resource = search(text="標準地図", providers=[ProviderId.GSI], limit=1)[0]
 with resource.open("rasterio", runtime=rasterio) as dataset:
     ...
 ```
 
-またはアプリケーションに解決とopenをまとめて依頼できます。
+独自構成では`app.open(resource, "rasterio", runtime=rasterio)`を使います。
+AccessPlanがない検索結果はReferenceからloadしてから実行します。
+形式を確定できない場合は`ExecutionAdapterUnavailableError`となり、別の形式やRuntimeへ
+自動で切り替えません。Rhinestoneはデータ解析や形式変換を行いません。
+
+## 既知の対象を読み込む
 
 ```python
-dataset = app.open(result, "rasterio", runtime=rasterio)
+from rhinestone import Reference, configure
+
+app = configure()
+resource = app.load(
+    Reference(
+        "direct",
+        parameters={
+            "uri": "https://example.invalid/data.geojson",
+            "format": "geojson",
+            "media_type": "application/geo+json",
+        },
+    )
+)
 ```
 
-RhinestoneはGIS I/O、形式変換、空間演算、解析を行いません。選択済みResourceを利用者が所有するRuntimeへ渡します。
-Execution Runtimeは`configure()`に登録せず、`open()`の呼び出しごとに渡します。
-
-Adapter名（`gdal`、`rasterio`、`pyogrio`など）は必須です。指定したAdapterがResourceに
-対応しない場合やRuntime実体がない場合は`ExecutionAdapterUnavailableError`になります。
-Execution Runtimeへ`RuntimeFactory`を渡すこともできません。
-ODPTのJSONサービスはCoreが通信するため、`resource.open("json-service")`とし、
-`runtime=`を省略します。
-
-## 高度な直接解決
-
-Provider固有の対象指定を再現可能なConfigとして扱う必要がある場合だけ、`Config`を使います。
+## 実行契約を転送する
 
 ```python
-resource = app.resolve(Config(
-    source_id="direct",
-    settings={
-        "uri": "https://example.invalid/data.geojson",
-        "format": "geojson",
-        "media_type": "application/geo+json",
-    },
-))
+from rhinestone import AccessPlan
+
+payload = app.plan(resource).to_dict()
+plan = AccessPlan.from_dict(payload)
+data = receiving_app.open(plan, "pyogrio", runtime=pyogrio)
 ```
+
+通常のopenではplan取得は不要です。受信側はProviderへ再問い合わせせず、自身の
+DestinationPolicyとCredential factoryで実行を認可します。Runtimeやsecretは転送しません。
+
+## Runtimeの指定
+
+Adapter名と対応するRuntime実体は必須です。Execution Runtimeは`configure()`へ登録せず、
+`open(..., runtime=...)`へ渡します。`RuntimeFactory`は実行用には使えません。
+ODPTのJSONサービスはCoreのRuntimeを使うため`open("json-service")`で開きます。

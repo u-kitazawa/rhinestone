@@ -3,7 +3,7 @@ from typing import Any, cast
 
 import pytest
 
-from rhinestone import Config, Provider, configure
+from rhinestone import Provider, Reference, configure
 from rhinestone.adapters.contracts import SourceAdapterDefinition
 from rhinestone.adapters.knowledge import (
     CRS84,
@@ -28,7 +28,7 @@ from rhinestone.errors import (
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import Metadata, Provenance, Reference, Resource, SearchQuery
+from rhinestone.models import Metadata, Provenance, Resource, SearchQuery
 from rhinestone.resolution import resource_from_delivery
 
 
@@ -301,10 +301,10 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
         )
     )
 
-    resource = app.resolve(
-        Config(
+    resource = app.load(
+        Reference(
             "estat",
-            {
+            parameters={
                 "dataset_id": "census-2020",
                 "boundary_kind": "small-area",
                 "survey_year": 2020,
@@ -324,18 +324,20 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
     assert "matches_config" not in resource.metadata.raw
 
     with pytest.raises(AmbiguousResourceError, match="2 distributions"):
-        app.resolve(Config("estat", {"dataset_id": "census-2020"}))
+        app.load(Reference("estat", parameters={"dataset_id": "census-2020"}))
 
-    zip_resource = app.resolve(
-        Config("estat", {"distribution_id": "census-2020-small-area-tokyo-shp"})
+    zip_resource = app.load(
+        Reference(
+            "estat", parameters={"distribution_id": "census-2020-small-area-tokyo-shp"}
+        )
     )
     assert zip_resource.access_plan is not None
     assert zip_resource.access_plan.options["entry_point"] == "tokyo.shp"
 
-    timed = app.resolve(
-        Config(
+    timed = app.load(
+        Reference(
             "estat",
-            {
+            parameters={
                 "distribution_id": "census-2020-small-area-tokyo-gml",
                 "time": "2020",
                 "time_kind": "survey_year",
@@ -344,10 +346,10 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
     )
     assert timed.provenance.raw["knowledge"]["time"]["kind"] == "survey_year"
     with pytest.raises(ConfigValidationError, match="survey_year"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "estat",
-                {
+                parameters={
                     "distribution_id": "census-2020-small-area-tokyo-gml",
                     "time": "2020",
                     "time_kind": "calendar_year",
@@ -355,28 +357,28 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
             )
         )
     with pytest.raises(ConfigValidationError, match="time_kind"):
-        app.resolve(Config("estat", {"time_kind": "survey_year"}))
+        app.load(Reference("estat", parameters={"time_kind": "survey_year"}))
     with pytest.raises(ConfigValidationError, match="survey_year"):
-        app.resolve(Config("estat", {"survey_year": "2020"}))
+        app.load(Reference("estat", parameters={"survey_year": "2020"}))
     with pytest.raises(ConfigValidationError, match="unexpected"):
-        app.resolve(Config("estat", {"unexpected": "value"}))
+        app.load(Reference("estat", parameters={"unexpected": "value"}))
     with pytest.raises(ResourceNotFoundError, match="No e-Stat"):
-        app.resolve(Config("estat", {"distribution_id": "missing"}))
+        app.load(Reference("estat", parameters={"distribution_id": "missing"}))
     with pytest.raises(ResourceNotFoundError, match="No e-Stat"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "estat",
-                {
+                parameters={
                     "distribution_id": "census-2020-small-area-tokyo-gml",
                     "survey_year": 2019,
                 },
             )
         )
     with pytest.raises(ResourceNotFoundError, match="No e-Stat"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "estat",
-                {
+                parameters={
                     "distribution_id": "census-2020-small-area-tokyo-gml",
                     "time": "2019",
                     "time_kind": "survey_year",
@@ -384,9 +386,11 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
             )
         )
     with pytest.raises(ConfigValidationError, match="survey_year"):
-        app.resolve(Config("estat", {"time": "2019"}))
+        app.load(Reference("estat", parameters={"time": "2019"}))
     with pytest.raises(ConfigValidationError, match="survey_year"):
-        app.resolve(Config("estat", {"boundary_kind": "missing", "time": "2019"}))
+        app.load(
+            Reference("estat", parameters={"boundary_kind": "missing", "time": "2019"})
+        )
 
     adapter = EstatGisAdapter(distributions)
     assert len(adapter.search(SearchQuery(text="Shape", limit=1))) == 1
@@ -398,25 +402,23 @@ def test_estat_gis_distribution_is_resolved_as_general_gis_resource() -> None:
 
     adapter.config_schema = lambda: None  # type: ignore[method-assign]
     with pytest.raises(ConfigValidationError, match="Unknown"):
-        adapter.load(
-            Reference.from_config(Config("estat-gis", {"unexpected": "value"}))
-        )
+        adapter.load(Reference("estat-gis", parameters={"unexpected": "value"}))
     calendar_adapter = EstatGisAdapter(
         distributions, knowledge=cast(Any, StandardTimeAdapter())
     )
     calendar_adapter.config_schema = lambda: None  # type: ignore[method-assign]
     with pytest.raises(ConfigValidationError, match="survey_year"):
         calendar_adapter.load(
-            Reference.from_config(
-                Config("estat-gis", {"time": "2020", "time_kind": "calendar_year"})
+            Reference(
+                "estat-gis", parameters={"time": "2020", "time_kind": "calendar_year"}
             )
         )
 
 
 def test_estat_gis_requires_and_validates_an_explicit_index() -> None:
     with pytest.raises(ConfigValidationError, match="requires distributions"):
-        configure(catalog=Catalog((Provider("estat", "estat-gis"),))).resolve(
-            Config("estat", {})
+        configure(catalog=Catalog((Provider("estat", "estat-gis"),))).load(
+            Reference("estat", parameters={})
         )
 
     valid = {
@@ -503,9 +505,7 @@ def test_estat_gis_deep_copies_nested_raw_distribution_metadata() -> None:
     adapter = EstatGisAdapter([distribution])
     extension["tags"].append("mutated")
 
-    source = adapter.load(
-        Reference.from_config(Config("estat-gis", {"distribution_id": "d1"}))
-    )
+    source = adapter.load(Reference("estat-gis", parameters={"distribution_id": "d1"}))
 
     assert source.metadata.raw["distribution"]["extension"]["tags"] == ("original",)
     assert source.provenance.raw["distribution"]["extension"]["tags"] == ("original",)
@@ -524,8 +524,8 @@ def test_estat_gis_accepts_provider_frozen_distribution_settings() -> None:
     }
     provider = Provider("estat", "estat-gis", {"distributions": [distribution]})
 
-    resource = configure(catalog=Catalog((provider,))).resolve(
-        Config("estat", {"distribution_id": "d1"})
+    resource = configure(catalog=Catalog((provider,))).load(
+        Reference("estat", parameters={"distribution_id": "d1"})
     )
 
     assert resource.metadata.raw["distribution"]["extension"]["nested"]["tags"] == (
@@ -558,7 +558,7 @@ def test_custom_adapter_context_uses_public_ports_only() -> None:
         catalog=Catalog((Provider("external", "external-source"),)),
         adapters=(SourceAdapterDefinition("external-source", source_factory),),
     )
-    app.resolve(Config("external", {}))
+    app.load(Reference("external", parameters={}))
     assert seen == [(True, True)]
 
 
@@ -736,7 +736,7 @@ def test_custom_transport_preserves_text_headers_and_normalizes_network_errors(
         ),
         adapters=(SourceAdapterDefinition("custom-source", factory),),
     )
-    app.resolve(Config("custom", {}))
+    app.load(Reference("custom", parameters={}))
     assert seen == {
         "url": "https://custom.example/catalog",
         "headers": {"Authorization": "secret"},
@@ -755,7 +755,7 @@ def test_custom_transport_normalizes_network_errors(
 
     def factory(provider: Provider, context: Any) -> Any:
         class Adapter:
-            def load(self, config: Config) -> Any:
+            def load(self, config: Reference) -> Any:
                 context.transport.get_json("https://custom.example/data", {})
                 raise AssertionError("transport should have failed")
 
@@ -772,7 +772,7 @@ def test_custom_transport_normalizes_network_errors(
         adapters=(SourceAdapterDefinition("custom-source", factory),),
     )
     with pytest.raises(ProviderMetadataError, match="Provider metadata request failed"):
-        app.resolve(Config("custom", {}))
+        app.load(Reference("custom", parameters={}))
 
 
 def test_discovery_record_rejects_empty_source_and_exposes_alias() -> None:

@@ -315,7 +315,7 @@ def test_public_area_search_resolves_alias_keeps_text_and_resolves_resource(
     )
     assert results.diagnostics == ()
     assert ids(results["geospatial-jp"]) == ["local-0", "municipal-0", "local-2"]
-    resource = app.resolve(results["geospatial-jp"][0])
+    resource = app.load(results["geospatial-jp"][0])
     assert resource.uri == "https://files.example/local-0"
     assert resource.format == "geojson"
     assert resource.provenance.provider == "geospatial-jp"

@@ -2,7 +2,7 @@
 
 import os
 
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
 from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
@@ -10,9 +10,13 @@ app = configure(
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 records = app.open(
-    Config(
+    Reference(
         "odpt",
-        {"dataset": "station", "credential": "odpt", "filters": {"dc:title": "東京"}},
+        parameters={
+            "dataset": "station",
+            "credential": "odpt",
+            "filters": {"dc:title": "東京"},
+        },
     )
 )
 print("records:", len(records))

@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import pytest
 
-from rhinestone import Config, configure
+from rhinestone import Catalog, Provider, Reference, configure
 from rhinestone.adapters.source.static import StaticAdapter
 from rhinestone.errors import (
     AmbiguousResourceError,
@@ -12,13 +12,7 @@ from rhinestone.errors import (
     ExecutionAdapterUnavailableError,
     ResourceNotFoundError,
 )
-from rhinestone.models import (
-    AccessPlan,
-    Metadata,
-    Provenance,
-    Reference,
-    Resource,
-)
+from rhinestone.models import AccessPlan, Metadata, Provenance, Resource
 
 
 def unresolved(
@@ -183,8 +177,25 @@ def test_unresolved_resource_is_loaded_or_rejected_before_open() -> None:
     )
     value = unresolved(reference=target)
 
-    assert app.resolve(value).format == "csv"
-    bound = app.bind(unresolved())
+    assert app.load(value).format == "csv"
+    unknown_app = configure(
+        catalog=Catalog(
+            (
+                Provider(
+                    "fixture",
+                    "static",
+                    {
+                        "items": {
+                            "data": {
+                                "candidates": [{"uri": "https://example.test/data"}]
+                            }
+                        },
+                    },
+                ),
+            )
+        )
+    )
+    bound = unknown_app.bind(unresolved(reference=Reference("fixture", "data")))
     with pytest.raises(ExecutionAdapterUnavailableError, match="no AccessPlan"):
         bound.open("gdal", runtime=object())
     with pytest.raises(ExecutionAdapterUnavailableError, match="no AccessPlan"):
@@ -199,9 +210,12 @@ def test_pipeline_open_resolves_a_reference_before_execution() -> None:
     app = configure()
     assert (
         app._pipeline.open(  # pyright: ignore[reportPrivateUsage]
-            Config(
+            Reference(
                 "direct",
-                {"uri": "https://example.test/data.tif", "format": "geotiff"},
+                parameters={
+                    "uri": "https://example.test/data.tif",
+                    "format": "geotiff",
+                },
             ),
             "rasterio",
             runtime=Runtime(),
@@ -224,9 +238,7 @@ def test_dcat_explicit_missing_distribution_is_not_found() -> None:
     from tests.test_adapter_expansion import dcat_adapter, dcat_config
 
     with pytest.raises(ResourceNotFoundError, match="no matching distribution"):
-        dcat_adapter().load(
-            Reference.from_config(dcat_config(distribution="https://missing.test"))
-        )
+        dcat_adapter().load(dcat_config(distribution="https://missing.test"))
 
 
 def test_estat_reference_identifies_the_distribution() -> None:
@@ -324,7 +336,7 @@ def test_deferred_discovery_survives_resolution_and_open(portable: bool) -> None
     if portable:
         resource = Resource.from_dict(resource.to_dict())
     app = configure()
-    resolved = app.resolve(resource)
+    resolved = app.load(resource)
     assert resolved.discovery == discovery
     assert resolved.provenance.provider == "direct"
     assert resolved.metadata != discovery.metadata

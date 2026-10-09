@@ -1,4 +1,4 @@
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
 
 
 class FakeGdal:
@@ -14,9 +14,9 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
     """Specの全アクセス順序とruntime callbackの遅延評価を垂直スライスで保証するために必要である。"""
     runtime = FakeGdal()
     app = configure()
-    config = Config(
-        source_id="direct",
-        settings={
+    config = Reference(
+        provider_id="direct",
+        parameters={
             "uri": "https://files.example/rivers.zip",
             "format": "shapefile",
             "archive": "zip",
@@ -38,9 +38,9 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
             return "pyogrio-data"
 
     app = configure()
-    config = Config(
-        source_id="direct",
-        settings={"uri": "/data/boundaries.gml", "format": "gml"},
+    config = Reference(
+        provider_id="direct",
+        parameters={"uri": "/data/boundaries.gml", "format": "gml"},
     )
 
     assert app.open(config, library="pyogrio", runtime=FakePyogrio()) == "pyogrio-data"

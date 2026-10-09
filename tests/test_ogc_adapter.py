@@ -2,7 +2,7 @@ import pytest
 
 from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
-from rhinestone.models import Config, Reference, SearchQuery
+from rhinestone.models import Reference, SearchQuery
 from tests.provider_support import (
     RecordingJsonClient,
     ResponseJsonClient,
@@ -16,11 +16,9 @@ def test_ogc_collection_items_link_becomes_service_resource() -> None:
     client = RecordingJsonClient({collection_url: fixture_json("ogc/collection.json")})
     adapter = OgcFeaturesAdapter(get_json=client)
     source = adapter.load(
-        Reference.from_config(
-            Config(
-                "ogc-features",
-                {"endpoint": endpoint, "collection_id": "rivers"},
-            )
+        Reference(
+            "ogc-features",
+            parameters={"endpoint": endpoint, "collection_id": "rivers"},
         )
     )
     assert client.calls == [(collection_url, {})]
@@ -82,11 +80,9 @@ def test_ogc_collection_without_items_link_is_rejected() -> None:
     )
     with pytest.raises(ProviderResponseError, match="items"):
         OgcFeaturesAdapter(get_json=client).load(
-            Reference.from_config(
-                Config(
-                    "ogc-features",
-                    {"endpoint": endpoint, "collection_id": "rivers"},
-                )
+            Reference(
+                "ogc-features",
+                parameters={"endpoint": endpoint, "collection_id": "rivers"},
             )
         )
 
@@ -105,15 +101,13 @@ def test_ogc_resolves_relative_items_href_against_collection_response_uri() -> N
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "ogc-features",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": "rivers",
-                    "feature_id": "river-1",
-                },
-            )
+        Reference(
+            "ogc-features",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": "rivers",
+                "feature_id": "river-1",
+            },
         )
     )
 
@@ -135,11 +129,9 @@ def test_ogc_relative_href_uses_rfc3986_query_and_fragment_rules() -> None:
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "ogc-features",
-                {"endpoint": endpoint, "collection_id": "rivers"},
-            )
+        Reference(
+            "ogc-features",
+            parameters={"endpoint": endpoint, "collection_id": "rivers"},
         )
     )
 
@@ -159,15 +151,13 @@ def test_ogc_resolves_relative_href_against_final_redirect_uri() -> None:
     )
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "ogc-features",
-                {
-                    "endpoint": "https://features.example",
-                    "collection_id": "rivers",
-                    "feature_id": "river-1",
-                },
-            )
+        Reference(
+            "ogc-features",
+            parameters={
+                "endpoint": "https://features.example",
+                "collection_id": "rivers",
+                "feature_id": "river-1",
+            },
         )
     )
 
@@ -187,15 +177,13 @@ def test_ogc_load_encodes_identifiers_and_keeps_logical_provenance() -> None:
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "ogc-features",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": collection_id,
-                    "feature_id": feature_id,
-                },
-            )
+        Reference(
+            "ogc-features",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": collection_id,
+                "feature_id": feature_id,
+            },
         )
     )
 
@@ -221,15 +209,13 @@ def test_ogc_load_escapes_dot_only_identifier_segments() -> None:
     client = RecordingJsonClient({collection_url: collection})
 
     source = OgcFeaturesAdapter(get_json=client).load(
-        Reference.from_config(
-            Config(
-                "ogc-features",
-                {
-                    "endpoint": endpoint,
-                    "collection_id": "..",
-                    "feature_id": ".",
-                },
-            )
+        Reference(
+            "ogc-features",
+            parameters={
+                "endpoint": endpoint,
+                "collection_id": "..",
+                "feature_id": ".",
+            },
         )
     )
 

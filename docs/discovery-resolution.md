@@ -41,25 +41,25 @@ discover
 
 ## 持ち運び可能な境界の判断
 
-`Result.to_dict()`と`Resource.to_dict()`は、次のdomain情報をversion付きのJSON-safeな表現へ変換します。`Result.from_dict()`と`Resource.from_dict()`で復元した値はdetachedであり、resolverやopenerを持ちません。別のApplicationで利用するときは`app.bind(value)`を明示的に呼びます。
+`Resource.to_dict()`と`Resource.to_dict()`は、次のdomain情報をversion付きのJSON-safeな表現へ変換します。`Resource.from_dict()`と`Resource.from_dict()`で復元した値はdetachedであり、resolverやopenerを持ちません。別のApplicationで利用するときは`app.bind(value)`を明示的に呼びます。
 
-- `Result.target`（解決先`Config`）
+- `Resource.reference`（解決先`Reference`）
 - `Metadata`
 - `Provenance`
 - `AccessPlan`のprovider非依存な値
 
-Credential、runtime instance、factory、`Result._resolver`、`Resource._opener`はこの境界に含めません。受信側ApplicationがProvider、Execution Adapter、Destination Policy、runtimeを所有します。解決後の`Resource`はtarget Sourceの`metadata` / `provenance` / `source.raw_metadata`を保持します。cross-sourceの場合は、発見側の`metadata` / `provenance` / `raw_metadata`を`Resource.discovery`へ別recordとして保持し、target側の記録を上書きしません。
+Credential、runtime instance、factory、`Resource._opener`はこの境界に含めません。受信側ApplicationがProvider、Execution Adapter、Destination Policy、runtimeを所有します。読み込み後の`Resource`はtarget Providerの`metadata` / `provenance` / `metadata.raw`を保持します。cross-sourceの場合は、発見側の`metadata` / `provenance` / `raw_metadata`を`Resource.discovery`へ別recordとして保持し、target側の記録を上書きしません。
 
 ```python
 import json
 
 portable = json.loads(json.dumps(result.to_dict()))
-detached = Result.from_dict(portable)
+detached = Resource.from_dict(portable)
 result_in_another_context = another_app.bind(detached)
-resource = result_in_another_context.resolve()
+resource = result_in_another_context
 ```
 
-schema名は`rhinestone.result` / `rhinestone.resource`、versionは`1`です。raw mappingとoptionsは、string key、文字列、有限数、真偽値、null、配列、objectだけを受け入れます。既知のdatetime fieldはISO 8601文字列へ変換します。未知schema/versionやJSONにできない値は`ConfigValidationError`になります。既知version内の未知fieldは将来の追加fieldを古いreaderが扱えるよう読み飛ばします。
+Resourceのschema名は`rhinestone.resource`、versionは`3`です。raw mappingとoptionsは、string key、文字列、有限数、真偽値、null、配列、objectだけを受け入れます。既知のdatetime fieldはISO 8601文字列へ変換します。未知schema/versionやJSONにできない値は`ConfigValidationError`になります。既知version内の未知fieldは将来の追加fieldを古いreaderが扱えるよう読み飛ばします。
 
 ## 直列化／Intake出力の評価
 
@@ -78,7 +78,7 @@ portable schemaでは次の契約を固定します。
 
 - immutable mappingとtupleはJSON object / arrayへ変換する
 - Metadata / ProvenanceのdatetimeはISO 8601へ変換する
-- Resourceが内包するSource、candidate、AccessPlan、discovery recordを省略せず保存する
+- ResourceのReference、任意のAccessPlan、discovery recordを省略せず保存する
 - 復元値はdetachedとし、`app.bind()`だけが実行contextを付与する
 - schema versionが未知の場合は推測せず拒否する
 

@@ -5,7 +5,7 @@ import os
 import pyogrio
 import rdflib
 
-from rhinestone import Config, Provider, configure
+from rhinestone import Provider, Reference, configure
 from rhinestone.catalogs import Catalog
 from rhinestone.models import RuntimeFactory
 
@@ -16,10 +16,10 @@ app = configure(
         "rdflib": RuntimeFactory(lambda: rdflib),
     },
 )
-resource = app.resolve(
-    Config(
+resource = app.load(
+    Reference(
         "catalog",
-        {
+        parameters={
             "uri": catalog_uri,
             "dataset": os.environ["RHINESTONE_DCAT_DATASET_URI"],
             "distribution": os.environ["RHINESTONE_DCAT_DISTRIBUTION_URI"],
