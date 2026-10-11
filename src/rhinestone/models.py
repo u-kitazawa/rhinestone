@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from math import isfinite
 from pathlib import PurePosixPath
@@ -576,12 +576,22 @@ class SearchQuery:
                 )
             start, end = cast(tuple[datetime | None, datetime | None], time_values)
             if start is not None and end is not None:
-                if (start.utcoffset() is None) != (end.utcoffset() is None):
+                start_offset = start.utcoffset()
+                end_offset = end.utcoffset()
+                if (start_offset is None) != (end_offset is None):
                     raise ConfigValidationError(
                         "time endpoints must both be timezone-aware or both naive "
                         "(SearchQuery.time)"
                     )
-                if start > end:
+                start_for_order = (
+                    start.astimezone(timezone.utc)
+                    if start_offset is not None
+                    else start
+                )
+                end_for_order = (
+                    end.astimezone(timezone.utc) if end_offset is not None else end
+                )
+                if start_for_order > end_for_order:
                     raise ConfigValidationError(
                         "time start must be earlier than or equal to time end "
                         "(SearchQuery.time)"

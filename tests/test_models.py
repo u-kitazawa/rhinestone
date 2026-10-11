@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -206,6 +207,23 @@ def test_search_query_rejects_invalid_time_intervals(
 ) -> None:
     with pytest.raises(ConfigValidationError, match="time"):
         SearchQuery(time=time)
+
+
+def test_search_query_rejects_dst_fold_interval_reversed_in_absolute_time() -> None:
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2024, 11, 3, 1, 30, tzinfo=new_york, fold=1)
+    end = datetime(2024, 11, 3, 1, 45, tzinfo=new_york, fold=0)
+
+    with pytest.raises(ConfigValidationError, match="time start"):
+        SearchQuery(time=(start, end))
+
+
+def test_search_query_accepts_dst_fold_interval_in_absolute_time_order() -> None:
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2024, 11, 3, 1, 30, tzinfo=new_york, fold=0)
+    end = datetime(2024, 11, 3, 1, 15, tzinfo=new_york, fold=1)
+
+    assert SearchQuery(time=(start, end)).time == (start, end)
 
 
 def test_search_query_accepts_valid_boundary_values() -> None:
