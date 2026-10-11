@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -190,17 +191,53 @@ def test_search_query_time_error_does_not_call_element_repr() -> None:
         SearchQuery(time=cast(Any, (Unrepresentable(), None)))
 
 
+@pytest.mark.parametrize(
+    "time",
+    (
+        (datetime(2024, 1, 2), datetime(2024, 1, 1)),
+        (
+            datetime(2024, 1, 2, tzinfo=timezone.utc),
+            datetime(2024, 1, 1, tzinfo=timezone.utc),
+        ),
+        (datetime(2024, 1, 1), datetime(2024, 1, 2, tzinfo=timezone.utc)),
+    ),
+)
+def test_search_query_rejects_invalid_time_intervals(
+    time: tuple[datetime, datetime],
+) -> None:
+    with pytest.raises(ConfigValidationError, match="time"):
+        SearchQuery(time=time)
+
+
+def test_search_query_rejects_dst_fold_interval_reversed_in_absolute_time() -> None:
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2024, 11, 3, 1, 30, tzinfo=new_york, fold=1)
+    end = datetime(2024, 11, 3, 1, 45, tzinfo=new_york, fold=0)
+
+    with pytest.raises(ConfigValidationError, match="time start"):
+        SearchQuery(time=(start, end))
+
+
+def test_search_query_accepts_dst_fold_interval_in_absolute_time_order() -> None:
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2024, 11, 3, 1, 30, tzinfo=new_york, fold=0)
+    end = datetime(2024, 11, 3, 1, 15, tzinfo=new_york, fold=1)
+
+    assert SearchQuery(time=(start, end)).time == (start, end)
+
+
 def test_search_query_accepts_valid_boundary_values() -> None:
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
     query = SearchQuery(
         bbox=(0, 1.5, 2, 3.5),
-        time=(start, None),
+        time=(start, end),
         limit=0,
     )
 
     assert query.bbox == (0, 1.5, 2, 3.5)
-    assert query.time == (start, None)
+    assert query.time == (start, end)
     assert query.limit == 0
 
 

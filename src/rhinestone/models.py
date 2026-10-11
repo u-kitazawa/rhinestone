@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from math import isfinite
 from pathlib import PurePosixPath
@@ -574,6 +574,28 @@ class SearchQuery:
                     "(SearchQuery.time); "
                     "got a tuple with an invalid length or element type"
                 )
+            start, end = cast(tuple[datetime | None, datetime | None], time_values)
+            if start is not None and end is not None:
+                start_offset = start.utcoffset()
+                end_offset = end.utcoffset()
+                if (start_offset is None) != (end_offset is None):
+                    raise ConfigValidationError(
+                        "time endpoints must both be timezone-aware or both naive "
+                        "(SearchQuery.time)"
+                    )
+                start_for_order = (
+                    start.astimezone(timezone.utc)
+                    if start_offset is not None
+                    else start
+                )
+                end_for_order = (
+                    end.astimezone(timezone.utc) if end_offset is not None else end
+                )
+                if start_for_order > end_for_order:
+                    raise ConfigValidationError(
+                        "time start must be earlier than or equal to time end "
+                        "(SearchQuery.time)"
+                    )
         raw_format = cast(object, self.format)
         if raw_format is not None:
             format_values = (
