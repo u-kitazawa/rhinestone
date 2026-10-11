@@ -152,37 +152,49 @@ class CkanAdapter(ProviderAdapter):
             for package in packages:
                 resources = self._objects(package.get("resources"), "CKAN resources")
                 for resource in resources:
-                    resource_id = resource.get("id")
-                    if not isinstance(resource_id, str) or not resource_id.strip():
-                        diagnostics.append(
-                            SearchDiagnostic(
-                                source_id=self.adapter_type,
-                                skipped_conditions=frozenset(),
-                                reason="item_skipped",
-                                detail="missing_resource_id",
-                            )
-                        )
-                        continue
-                    item = self._resource_result(package, resource, endpoint, query)
+                    item = self._search_resource_result(
+                        package, resource, endpoint, query, diagnostics
+                    )
                     if item is None:
                         continue
                     found.append(item)
                     if query.limit is not None and len(found) == query.limit:
-                        return _search_results(found, diagnostics)
+                        return self._search_results(found, diagnostics)
             if query.limit is None:
-                return _search_results(found, diagnostics)
+                return self._search_results(found, diagnostics)
             total = result.get("count")
             if type(total) is not int or total < 0:
                 raise ProviderResponseError(
                     "CKAN search result count must be an integer"
                 )
             if start + len(packages) >= total:
-                return _search_results(found, diagnostics)
+                return self._search_results(found, diagnostics)
             if not packages:
                 raise ProviderResponseError(
                     "CKAN search result is empty before its declared count"
                 )
             start += len(packages)
+
+    def _search_resource_result(
+        self,
+        package: JsonObject,
+        resource: JsonObject,
+        endpoint: str,
+        query: SearchQuery,
+        diagnostics: list[SearchDiagnostic],
+    ) -> Resource | None:
+        resource_id = resource.get("id")
+        if not isinstance(resource_id, str) or not resource_id.strip():
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=self.adapter_type,
+                    skipped_conditions=frozenset(),
+                    reason="item_skipped",
+                    detail="missing_resource_id",
+                )
+            )
+            return None
+        return self._resource_result(package, resource, endpoint, query)
 
     def _resource_result(
         self,
@@ -279,6 +291,15 @@ class CkanAdapter(ProviderAdapter):
         )
 
     @staticmethod
+    def _search_results(
+        found: list[Resource], diagnostics: list[SearchDiagnostic]
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
+        results = tuple(found)
+        if diagnostics:
+            return ProviderSearchResults(results, tuple(diagnostics))
+        return results
+
+    @staticmethod
     def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:
         requested = {value.value for value in query.expanded_formats}
         return bool(formats & requested) or (not formats and "unknown" in requested)
@@ -286,15 +307,6 @@ class CkanAdapter(ProviderAdapter):
 
 def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) else None
-
-
-def _search_results(
-    found: list[Resource], diagnostics: list[SearchDiagnostic]
-) -> tuple[Resource, ...] | ProviderSearchResults:
-    results = tuple(found)
-    if diagnostics:
-        return ProviderSearchResults(results, tuple(diagnostics))
-    return results
 
 
 def replace_reference(
