@@ -519,6 +519,10 @@ class SearchQuery:
                 "text must be a string or None (SearchQuery.text); "
                 f"got {type(raw_text).__name__}"
             )
+        if isinstance(raw_text, str) and not raw_text.strip():
+            raise ConfigValidationError(
+                "text must be a non-empty string or None (SearchQuery.text)"
+            )
         raw_area = cast(object, self.area)
         if raw_area is not None and (
             not isinstance(raw_area, str) or not raw_area.strip()

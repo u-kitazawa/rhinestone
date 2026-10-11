@@ -134,7 +134,6 @@ def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -
     ("text", "expected"),
     [
         (None, "*:*"),
-        ("  ", "*:*"),
         (
             "河川 河川　洪水",
             "(title_string:*河川* OR tags:*河川*) AND (title_string:*洪水* OR tags:*洪水*)",
