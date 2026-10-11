@@ -325,12 +325,16 @@ class Rhinestone:
                 limit=limit,
                 providers=providers,
             )
-        elif isinstance(query, str):
-            normalized_query = SearchQuery(text=query)
-        elif isinstance(cast(object, query), SearchQuery):
-            normalized_query = query
         else:
-            raise ConfigValidationError("query must be a SearchQuery, string, or None")
+            query_type = type(cast(object, query))
+            if issubclass(query_type, str):
+                normalized_query = SearchQuery(text=cast(str, query))
+            elif issubclass(query_type, SearchQuery):
+                normalized_query = cast(SearchQuery, query)
+            else:
+                raise ConfigValidationError(
+                    "query must be a SearchQuery, string, or None"
+                )
         return self._search.search(normalized_query).bind(self.bind)
 
 

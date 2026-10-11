@@ -87,8 +87,26 @@ def test_invalid_query_validation_does_not_inspect_user_object() -> None:
             raise AssertionError("query repr must not be called")
 
         @property
+        def __class__(  # pyright: ignore[reportIncompatibleMethodOverride]
+            self,
+        ) -> type[SearchQuery]:
+            raise AssertionError("query __class__ must not be accessed")
+
+    with pytest.raises(ConfigValidationError, match="query must be"):
+        configure().search(cast(Any, SecretQuery()))
+
+
+def test_invalid_query_cannot_spoof_search_query_type() -> None:
+    class SpoofedQuery:
+        @property
+        def __class__(  # pyright: ignore[reportIncompatibleMethodOverride]
+            self,
+        ) -> type[SearchQuery]:
+            return SearchQuery
+
+        @property
         def providers(self) -> None:
             raise AssertionError("query attributes must not be accessed")
 
     with pytest.raises(ConfigValidationError, match="query must be"):
-        configure().search(cast(Any, SecretQuery()))
+        configure().search(cast(Any, SpoofedQuery()))
