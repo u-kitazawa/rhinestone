@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from fnmatch import fnmatchcase
 from typing import Any, cast
 
@@ -10,7 +10,7 @@ from rhinestone import Format, configure
 from rhinestone.adapters.source import CkanAdapter, GeospatialJpAdapter
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
-from rhinestone.models import SearchQuery
+from rhinestone.models import Provider, ProviderSearchResults, SearchQuery
 from tests.provider_support import fixture_json
 
 
@@ -88,8 +88,55 @@ def adapter(client: Client) -> GeospatialJpAdapter:
     return GeospatialJpAdapter(client, endpoint="https://catalog.example")
 
 
-def ids(results: tuple[Any, ...]) -> list[str]:
+def ids(results: Sequence[Any]) -> list[str]:
     return [item.reference.resource_identifier for item in results]
+
+
+@pytest.mark.parametrize("limit", [None, 1])
+def test_search_isolates_invalid_resource_ids(limit: int | None) -> None:
+    candidate = package("dataset")
+    candidate["resources"] = [
+        {},
+        {"id": None},
+        {"id": 1},
+        {"id": ""},
+        {"id": "   "},
+        {"id": "valid", "format": "CSV"},
+    ]
+    results = adapter(Client([candidate])).search(SearchQuery(limit=limit))
+
+    assert ids(results) == ["valid"]
+    assert isinstance(results, ProviderSearchResults)
+    assert len(results.diagnostics) == 5
+    assert all(d.source_id == "geospatial-jp" for d in results.diagnostics)
+    assert all(d.reason == "item_skipped" for d in results.diagnostics)
+    assert all(d.detail == "missing_resource_id" for d in results.diagnostics)
+    assert all(d.resource_identifier is None for d in results.diagnostics)
+
+
+def test_public_federated_search_preserves_siblings_and_item_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = package("dataset")
+    candidate["resources"] = [{}, {"id": "valid", "format": "CSV"}]
+    monkeypatch.setattr(_http, "get_json", Client([candidate]))
+    catalog = Catalog(
+        (
+            Provider(
+                "g-spatial", "geospatial-jp", {"endpoint": "https://catalog.example"}
+            ),
+            Provider("other", "ckan", {"endpoint": "https://other.example"}),
+        )
+    )
+
+    results = configure(catalog=catalog).search(text="river", limit=1)
+
+    assert results.keys() == ("g-spatial", "other")
+    assert ids(results["g-spatial"]) == ["valid"]
+    assert ids(results["other"]) == ["valid"]
+    assert [d.source_id for d in results.diagnostics] == ["g-spatial", "other"]
+    assert all(d.reason == "item_skipped" for d in results.diagnostics)
+    assert all(d.detail == "missing_resource_id" for d in results.diagnostics)
 
 
 def test_synthetic_quality_fixture_improves_area_order_and_dataset_diversity() -> None:

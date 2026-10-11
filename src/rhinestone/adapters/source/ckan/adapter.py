@@ -7,8 +7,10 @@ from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
     Metadata,
     Provenance,
+    ProviderSearchResults,
     Reference,
     Resource,
+    SearchDiagnostic,
     SearchQuery,
 )
 from ....registry import CredentialRegistry
@@ -122,7 +124,9 @@ class CkanAdapter(ProviderAdapter):
             archive=archive,
         )
 
-    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
         """Search CKAN packages and return their resource-level results."""
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
@@ -134,6 +138,7 @@ class CkanAdapter(ProviderAdapter):
             return ()
         params = self._package_search_params(query)
         found: list[Resource] = []
+        diagnostics: list[SearchDiagnostic] = []
         start = 0
         while True:
             page_params = dict(params)
@@ -147,26 +152,49 @@ class CkanAdapter(ProviderAdapter):
             for package in packages:
                 resources = self._objects(package.get("resources"), "CKAN resources")
                 for resource in resources:
-                    item = self._resource_result(package, resource, endpoint, query)
+                    item = self._search_resource_result(
+                        package, resource, endpoint, query, diagnostics
+                    )
                     if item is None:
                         continue
                     found.append(item)
                     if query.limit is not None and len(found) == query.limit:
-                        return tuple(found)
+                        return self._search_results(found, diagnostics)
             if query.limit is None:
-                return tuple(found)
+                return self._search_results(found, diagnostics)
             total = result.get("count")
             if type(total) is not int or total < 0:
                 raise ProviderResponseError(
                     "CKAN search result count must be an integer"
                 )
             if start + len(packages) >= total:
-                return tuple(found)
+                return self._search_results(found, diagnostics)
             if not packages:
                 raise ProviderResponseError(
                     "CKAN search result is empty before its declared count"
                 )
             start += len(packages)
+
+    def _search_resource_result(
+        self,
+        package: JsonObject,
+        resource: JsonObject,
+        endpoint: str,
+        query: SearchQuery,
+        diagnostics: list[SearchDiagnostic],
+    ) -> Resource | None:
+        resource_id = resource.get("id")
+        if not isinstance(resource_id, str) or not resource_id.strip():
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=self.adapter_type,
+                    skipped_conditions=frozenset(),
+                    reason="item_skipped",
+                    detail="missing_resource_id",
+                )
+            )
+            return None
+        return self._resource_result(package, resource, endpoint, query)
 
     def _resource_result(
         self,
@@ -261,6 +289,15 @@ class CkanAdapter(ProviderAdapter):
             media_type,
             archive,
         )
+
+    @staticmethod
+    def _search_results(
+        found: list[Resource], diagnostics: list[SearchDiagnostic]
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
+        results = tuple(found)
+        if diagnostics:
+            return ProviderSearchResults(results, tuple(diagnostics))
+        return results
 
     @staticmethod
     def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:

@@ -6,7 +6,13 @@ from itertools import zip_longest
 from typing import Any, cast
 
 from ....errors import ConfigValidationError, ProviderResponseError
-from ....models import Reference, Resource, SearchQuery
+from ....models import (
+    ProviderSearchResults,
+    Reference,
+    Resource,
+    SearchDiagnostic,
+    SearchQuery,
+)
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
 from ..base import JsonObject
 from ..ckan import CkanAdapter
@@ -205,7 +211,9 @@ class GeospatialJpAdapter(CkanAdapter):
             ),
         )
 
-    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
         endpoint = self._endpoint_from({}, self._endpoint)
         unsupported = query.supplied_conditions - self.search_conditions
         if unsupported:
@@ -228,6 +236,7 @@ class GeospatialJpAdapter(CkanAdapter):
         seen_packages: set[str] = set()
         seen_resources: set[str] = set()
         found: list[Resource] = []
+        diagnostics: list[SearchDiagnostic] = []
         for stage in stages:
             offsets = [0] * len(stage)
             active = [True] * len(stage)
@@ -275,7 +284,9 @@ class GeospatialJpAdapter(CkanAdapter):
                     for resource in self._objects(
                         package.get("resources"), "CKAN resources"
                     ):
-                        item = self._resource_result(package, resource, endpoint, query)
+                        item = self._search_resource_result(
+                            package, resource, endpoint, query, diagnostics
+                        )
                         if item is None:
                             continue
                         identifier = self._required_string(resource, "id")
@@ -307,7 +318,7 @@ class GeospatialJpAdapter(CkanAdapter):
                             continue
                         found.append(item)
                         if query.limit is not None and len(found) == query.limit:
-                            return tuple(found)
+                            return self._search_results(found, diagnostics)
                 if query.limit is None:
                     break
-        return tuple(found)
+        return self._search_results(found, diagnostics)
