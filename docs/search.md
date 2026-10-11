@@ -34,15 +34,17 @@ results = app.search(text="人口", limit=10)
 `text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`をキーワードで指定できます。高度な用途では`SearchQuery`を渡すこともできます。
 
 - `providers`: `ProviderId` enumまたは独自Provider ID文字列の配列（list / tuple）
-- `text`: `str`または`None`
+- `text`: 空白だけではない`str`、または未指定を表す`None`
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
 - `limit`: `bool`を除く0以上の整数または`None`（ProviderごとのResource上限）
 - `bbox`: 数値4要素のtuple
 - `time`: `datetime`または`None`を2要素で保持するtuple
 - `format`: `Format`または`FormatPreset`を1つ以上保持するtuple（OR条件）
 
-不正な値はProviderへリクエストする前に`ConfigValidationError`になります。`area`と`bbox`は
-同時に指定できません。`bbox`の既存の4数値tuple契約は変更されません。
+不正な値はProviderへリクエストする前に`ConfigValidationError`になります。明示的な空文字・
+空白だけの`text`は不正入力であり、全件検索へ変換しません。検索語を指定しない全件検索は
+`text=None`または`SearchQuery()`で表します。`area`と`bbox`は同時に指定できません。
+`bbox`の既存の4数値tuple契約は変更されません。
 
 `limit`はDatasetや検索応答Itemの件数ではなく、展開後のResource件数を数えます。例えば
 1つのSTAC Itemにdata assetが3件あれば3 Resource、1つのDCAT distributionにdownload URLが

@@ -61,8 +61,6 @@ class SearchCkanJpAdapter(ProviderAdapter):
             return ()
         endpoint = self._endpoint_from({}, DEFAULT_ENDPOINT)
         terms = _search_terms(query.text)
-        if not terms:
-            return ()
         resource_terms = tuple(term for term in terms if term not in _AREA_NAMES)
         params: dict[str, Any] = {"q": _text_query(terms)}
         if query.limit is not None:

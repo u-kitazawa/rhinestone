@@ -359,11 +359,9 @@ def test_search_ckan_jp_rejects_resource_urls_with_embedded_credentials() -> Non
 
 
 @pytest.mark.parametrize("text", ["", " \t\n　"])
-def test_search_ckan_jp_blank_text_does_not_search_everything(text: str) -> None:
-    adapter = SearchCkanJpAdapter(
-        get_json=lambda url, params: pytest.fail("no request")
-    )
-    assert adapter.search(SearchQuery(text=text)) == ()
+def test_search_ckan_jp_rejects_blank_text_at_query_boundary(text: str) -> None:
+    with pytest.raises(ConfigValidationError, match="non-empty string"):
+        SearchQuery(text=text)
 
 
 def test_search_ckan_jp_literal_and_query_and_actual_provenance() -> None:
