@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from fnmatch import fnmatchcase
 from typing import Any, cast
 
@@ -88,7 +88,7 @@ def adapter(client: Client) -> GeospatialJpAdapter:
     return GeospatialJpAdapter(client, endpoint="https://catalog.example")
 
 
-def ids(results: tuple[Any, ...]) -> list[str]:
+def ids(results: Sequence[Any]) -> list[str]:
     return [item.reference.resource_identifier for item in results]
 
 

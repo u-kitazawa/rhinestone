@@ -230,7 +230,7 @@ iteration順は変わりません。Provider固有のrankingを扱う場合は�
 
 各Sourceは対応する条件だけを受け取ります。例えば`text`に対応するCKANと`bbox`に対応するSTACを構成している場合、両方を指定しても検索全体は失敗せず、各Sourceへ理解できる条件だけが渡されます。
 
-STAC検索では、`data` roleのassetをそれぞれ別Resourceへ展開します。対象assetがないItemや不正な配信metadataはスキップします。`SearchResults.diagnostics`の`reason="item_skipped"`、`resource_identifier`、`detail`から対象Itemと理由を確認できます。
+STAC検索では、`data` roleのassetをそれぞれ別Resourceへ展開します。対象assetがないItemや不正な配信metadataはスキップします。CKAN検索でも、必須のresource IDが欠けたitemは他の正常なresourceを失わせずにスキップします。`SearchResults.diagnostics`の`reason="item_skipped"`、`resource_identifier`、`detail`から対象Itemと理由を確認できます。識別子自体が欠けている場合、`resource_identifier`は`None`になり、`detail`が安定した理由コードを示します。
 
 適用されなかった条件は`results.diagnostics`で確認できます。
 

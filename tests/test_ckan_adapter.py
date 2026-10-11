@@ -6,7 +6,7 @@ import pytest
 from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.errors import ProviderResponseError
-from rhinestone.models import AccessPlan, Reference, SearchQuery
+from rhinestone.models import AccessPlan, ProviderSearchResults, Reference, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json
 
 
@@ -161,6 +161,55 @@ def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None
     )
     assert "endpoint" not in results[0].reference.parameters
     assert results[0].metadata.raw["id"] == "dataset-1"
+
+
+def test_ckan_search_skips_resources_without_a_valid_id() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    client = RecordingJsonClient(
+        {
+            search_url: {
+                "success": True,
+                "result": {
+                    "results": [
+                        {
+                            "id": "dataset-1",
+                            "resources": [
+                                {},
+                                {"id": None},
+                                {"id": 1},
+                                {"id": "   "},
+                                {"id": "resource-1"},
+                            ],
+                        }
+                    ]
+                },
+            }
+        }
+    )
+
+    results = CkanAdapter(endpoint=endpoint, get_json=client).search(SearchQuery())
+
+    assert isinstance(results, ProviderSearchResults)
+    assert [item.reference.resource_identifier for item in results] == ["resource-1"]
+    assert [item.reason for item in results.diagnostics] == [
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+    ]
+    assert [item.resource_identifier for item in results.diagnostics] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+    assert [item.detail for item in results.diagnostics] == [
+        "missing_resource_id",
+        "missing_resource_id",
+        "missing_resource_id",
+        "missing_resource_id",
+    ]
 
 
 def test_ckan_search_pages_packages_until_the_resource_limit_is_met() -> None:
