@@ -574,6 +574,18 @@ class SearchQuery:
                     "(SearchQuery.time); "
                     "got a tuple with an invalid length or element type"
                 )
+            start, end = cast(tuple[datetime | None, datetime | None], time_values)
+            if start is not None and end is not None:
+                if (start.utcoffset() is None) != (end.utcoffset() is None):
+                    raise ConfigValidationError(
+                        "time endpoints must both be timezone-aware or both naive "
+                        "(SearchQuery.time)"
+                    )
+                if start > end:
+                    raise ConfigValidationError(
+                        "time start must be earlier than or equal to time end "
+                        "(SearchQuery.time)"
+                    )
         raw_format = cast(object, self.format)
         if raw_format is not None:
             format_values = (

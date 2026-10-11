@@ -190,17 +190,36 @@ def test_search_query_time_error_does_not_call_element_repr() -> None:
         SearchQuery(time=cast(Any, (Unrepresentable(), None)))
 
 
+@pytest.mark.parametrize(
+    "time",
+    (
+        (datetime(2024, 1, 2), datetime(2024, 1, 1)),
+        (
+            datetime(2024, 1, 2, tzinfo=timezone.utc),
+            datetime(2024, 1, 1, tzinfo=timezone.utc),
+        ),
+        (datetime(2024, 1, 1), datetime(2024, 1, 2, tzinfo=timezone.utc)),
+    ),
+)
+def test_search_query_rejects_invalid_time_intervals(
+    time: tuple[datetime, datetime],
+) -> None:
+    with pytest.raises(ConfigValidationError, match="time"):
+        SearchQuery(time=time)
+
+
 def test_search_query_accepts_valid_boundary_values() -> None:
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
     query = SearchQuery(
         bbox=(0, 1.5, 2, 3.5),
-        time=(start, None),
+        time=(start, end),
         limit=0,
     )
 
     assert query.bbox == (0, 1.5, 2, 3.5)
-    assert query.time == (start, None)
+    assert query.time == (start, end)
     assert query.limit == 0
 
 

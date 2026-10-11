@@ -38,7 +38,8 @@ results = app.search(text="人口", limit=10)
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
 - `limit`: `bool`を除く0以上の整数または`None`（ProviderごとのResource上限）
 - `bbox`: 数値4要素のtuple
-- `time`: `datetime`または`None`を2要素で保持するtuple
+- `time`: `datetime`または`None`を2要素で保持するtuple。両端を指定する場合は
+  timezone-aware同士またはnaive同士とし、開始日時を終了日時以前にする
 - `format`: `Format`または`FormatPreset`を1つ以上保持するtuple（OR条件）
 
 不正な値はProviderへリクエストする前に`ConfigValidationError`になります。明示的な空文字・

@@ -137,6 +137,8 @@ result = results[0]
 `ConfigValidationError`になります。不正な値の属性や文字列表現は検証に使いません。
 明示的な空文字・空白だけの検索文字列は`ConfigValidationError`になります。検索語を指定せず
 Provider固有の全件検索を使う場合は、`text=None`または`SearchQuery()`を指定します。
+`time`の両端を指定する場合、timezone-awareとnaiveは混在できず、開始日時は終了日時以前で
+なければなりません。不正な時間範囲はProviderへの通信前に`ConfigValidationError`になります。
 
 `SearchResults`のiterationと整数indexingは、構成したProvider順にgroupを連結し、
 各Provider内の順序を保持します。このsequenceは決定的な走査用であり、Providerを
