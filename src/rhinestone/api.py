@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
-from typing import Protocol, runtime_checkable
+from typing import Protocol, cast, runtime_checkable
 
 from . import _http
 from ._composition import (
@@ -327,8 +327,10 @@ class Rhinestone:
             )
         elif isinstance(query, str):
             normalized_query = SearchQuery(text=query)
-        else:
+        elif isinstance(cast(object, query), SearchQuery):
             normalized_query = query
+        else:
+            raise ConfigValidationError("query must be a SearchQuery, string, or None")
         return self._search.search(normalized_query).bind(self.bind)
 
 

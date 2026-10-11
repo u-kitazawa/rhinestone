@@ -133,6 +133,8 @@ result = results[0]
 
 位置引数`query`には`SearchQuery`または検索文字列を渡せます。`query`とキーワード検索条件の
 併用は`TypeError`になります。この呼び出し契約はトップレベルの`search()`と共通です。
+`query`に`SearchQuery`・文字列・`None`以外の値を渡すと、Providerへの通信前に
+`ConfigValidationError`になります。不正な値の属性や文字列表現は検証に使いません。
 明示的な空文字・空白だけの検索文字列は`ConfigValidationError`になります。検索語を指定せず
 Provider固有の全件検索を使う場合は、`text=None`または`SearchQuery()`を指定します。
 
