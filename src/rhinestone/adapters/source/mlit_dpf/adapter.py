@@ -1,7 +1,6 @@
 """Discovery-only adapter for the MLIT Data Platform GraphQL API."""
 
 import json
-import math
 from collections.abc import Callable, Mapping
 from typing import Any, cast
 from urllib.parse import urlsplit
@@ -360,8 +359,6 @@ def _build_query(
         arguments.append("attributeFilter: { AND: [" + ", ".join(filters) + "] }")
     if query.bbox is not None:
         west, south, east, north = query.bbox
-        if not all(math.isfinite(value) for value in query.bbox):
-            raise ConfigValidationError("mlit-dpf bbox coordinates must be finite")
         if not (-180 <= west <= east <= 180 and -90 <= south <= north <= 90):
             raise ConfigValidationError(
                 "mlit-dpf bbox must be ordered WGS84 coordinates within valid ranges"

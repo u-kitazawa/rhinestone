@@ -150,6 +150,9 @@ def test_search_query_rejects_invalid_limits(limit: object) -> None:
         (0, 1, 2, 3, 4),
         (0, 1, 2, "3"),
         (False, 1, 2, 3),
+        (float("nan"), 1, 2, 3),
+        (0, float("inf"), 2, 3),
+        (0, 1, float("-inf"), 3),
         [0, 1, 2, 3],
     ),
 )
