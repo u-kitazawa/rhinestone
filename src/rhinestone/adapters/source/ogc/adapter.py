@@ -115,6 +115,8 @@ class OgcFeaturesAdapter(ProviderAdapter):
         diagnostics: list[SearchDiagnostic] = []
         for feature in features:
             feature_id = _optional_string(feature.get("id"))
+            if feature_id is not None and not feature_id.strip():
+                feature_id = None
             try:
                 if not feature_id:
                     raise ProviderResponseError(

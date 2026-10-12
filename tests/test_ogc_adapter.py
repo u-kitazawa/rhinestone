@@ -65,6 +65,7 @@ def test_ogc_search_isolates_invalid_features() -> None:
     response = {
         "features": [
             {"properties": {"title": "Missing ID"}},
+            {"id": "   ", "properties": {"title": "Blank ID"}},
             {"id": "bad-properties", "properties": None},
             valid_feature,
         ]
@@ -80,12 +81,15 @@ def test_ogc_search_isolates_invalid_features() -> None:
     assert [diagnostic.reason for diagnostic in diagnostics] == [
         "item_skipped",
         "item_skipped",
+        "item_skipped",
     ]
     assert [diagnostic.resource_identifier for diagnostic in diagnostics] == [
+        None,
         None,
         "bad-properties",
     ]
     assert [diagnostic.detail for diagnostic in diagnostics] == [
+        "invalid_feature",
         "invalid_feature",
         "invalid_feature",
     ]
