@@ -128,8 +128,8 @@ class MlitDpfAdapter(ProviderAdapter):
                     "scope": scope,
                 }
                 previous_count = len(stage_seen)
-                skipped_invalid = False
                 for value in cast(list[Any], records):
+                    stage_seen.add(_record_progress_key(value))
                     record_id = (
                         _optional_string(cast(Mapping[str, Any], value).get("id"))
                         if isinstance(value, Mapping)
@@ -141,12 +141,10 @@ class MlitDpfAdapter(ProviderAdapter):
                             _required_record_string(record, key)
                             for key in ("id", "dataset_id", "catalog_id")
                         )
-                        stage_seen.add(identity)
                         if identity in seen:
                             continue
                         item_results = self._record_results(record, parameters)
                     except (ConfigValidationError, ProviderResponseError):
-                        skipped_invalid = True
                         diagnostics.append(
                             SearchDiagnostic(
                                 source_id=self.adapter_type,
@@ -176,7 +174,7 @@ class MlitDpfAdapter(ProviderAdapter):
                 first += len(cast(list[Any], records))
                 if first >= total or not scope:
                     break
-                if len(stage_seen) == previous_count and not skipped_invalid:
+                if len(stage_seen) == previous_count:
                     raise ProviderResponseError("MLIT DPF pagination made no progress")
         return self._search_results(found, diagnostics)
 
@@ -554,6 +552,24 @@ def _required_record_string(record: JsonObject, name: str) -> str:
             f"MLIT DPF search record {name} must be a non-empty string"
         )
     return value
+
+
+def _record_progress_key(value: Any) -> tuple[str, ...]:
+    if isinstance(value, Mapping):
+        record = cast(Mapping[str, Any], value)
+        identity = tuple(
+            record.get(name) for name in ("id", "dataset_id", "catalog_id")
+        )
+        if all(isinstance(item, str) and item for item in identity):
+            return ("identity", *cast(tuple[str, str, str], identity))
+    serialized = json.dumps(
+        value,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        default=repr,
+    )
+    return ("invalid", serialized)
 
 
 def _optional_string(value: Any) -> str | None:
