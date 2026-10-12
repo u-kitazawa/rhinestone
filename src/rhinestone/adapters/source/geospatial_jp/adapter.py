@@ -267,7 +267,17 @@ class GeospatialJpAdapter(CkanAdapter):
                     for package in packages:
                         if _area_priority(package, query.area) not in priorities:
                             continue
-                        identifier = self._required_string(package, "id")
+                        identifier = package.get("id")
+                        if not isinstance(identifier, str) or not identifier.strip():
+                            diagnostics.append(
+                                SearchDiagnostic(
+                                    source_id=self.adapter_type,
+                                    skipped_conditions=frozenset(),
+                                    reason="item_skipped",
+                                    detail="missing_dataset_id",
+                                )
+                            )
+                            continue
                         if identifier in seen_packages:
                             continue
                         seen_packages.add(identifier)

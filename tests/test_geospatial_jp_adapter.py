@@ -92,6 +92,22 @@ def ids(results: Sequence[Any]) -> list[str]:
     return [item.reference.resource_identifier for item in results]
 
 
+def test_search_isolates_invalid_dataset_ids() -> None:
+    invalid = [package(f"invalid-{index}") for index in range(4)]
+    for candidate, identifier in zip(invalid, (None, 1, "", "   "), strict=True):
+        candidate["id"] = identifier
+
+    results = adapter(Client([*invalid, package("valid")])).search(SearchQuery())
+
+    assert ids(results) == ["valid"]
+    assert isinstance(results, ProviderSearchResults)
+    assert len(results.diagnostics) == 4
+    assert all(d.source_id == "geospatial-jp" for d in results.diagnostics)
+    assert all(d.reason == "item_skipped" for d in results.diagnostics)
+    assert all(d.detail == "missing_dataset_id" for d in results.diagnostics)
+    assert all(d.resource_identifier is None for d in results.diagnostics)
+
+
 @pytest.mark.parametrize("limit", [None, 1])
 def test_search_isolates_invalid_resource_ids(limit: int | None) -> None:
     candidate = package("dataset")
