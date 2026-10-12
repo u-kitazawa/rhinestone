@@ -3,6 +3,7 @@
 from collections import Counter, deque
 from typing import Any
 
+from ...._uri import is_valid_http_authority
 from ....errors import (
     ConfigValidationError,
     ProviderResponseError,
@@ -21,7 +22,6 @@ from ....models import (
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
-from .._uri import has_embedded_credentials
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
@@ -165,14 +165,35 @@ class SearchCkanJpAdapter(ProviderAdapter):
         license_name = optional_string(package.get("license_title"))
         site_url = optional_string(package.get("xckan_site_url"))
         resources = self._objects(package.get("resources"), "search.ckan.jp resources")
+        invalid_urls = {
+            index
+            for index, resource in enumerate(resources)
+            if (
+                (uri := optional_string(resource.get("url"))) is not None
+                and (not uri or not is_valid_http_authority(uri))
+            )
+        }
+        safe_package: JsonObject = package
+        if invalid_urls:
+            safe_package = {
+                **package,
+                "resources": [
+                    (
+                        {**resource, "url": "[redacted]"}
+                        if index in invalid_urls
+                        else resource
+                    )
+                    for index, resource in enumerate(resources)
+                ],
+            }
         found: list[Resource] = []
-        for resource in resources:
+        for index, resource in enumerate(resources):
             resource_id = optional_string(resource.get("id"))
             uri = optional_string(resource.get("url"))
             format_name = resource_format(resource)
             if resource_id is None or uri is None or format_name is None:
                 continue
-            if has_embedded_credentials(uri):
+            if index in invalid_urls:
                 diagnostics.append(
                     SearchDiagnostic(
                         source_id=self.adapter_type,
@@ -188,7 +209,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 description=description,
                 publisher=publisher,
                 license=license_name,
-                raw=package,
+                raw=safe_package,
             )
             provenance = Provenance(
                 provider=optional_string(package.get("xckan_site_name"))
@@ -199,7 +220,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 original_url=site_url or uri,
                 query_parameters=params,
                 adapter=self.adapter_type,
-                raw={"catalog": package, "resource": resource},
+                raw={"catalog": safe_package, "resource": resource},
             )
             target_parameters: dict[str, Any] = {
                 "uri": uri,
@@ -209,7 +230,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                     "description": description,
                     "publisher": publisher,
                     "license": license_name,
-                    "raw": package,
+                    "raw": safe_package,
                 },
             }
             media_type = optional_string(resource.get("mimetype"))
@@ -220,7 +241,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 description=description,
                 publisher=publisher,
                 license=license_name,
-                raw=package,
+                raw=safe_package,
             )
             target_provenance = Provenance(
                 provider="direct",
@@ -228,7 +249,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 resource_identifier=resource_id,
                 original_url=uri,
                 adapter="direct",
-                raw={"catalog": package, "resource": resource},
+                raw={"catalog": safe_package, "resource": resource},
             )
             found.append(
                 resource_from_delivery(
@@ -247,7 +268,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                         source_id=self.adapter_type,
                         metadata=metadata,
                         provenance=provenance,
-                        raw_metadata={"catalog": package, "resource": resource},
+                        raw_metadata={"catalog": safe_package, "resource": resource},
                     ),
                 )
             )
