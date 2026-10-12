@@ -158,6 +158,10 @@ def test_stac_search_isolates_invalid_items() -> None:
                 "bad-href",
                 assets={"visual": {"href": None, "roles": ["data"]}},
             ),
+            item(
+                "malformed-href",
+                assets={"visual": {"href": "https://[invalid", "roles": ["data"]}},
+            ),
             item("usable"),
         ]
     }
@@ -174,6 +178,7 @@ def test_stac_search_isolates_invalid_items() -> None:
         "item_skipped",
         "item_skipped",
         "item_skipped",
+        "item_skipped",
     ]
     assert [diagnostic.resource_identifier for diagnostic in results.diagnostics] == [
         None,
@@ -182,8 +187,10 @@ def test_stac_search_isolates_invalid_items() -> None:
         "bad-properties",
         "bad-assets",
         "bad-href",
+        "malformed-href",
     ]
     assert [diagnostic.detail for diagnostic in results.diagnostics] == [
+        "invalid_item",
         "invalid_item",
         "invalid_item",
         "invalid_item",

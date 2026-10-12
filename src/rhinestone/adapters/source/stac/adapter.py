@@ -234,7 +234,10 @@ class StacAdapter(ProviderAdapter):
         self, asset: JsonObject, response_uri: str
     ) -> tuple[str, str | None, str | None]:
         href = self._required_string(asset, "href")
-        uri = resolve_response_href(response_uri, href)
+        try:
+            uri = resolve_response_href(response_uri, href)
+        except ValueError as error:
+            raise ProviderResponseError("STAC asset href is invalid") from error
         media_type = _optional_string(asset.get("type"))
         format_name = (
             "cog"
