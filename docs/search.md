@@ -50,7 +50,9 @@ results = app.search(text="人口", limit=10)
 Provider応答内の一部Resourceだけが不正な場合、可能な範囲でそのResourceを除外し、
 `reason="item_skipped"`のdiagnosticを残します。例えばsearch.ckan.jpが資格情報を埋め込んだ
 Resource URLを返した場合、該当Resourceだけを`detail="invalid_resource_url"`として隔離し、
-同じ応答内の正常Resourceは保持します。
+同じ応答内の正常Resourceは保持します。MLIT DPFでも識別子、metadata、download URLなどが
+不正なレコードを`detail="invalid_record"`として隔離し、正常レコードの処理と後続ページの
+取得を継続します。
 
 `limit`はDatasetや検索応答Itemの件数ではなく、展開後のResource件数を数えます。例えば
 1つのSTAC Itemにdata assetが3件あれば3 Resource、1つのDCAT distributionにdownload URLが
