@@ -742,6 +742,22 @@ def test_invalid_records_are_isolated_and_paging_continues() -> None:
     assert "first: 4" in calls[1]
 
 
+def test_pagination_rejects_repeated_invalid_records() -> None:
+    calls: list[str] = []
+    invalid = {
+        **_record(**{"DPF:downloadURLs": ["https://user:pass@example.test/data"]}),
+        "id": "invalid-url",
+    }
+    adapter = _paged_adapter(
+        [_page(4, invalid), _page(4, invalid)],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+
+    with pytest.raises(ProviderResponseError, match="no progress"):
+        adapter.search(SearchQuery(limit=2))
+
+
 def test_paging_counts_resolvable_resources_and_preserves_request_provenance() -> None:
     calls: list[str] = []
     skipped = {**_record(), "id": "unmapped"}
