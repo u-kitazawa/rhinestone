@@ -12,7 +12,7 @@ from rhinestone.errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Reference, SearchQuery
+from rhinestone.models import ProviderSearchResults, Reference, SearchQuery
 
 from .provider_support import fixture_json
 
@@ -340,22 +340,48 @@ def test_search_ckan_jp_rejects_unsuccessful_response() -> None:
         adapter.search(SearchQuery(text="archive"))
 
 
-def test_search_ckan_jp_rejects_resource_urls_with_embedded_credentials() -> None:
-    adapter = SearchCkanJpAdapter(get_json=lambda url, params: {})
-
-    with pytest.raises(ProviderResponseError, match="embedded credentials"):
-        adapter._package_results(  # pyright: ignore[reportPrivateUsage]
-            {
-                "title": "Private URL",
-                "resources": {
-                    "id": "secret-1",
-                    "url": "https://user:password@example.jp/data.csv",
-                    "format": "CSV",
+def test_search_ckan_jp_isolates_resource_urls_with_embedded_credentials() -> None:
+    endpoint = "https://search.ckan.jp/backend/api"
+    client = RecordingJsonClient(
+        {
+            endpoint + "/package_search": {
+                "success": True,
+                "result": {
+                    "results": [
+                        {
+                            "id": "mixed",
+                            "title": "Mixed resources",
+                            "resources": [
+                                {
+                                    "id": "secret-1",
+                                    "url": "https://user:password@example.jp/data.csv",
+                                    "format": "CSV",
+                                },
+                                {
+                                    "id": "public-1",
+                                    "url": "https://example.jp/data.csv",
+                                    "format": "CSV",
+                                },
+                            ],
+                        }
+                    ]
                 },
-            },
-            "https://search.ckan.jp/backend/api",
-            {},
-        )
+            }
+        }
+    )
+
+    results = SearchCkanJpAdapter(endpoint=endpoint, get_json=client).search(
+        SearchQuery(text="data")
+    )
+
+    assert isinstance(results, ProviderSearchResults)
+    assert [item.provenance.resource_identifier for item in results] == ["public-1"]
+    assert len(results.diagnostics) == 1
+    diagnostic = results.diagnostics[0]
+    assert diagnostic.source_id == "search-ckan-jp"
+    assert diagnostic.reason == "item_skipped"
+    assert diagnostic.resource_identifier == "secret-1"
+    assert diagnostic.detail == "invalid_resource_url"
 
 
 @pytest.mark.parametrize("text", ["", " \t\n　"])
