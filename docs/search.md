@@ -47,6 +47,11 @@ results = app.search(text="人口", limit=10)
 `text=None`または`SearchQuery()`で表します。`area`と`bbox`は同時に指定できません。
 `bbox`の既存の4数値tuple契約は変更されません。
 
+Provider応答内の一部Resourceだけが不正な場合、可能な範囲でそのResourceを除外し、
+`reason="item_skipped"`のdiagnosticを残します。例えばsearch.ckan.jpが資格情報を埋め込んだ
+Resource URLを返した場合、該当Resourceだけを`detail="invalid_resource_url"`として隔離し、
+同じ応答内の正常Resourceは保持します。
+
 `limit`はDatasetや検索応答Itemの件数ではなく、展開後のResource件数を数えます。例えば
 1つのSTAC Itemにdata assetが3件あれば3 Resource、1つのDCAT distributionにdownload URLが
 2件あれば2 Resourceです。Adapterは配信識別子で安定順序を作り、その順で上限まで返します。
