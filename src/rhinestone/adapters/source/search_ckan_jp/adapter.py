@@ -12,8 +12,10 @@ from ....models import (
     DiscoveryRecord,
     Metadata,
     Provenance,
+    ProviderSearchResults,
     Reference,
     Resource,
+    SearchDiagnostic,
     SearchQuery,
 )
 from ....resolution import resource_from_delivery
@@ -51,7 +53,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
             "search-ckan-jp is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
         """Search the official search.ckan.jp endpoint using text criteria."""
         if query.text is None:
             raise ConfigValidationError(
@@ -66,6 +70,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         if query.limit is not None:
             params["rows"] = min(100, max(10, query.limit))
         found: list[Resource] = []
+        diagnostics: list[SearchDiagnostic] = []
         start = 0
         seen: set[tuple[str | None, str | None, str | None, str | None, str | None]] = (
             set()
@@ -82,7 +87,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
             batches: list[deque[Resource]] = []
             for package in packages:
                 items: deque[Resource] = deque()
-                for item in self._package_results(package, endpoint, page_params):
+                for item in self._package_results(
+                    package, endpoint, page_params, diagnostics
+                ):
                     if query.format is not None and not self._matches_query_formats(
                         item.formats, query
                     ):
@@ -116,19 +123,19 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 for items in batches:
                     found.append(items.popleft())
                     if query.limit is not None and len(found) == query.limit:
-                        return tuple(found)
+                        return self._search_results(found, diagnostics)
                     if items:
                         remaining.append(items)
                 batches = remaining
             if query.limit is None:
-                return tuple(found)
+                return self._search_results(found, diagnostics)
             total = result.get("count")
             if type(total) is not int or total < 0:
                 raise ProviderResponseError(
                     "search.ckan.jp result count must be an integer"
                 )
             if start + len(packages) >= total:
-                return tuple(found)
+                return self._search_results(found, diagnostics)
             if not packages:
                 raise ProviderResponseError(
                     "search.ckan.jp result is empty before its declared count"
@@ -140,7 +147,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
         package: JsonObject,
         endpoint: str,
         params: dict[str, Any],
+        diagnostics: list[SearchDiagnostic] | None = None,
     ) -> tuple[Resource, ...]:
+        diagnostics = [] if diagnostics is None else diagnostics
         package_id = optional_string(package.get("xckan_original_id"))
         if package_id is None:
             package_id = optional_string(package.get("id"))
@@ -164,9 +173,16 @@ class SearchCkanJpAdapter(ProviderAdapter):
             if resource_id is None or uri is None or format_name is None:
                 continue
             if has_embedded_credentials(uri):
-                raise ProviderResponseError(
-                    "search.ckan.jp resource URL must not contain embedded credentials"
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=self.adapter_type,
+                        skipped_conditions=frozenset(),
+                        reason="item_skipped",
+                        resource_identifier=resource_id,
+                        detail="invalid_resource_url",
+                    )
                 )
+                continue
             metadata = Metadata(
                 title=title,
                 description=description,
@@ -236,6 +252,15 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 )
             )
         return tuple(found)
+
+    @staticmethod
+    def _search_results(
+        found: list[Resource], diagnostics: list[SearchDiagnostic]
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
+        results = tuple(found)
+        if diagnostics:
+            return ProviderSearchResults(results, tuple(diagnostics))
+        return results
 
     @staticmethod
     def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:
