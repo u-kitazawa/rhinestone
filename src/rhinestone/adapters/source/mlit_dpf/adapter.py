@@ -15,8 +15,10 @@ from ....models import (
     DiscoveryRecord,
     Metadata,
     Provenance,
+    ProviderSearchResults,
     Reference,
     Resource,
+    SearchDiagnostic,
     SearchQuery,
 )
 from ....registry import CredentialRegistry
@@ -72,7 +74,9 @@ class MlitDpfAdapter(ProviderAdapter):
             "mlit-dpf is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
         """Search DPF, preferring explicit native-source delegation."""
         limit = DEFAULT_LIMIT if query.limit is None else query.limit
         if limit == 0:
@@ -80,6 +84,7 @@ class MlitDpfAdapter(ProviderAdapter):
         scope = self._search_scope()
         headers: dict[str, str] | None = None
         found: list[Resource] = []
+        diagnostics: list[SearchDiagnostic] = []
         seen: set[tuple[str, ...]] = set()
         modes = (
             (True, False) if query.text and query.text.strip() and scope else (True,)
@@ -123,17 +128,37 @@ class MlitDpfAdapter(ProviderAdapter):
                     "scope": scope,
                 }
                 previous_count = len(stage_seen)
+                skipped_invalid = False
                 for value in cast(list[Any], records):
-                    record = _object(value, "MLIT DPF search record")
-                    identity = tuple(
-                        _required_record_string(record, key)
-                        for key in ("id", "dataset_id", "catalog_id")
+                    record_id = (
+                        _optional_string(cast(Mapping[str, Any], value).get("id"))
+                        if isinstance(value, Mapping)
+                        else None
                     )
-                    stage_seen.add(identity)
-                    if identity in seen:
+                    try:
+                        record = _object(value, "MLIT DPF search record")
+                        identity = tuple(
+                            _required_record_string(record, key)
+                            for key in ("id", "dataset_id", "catalog_id")
+                        )
+                        stage_seen.add(identity)
+                        if identity in seen:
+                            continue
+                        item_results = self._record_results(record, parameters)
+                    except (ConfigValidationError, ProviderResponseError):
+                        skipped_invalid = True
+                        diagnostics.append(
+                            SearchDiagnostic(
+                                source_id=self.adapter_type,
+                                skipped_conditions=frozenset(),
+                                reason="item_skipped",
+                                resource_identifier=record_id,
+                                detail="invalid_record",
+                            )
+                        )
                         continue
                     seen.add(identity)
-                    for item in self._record_results(record, parameters):
+                    for item in item_results:
                         available = {
                             value for value in Format if value.value in item.formats
                         }
@@ -147,13 +172,22 @@ class MlitDpfAdapter(ProviderAdapter):
                         ):
                             found.append(item)
                 if len(found) >= limit:
-                    return tuple(found[:limit])
+                    return self._search_results(found[:limit], diagnostics)
                 first += len(cast(list[Any], records))
                 if first >= total or not scope:
                     break
-                if len(stage_seen) == previous_count:
+                if len(stage_seen) == previous_count and not skipped_invalid:
                     raise ProviderResponseError("MLIT DPF pagination made no progress")
-        return tuple(found)
+        return self._search_results(found, diagnostics)
+
+    @staticmethod
+    def _search_results(
+        found: list[Resource], diagnostics: list[SearchDiagnostic]
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
+        results = tuple(found)
+        if diagnostics:
+            return ProviderSearchResults(results, tuple(diagnostics))
+        return results
 
     def _search_scope(self) -> str | None:
         """Ask DPF only for catalogs/datasets with declared resolution routes."""
