@@ -358,6 +358,11 @@ def test_search_ckan_jp_isolates_resource_urls_with_embedded_credentials() -> No
                                     "format": "CSV",
                                 },
                                 {
+                                    "id": "malformed-1",
+                                    "url": "https://user:password@[invalid",
+                                    "format": "CSV",
+                                },
+                                {
                                     "id": "public-1",
                                     "url": "https://example.jp/data.csv",
                                     "format": "CSV",
@@ -376,12 +381,39 @@ def test_search_ckan_jp_isolates_resource_urls_with_embedded_credentials() -> No
 
     assert isinstance(results, ProviderSearchResults)
     assert [item.provenance.resource_identifier for item in results] == ["public-1"]
-    assert len(results.diagnostics) == 1
-    diagnostic = results.diagnostics[0]
-    assert diagnostic.source_id == "search-ckan-jp"
-    assert diagnostic.reason == "item_skipped"
-    assert diagnostic.resource_identifier == "secret-1"
-    assert diagnostic.detail == "invalid_resource_url"
+    assert len(results.diagnostics) == 2
+    assert [item.source_id for item in results.diagnostics] == [
+        "search-ckan-jp",
+        "search-ckan-jp",
+    ]
+    assert [item.reason for item in results.diagnostics] == [
+        "item_skipped",
+        "item_skipped",
+    ]
+    assert [item.resource_identifier for item in results.diagnostics] == [
+        "secret-1",
+        "malformed-1",
+    ]
+    assert [item.detail for item in results.diagnostics] == [
+        "invalid_resource_url",
+        "invalid_resource_url",
+    ]
+    result = results[0]
+    assert result.discovery is not None
+    raw_packages = (
+        result.metadata.raw,
+        result.provenance.raw["catalog"],
+        result.reference.parameters["metadata"]["raw"],
+        result.discovery.metadata.raw,
+        result.discovery.provenance.raw["catalog"],
+        result.discovery.raw_metadata["catalog"],
+    )
+    for raw_package in raw_packages:
+        assert [resource["url"] for resource in raw_package["resources"]] == [
+            "[redacted]",
+            "[redacted]",
+            "https://example.jp/data.csv",
+        ]
 
 
 @pytest.mark.parametrize("text", ["", " \t\n　"])
