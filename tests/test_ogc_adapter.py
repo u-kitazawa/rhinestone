@@ -58,6 +58,39 @@ def test_ogc_search_uses_items_endpoint_and_standard_query_parameters() -> None:
     assert results[0].metadata.raw["geometry"]["type"] == "LineString"
 
 
+def test_ogc_search_isolates_invalid_features() -> None:
+    endpoint = "https://features.example"
+    items_url = endpoint + "/collections/rivers/items"
+    valid_feature = fixture_json("ogc/feature_collection.json")["features"][0]
+    response = {
+        "features": [
+            {"properties": {"title": "Missing ID"}},
+            {"id": "bad-properties", "properties": None},
+            valid_feature,
+        ]
+    }
+    results = OgcFeaturesAdapter(
+        endpoint=endpoint,
+        collection_id="rivers",
+        get_json=RecordingJsonClient({items_url: response}),
+    ).search(SearchQuery())
+
+    assert [result.title for result in results] == ["Example River"]
+    diagnostics = getattr(results, "diagnostics")
+    assert [diagnostic.reason for diagnostic in diagnostics] == [
+        "item_skipped",
+        "item_skipped",
+    ]
+    assert [diagnostic.resource_identifier for diagnostic in diagnostics] == [
+        None,
+        "bad-properties",
+    ]
+    assert [diagnostic.detail for diagnostic in diagnostics] == [
+        "invalid_feature",
+        "invalid_feature",
+    ]
+
+
 def test_ogc_search_requires_collection_context() -> None:
     adapter = OgcFeaturesAdapter(
         endpoint="https://features.example", get_json=RecordingJsonClient({})

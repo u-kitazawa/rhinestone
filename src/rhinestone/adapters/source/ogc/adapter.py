@@ -7,8 +7,10 @@ from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
     Metadata,
     Provenance,
+    ProviderSearchResults,
     Reference,
     Resource,
+    SearchDiagnostic,
     SearchQuery,
 )
 from ....registry import CredentialRegistry
@@ -94,7 +96,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
             options={"collection_id": collection_id, "feature_id": feature_id},
         )
 
-    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
+    def search(self, query: SearchQuery) -> ProviderSearchResults:
         """Search one configured OGC collection using standard parameters."""
         endpoint = self._endpoint_from({}, self._endpoint)
         if not self._collection_id:
@@ -110,46 +112,62 @@ class OgcFeaturesAdapter(ProviderAdapter):
         response = self._request(items_url, params)
         features = self._objects(response.get("features"), "OGC features")
         found: list[Resource] = []
+        diagnostics: list[SearchDiagnostic] = []
         for feature in features:
-            feature_id = self._required_string(feature, "id")
-            properties = self._object(feature.get("properties"), "OGC properties")
-            title = _feature_title(properties, feature_id)
-            uri = append_path_segment(items_url, feature_id)
-            provenance = Provenance(
-                provider="ogc-features",
-                dataset_identifier=self._collection_id,
-                resource_identifier=feature_id,
-                api_endpoint=endpoint,
-                original_url=uri,
-                query_parameters=params,
-                adapter="ogc-features",
-                raw=feature,
-            )
-            found.append(
-                resource_from_delivery(
-                    reference=Reference(
-                        self.adapter_type,
-                        dataset_identifier=self._collection_id,
-                        resource_identifier=feature_id,
-                        parameters={
-                            "collection_id": self._collection_id,
-                            "feature_id": feature_id,
-                        },
-                    ),
-                    uri=uri,
-                    format="ogc-api-features",
-                    media_type="application/geo+json",
-                    metadata=Metadata(
-                        title=title,
-                        description=_optional_string(properties.get("description")),
-                        raw=feature,
-                    ),
-                    provenance=provenance,
-                    kind="service-query",
-                    options={"query": params},
+            feature_id = _optional_string(feature.get("id"))
+            try:
+                if not feature_id:
+                    raise ProviderResponseError(
+                        "OGC feature id must be a non-empty string"
+                    )
+                properties = self._object(feature.get("properties"), "OGC properties")
+                title = _feature_title(properties, feature_id)
+                uri = append_path_segment(items_url, feature_id)
+                provenance = Provenance(
+                    provider="ogc-features",
+                    dataset_identifier=self._collection_id,
+                    resource_identifier=feature_id,
+                    api_endpoint=endpoint,
+                    original_url=uri,
+                    query_parameters=params,
+                    adapter="ogc-features",
+                    raw=feature,
                 )
-            )
-        return tuple(found)
+                found.append(
+                    resource_from_delivery(
+                        reference=Reference(
+                            self.adapter_type,
+                            dataset_identifier=self._collection_id,
+                            resource_identifier=feature_id,
+                            parameters={
+                                "collection_id": self._collection_id,
+                                "feature_id": feature_id,
+                            },
+                        ),
+                        uri=uri,
+                        format="ogc-api-features",
+                        media_type="application/geo+json",
+                        metadata=Metadata(
+                            title=title,
+                            description=_optional_string(properties.get("description")),
+                            raw=feature,
+                        ),
+                        provenance=provenance,
+                        kind="service-query",
+                        options={"query": params},
+                    )
+                )
+            except ProviderResponseError:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=self.adapter_type,
+                        skipped_conditions=frozenset(),
+                        reason="item_skipped",
+                        resource_identifier=feature_id,
+                        detail="invalid_feature",
+                    )
+                )
+        return ProviderSearchResults(tuple(found), tuple(diagnostics))
 
     @staticmethod
     def _query_parameters(query: SearchQuery) -> dict[str, Any]:
