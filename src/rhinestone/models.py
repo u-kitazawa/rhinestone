@@ -556,6 +556,13 @@ class SearchQuery:
                     "bbox must be a tuple of four numbers (SearchQuery.bbox); "
                     "got a tuple with an invalid length or element type"
                 )
+            if any(
+                isinstance(value, float) and not isfinite(value)
+                for value in bbox_values
+            ):
+                raise ConfigValidationError(
+                    "bbox coordinates must be finite numbers (SearchQuery.bbox)"
+                )
         raw_time = cast(object, self.time)
         if raw_time is not None:
             if not isinstance(raw_time, tuple):
