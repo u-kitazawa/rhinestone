@@ -3,6 +3,7 @@
 from collections import Counter, deque
 from typing import Any
 
+from ...._uri import is_valid_http_authority
 from ....errors import (
     ConfigValidationError,
     ProviderResponseError,
@@ -12,14 +13,15 @@ from ....models import (
     DiscoveryRecord,
     Metadata,
     Provenance,
+    ProviderSearchResults,
     Reference,
     Resource,
+    SearchDiagnostic,
     SearchQuery,
 )
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
-from .._uri import has_embedded_credentials
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
@@ -51,7 +53,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
             "search-ckan-jp is a discovery-only source and cannot resolve resources"
         )
 
-    def search(self, query: SearchQuery) -> tuple[Resource, ...]:
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
         """Search the official search.ckan.jp endpoint using text criteria."""
         if query.text is None:
             raise ConfigValidationError(
@@ -66,6 +70,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
         if query.limit is not None:
             params["rows"] = min(100, max(10, query.limit))
         found: list[Resource] = []
+        diagnostics: list[SearchDiagnostic] = []
         start = 0
         seen: set[tuple[str | None, str | None, str | None, str | None, str | None]] = (
             set()
@@ -82,7 +87,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
             batches: list[deque[Resource]] = []
             for package in packages:
                 items: deque[Resource] = deque()
-                for item in self._package_results(package, endpoint, page_params):
+                for item in self._package_results(
+                    package, endpoint, page_params, diagnostics
+                ):
                     if query.format is not None and not self._matches_query_formats(
                         item.formats, query
                     ):
@@ -116,19 +123,19 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 for items in batches:
                     found.append(items.popleft())
                     if query.limit is not None and len(found) == query.limit:
-                        return tuple(found)
+                        return self._search_results(found, diagnostics)
                     if items:
                         remaining.append(items)
                 batches = remaining
             if query.limit is None:
-                return tuple(found)
+                return self._search_results(found, diagnostics)
             total = result.get("count")
             if type(total) is not int or total < 0:
                 raise ProviderResponseError(
                     "search.ckan.jp result count must be an integer"
                 )
             if start + len(packages) >= total:
-                return tuple(found)
+                return self._search_results(found, diagnostics)
             if not packages:
                 raise ProviderResponseError(
                     "search.ckan.jp result is empty before its declared count"
@@ -140,7 +147,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
         package: JsonObject,
         endpoint: str,
         params: dict[str, Any],
+        diagnostics: list[SearchDiagnostic] | None = None,
     ) -> tuple[Resource, ...]:
+        diagnostics = [] if diagnostics is None else diagnostics
         package_id = optional_string(package.get("xckan_original_id"))
         if package_id is None:
             package_id = optional_string(package.get("id"))
@@ -156,23 +165,51 @@ class SearchCkanJpAdapter(ProviderAdapter):
         license_name = optional_string(package.get("license_title"))
         site_url = optional_string(package.get("xckan_site_url"))
         resources = self._objects(package.get("resources"), "search.ckan.jp resources")
+        invalid_urls = {
+            index
+            for index, resource in enumerate(resources)
+            if (
+                (uri := optional_string(resource.get("url"))) is not None
+                and (not uri or not is_valid_http_authority(uri))
+            )
+        }
+        safe_package: JsonObject = package
+        if invalid_urls:
+            safe_package = {
+                **package,
+                "resources": [
+                    (
+                        {**resource, "url": "[redacted]"}
+                        if index in invalid_urls
+                        else resource
+                    )
+                    for index, resource in enumerate(resources)
+                ],
+            }
         found: list[Resource] = []
-        for resource in resources:
+        for index, resource in enumerate(resources):
             resource_id = optional_string(resource.get("id"))
             uri = optional_string(resource.get("url"))
             format_name = resource_format(resource)
             if resource_id is None or uri is None or format_name is None:
                 continue
-            if has_embedded_credentials(uri):
-                raise ProviderResponseError(
-                    "search.ckan.jp resource URL must not contain embedded credentials"
+            if index in invalid_urls:
+                diagnostics.append(
+                    SearchDiagnostic(
+                        source_id=self.adapter_type,
+                        skipped_conditions=frozenset(),
+                        reason="item_skipped",
+                        resource_identifier=resource_id,
+                        detail="invalid_resource_url",
+                    )
                 )
+                continue
             metadata = Metadata(
                 title=title,
                 description=description,
                 publisher=publisher,
                 license=license_name,
-                raw=package,
+                raw=safe_package,
             )
             provenance = Provenance(
                 provider=optional_string(package.get("xckan_site_name"))
@@ -183,7 +220,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 original_url=site_url or uri,
                 query_parameters=params,
                 adapter=self.adapter_type,
-                raw={"catalog": package, "resource": resource},
+                raw={"catalog": safe_package, "resource": resource},
             )
             target_parameters: dict[str, Any] = {
                 "uri": uri,
@@ -193,7 +230,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                     "description": description,
                     "publisher": publisher,
                     "license": license_name,
-                    "raw": package,
+                    "raw": safe_package,
                 },
             }
             media_type = optional_string(resource.get("mimetype"))
@@ -204,7 +241,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 description=description,
                 publisher=publisher,
                 license=license_name,
-                raw=package,
+                raw=safe_package,
             )
             target_provenance = Provenance(
                 provider="direct",
@@ -212,7 +249,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 resource_identifier=resource_id,
                 original_url=uri,
                 adapter="direct",
-                raw={"catalog": package, "resource": resource},
+                raw={"catalog": safe_package, "resource": resource},
             )
             found.append(
                 resource_from_delivery(
@@ -231,11 +268,20 @@ class SearchCkanJpAdapter(ProviderAdapter):
                         source_id=self.adapter_type,
                         metadata=metadata,
                         provenance=provenance,
-                        raw_metadata={"catalog": package, "resource": resource},
+                        raw_metadata={"catalog": safe_package, "resource": resource},
                     ),
                 )
             )
         return tuple(found)
+
+    @staticmethod
+    def _search_results(
+        found: list[Resource], diagnostics: list[SearchDiagnostic]
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
+        results = tuple(found)
+        if diagnostics:
+            return ProviderSearchResults(results, tuple(diagnostics))
+        return results
 
     @staticmethod
     def _matches_query_formats(formats: frozenset[str], query: SearchQuery) -> bool:
