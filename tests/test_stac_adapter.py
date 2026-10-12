@@ -88,7 +88,7 @@ def test_stac_search_isolates_items_without_one_data_asset() -> None:
             "assets": assets,
         }
 
-    response = {
+    response: dict[str, object] = {
         "features": [
             item("missing", {"thumbnail": {"href": "https://thumb"}}),
             item(
@@ -125,6 +125,78 @@ def test_stac_search_isolates_items_without_one_data_asset() -> None:
     ]
     assert [diagnostic.detail for diagnostic in results.diagnostics] == [
         "missing_data_asset",
+    ]
+
+
+def test_stac_search_isolates_invalid_items() -> None:
+    endpoint = "https://stac.example"
+    search_url = endpoint + "/search"
+
+    def item(item_id: str, **overrides: object) -> dict[str, object]:
+        value: dict[str, object] = {
+            "id": item_id,
+            "collection": "imagery",
+            "properties": {"title": item_id},
+            "assets": {
+                "visual": {
+                    "href": f"https://assets.example/{item_id}.tif",
+                    "roles": ["data"],
+                }
+            },
+        }
+        value.update(overrides)
+        return value
+
+    response: dict[str, object] = {
+        "features": [
+            {"collection": "imagery", "properties": {}, "assets": {}},
+            item("   "),
+            item("bad-collection", collection="   "),
+            item("bad-properties", properties=None),
+            item("bad-assets", assets=None),
+            item(
+                "bad-href",
+                assets={"visual": {"href": None, "roles": ["data"]}},
+            ),
+            item(
+                "malformed-href",
+                assets={"visual": {"href": "https://[invalid", "roles": ["data"]}},
+            ),
+            item("usable"),
+        ]
+    }
+
+    results = StacAdapter(
+        endpoint=endpoint, get_json=RecordingJsonClient({search_url: response})
+    ).search(SearchQuery())
+
+    assert [result.title for result in results] == ["usable"]
+    assert [diagnostic.reason for diagnostic in results.diagnostics] == [
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+    ]
+    assert [diagnostic.resource_identifier for diagnostic in results.diagnostics] == [
+        None,
+        None,
+        "bad-collection",
+        "bad-properties",
+        "bad-assets",
+        "bad-href",
+        "malformed-href",
+    ]
+    assert [diagnostic.detail for diagnostic in results.diagnostics] == [
+        "invalid_item",
+        "invalid_item",
+        "invalid_item",
+        "invalid_item",
+        "invalid_item",
+        "invalid_item",
+        "invalid_item",
     ]
 
 

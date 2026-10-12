@@ -124,60 +124,87 @@ class StacAdapter(ProviderAdapter):
         found: list[Resource] = []
         diagnostics: list[SearchDiagnostic] = []
         for item in items:
-            item_id = self._required_string(item, "id")
-            collection_id = self._required_string(item, "collection")
-            properties = self._object(item.get("properties"), "STAC properties")
-            asset_keys = self._data_asset_keys(item)
-            if not asset_keys:
+            item_id = _optional_string(item.get("id"))
+            if item_id is not None and not item_id.strip():
+                item_id = None
+            try:
+                if item_id is None:
+                    raise ProviderResponseError(
+                        "STAC item id must be a non-empty string"
+                    )
+                collection_id = _optional_string(item.get("collection"))
+                if collection_id is None or not collection_id.strip():
+                    raise ProviderResponseError(
+                        "STAC collection must be a non-empty string"
+                    )
+                properties = self._object(item.get("properties"), "STAC properties")
+                asset_keys = self._data_asset_keys(item)
+                if not asset_keys:
+                    diagnostics.append(
+                        SearchDiagnostic(
+                            source_id=self.adapter_type,
+                            skipped_conditions=frozenset(),
+                            reason="item_skipped",
+                            resource_identifier=item_id,
+                            detail="missing_data_asset",
+                        )
+                    )
+                    continue
+                title = _optional_string(properties.get("title")) or item_id
+                item_results: list[Resource] = []
+                for asset_key in asset_keys:
+                    asset = self._asset(item, asset_key)
+                    uri, format_name, media_type = self._delivery(
+                        asset, f"{endpoint}/search"
+                    )
+                    provenance = Provenance(
+                        provider="stac",
+                        dataset_identifier=collection_id,
+                        resource_identifier=f"{item_id}:{asset_key}",
+                        api_endpoint=endpoint,
+                        original_url=uri,
+                        query_parameters=params,
+                        adapter="stac",
+                        raw=item,
+                    )
+                    item_results.append(
+                        resource_from_delivery(
+                            reference=Reference(
+                                self.adapter_type,
+                                dataset_identifier=collection_id,
+                                resource_identifier=f"{item_id}:{asset_key}",
+                                parameters={
+                                    "collection_id": collection_id,
+                                    "item_id": item_id,
+                                    "asset_key": asset_key,
+                                },
+                            ),
+                            uri=uri,
+                            format=format_name,
+                            media_type=media_type,
+                            metadata=Metadata(
+                                title=title,
+                                description=_optional_string(
+                                    properties.get("description")
+                                ),
+                                raw=item,
+                            ),
+                            provenance=provenance,
+                        )
+                    )
+            except (ConfigValidationError, ProviderResponseError):
                 diagnostics.append(
                     SearchDiagnostic(
                         source_id=self.adapter_type,
                         skipped_conditions=frozenset(),
                         reason="item_skipped",
                         resource_identifier=item_id,
-                        detail="missing_data_asset",
+                        detail="invalid_item",
                     )
                 )
                 continue
-            title = _optional_string(properties.get("title")) or item_id
-            for asset_key in asset_keys:
-                asset = self._asset(item, asset_key)
-                uri, format_name, media_type = self._delivery(
-                    asset, f"{endpoint}/search"
-                )
-                provenance = Provenance(
-                    provider="stac",
-                    dataset_identifier=collection_id,
-                    resource_identifier=f"{item_id}:{asset_key}",
-                    api_endpoint=endpoint,
-                    original_url=uri,
-                    query_parameters=params,
-                    adapter="stac",
-                    raw=item,
-                )
-                found.append(
-                    resource_from_delivery(
-                        reference=Reference(
-                            self.adapter_type,
-                            dataset_identifier=collection_id,
-                            resource_identifier=f"{item_id}:{asset_key}",
-                            parameters={
-                                "collection_id": collection_id,
-                                "item_id": item_id,
-                                "asset_key": asset_key,
-                            },
-                        ),
-                        uri=uri,
-                        format=format_name,
-                        media_type=media_type,
-                        metadata=Metadata(
-                            title=title,
-                            description=_optional_string(properties.get("description")),
-                            raw=item,
-                        ),
-                        provenance=provenance,
-                    )
-                )
+            for result in item_results:
+                found.append(result)
                 if query.limit is not None and len(found) >= query.limit:
                     return ProviderSearchResults(tuple(found), tuple(diagnostics))
         return ProviderSearchResults(tuple(found), tuple(diagnostics))
@@ -207,7 +234,10 @@ class StacAdapter(ProviderAdapter):
         self, asset: JsonObject, response_uri: str
     ) -> tuple[str, str | None, str | None]:
         href = self._required_string(asset, "href")
-        uri = resolve_response_href(response_uri, href)
+        try:
+            uri = resolve_response_href(response_uri, href)
+        except ValueError as error:
+            raise ProviderResponseError("STAC asset href is invalid") from error
         media_type = _optional_string(asset.get("type"))
         format_name = (
             "cog"
