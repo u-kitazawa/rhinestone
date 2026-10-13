@@ -27,6 +27,14 @@ from tests.provider_support import fixture_json
     (
         Provider("stac-source", "stac", {"endpoint": "https://stac.test"}),
         Provider(
+            "static-stac-source",
+            "stac",
+            {
+                "catalog_uri": "https://static.stac.test/catalog/",
+                "max_documents": 25,
+            },
+        ),
+        Provider(
             "ogc-source",
             "ogc-features",
             {"endpoint": "https://ogc.test", "collection_id": "rivers"},

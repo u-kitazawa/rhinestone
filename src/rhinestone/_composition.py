@@ -309,7 +309,12 @@ def _build_geospatial_jp(
         provider_id=provider.id,
         **_settings(
             provider,
-            ("endpoint", "credential", "credential_header", "credential_scheme"),
+            (
+                "endpoint",
+                "credential",
+                "credential_header",
+                "credential_scheme",
+            ),
         ),
     )
 
@@ -322,7 +327,14 @@ def _build_stac(provider: Provider, context: SourceAdapterContext) -> ProviderAd
         provider_id=provider.id,
         **_settings(
             provider,
-            ("endpoint", "credential", "credential_header", "credential_scheme"),
+            (
+                "endpoint",
+                "catalog_uri",
+                "max_documents",
+                "credential",
+                "credential_header",
+                "credential_scheme",
+            ),
         ),
     )
 
