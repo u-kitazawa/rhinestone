@@ -56,16 +56,18 @@ ODPTのJSONサービスはCoreのRuntimeを使うため`open("json-service")`で
 ## 検索・解決・実行のエラー境界
 
 検索できること、Resourceへ解決できること、Runtimeで開けることは別々の契約です。
-失敗した段階に応じて、次の例外を使い分けます。
+失敗した段階に応じて、診断または例外を使い分けます。
 
-| 段階 | 代表的な失敗 | 例外 | 対応 |
+| 段階 | 代表的な失敗 | 観測結果 | 対応 |
 | --- | --- | --- | --- |
-| 検索 | Providerへの接続・認証・応答形式 | `ProviderMetadataError` / `ProviderResponseError` | Provider設定や応答を確認する |
+| 検索 | Providerへの接続・認証・応答形式 | `SearchResults.diagnostics`の`reason="provider_failure"` | `failure_type`からmetadata・response・credentialを判別する |
 | 解決 | 候補なし・候補が複数・AccessPlanを確定できない | `ResourceNotFoundError` / `AmbiguousResourceError` / `UnsupportedAccessError` | 明示的なResource選択や形式を指定する |
 | 実行準備 | 対応AdapterまたはRuntimeがない | `ExecutionAdapterUnavailableError` | 対応するAdapter・形式・Runtimeを指定する |
 | 実行 | 選択済みデータをRuntimeが開けない | `ResourceAccessError` | URI、権限、Runtimeのdriver対応、元の例外を確認する |
 | 実行認可 | 接続先がDestinationPolicyで許可されない | `DestinationNotAllowedError` | 信頼済み接続先とpolicy設定を確認する |
 
+検索時のProvider障害はSource単位で隔離され、他のSourceの結果とともに返ります。
+全Sourceが失敗した場合も、空の`SearchResults`とdiagnosticsを返します。
 `ResourceAccessError`はResourceと実行Adapterの選択後に発生します。GDALなどのRuntimeが
 返した例外は`__cause__`へ保持されます。一方、Adapter自身が不正なAccessPlanや
 「データセットなし」を検出した場合は、回復方法を含む元の`ResourceAccessError`を
