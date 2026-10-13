@@ -8,8 +8,9 @@
 - 検索: `bbox`, `time`, `limit`
 - 注入: `get_json(url, params)`。`credential` に論理名を指定し、`credentials` のRegistryから認証情報を取得します。
 
-API型の検索は data role のassetがちょうど1件のItemだけを返します。
-静的型は各data assetを独立Resourceとして返し、先頭assetを暗黙選択しません。
+API型・静的型のどちらも各data assetを独立Resourceとして返し、
+複数assetのItemでも先頭assetを暗黙選択しません。
+data assetがないItemや不正Itemはスキップし、diagnosticsで理由を確認できます。
 静的型は公式のchild/itemリンクを有界に巡回します（`max_documents`、既定100）。
 条件はItem取得後に適用し、Collection extentによる枝刈りは現在行いません。
 asset URLやフォーマットは推測しません。詳細は

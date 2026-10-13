@@ -29,9 +29,9 @@ CatalogのIDから子階層を事前に絞り込む機能はありません。`l
 
 Item、Search、静的Catalogの取得はRhinestoneの組み込みHTTP transportで行います。
 Adapterを直接構築する場合も、`credential`に論理名を指定し、`credentials`の
-CredentialRegistryから認証情報を取得します。API型の検索はdata roleのassetが
-ちょうど一件であるItemだけを返します。静的型はdata roleの各assetを独立Resourceとして
-返します。欠損・不正Item等の理由は検索結果の `diagnostics` で確認できます。
+CredentialRegistryから認証情報を取得します。API型・静的型のどちらもdata roleの各assetを
+独立Resourceとして返します。複数assetのItemも返し、先頭assetを暗黙選択しません。
+data assetがないItemや不正Item等の理由は検索結果の `diagnostics` で確認できます。
 asset formatはmedia typeに基づき、URLやファイル名から推測しません。
 
 Assetの`href`がrelative URI referenceの場合は、そのAssetを含むItem responseの最終URI（HTTP redirect後を含む）を基準にRFC 3986の規則でabsolute URIへ解決します。元の`href`はraw metadataに保持し、解決済みURIをResourceとprovenanceの`original_url`に使用します。認証付きリクエストでは、認証情報が別originへ転送されないようredirectを許可しません。

@@ -74,16 +74,15 @@ GeoTIFFを広告するmedia typeなら、`geotiff` としてRasterioへ渡せま
 
 ## 検索時の制約
 
-API型の `StacAdapter.search()` は、各Itemで `data` roleのassetがちょうど1件の場合だけ
-そのasset keyを含む検索結果を返します。0件または複数件の場合はassetを推測せず、
-そのItemだけをスキップします。スキップしたItem IDと理由はFederated searchの
-`diagnostics`で確認できます。
+`StacAdapter.search()` はAPI型・静的型のどちらも、各Itemの `data` roleを持つ各assetを
+独立したResourceとして返します。各ResourceのReferenceはasset keyを保持するため、
+複数assetを持つItemでも、それぞれの配信URIを区別して利用できます。
+data assetがないItemや不正Itemはスキップし、Item IDと理由を `diagnostics` で確認できます。
 
-API型でそのようなItemを扱う場合は、この例のように利用するItemとasset keyを明示してください。
-単一 `data` assetに制約され、かつそのassetがCOGまたはGeoTIFF media typeを広告するcollectionでのみ
-このRasterioフローへ検索結果をそのまま `app.load(result)` で渡せます。単一assetでも
-media typeが未指定または非対応の場合、検索結果は返りますが解決時に
-`UnsupportedAccessError` となります。
+検索結果のうち、COGまたはGeoTIFF media typeを広告するResourceを選び、
+`resource.open("rasterio", runtime=rasterio)` で開けます。media typeが未指定または
+Rasterio非対応の形式なら検索結果は返っても、Rasterioで開けるとは限りません。
+URLやファイル名から形式を推測することはありません。
 
 静的型では `endpoint` の代わりに `catalog_uri` を設定します。各data assetが独立した
 Resourceとして返り、検索結果から直接 `resource.open("rasterio", runtime=rasterio)` を
@@ -95,7 +94,7 @@ Resourceとして返り、検索結果から直接 `resource.open("rasterio", ru
 - 必須: ネットワーク接続、公開STAC API、Rasterioとそのnative依存関係
 - credential: この標準経路では認証なしの公開STAC APIを使う
 - 変更される値: Item metadata、asset URL、media type
-- Rhinestoneの責務: 明示されたItemとassetの検証、COG Resourceへの解決、Rasterioへの委譲
+- Rhinestoneの責務: 明示されたItemとassetの検証、COG/GeoTIFF Resourceへの解決、Rasterioへの委譲
 - Rasterioの責務: URIの読み込み、datasetの提供、ウィンドウ読み込みや解析
 - 非対応: asset URLの推測、非対応形式の自動変換、archiveの展開
 
