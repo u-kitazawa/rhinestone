@@ -212,6 +212,117 @@ def test_ckan_search_skips_resources_without_a_valid_id() -> None:
     ]
 
 
+def test_ckan_search_isolates_invalid_resource_urls_and_redacts_raw_metadata() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    client = RecordingJsonClient(
+        {
+            search_url: {
+                "success": True,
+                "result": {
+                    "results": [
+                        {
+                            "id": "dataset-1",
+                            "resources": [
+                                {
+                                    "id": "secret-1",
+                                    "url": "https://user:password@example/data.csv",
+                                },
+                                {
+                                    "id": "typed-1",
+                                    "url": 1,
+                                },
+                                {
+                                    "id": "ftp-secret-1",
+                                    "url": "ftp://user:password@example/data.csv",
+                                },
+                                {
+                                    "id": "malformed-1",
+                                    "url": "https://[invalid",
+                                },
+                                {
+                                    "id": "public-1",
+                                    "url": "https://files.example/data.csv",
+                                    "format": "CSV",
+                                },
+                            ],
+                        }
+                    ]
+                },
+            }
+        }
+    )
+
+    results = CkanAdapter(endpoint=endpoint, get_json=client).search(SearchQuery())
+
+    assert isinstance(results, ProviderSearchResults)
+    assert [item.reference.resource_identifier for item in results] == ["public-1"]
+    assert [item.resource_identifier for item in results.diagnostics] == [
+        "secret-1",
+        "typed-1",
+        "ftp-secret-1",
+        "malformed-1",
+    ]
+    assert [item.detail for item in results.diagnostics] == [
+        "invalid_resource_url",
+        "invalid_resource_url",
+        "invalid_resource_url",
+        "invalid_resource_url",
+    ]
+    raw_resources = results[0].metadata.raw["resources"]
+    assert [resource["url"] for resource in raw_resources] == [
+        "[redacted]",
+        "[redacted]",
+        "[redacted]",
+        "[redacted]",
+        "https://files.example/data.csv",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("resource", "message"),
+    (
+        ({"id": "resource-1", "url": "https://files.example/data.csv"}, "package_id"),
+        (
+            {
+                "id": "resource-1",
+                "package_id": "dataset-1",
+                "url": "https://user:password@example/data.csv",
+            },
+            "invalid HTTP",
+        ),
+        (
+            {
+                "id": "resource-1",
+                "package_id": "dataset-1",
+                "url": "ftp://user:password@example/data.csv",
+            },
+            "invalid HTTP",
+        ),
+    ),
+)
+def test_ckan_load_classifies_invalid_provider_resource_fields(
+    resource: Mapping[str, Any], message: str
+) -> None:
+    endpoint = "https://catalog.example"
+    resource_url = endpoint + "/api/3/action/resource_show"
+    package_url = endpoint + "/api/3/action/package_show"
+    client = RecordingJsonClient(
+        {
+            resource_url: {"success": True, "result": resource},
+            package_url: {
+                "success": True,
+                "result": {"id": "dataset-1"},
+            },
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match=message):
+        CkanAdapter(endpoint=endpoint, get_json=client).load(
+            Reference("ckan", resource_identifier="resource-1")
+        )
+
+
 def test_ckan_search_pages_packages_until_the_resource_limit_is_met() -> None:
     endpoint = "https://catalog.example"
     search_url = endpoint + "/api/3/action/package_search"
