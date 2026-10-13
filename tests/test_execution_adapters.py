@@ -142,9 +142,34 @@ def test_gdal_rejects_invalid_tile_options(tile: object) -> None:
         access_plan=replace(resource.access_plan, options={"tile": tile}),
     )
 
-    with pytest.raises(ResourceAccessError):
+    with pytest.raises(ResourceAccessError, match="GDAL tile") as captured:
         assert resource.access_plan is not None
         GdalAdapter().open(resource.access_plan, FakeGdal())
+
+    assert captured.value.__cause__ is None
+
+
+def test_gdal_preserves_no_dataset_error() -> None:
+    """GDAL's classified no-dataset result keeps its actionable recovery message."""
+
+    class EmptyGdal:
+        def OpenEx(
+            self,
+            uri: str,
+            open_options: tuple[str, ...] = (),
+        ) -> None:
+            return None
+
+    resource = make_resource("/data/unsupported.bin", "gml")
+
+    with pytest.raises(
+        ResourceAccessError,
+        match="GDAL returned no dataset; verify the selected AccessPlan",
+    ) as captured:
+        assert resource.access_plan is not None
+        GdalAdapter().open(resource.access_plan, EmptyGdal())
+
+    assert captured.value.__cause__ is None
 
 
 class FakeRasterio:

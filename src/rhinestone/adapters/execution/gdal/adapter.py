@@ -54,6 +54,8 @@ class GdalAdapter(ExecutionAdapter):
                     "GDAL-supported format"
                 )
             return result
+        except ResourceAccessError:
+            raise
         except Exception as error:
             raise ResourceAccessError(f"GDAL could not open {plan.uri!r}") from error
 
