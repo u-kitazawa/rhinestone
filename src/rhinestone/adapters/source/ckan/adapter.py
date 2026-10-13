@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 from ...._uri import is_valid_http_authority
 from ....errors import ConfigValidationError, ProviderResponseError
@@ -317,7 +318,7 @@ class CkanAdapter(ProviderAdapter):
         self, resource: JsonObject
     ) -> tuple[str, str | None, str | None, str | None]:
         uri = self._response_string(resource, "url")
-        if not is_valid_http_authority(uri):
+        if not self._is_safe_resource_url(uri):
             raise ProviderResponseError(
                 "CKAN resource URL has an invalid HTTP(S) authority"
             )
@@ -348,7 +349,19 @@ class CkanAdapter(ProviderAdapter):
         return (
             not isinstance(value, str)
             or not value.strip()
-            or not is_valid_http_authority(value)
+            or not CkanAdapter._is_safe_resource_url(value)
+        )
+
+    @staticmethod
+    def _is_safe_resource_url(uri: str) -> bool:
+        try:
+            parsed = urlsplit(uri)
+        except (TypeError, ValueError, UnicodeError):
+            return False
+        return (
+            parsed.username is None
+            and parsed.password is None
+            and is_valid_http_authority(uri)
         )
 
     @staticmethod

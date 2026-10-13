@@ -233,6 +233,14 @@ def test_ckan_search_isolates_invalid_resource_urls_and_redacts_raw_metadata() -
                                     "url": 1,
                                 },
                                 {
+                                    "id": "ftp-secret-1",
+                                    "url": "ftp://user:password@example/data.csv",
+                                },
+                                {
+                                    "id": "malformed-1",
+                                    "url": "https://[invalid",
+                                },
+                                {
                                     "id": "public-1",
                                     "url": "https://files.example/data.csv",
                                     "format": "CSV",
@@ -252,13 +260,19 @@ def test_ckan_search_isolates_invalid_resource_urls_and_redacts_raw_metadata() -
     assert [item.resource_identifier for item in results.diagnostics] == [
         "secret-1",
         "typed-1",
+        "ftp-secret-1",
+        "malformed-1",
     ]
     assert [item.detail for item in results.diagnostics] == [
+        "invalid_resource_url",
+        "invalid_resource_url",
         "invalid_resource_url",
         "invalid_resource_url",
     ]
     raw_resources = results[0].metadata.raw["resources"]
     assert [resource["url"] for resource in raw_resources] == [
+        "[redacted]",
+        "[redacted]",
         "[redacted]",
         "[redacted]",
         "https://files.example/data.csv",
@@ -274,6 +288,14 @@ def test_ckan_search_isolates_invalid_resource_urls_and_redacts_raw_metadata() -
                 "id": "resource-1",
                 "package_id": "dataset-1",
                 "url": "https://user:password@example/data.csv",
+            },
+            "invalid HTTP",
+        ),
+        (
+            {
+                "id": "resource-1",
+                "package_id": "dataset-1",
+                "url": "ftp://user:password@example/data.csv",
             },
             "invalid HTTP",
         ),
