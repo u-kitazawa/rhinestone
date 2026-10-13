@@ -328,6 +328,18 @@ def test_static_stac_configuration_is_explicit() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "catalog_uri",
+    (cast(Any, 1), "", "https://[invalid", "https://user:pass@example.com/catalog"),
+)
+def test_static_stac_rejects_invalid_catalog_uri(catalog_uri: str) -> None:
+    with pytest.raises(ConfigValidationError, match="catalog_uri must be a valid URI"):
+        StacAdapter(
+            get_json=RecordingJsonClient({}),
+            catalog_uri=catalog_uri,
+        )
+
+
 def test_static_stac_zero_limit_avoids_catalog_request() -> None:
     client = RecordingJsonClient({})
     adapter = StacAdapter(
@@ -444,12 +456,38 @@ def test_static_stac_skips_duplicate_and_non_traversal_links() -> None:
         }
     )
 
-    results = StacAdapter(get_json=client, catalog_uri=catalog_uri).search(
-        SearchQuery()
-    )
+    results = StacAdapter(
+        get_json=client,
+        catalog_uri=catalog_uri,
+        max_documents=2,
+    ).search(SearchQuery())
 
     assert not results
     assert client.calls == [(catalog_uri, {}), (child_uri, {})]
+
+
+def test_static_stac_preserves_catalog_trailing_slash_for_relative_links() -> None:
+    catalog_uri = "https://static.example/catalog/"
+    item_uri = "https://static.example/catalog/item.json"
+    client = RecordingJsonClient(
+        {
+            catalog_uri: {
+                "type": "Catalog",
+                "links": [{"rel": "item", "href": "item.json"}],
+            },
+            item_uri: {
+                "type": "Feature",
+                "id": "item",
+                "collection": "elevation",
+                "properties": {},
+                "assets": {},
+            },
+        }
+    )
+
+    StacAdapter(get_json=client, catalog_uri=catalog_uri).search(SearchQuery())
+
+    assert client.calls == [(catalog_uri, {}), (item_uri, {})]
 
 
 def test_static_stac_rejects_malformed_link_href() -> None:
@@ -481,6 +519,10 @@ def test_static_stac_rejects_malformed_link_href() -> None:
         [139.0, 35.0, 140.0],
         [139.0, 35.0, 0.0, 140.0, 36.0, 100.0],
         ["invalid", 35.0, 140.0, 36.0],
+        ["139.0", 35.0, 140.0, 36.0],
+        [True, 35.0, 140.0, 36.0],
+        [float("inf"), 35.0, 140.0, 36.0],
+        [float("nan"), 35.0, 140.0, 36.0],
     ),
 )
 def test_static_stac_filters_nonmatching_or_invalid_bboxes(

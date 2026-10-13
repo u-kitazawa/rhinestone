@@ -3,8 +3,10 @@
 from collections import deque
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from math import isfinite
 from typing import Any, cast
 
+from ...._uri import is_valid_http_authority
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
     Metadata,
@@ -57,7 +59,17 @@ class StacAdapter(ProviderAdapter):
                 "Configure either endpoint or catalog_uri for STAC, not both"
             )
         if catalog_uri is not None:
-            self._catalog_uri = self._normalize_endpoint(catalog_uri)
+            if (
+                not isinstance(cast(object, catalog_uri), str)
+                or not catalog_uri.strip()
+                or not catalog_uri.casefold().startswith(("http://", "https://"))
+                or not is_valid_http_authority(catalog_uri)
+            ):
+                raise ConfigValidationError(
+                    "catalog_uri must be a valid URI with a valid HTTP(S) authority "
+                    "and without embedded credentials"
+                )
+            self._catalog_uri = catalog_uri
         else:
             self._catalog_uri = None
         if type(max_documents) is not int:
@@ -205,15 +217,14 @@ class StacAdapter(ProviderAdapter):
         if catalog_uri is None:  # pragma: no cover - guarded by search
             raise AssertionError("static STAC catalog is not configured")
         queue: deque[str] = deque((catalog_uri,))
-        seen: set[str] = set()
+        discovered: set[str] = {catalog_uri}
+        documents_read = 0
         found: list[Resource] = []
         diagnostics: list[SearchDiagnostic] = []
-        while queue and len(seen) < self._max_documents:
+        while queue and documents_read < self._max_documents:
             requested_uri = queue.popleft()
-            if requested_uri in seen:
-                continue
             document, response_uri = self._request_with_uri(requested_uri, {})
-            seen.add(requested_uri)
+            documents_read += 1
             document_type = document.get("type")
             if document_type == "Feature":
                 item_id = _optional_string(document.get("id"))
@@ -262,7 +273,8 @@ class StacAdapter(ProviderAdapter):
                     raise ProviderResponseError(
                         "Static STAC link href is invalid"
                     ) from error
-                if target not in seen:
+                if target not in discovered:
+                    discovered.add(target)
                     queue.append(target)
         if queue:
             raise ProviderResponseError(
@@ -343,10 +355,11 @@ class StacAdapter(ProviderAdapter):
             bbox_values = cast(list[Any], raw_bbox)
             if len(bbox_values) != 4:
                 return False
-            try:
-                item_bbox = tuple(float(value) for value in bbox_values)
-            except (TypeError, ValueError):
+            if not all(
+                type(value) in {int, float} and isfinite(value) for value in bbox_values
+            ):
                 return False
+            item_bbox = bbox_values
             query_bbox = query.bbox
             if (
                 item_bbox[2] < query_bbox[0]
