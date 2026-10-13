@@ -16,7 +16,7 @@ from rhinestone.errors import (
     ProviderResponseError,
     UnsupportedSourceError,
 )
-from rhinestone.models import Reference, SearchQuery
+from rhinestone.models import ProviderSearchResults, Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from rhinestone.representations import Format
 
@@ -214,42 +214,11 @@ def test_null_metadata_and_nonmatching_rules_are_safely_omitted() -> None:
         ({"data": None}, "data"),
         ({"data": {"search": None}}, "search result"),
         ({"data": {"search": {}}}, "searchResults"),
-        (_response({"id": "x"}), "dataset_id"),
-        (
-            _response(
-                {
-                    "id": "data-1",
-                    "dataset_id": "dataset-1",
-                    "catalog_id": "catalog-1",
-                    "metadata": [],
-                }
-            ),
-            "record metadata",
-        ),
     ),
 )
 def test_invalid_provider_responses_are_classified(response: Any, message: str) -> None:
     with pytest.raises(ProviderResponseError, match=message):
         _adapter(response).search(SearchQuery())
-
-
-@pytest.mark.parametrize(
-    "metadata, message",
-    (
-        ({"DPF:downloadURLs": "https://example.test/data"}, "array"),
-        ({"DPF:downloadURLs": ["file:///tmp/data"]}, "safe HTTP"),
-        ({"DPF:downloadURLs": ["https://user:pass@example.test/data"]}, "safe HTTP"),
-    ),
-)
-def test_direct_fallback_rejects_invalid_download_urls(
-    metadata: Mapping[str, Any], message: str
-) -> None:
-    adapter = _adapter(
-        _response(_record(**metadata)),
-        representations={"dataset-1": {"format": "geojson"}},
-    )
-    with pytest.raises(ProviderResponseError, match=message):
-        adapter.search(SearchQuery())
 
 
 @pytest.mark.parametrize(
@@ -722,6 +691,71 @@ def _download(data_id: str, dataset: str = "dataset-1") -> dict[str, Any]:
         "id": data_id,
         "dataset_id": dataset,
     }
+
+
+def test_invalid_records_are_isolated_and_paging_continues() -> None:
+    calls: list[str] = []
+    missing_id = _record()
+    del missing_id["id"]
+    invalid_url = {
+        **_record(**{"DPF:downloadURLs": ["https://user:pass@example.test/data"]}),
+        "id": "invalid-url",
+    }
+    invalid_array = {
+        **_record(**{"DPF:downloadURLs": "https://example.test/data"}),
+        "id": "invalid-array",
+    }
+    adapter = _paged_adapter(
+        [
+            _page(
+                5,
+                cast(Mapping[str, Any], 1),
+                missing_id,
+                invalid_array,
+                invalid_url,
+            ),
+            _page(5, _download("valid")),
+        ],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+
+    results = adapter.search(SearchQuery(limit=1))
+
+    assert isinstance(results, ProviderSearchResults)
+    assert [item.provenance.resource_identifier for item in results] == ["valid"]
+    assert [diagnostic.reason for diagnostic in results.diagnostics] == [
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+    ]
+    assert [diagnostic.resource_identifier for diagnostic in results.diagnostics] == [
+        None,
+        None,
+        "invalid-array",
+        "invalid-url",
+    ]
+    assert {diagnostic.detail for diagnostic in results.diagnostics} == {
+        "invalid_record"
+    }
+    assert "first: 4" in calls[1]
+
+
+def test_pagination_rejects_repeated_invalid_records() -> None:
+    calls: list[str] = []
+    invalid = {
+        **_record(**{"DPF:downloadURLs": ["https://user:pass@example.test/data"]}),
+        "id": "invalid-url",
+    }
+    adapter = _paged_adapter(
+        [_page(4, invalid), _page(4, invalid)],
+        calls,
+        representations={"dataset-1": {"format": "geojson"}},
+    )
+
+    with pytest.raises(ProviderResponseError, match="no progress"):
+        adapter.search(SearchQuery(limit=2))
 
 
 def test_paging_counts_resolvable_resources_and_preserves_request_provenance() -> None:
