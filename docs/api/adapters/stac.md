@@ -1,6 +1,12 @@
 # StacAdapter（STAC提供元アダプター）
 
-`StacAdapter` は STAC API 1.0 の Item asset を解決します。
+`StacAdapter` は STAC API 1.0 と静的STAC Catalogの Item asset を解決します。
+
+API型は`endpoint`から`/search`を呼びます。静的型は`catalog_uri`から公式の
+`rel="child"` / `rel="item"`リンクだけを幅優先で辿り、同じURIを再取得しません。
+`max_documents`（既定100）を超えて探索が完了しない場合は、不完全な検索結果を返さず
+明示的に失敗します。相対リンクとasset hrefは、それぞれを含むレスポンスURIを基準に
+解決されます。
 
 [Source Adapter 一覧](../source-adapters.md) · source type: `stac`
 

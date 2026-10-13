@@ -1,9 +1,16 @@
+from datetime import datetime, timezone
+from typing import Any, cast
+
 import pytest
 
 from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
     ConfiguredSourceAdapter,
 )
 from rhinestone.adapters.source.stac import StacAdapter
+from rhinestone.adapters.source.stac.adapter import (
+    _comparable_interval,  # pyright: ignore[reportPrivateUsage]
+    _stac_datetime,  # pyright: ignore[reportPrivateUsage]
+)
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Reference, SearchQuery
 from tests.provider_support import (
@@ -198,6 +205,413 @@ def test_stac_search_isolates_invalid_items() -> None:
         "invalid_item",
         "invalid_item",
     ]
+
+
+def test_static_stac_search_traverses_links_and_returns_reloadable_resource() -> None:
+    catalog_uri = "https://static.example/catalog.json"
+    collection_uri = "https://static.example/collections/elevation/collection.json"
+    item_uri = "https://static.example/collections/elevation/items/tokyo.json"
+    root = {
+        "type": "Catalog",
+        "links": [
+            {"rel": "self", "href": catalog_uri},
+            {"rel": "child", "href": "./collections/elevation/collection.json"},
+        ],
+    }
+    collection = {
+        "type": "Collection",
+        "id": "elevation",
+        "links": [
+            {"rel": "root", "href": "../../catalog.json"},
+            {"rel": "item", "href": "./items/tokyo.json"},
+        ],
+    }
+    item = {
+        "type": "Feature",
+        "id": "tokyo-dem",
+        "collection": "elevation",
+        "bbox": [139.0, 35.0, 140.0, 36.0],
+        "properties": {
+            "title": "Tokyo DEM",
+            "datetime": "2026-01-02T03:04:05Z",
+        },
+        "assets": {
+            "dem": {
+                "href": "../assets/tokyo.tif",
+                "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                "roles": ["data"],
+            }
+        },
+        "links": [{"rel": "parent", "href": "../collection.json"}],
+    }
+    client = RecordingJsonClient(
+        {catalog_uri: root, collection_uri: collection, item_uri: item}
+    )
+    adapter = StacAdapter(get_json=client, catalog_uri=catalog_uri)
+
+    results = adapter.search(
+        SearchQuery(
+            bbox=(139.5, 35.5, 140.5, 36.5),
+            time=(
+                datetime(2026, 1, 1, tzinfo=timezone.utc),
+                datetime(2026, 1, 3, tzinfo=timezone.utc),
+            ),
+            limit=1,
+        )
+    )
+
+    assert [result.title for result in results] == ["Tokyo DEM"]
+    assert results[0].uri == (
+        "https://static.example/collections/elevation/assets/tokyo.tif"
+    )
+    assert results[0].format == "cog"
+    assert results[0].reference.parameters["item_href"] == item_uri
+    assert client.calls == [
+        (catalog_uri, {}),
+        (collection_uri, {}),
+        (item_uri, {}),
+    ]
+
+    reloaded = adapter.load(results[0].reference)
+
+    assert reloaded.uri == results[0].uri
+    assert client.calls[-1] == (item_uri, {})
+    assert len(adapter.search(SearchQuery())) == 1
+
+
+def test_static_stac_search_is_bounded_and_cycle_safe() -> None:
+    catalog_uri = "https://static.example/catalog.json"
+    child_uri = "https://static.example/child.json"
+    client = RecordingJsonClient(
+        {
+            catalog_uri: {
+                "type": "Catalog",
+                "links": [{"rel": "child", "href": child_uri}],
+            },
+            child_uri: {
+                "type": "Catalog",
+                "links": [
+                    {"rel": "child", "href": catalog_uri},
+                    {"rel": "child", "href": "https://static.example/third.json"},
+                ],
+            },
+        }
+    )
+    adapter = StacAdapter(get_json=client, catalog_uri=catalog_uri, max_documents=2)
+
+    with pytest.raises(ProviderResponseError, match="max_documents"):
+        adapter.search(SearchQuery())
+
+    assert client.calls == [(catalog_uri, {}), (child_uri, {})]
+
+
+def test_static_stac_configuration_is_explicit() -> None:
+    with pytest.raises(ConfigValidationError, match="either endpoint or catalog_uri"):
+        StacAdapter(
+            get_json=RecordingJsonClient({}),
+            endpoint="https://api.example",
+            catalog_uri="https://static.example/catalog.json",
+        )
+
+    with pytest.raises(ConfigValidationError, match="positive integer"):
+        StacAdapter(
+            get_json=RecordingJsonClient({}),
+            catalog_uri="https://static.example/catalog.json",
+            max_documents=0,
+        )
+
+    with pytest.raises(ConfigValidationError, match="positive integer"):
+        StacAdapter(
+            get_json=RecordingJsonClient({}),
+            catalog_uri="https://static.example/catalog.json",
+            max_documents=cast(Any, True),
+        )
+
+
+def test_static_stac_zero_limit_avoids_catalog_request() -> None:
+    client = RecordingJsonClient({})
+    adapter = StacAdapter(
+        get_json=client, catalog_uri="https://static.example/catalog.json"
+    )
+
+    assert not adapter.search(SearchQuery(limit=0))
+    assert client.calls == []
+
+
+def test_static_stac_rejects_unsupported_search_condition() -> None:
+    adapter = StacAdapter(
+        get_json=RecordingJsonClient({}),
+        catalog_uri="https://static.example/catalog.json",
+    )
+
+    with pytest.raises(ConfigValidationError, match="text"):
+        adapter.search(SearchQuery(text="elevation"))
+
+
+def test_api_stac_rejects_static_item_href() -> None:
+    adapter = StacAdapter(
+        get_json=RecordingJsonClient({}), endpoint="https://api.example"
+    )
+
+    with pytest.raises(ConfigValidationError, match="static STAC Provider"):
+        adapter.load(
+            Reference(
+                "stac",
+                parameters={
+                    "collection_id": "elevation",
+                    "item_id": "tokyo",
+                    "asset_key": "dem",
+                    "item_href": "https://static.example/tokyo.json",
+                },
+            )
+        )
+
+
+def test_static_stac_rejects_malformed_item_href() -> None:
+    adapter = StacAdapter(
+        get_json=RecordingJsonClient({}),
+        catalog_uri="https://static.example/catalog.json",
+    )
+
+    with pytest.raises(ConfigValidationError, match="item_href is invalid"):
+        adapter.load(
+            Reference(
+                "stac",
+                parameters={
+                    "collection_id": "elevation",
+                    "item_id": "tokyo",
+                    "asset_key": "dem",
+                    "item_href": "https://[invalid",
+                },
+            )
+        )
+
+
+def test_static_stac_reports_invalid_and_missing_data_items() -> None:
+    catalog_uri = "https://static.example/catalog.json"
+    invalid_uri = "https://static.example/invalid.json"
+    missing_uri = "https://static.example/missing.json"
+    client = RecordingJsonClient(
+        {
+            catalog_uri: {
+                "type": "Catalog",
+                "links": [
+                    {"rel": "item", "href": invalid_uri},
+                    {"rel": "item", "href": missing_uri},
+                ],
+            },
+            invalid_uri: {
+                "type": "Feature",
+                "collection": "elevation",
+                "properties": {},
+                "assets": {},
+            },
+            missing_uri: {
+                "type": "Feature",
+                "id": "missing",
+                "collection": "elevation",
+                "properties": {},
+                "assets": {},
+            },
+        }
+    )
+
+    results = StacAdapter(get_json=client, catalog_uri=catalog_uri).search(
+        SearchQuery()
+    )
+
+    assert not results
+    assert [item.detail for item in results.diagnostics] == [
+        "invalid_item",
+        "missing_data_asset",
+    ]
+
+
+def test_static_stac_skips_duplicate_and_non_traversal_links() -> None:
+    catalog_uri = "https://static.example/catalog.json"
+    child_uri = "https://static.example/child.json"
+    client = RecordingJsonClient(
+        {
+            catalog_uri: {
+                "type": "Catalog",
+                "links": [
+                    {"rel": "self", "href": catalog_uri},
+                    {"rel": "child", "href": child_uri},
+                    {"rel": "child", "href": child_uri},
+                ],
+            },
+            child_uri: {"type": "Catalog", "links": []},
+        }
+    )
+
+    results = StacAdapter(get_json=client, catalog_uri=catalog_uri).search(
+        SearchQuery()
+    )
+
+    assert not results
+    assert client.calls == [(catalog_uri, {}), (child_uri, {})]
+
+
+def test_static_stac_rejects_malformed_link_href() -> None:
+    catalog_uri = "https://static.example/catalog.json"
+    adapter = StacAdapter(
+        get_json=RecordingJsonClient(
+            {
+                catalog_uri: {
+                    "type": "Catalog",
+                    "links": [{"rel": "child", "href": "https://[invalid"}],
+                }
+            }
+        ),
+        catalog_uri=catalog_uri,
+    )
+
+    with pytest.raises(ProviderResponseError, match="link href"):
+        adapter.search(SearchQuery())
+
+
+@pytest.mark.parametrize(
+    "item_bbox",
+    (
+        [137.0, 35.0, 138.0, 36.0],
+        [141.0, 35.0, 142.0, 36.0],
+        [139.0, 33.0, 140.0, 34.0],
+        [139.0, 37.0, 140.0, 38.0],
+        None,
+        [139.0, 35.0, 140.0],
+        [139.0, 35.0, 0.0, 140.0, 36.0, 100.0],
+        ["invalid", 35.0, 140.0, 36.0],
+    ),
+)
+def test_static_stac_filters_nonmatching_or_invalid_bboxes(
+    item_bbox: object,
+) -> None:
+    catalog_uri = "https://static.example/catalog.json"
+    item_uri = "https://static.example/item.json"
+    item = {
+        "type": "Feature",
+        "id": "outside",
+        "collection": "elevation",
+        "bbox": item_bbox,
+        "properties": {},
+        "assets": {
+            "dem": {
+                "href": "./dem.tif",
+                "roles": ["data"],
+            }
+        },
+    }
+    adapter = StacAdapter(
+        get_json=RecordingJsonClient(
+            {
+                catalog_uri: {
+                    "type": "Catalog",
+                    "links": [{"rel": "item", "href": item_uri}],
+                },
+                item_uri: item,
+            }
+        ),
+        catalog_uri=catalog_uri,
+    )
+
+    assert not adapter.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
+
+
+def test_static_stac_filters_collection_and_time() -> None:
+    adapter = StacAdapter(
+        get_json=RecordingJsonClient({}),
+        catalog_uri="https://static.example/catalog.json",
+    )
+    item = {
+        "type": "Feature",
+        "id": "tokyo",
+        "collection": "elevation",
+        "bbox": [139.0, 35.0, 140.0, 36.0],
+        "properties": {"datetime": "invalid"},
+        "assets": {},
+    }
+
+    assert not adapter._matches_static_query(  # pyright: ignore[reportPrivateUsage]
+        item, SearchQuery(), ("land-cover",)
+    )
+    assert not adapter._matches_static_query(  # pyright: ignore[reportPrivateUsage]
+        item,
+        SearchQuery(time=(datetime(2026, 1, 1), datetime(2026, 1, 2))),
+        (),
+    )
+    item["properties"] = {
+        "start_datetime": "2026-01-03T00:00:00Z",
+        "end_datetime": "2026-01-04T00:00:00Z",
+    }
+    assert not adapter._matches_static_query(  # pyright: ignore[reportPrivateUsage]
+        item,
+        SearchQuery(time=(datetime(2026, 1, 1), datetime(2026, 1, 2))),
+        (),
+    )
+    assert not adapter._matches_static_query(  # pyright: ignore[reportPrivateUsage]
+        item,
+        SearchQuery(time=(datetime(2026, 1, 5), datetime(2026, 1, 6))),
+        (),
+    )
+
+
+@pytest.mark.parametrize(
+    ("item_start", "item_end", "query_start", "query_end", "aware"),
+    (
+        (
+            datetime(2026, 1, 1),
+            datetime(2026, 1, 2),
+            None,
+            None,
+            False,
+        ),
+        (
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            datetime(2026, 1, 2, tzinfo=timezone.utc),
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            None,
+            True,
+        ),
+        (
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            datetime(2026, 1, 2, tzinfo=timezone.utc),
+            datetime(2026, 1, 1),
+            None,
+            False,
+        ),
+        (
+            datetime(2026, 1, 1),
+            datetime(2026, 1, 2),
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            None,
+            True,
+        ),
+        (
+            datetime(2026, 1, 1),
+            datetime(2026, 1, 2),
+            datetime(2026, 1, 1),
+            None,
+            False,
+        ),
+    ),
+)
+def test_static_stac_normalizes_datetime_awareness(
+    item_start: datetime,
+    item_end: datetime,
+    query_start: datetime | None,
+    query_end: datetime | None,
+    aware: bool,
+) -> None:
+    start, end = _comparable_interval(item_start, item_end, query_start, query_end)
+
+    assert (start.utcoffset() is not None) is aware
+    assert (end.utcoffset() is not None) is aware
+
+
+def test_invalid_stac_datetime_returns_none() -> None:
+    assert _stac_datetime(None) is None
+    assert _stac_datetime("") is None
+    assert _stac_datetime("not-a-datetime") is None
 
 
 def test_configured_stac_search_rebinds_item_diagnostic_source() -> None:
