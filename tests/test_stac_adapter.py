@@ -83,7 +83,7 @@ def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
     assert results[0].metadata.raw["stac_version"] == "1.0.0"
 
 
-def test_stac_search_isolates_items_without_one_data_asset() -> None:
+def test_stac_search_returns_each_data_asset_and_skips_missing_data() -> None:
     endpoint = "https://stac.example"
     search_url = endpoint + "/search"
 
@@ -127,6 +127,11 @@ def test_stac_search_isolates_items_without_one_data_asset() -> None:
         "ambiguous",
     ]
     assert results[0].reference.parameters["asset_key"] == "visual"
+    assert [result.reference.parameters["asset_key"] for result in results[1:]] == [
+        "green",
+        "red",
+    ]
+    assert [result.uri for result in results[1:]] == ["https://green", "https://red"]
     assert [diagnostic.resource_identifier for diagnostic in results.diagnostics] == [
         "missing",
     ]

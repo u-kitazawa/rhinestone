@@ -12,13 +12,27 @@ API型は`endpoint`から`/search`を呼びます。静的型は`catalog_uri`か
 
 ## 設定と検索
 
-Provider の `settings` へ `endpoint`、Reference へ `collection_id`、`item_id`、`asset_key` を指定します。検索には `bbox`、`time`、`limit` を使えます。
+Provider の `settings` へAPI型は `endpoint`、静的型は `catalog_uri` を指定します。
+直接loadのReferenceには `collection_id`、`item_id`、`asset_key` が必要です。
+静的型ではItemの配信URIを `item_href` に指定します（検索結果のReferenceには保持済み）。
+検索には `bbox`、`time`、`limit` を使えます。
+
+静的型のbbox/time/collection条件はItem取得後に適用します。Collectionのextentや
+CatalogのIDから子階層を事前に絞り込む機能はありません。`limit`は返すResource数の
+上限であり、Itemに到達するまでのHTTPリクエスト数を保証しません。
+大規模なルートCatalogを指定する前に、対象階層と `max_documents` を確認してください。
+上限の増加だけで大規模Catalogの応答時間を解決できるとは限りません。
 
 `collection_id` と `item_id` は未エンコードの論理IDとして指定します。RhinestoneはHTTP requestを組み立てる際に各IDを1つのpath segmentとしてpercent-encodeします。既にエンコードされたように見える値も推測で復号しないため、例えば論理IDの`%2F`はrequest pathでは`%252F`になります。`.`と`..`だけのIDもpath traversalとして正規化されないようエンコードします。Metadataとprovenanceには元の論理IDを保持します。
 
 ## 接続先と認証
 
-Item と Search の公式 STAC API endpoint はRhinestoneの組み込みHTTP transportで呼びます。Adapterを直接構築する場合も、`credential`に論理名を指定し、`credentials`のCredentialRegistryから認証情報を取得します。検索結果では data role の asset がちょうど一件であるItemだけを返し、0件または複数件のItemは推測選択せずItem単位でスキップします。スキップしたItem IDと理由は検索結果の`diagnostics`で確認できます。asset format は推測しません。
+Item、Search、静的Catalogの取得はRhinestoneの組み込みHTTP transportで行います。
+Adapterを直接構築する場合も、`credential`に論理名を指定し、`credentials`の
+CredentialRegistryから認証情報を取得します。API型・静的型のどちらもdata roleの各assetを
+独立Resourceとして返します。複数assetのItemも返し、先頭assetを暗黙選択しません。
+data assetがないItemや不正Item等の理由は検索結果の `diagnostics` で確認できます。
+asset formatはmedia typeに基づき、URLやファイル名から推測しません。
 
 Assetの`href`がrelative URI referenceの場合は、そのAssetを含むItem responseの最終URI（HTTP redirect後を含む）を基準にRFC 3986の規則でabsolute URIへ解決します。元の`href`はraw metadataに保持し、解決済みURIをResourceとprovenanceの`original_url`に使用します。認証付きリクエストでは、認証情報が別originへ転送されないようredirectを許可しません。
 
