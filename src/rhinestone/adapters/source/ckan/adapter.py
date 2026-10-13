@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from typing import Any, cast
 
+from ...._uri import is_valid_http_authority
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
     Metadata,
@@ -85,7 +86,7 @@ class CkanAdapter(ProviderAdapter):
             self._action(endpoint, "resource_show", {"id": resource_id}),
             "CKAN resource",
         )
-        package_id = self._required_string(resource, "package_id")
+        package_id = self._response_string(resource, "package_id")
         package = self._object(
             self._action(endpoint, "package_show", {"id": package_id}),
             "CKAN package",
@@ -151,9 +152,32 @@ class CkanAdapter(ProviderAdapter):
             packages = self._objects(result.get("results"), "CKAN search results")
             for package in packages:
                 resources = self._objects(package.get("resources"), "CKAN resources")
-                for resource in resources:
+                invalid_urls = {
+                    index
+                    for index, resource in enumerate(resources)
+                    if self._invalid_resource_url(resource)
+                }
+                safe_package: JsonObject = package
+                if invalid_urls:
+                    safe_package = {
+                        **package,
+                        "resources": [
+                            (
+                                {**resource, "url": "[redacted]"}
+                                if index in invalid_urls
+                                else resource
+                            )
+                            for index, resource in enumerate(resources)
+                        ],
+                    }
+                for index, resource in enumerate(resources):
                     item = self._search_resource_result(
-                        package, resource, endpoint, query, diagnostics
+                        safe_package,
+                        resource,
+                        endpoint,
+                        query,
+                        diagnostics,
+                        invalid_resource_url=index in invalid_urls,
                     )
                     if item is None:
                         continue
@@ -182,6 +206,8 @@ class CkanAdapter(ProviderAdapter):
         endpoint: str,
         query: SearchQuery,
         diagnostics: list[SearchDiagnostic],
+        *,
+        invalid_resource_url: bool = False,
     ) -> Resource | None:
         resource_id = resource.get("id")
         if not isinstance(resource_id, str) or not resource_id.strip():
@@ -191,6 +217,17 @@ class CkanAdapter(ProviderAdapter):
                     skipped_conditions=frozenset(),
                     reason="item_skipped",
                     detail="missing_resource_id",
+                )
+            )
+            return None
+        if invalid_resource_url:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=self.adapter_type,
+                    skipped_conditions=frozenset(),
+                    reason="item_skipped",
+                    resource_identifier=resource_id,
+                    detail="invalid_resource_url",
                 )
             )
             return None
@@ -279,7 +316,11 @@ class CkanAdapter(ProviderAdapter):
     def _delivery(
         self, resource: JsonObject
     ) -> tuple[str, str | None, str | None, str | None]:
-        uri = self._required_string(resource, "url")
+        uri = self._response_string(resource, "url")
+        if not is_valid_http_authority(uri):
+            raise ProviderResponseError(
+                "CKAN resource URL has an invalid HTTP(S) authority"
+            )
         media_type = _optional_string(resource.get("mimetype"))
         archive = container_from_media_type(media_type)
         return (
@@ -288,6 +329,26 @@ class CkanAdapter(ProviderAdapter):
             or format_from_media_type(media_type),
             media_type,
             archive,
+        )
+
+    @staticmethod
+    def _response_string(response: Mapping[str, Any], name: str) -> str:
+        value = response.get(name)
+        if not isinstance(value, str) or not value.strip():
+            raise ProviderResponseError(
+                f"CKAN resource {name} must be a non-empty string"
+            )
+        return value
+
+    @staticmethod
+    def _invalid_resource_url(resource: JsonObject) -> bool:
+        if "url" not in resource or resource.get("url") is None:
+            return False
+        value = resource.get("url")
+        return (
+            not isinstance(value, str)
+            or not value.strip()
+            or not is_valid_http_authority(value)
         )
 
     @staticmethod
