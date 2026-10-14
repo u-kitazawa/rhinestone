@@ -1,4 +1,4 @@
-"""Resolve a fully described direct resource without network access."""
+"""Load a fully described direct Resource without network access."""
 
 from rhinestone import Reference, configure
 

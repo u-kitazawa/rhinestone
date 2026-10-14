@@ -1,9 +1,14 @@
 import os
+import runpy
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
+
+import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 
 EXAMPLES_ROOT = Path(__file__).parents[1] / "examples"
 EXAMPLE_NAMES: tuple[str, ...] = (
@@ -19,6 +24,45 @@ EXAMPLE_NAMES: tuple[str, ...] = (
     "11_dcat_dataset",
     "12_odpt_station",
 )
+
+
+@pytest.mark.parametrize("records", [[], [{"owl:sameAs": "odpt.Station:Fixture"}]])
+def test_odpt_example_runs_with_core_json_service_without_live_network(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    records: list[dict[str, str]],
+) -> None:
+    """Run the real example through configure/load/open with a fixture transport."""
+    monkeypatch.setenv("ODPT_CONSUMER_KEY", "fixture-secret")
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def get(uri: str, **kwargs: Any) -> object:
+        calls.append((uri, kwargs))
+        return SimpleNamespace(
+            status_code=200,
+            raise_for_status=lambda: None,
+            json=lambda: records,
+        )
+
+    monkeypatch.setattr(_http, "JsonServiceRuntime", lambda: SimpleNamespace(get=get))
+    runpy.run_path(str(EXAMPLES_ROOT / "12_odpt_station" / "example.py"))
+
+    assert calls == [
+        (
+            "https://api.odpt.org/api/v4/odpt:Station",
+            {
+                "params": {"dc:title": "東京", "acl:consumerKey": "fixture-secret"},
+                "headers": {},
+                "timeout": 30,
+                "allow_redirects": False,
+            },
+        )
+    ]
+    output = capsys.readouterr().out
+    assert f"records: {len(records)}" in output
+    identifier = records[0]["owl:sameAs"] if records else "none"
+    assert f"first identifier: {identifier}" in output
+    assert "fixture-secret" not in output
 
 
 @pytest.mark.parametrize("name", EXAMPLE_NAMES)

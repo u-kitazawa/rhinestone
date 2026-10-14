@@ -1,8 +1,8 @@
 # 検索能力の対照表
 
 この表は現行の `SearchQuery(text, area, bbox, time, format, limit)` が各 Source Adapter でどこまで
-適用されるかを示します。検索結果はすべて既存の `Resource` であり、`resolve()` への経路、
-discovery provenance、provider ごとの順序は変わりません。
+適用されるかを示します。検索結果は `Resource` として返り、そのまま `open()` へ渡せます。
+discovery provenanceとProviderごとの順序を保持します。
 
 `area`は検索前に行政区域Knowledge Adapterで解決されます。`area`対応Adapterには正式区域名を直接渡し、G空間情報センターでは独立した地域条件、MLIT DPFでは行政コードの属性条件として扱います。STAC、OGC API Featuresと、空間検索を明示的に有効化したCKANにはbboxとして、通常のCKAN、PLATEAU、search.ckan.jp、DCAT、Staticには正式区域名のtextとして投影されます。e-Stat GISでは未対応diagnosticになります。未知区域は全Providerの呼び出し前に失敗します。
 
@@ -51,7 +51,7 @@ CKAN系でこのような未登録形式を取得する場合は`format`を省�
 `result.formats`を確認してください。形式条件を省略すれば、未知形式だけを抽出する検索には
 なりませんが、非空の未登録形式も結果に含まれます。
 
-URIの拡張子やraw metadataを調べて形式を補完したり、検索中に`resolve()`したりしません。
+URIの拡張子やraw metadataを調べて形式を補完したり、検索中に追加の`load()`を実行したりしません。
 `Format.UNKNOWN`は解決・openの成功を保証せず、Adapterが検索結果自体を省略する規則も
 変更しません。たとえばsearch.ckan.jpが省略する形式未宣言のResourceは取得できません。
 `FormatPreset.PYOGRIO`も検索候補の形式集合であり、Runtimeのdriver対応を保証しません。
