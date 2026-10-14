@@ -45,3 +45,14 @@ def test_all_local_markdown_links_exist_and_anchors_resolve() -> None:
                 failures.append(f"{source}: missing anchor {target}")
 
     assert not failures, "\n".join(failures)
+
+
+def test_example_index_lists_each_runnable_example() -> None:
+    """The landing page must not silently omit runnable example directories."""
+    index = (ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+    targets = set(LINK_PATTERN.findall(index))
+    expected = {
+        f"{script.parent.name}/README.md"
+        for script in (ROOT / "examples").glob("*/example.py")
+    }
+    assert expected <= targets
