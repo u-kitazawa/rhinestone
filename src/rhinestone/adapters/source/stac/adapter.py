@@ -361,11 +361,26 @@ class StacAdapter(ProviderAdapter):
                 return False
             item_bbox = bbox_values
             query_bbox = query.bbox
-            if (
-                item_bbox[2] < query_bbox[0]
-                or query_bbox[2] < item_bbox[0]
-                or item_bbox[3] < query_bbox[1]
-                or query_bbox[3] < item_bbox[1]
+            if item_bbox[3] < query_bbox[1] or query_bbox[3] < item_bbox[1]:
+                return False
+            # CRS84 boxes crossing the antimeridian have west > east.
+            # Compare their two longitude intervals, not an inverted interval.
+            item_intervals = (
+                ((item_bbox[0], 180), (-180, item_bbox[2]))
+                if item_bbox[0] > item_bbox[2]
+                else ((item_bbox[0], item_bbox[2]),)
+            )
+            query_intervals = (
+                ((query_bbox[0], 180), (-180, query_bbox[2]))
+                if query_bbox[0] > query_bbox[2]
+                else ((query_bbox[0], query_bbox[2]),)
+            )
+            if not any(
+                (west <= other_east and other_west <= east)
+                or (east == 180 and other_west == -180)
+                or (west == -180 and other_east == 180)
+                for west, east in item_intervals
+                for other_west, other_east in query_intervals
             ):
                 return False
         if query.time is not None:
