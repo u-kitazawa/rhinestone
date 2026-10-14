@@ -376,7 +376,9 @@ class StacAdapter(ProviderAdapter):
                 else ((query_bbox[0], query_bbox[2]),)
             )
             if not any(
-                west <= other_east and other_west <= east
+                (west <= other_east and other_west <= east)
+                or (east == 180 and other_west == -180)
+                or (west == -180 and other_east == 180)
                 for west, east in item_intervals
                 for other_west, other_east in query_intervals
             ):

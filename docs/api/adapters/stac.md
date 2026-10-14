@@ -19,6 +19,7 @@ Provider の `settings` へAPI型は `endpoint`、静的型は `catalog_uri` を
 
 静的型のbbox交差判定はItemの4座標bboxを使います。検索範囲またはItemが日付変更線を
 跨ぐ場合（`west > east`）も両側の経度区間を比較し、接する境界を含めます。
+`180°`と`-180°`は同じ境界として扱います。
 これはbboxによる絞り込みであり、geometryの厳密な交差判定ではありません。
 日付変更線跨ぎの表現は[OGC API Featuresのbbox仕様](https://docs.ogc.org/is/17-069r4/17-069r4.html#_parameter_bbox)
 および[STAC APIの検索例](https://github.com/radiantearth/stac-api-spec/blob/release/v1.0.0/item-search/examples.md)に従います。

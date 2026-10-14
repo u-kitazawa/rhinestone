@@ -576,6 +576,10 @@ def test_static_stac_filters_nonmatching_or_invalid_bboxes(
         ([170, -40, -170, -30], (0, -39, 5, -31), False),
         ([170, -40, -170, -30], (175, -39, -175, -31), True),
         ([170, -40, 175, -30], (175, -40, 179, -30), True),
+        ([175, -1, 180, 1], (-180, -1, -175, 1), True),
+        ([-180, -1, -175, 1], (175, -1, 180, 1), True),
+        ([180, -1, 180, 1], (-180, -1, -180, 1), True),
+        ([-180, -1, -180, 1], (180, -1, 180, 1), True),
     ],
 )
 def test_static_stac_bbox_intersection_preserves_antimeridian_semantics(
