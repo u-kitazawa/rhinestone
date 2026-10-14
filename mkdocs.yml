@@ -51,7 +51,6 @@ exclude_docs: |
   research/*
   spec_v4.md
   spec_v5.md
-  specs/*
 
 theme:
   name: material
