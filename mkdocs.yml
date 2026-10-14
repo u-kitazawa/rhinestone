@@ -16,7 +16,6 @@ nav:
       - データを検索する: search.md
       - 検索能力の対照表: search-capabilities.md
       - Resourceを解決して開く: resolve-and-open.md
-      - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:
       - 対応状況: compatibility.md
       - Runtime の導入ガイド: runtimes.md
