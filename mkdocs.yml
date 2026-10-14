@@ -51,7 +51,6 @@ nav:
 exclude_docs: |
   research/*
   adapter_expansion.md
-  architecture/*
   spec_v4.md
   spec_v5.md
   specs/*

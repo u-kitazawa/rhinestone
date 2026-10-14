@@ -2,7 +2,7 @@
 
 このページは、通常の利用で使う公開APIを説明します。初めて使う場合は先に[はじめに](getting-started.md)を読んでください。
 用語は[用語と概念](concepts.md)、Adapterを追加する場合は[Source Adapter](api/source-adapters.md)と
-[Execution Adapter](api/execution-adapters.md)を参照してください。履歴資料の`architecture/`は現行APIの規範ではありません。
+[Execution Adapter](api/execution-adapters.md)を参照してください。
 
 ## `search()`（標準構成で検索する）
 
