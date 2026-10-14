@@ -1,4 +1,4 @@
-"""Search the built-in CKAN source, then resolve a selected result."""
+"""Search the built-in CKAN provider and inspect a selected Resource."""
 
 import os
 

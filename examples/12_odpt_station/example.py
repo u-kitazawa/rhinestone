@@ -17,7 +17,8 @@ records = app.open(
             "credential": "odpt",
             "filters": {"dc:title": "東京"},
         },
-    )
+    ),
+    "json-service",
 )
 print("records:", len(records))
 print("first identifier:", records[0]["owl:sameAs"] if records else "none")

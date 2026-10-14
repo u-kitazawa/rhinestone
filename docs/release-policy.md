@@ -72,86 +72,13 @@ Publish workflowは、Release tagの`v`を除いたversionが`pyproject.toml`の
 
 GitHub ReleaseをPublishした後にnotesを編集しても、すでにPyPIへ公開された配布物は変更されません。公開後の訂正は、必要に応じてnotesの修正と次versionのFixedで行います。
 
-## v0.1.0の変更履歴
+## 現行APIの確認
 
-v0.1.0は初回Releaseです。初回Release notesでは、少なくとも次の主要変更を利用者が追跡できるようにします。
+通常フローは`search → Resource → open`です。直接指定には`Reference`と`load()`、
+別コンテキストへの転送には`AccessPlan`と`plan()`を使います。
+`AccessPlan`は`rhinestone`のトップレベル公開APIに含まれます。
+正確な引数・戻り値・portable schemaは[APIリファレンス](api.md)を正本とします。
 
-- `Catalog`、`Provider`、`Result`、`Resource`を中心とした公開語彙と、検索からResource解決までの利用導線
-- CKAN、DCAT、Direct、ODPT、OGC API Features、PLATEAU、STAC、静的SourceなどのSource対応範囲
-- 組み込みHTTP、外部Runtimeの注入、Credentialの分離、およびResourceのExecution Adapter連携
-- package metadata、wheel検証、GitHub Actionsによるテスト・ドキュメント・PyPI公開workflow
-- Catalog由来の宛先制限を含む、認証付きSourceとネットワークポリシーの利用契約
-
-これらはv0.1.0のRelease notesの`Added`または`Changed`に整理します。以降のversionでは、初回Releaseから変わった公開surfaceを同じ形式で追跡します。
-
-## v0.1.1の変更履歴
-
-### Removed / Breaking changes
-
-トップレベルの再エクスポートを通常利用・設定導線へ整理しました。`Source`、
-`ResourceCandidate`、`AccessPlan`系、`Metadata`、`Provenance`、`SearchQuery`、Runtime型、
-Adapter／Knowledge Adapter契約、`DestinationPolicy`、format定義・正規化関数、
-`SourceDefinition` は `rhinestone` から削除されています。
-
-これらを使うコードは、次の移行先へimportを変更してください。
-
-- ドメイン型・Runtime型: `rhinestone.models`
-- Adapter Definition／Context／Factory: `rhinestone.adapters.contracts`
-- Knowledge Adapter: `rhinestone.adapters.knowledge`
-- 宛先ポリシー: `rhinestone.security`
-- format定義・正規化: `rhinestone.representations`
-
-`Provider`が通常利用における提供元定義の正式名です。`SourceDefinition`を使っていた設定例は
-`Provider`へ置き換えてください。0.1.xでもbreaking changeを許容する方針に基づき、0.2まで
-旧トップレベルimportを残す段階的廃止は行いません。
-
-
-後方互換用のAPIも削除しました。旧名や旧引数を受け付けるwrapperは提供しません。
-
-| 削除したAPI・利用方法 | 現行の利用方法 |
-| --- | --- |
-| `rhinestone.sources` と `sources.ALL` | `rhinestone.catalogs.BUILTIN`。Providerは `Provider.id` で選びます |
-| `SourceDefinition`（`rhinestone.models`を含む） | `Provider` |
-| `SearchResult`（`rhinestone.models`を含む） | `Result` |
-| `configure(sources=...)` / `Rhinestone(sources=...)` | `catalog=Catalog(providers)` |
-| `CatalogSource.definition` | `CatalogSource.provider` |
-| `rhinestone.adapters.source.ckan.canonical_format` / `ckan.format.canonical_format` | `rhinestone.representations.canonical_format` |
-| Adapterの `api_token` / `api_key` | `credential` に論理名を指定し、`credentials` に `CredentialRegistry` を渡します |
-| Adapterの `api_key_header` / `token_scheme` | `credential_header` / `credential_scheme` |
-| `tuple(bbox)` やBoundingBoxの反復 | `bbox.as_tuple()` |
-
-組み込みProviderを選ぶ例です。一覧の並び順には依存しません。
-
-```python
-from rhinestone import Catalog, configure
-from rhinestone.catalogs import BUILTIN
-
-app = configure(
-    catalog=Catalog(provider for provider in BUILTIN if provider.id == "gsi"),
-)
-```
-
-Adapterを直接構成する場合も、secretを直接渡す引数を使わず、認証情報をRegistryへ登録します。
-`configure()` では `credentials={"catalog-key": lambda: token}` のようにfactoryのmappingを渡します。
-
-```python
-from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.registry import CredentialRegistry
-
-adapter = CkanAdapter(
-    get_json=get_json,
-    endpoint="https://catalog.example",
-    credential="catalog-key",
-    credential_header="X-CKAN-API-Key",
-    credential_scheme="",
-    credentials=CredentialRegistry({"catalog-key": lambda: token}),
-)
-```
-
-## developのReference / Resource移行
-
-通常フローは`search → open(Resource)`です。旧`Config`、`Result`、`Source`、
-`ResourceCandidate`、`resolve()`は削除し、互換aliasを提供しません。
-直接指定は`app.load(Reference(...))`、転送は`app.plan(resource)`と
-`AccessPlan.to_dict()` / `from_dict()`を使います。`AccessPlan`はトップレベルからimportできます。
-Resourceのportable schemaはversion 3です。旧versionは拒否します。
+過去のversion固有の変更・削除・移行方法は
+[GitHub Releases](https://github.com/u-kitazawa/rhinestone/releases)を参照してください。
+このページでは現行の安定性・リリース運用のみを管理し、旧APIの移行表は保持しません。
