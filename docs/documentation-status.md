@@ -45,7 +45,6 @@ GitHub Pagesは公開済みの境界です。`pip install rhinestone`で入るPy
 
 - `spec_v4.md`（凍結。内容を変更しない）
 - `adapter_expansion.md`
-- `architecture/`
 - `specs/`
 
 これらはMkDocsのナビゲーションと公開ビルド対象から除外します。履歴資料を参照する場合は、現行の実装、テスト、公開ドキュメントとの差分を確認してください。
