@@ -564,6 +564,53 @@ def test_static_stac_filters_nonmatching_or_invalid_bboxes(
     assert not adapter.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
 
 
+@pytest.mark.parametrize(
+    "item_bbox,query_bbox,expected",
+    [
+        ([170, -40, 175, -30], (160.6, -55.95, -170, -25.89), True),
+        ([-175, -40, -172, -30], (160.6, -55.95, -170, -25.89), True),
+        ([0, -40, 5, -30], (160.6, -55.95, -170, -25.89), False),
+        ([170, 30, 175, 40], (160.6, -55.95, -170, -25.89), False),
+        ([170, -40, -170, -30], (172, -39, 175, -31), True),
+        ([170, -40, -170, -30], (-175, -39, -172, -31), True),
+        ([170, -40, -170, -30], (0, -39, 5, -31), False),
+        ([170, -40, -170, -30], (175, -39, -175, -31), True),
+        ([170, -40, 175, -30], (175, -40, 179, -30), True),
+    ],
+)
+def test_static_stac_bbox_intersection_preserves_antimeridian_semantics(
+    item_bbox: list[float],
+    query_bbox: tuple[float, float, float, float],
+    expected: bool,
+) -> None:
+    """Crossing query and Item boxes retain both sides and exclude the middle."""
+    catalog_uri = "https://static.example/catalog.json"
+    item_uri = "https://static.example/item.json"
+    adapter = StacAdapter(
+        get_json=RecordingJsonClient(
+            {
+                catalog_uri: {
+                    "type": "Catalog",
+                    "links": [{"rel": "item", "href": item_uri}],
+                },
+                item_uri: {
+                    "type": "Feature",
+                    "id": "selected",
+                    "collection": "sample",
+                    "bbox": item_bbox,
+                    "properties": {},
+                    "assets": {"data": {"href": "./data.tif", "roles": ["data"]}},
+                },
+            }
+        ),
+        catalog_uri=catalog_uri,
+    )
+    results = adapter.search(SearchQuery(bbox=query_bbox))
+    assert bool(results) is expected
+    if expected:
+        assert results[0].uri == "https://static.example/data.tif"
+
+
 def test_static_stac_filters_collection_and_time() -> None:
     adapter = StacAdapter(
         get_json=RecordingJsonClient({}),
