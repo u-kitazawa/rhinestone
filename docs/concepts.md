@@ -2,6 +2,10 @@
 
 通常の流れは `search → Resource → open → Data` です。
 
+RhinestoneはProviderの識別子・配布形式・asset・明示されたarchive memberなどを解釈し、
+metadataとprovenanceを保った実行契約を既存の専門Runtimeへ渡します。
+データの解析・形式変換や全国metadata indexの再ホストは行いません。
+
 ## CatalogとProvider
 
 `Catalog`は構成するProviderの一覧です。`Provider`は接続先やサービス固有の設定を持ちます。
