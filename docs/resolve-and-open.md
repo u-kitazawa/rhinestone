@@ -68,6 +68,9 @@ ODPTのJSONサービスはCoreのRuntimeを使うため`open("json-service")`で
 
 検索時のProvider障害はSource単位で隔離され、他のSourceの結果とともに返ります。
 全Sourceが失敗した場合も、空の`SearchResults`とdiagnosticsを返します。
+Adapterが形式に対応していても、利用環境のdriver、ZIP内の対象ファイル、データ配信先の
+可用性や認証まで保証するものではありません。これらの実データアクセス失敗は
+`ResourceAccessError`として扱い、別のResourceやRuntimeへ自動で切り替えません。
 `ResourceAccessError`はResourceと実行Adapterの選択後に発生します。GDALなどのRuntimeが
 返した例外は`__cause__`へ保持されます。一方、Adapter自身が不正なAccessPlanや
 「データセットなし」を検出した場合は、回復方法を含む元の`ResourceAccessError`を
