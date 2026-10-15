@@ -22,4 +22,4 @@ URL、タイトル、catalog名からProvider、識別子、形式を推測し�
 Directの形式は明示されたrepresentationから保持し、Native委譲の形式は未確定として扱います。
 
 詳細・制約・検証範囲は[APIリファレンス](../../../../../docs/api/adapters/mlit-dpf.md)と
-[調査記録](../../../../../docs/research/mlit-dpf-search.md)を参照してください。
+[Issueの引継ぎ記録](https://github.com/u-kitazawa/rhinestone/issues/213#issuecomment-6182353965)を参照してください。
