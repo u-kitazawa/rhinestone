@@ -1,38 +1,42 @@
-# 仕様適合テスト
+# 契約テスト
 
-これらのテストは、`docs/spec_v4.md`にある提供元に依存しない要件を、実行可能な契約へ変換します。
-`docs/spec_v4.md`は履歴資料として凍結されており、このREADMEやテストがその内容を更新することはありません。
+テストは、同じブランチの[公開API](../docs/api.md)と[責務境界](../docs/concepts.md)を
+実行可能な契約として固定します。過去の設計案を現在のAPIや追加の製品要件として扱いません。
+公開契約を変更する場合は、実装・テスト・利用者向け文書を同じ変更で更新します。
 
-## APIに関する前提
+## 公開APIと拡張境界
 
-仕様書はモデル名とコンポーネント名を定義しますが、Pythonのモジュールパスや完全なコンストラクタの
-シグネチャは意図的に固定していません。実装を明確な設計から始められるよう、テストでは次の最小構成を使います。
+- 通常の経路は`search → Resource → open`、既知の対象は`Reference → app.load()`です。
+  検索は配信単位のResourceを返し、metadata、raw metadata、provenance、discoveryを保持します。
+- `configure()`は分離されたアプリケーションを作ります。Source Runtimeは`dependencies=`へ、
+  遅延factoryは明示的な`RuntimeFactory`で渡します。Execution Runtimeは
+  `app.open(resource, name, runtime=...)`または`resource.open(name, runtime=...)`へ実体を渡します。
+  Core所有の`json-service` Runtimeは省略できます。Runtimeを暗黙に選びません。
+- 公開する名前とシグネチャは[公開APIテスト](test_public_api.py)で確認します。
+  詳細なモデルは`rhinestone.models`、原因別エラーは`rhinestone.errors`に置きます。
+- 外部Adapterの拡張境界は`rhinestone.adapters.contracts`のDefinition/Contextと
+  `rhinestone.adapters.ports`です。[Custom Adapterテスト](test_custom_adapters.py)では、
+  公開構成経路で登録・依存・認証の境界を検証します。内部Registryの配置を外部契約にしません。
 
-- ドメインの値は`rhinestone.models`に置く。
-- 原因ごとに分かれた安定したエラーは`rhinestone.errors`に置く。
-- Registry、解決、検索、実行先の選択は別モジュールに分ける。
-- Adapterは振る舞い（ダックタイピング）で受け入れ、Coreに未成熟な外部Adapter APIを公開しない。
+## Providerと実行の検証
 
-これはテスト設計上の前提であり、追加の製品要件ではありません。実装によってよりよい公開配置が分かった場合は、
-振る舞いに関する検証を弱めず、この説明とimportを更新してください。
+同じAdapter型を異なる`Provider.id`で構成でき、Source Adapterは`Reference`を配信単位の
+`Resource`へ読み込みます。Source Adapterの直接テストでは、小さなfixtureとfake transportで
+要求、選択、情報保持、曖昧性、異常応答を確認し、公開search/load経路も別途検証します。
+e-Stat統計GISは明示distribution indexを扱い、統計表APIの実装を前提にしません。
 
-提供元固有のテストでは、公式のCKAN Action API、e-Stat API 3.0、STAC API 1.0.0、OGC API Features 1.0の
-契約をもとにした小さく決定的なfixtureを使います。各標準とfixtureが対応する振る舞いだけを定義し、
-環境固有の拡張は対象外とします。
+Execution Adapterは選択済み`AccessPlan`を受け取り、Resourceを再選択せず、既存Runtimeの
+呼び出しへ翻訳します。形式・ZIP entry point等を推測せず、失敗原因と宛先認可を検証します。
+[AccessPlan実行テスト](test_plan_execution.py)では、JSONから復元した計画を、元のResourceや
+Providerへの再問い合わせなしで開くことを確認します。[直列化テスト](test_portable.py)では、
+Resourceのmetadata/discovery保持、runtime状態の非転送、復元・bindの契約を確認します。
 
-Source Adapterクラスは内部契約です。公開構成APIは名前付きの`Provider`を組み込みAdapterへ対応付け、
-複数のsource idで同じAdapter型を共有できます。リポジトリ管理のCatalog値は構成前にProviderへ読み込みます。
-テストではAdapterを直接生成し、リクエスト、情報の保持、明示的な選択、失敗時の振る舞いを検証できます。
+## 決定的なCIと実地確認
 
-最初の実行垂直スライスでは、実行Adapterを一時的に`rhinestone.adapters.execution`へ置き、
-`AccessPipeline.open`で接続します。パッケージやコンストラクタの形は変わる可能性がありますが、
-選択済みResourceを再選択せずに変換すること、外部ライブラリを遅延かつ利用者所有で扱うこと、
-実行時の失敗原因を保持することは安定した契約です。
+通常CIはネットワークに依存しないfixture/fake Runtimeを使います。観測応答の抜粋と合成データは
+区別し、fixtureが検証する範囲を超えて外部Providerやnative driverへの適合を保証しません。
+live通信や実Runtimeの手動検証は、実行環境・日時・条件・結果を別途記録し、通常CIの成功と区別します。
 
-Execution Adapterクラスも内部で構成します。名前、優先度、対応判定、Runtimeを開く操作は内部契約として維持し、
-利用者は外部ライブラリのfactoryだけを渡します。
-
-現在の公開構成では、`rhinestone.configure()`をプロセス全体で変更される設定ではなく、分離されたアプリケーション
-コンテキストを作るfactoryとして扱います。そのコンテキストで解決したResourceは実行先に結び付くため、
-`resource.open(library)`で文書化されたインターフェースを使えます。結び付け方自体は固定APIではありませんが、
-コンテキストの分離、外部ライブラリの遅延評価、通常の解決、実行先の明示選択を保証します。
+全品質チェックは[開発ガイド](../CONTRIBUTING.md)に従い`bash scripts/check.sh`で実行します。
+対象を絞ったテストが通るだけで、全体のcoverage・lint・型チェック・文書・配布物ビルドを
+検証済みとは扱いません。
