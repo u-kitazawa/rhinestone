@@ -14,9 +14,12 @@
   Core所有の`json-service` Runtimeは省略できます。Runtimeを暗黙に選びません。
 - 公開する名前とシグネチャは[公開APIテスト](test_public_api.py)で確認します。
   詳細なモデルは`rhinestone.models`、原因別エラーは`rhinestone.errors`に置きます。
-- 外部Adapterの拡張境界は`rhinestone.adapters.contracts`のDefinition/Contextと
+- Source/Execution Adapterの拡張境界は`rhinestone.adapters.contracts`のDefinition/Contextと
   `rhinestone.adapters.ports`です。[Custom Adapterテスト](test_custom_adapters.py)では、
   公開構成経路で登録・依存・認証の境界を検証します。内部Registryの配置を外部契約にしません。
+- Knowledge Adapterの`KnowledgeAdapterDefinition`と`KnowledgeAdapterContext`は
+  `rhinestone.adapters.knowledge`からimportします。[Knowledgeガイド](../docs/knowledge.md)と
+  [Knowledgeテスト](test_knowledge.py)で、`configure(adapters=...)`による登録と共有知識の契約を確認します。
 
 ## Providerと実行の検証
 
