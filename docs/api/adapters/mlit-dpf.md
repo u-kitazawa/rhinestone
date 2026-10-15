@@ -98,7 +98,7 @@ G空間の地域タグによる包含関係をDPFに流用していません。
 実APIの結果数・応答時間・順位の比較は、利用者のAPIキーを使う環境での検証が必要です。
 この変更では公式仕様・公式クライアントと合成応答による回帰テストを根拠としており、
 実サービスに対する検索品質向上率を計測したものではありません。
-[調査記録](https://github.com/u-kitazawa/rhinestone/blob/develop/docs/research/mlit-dpf-search.md)に確認範囲と手動検証項目を記載しています。
+[Issueの引継ぎ記録](https://github.com/u-kitazawa/rhinestone/issues/213#issuecomment-6182353965)に未実施の手動検証項目と必要な条件を記載しています。
 
 ```python
 results = app.search(text="道路", bbox=(139.5, 35.5, 140.0, 36.0), limit=10)
