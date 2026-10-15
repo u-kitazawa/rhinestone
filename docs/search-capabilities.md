@@ -15,7 +15,7 @@ discovery provenanceとProviderごとの順序を保持します。
 | MLIT DPF | `text`はphraseMatch trueを優先し、falseで補充。`area`は都道府県・市区町村コードの属性条件。`bbox`はrectangle。解決可能なcatalog / datasetをattributeFilterで絞り、`format`はResource展開後に照合 | first / size / totalNumberで次ページを取得。最大50レコード/page。`limit`は形式照合後のResource数、Noneは50 Resource | `time`は未対応。Nativeの形式はUNKNOWN。地域コード未宣言の全国版を含む保証はない。実APIの品質比較は未検証。[詳細](api/adapters/mlit-dpf.md) |
 | STAC | API型は`bbox`、`time`、`limit`を`/search`へ渡す。静的型は公式リンクを有界に探索し、Itemのbbox/timeを照合する | API型はproviderの`limit`に従いnext linkを追跡しない。静的型は`max_documents`を超える未完了探索を失敗させる | collectionはProvider設定内部の絞り込みで、共通条件ではない。data roleの各assetをResourceとして返す |
 | OGC API Features | 設定済み collection の `/items` に `bbox`、`datetime`、`limit` を渡す | provider の `limit` に従う。next link の追跡はしない | collection は Provider 設定で必須。`text` は共通条件ではない |
-| DCAT | ローカル RDF graph 上で `text` の全語を title / description に照合する | `limit` は照合後 Dataset 数。文書は検索ごとに一度だけ読み込む | RDF catalog の全件を読むため、大きな remote catalog の索引 API にはならない。bbox / time は未対応 |
+| DCAT | ローカル RDF graph 上で `text` の全語を title / description に照合する | `limit` は照合後の配信単位のResource数。文書は検索ごとに一度だけ読み込む | RDF catalog の全件を読むため、大きな remote catalog の索引 API にはならない。bbox / time は未対応 |
 | Static | ローカル定義の id / title / description に `text` の全語を照合する | `limit` は照合後 Resource 数。通信はしない | bbox / time は未対応 |
 | e-Stat GIS | 利用者が与えた distribution index の id / title / dataset / level に `text` の全語を照合する | `limit` は照合後 Resource 数。通信はしない | `load()` の selector（survey year、region など）は検索条件に昇格しない。共通の形式検索は下記の制限がある。UI の HTML は検索しない |
 
@@ -31,7 +31,8 @@ discovery provenanceとProviderごとの順序を保持します。
 | OGC API Features | Search Coordinatorが取得済み結果を絞り込む | `ogc-api-features` |
 | Static | Search Coordinatorが取得済み結果を絞り込む | 静的定義の候補に明示されたformat |
 | MLIT DPF | Adapter内。必要件数まで次pageを取得する | Directは明示representation。Native委譲は不明として扱う |
-| DCAT / e-Stat GIS | Search Coordinatorが取得済み結果を絞り込む | 現行Adapterは`Resource.formats`を設定しないため、形式検索では不明として扱う |
+| DCAT | Search Coordinatorが取得済み結果を絞り込む | 各Distributionの宣言済みformatまたは対応media typeから得られる形式。形式未宣言・未登録の場合は不明として扱う |
+| e-Stat GIS | Search Coordinatorが取得済み結果を絞り込む | distribution indexの各配信に明示されたShapefile、GML、KML |
 
 Search Coordinatorで絞り込む場合、Adapterへは`format`を渡さず、`limit=None`で取得した
 結果を形式照合してからProviderごとに`limit`を適用します。取得範囲は各Adapterが
