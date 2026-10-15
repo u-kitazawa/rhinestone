@@ -56,3 +56,13 @@ def test_example_index_lists_each_runnable_example() -> None:
         for script in (ROOT / "examples").glob("*/example.py")
     }
     assert expected <= targets
+
+
+def test_adapter_guides_use_current_public_resource_contract() -> None:
+    """These guides must not reintroduce the retired model or method names."""
+    for name in ("static", "dcat", "geospatial-jp", "search-ckan-jp", "mlit-dpf"):
+        guide = (ROOT / "docs" / "api" / "adapters" / f"{name}.md").read_text(
+            encoding="utf-8"
+        )
+        for retired in ("`Source`", "`target`", "`resolve()`", " Config"):
+            assert retired not in guide, (name, retired)

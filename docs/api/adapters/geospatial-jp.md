@@ -17,8 +17,8 @@ Providerの `endpoint` はCatalogから渡されます。`credential`、`credent
 共通処理は `area` をKnowledge Adapterで検証・正規化し、正式区域名として専用Adapterへ渡します。
 本文への連結やbboxへの変換は行いません。
 
-結果はResource単位の `Resource` です。`target` は同じProviderの `resource_id` Configを指します。
-packageとresourceのmetadataは `raw_metadata`、実際の検索APIパラメータは
+検索は配信単位の `Resource` を返します。`reference` は同じProviderの `resource_id` を持つ `Reference` です。
+packageとresourceのmetadataは `metadata.raw`、実際の検索APIパラメータは
 `provenance.query_parameters` に保持します。解決後の形式とURLはCKANの宣言を使います。
 
 ## 検索戦略
