@@ -15,7 +15,7 @@
 外部入力をそのまま `Reference` に渡さないでください。
 ## カタログとRuntime
 
-標準の`configure()`経路ではDCAT文書の取得にRhinestoneの組み込みHTTP transportを使い、RDF解釈runtimeだけを`dependencies={"rdflib": ...}`として利用者が供給します。遅延評価する場合は `RuntimeFactory(factory)` を指定し、DCATの`search()`または`resolve()`で初めて評価されます。未設定またはfactoryの失敗は`DependencyUnavailableError`、文書取得の失敗は`ProviderMetadataError`として区別されます。解決済みResourceやAccessPlanは`rdflib`の実体・factoryを保持しません。
+標準の`configure()`経路ではDCAT文書の取得にRhinestoneの組み込みHTTP transportを使い、RDF解釈runtimeだけを`dependencies={"rdflib": ...}`として利用者が供給します。遅延評価する場合は `RuntimeFactory(factory)` を指定し、DCATの`search()`または`load()`で初めて評価されます。未設定またはfactoryの失敗は`DependencyUnavailableError`、文書取得の失敗は`ProviderMetadataError`として区別されます。解決済みResourceやAccessPlanは`rdflib`の実体・factoryを保持しません。
 
 `dcat:downloadURL` を持つ Distribution のみを候補にし、`accessURL` だけの Distribution は解決しません。検索は `text` と `limit` を使えます。
 
