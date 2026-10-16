@@ -32,7 +32,7 @@ app = configure(
 ## 独自の提供元を追加する
 
 ```python
-from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
+from rhinestone import Catalog, Provider, configure
 
 catalog = Catalog(
     (
@@ -53,9 +53,10 @@ app = configure(catalog=catalog)
 詳しい実装手順、Context、検索、エラー処理は[Custom Adapter を作る](custom-adapters.md)を参照してください。
 
 Source と Execution は、組み込みと同じパイプラインへ明示的に登録できます。
+次は登録構造の例です。`...`のメソッド本体は独自の処理に置き換えてください。
 
 ```python
-from rhinestone import Catalog, Provider, configure
+from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
 from rhinestone.adapters.contracts import (
     ExecutionAdapterDefinition,
     SourceAdapterDefinition,
@@ -93,7 +94,7 @@ app = configure(
 
 Source factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
 `SourceAdapterContext`として渡します。Execution factoryの`ExecutionAdapterContext`には
-DestinationPolicyを渡します。Execution Runtimeは`open(..., runtime=...)`へ渡します。
+Credential PortとDestinationPolicyを渡します。Execution Runtimeは`open(..., runtime=...)`へ渡します。
 
 共有知識をSource Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
 追加設定なしで西暦・年度・元号を利用できます。自治体辞書など独自の公式データを使う場合は、
@@ -169,6 +170,9 @@ app = configure(
 secretはCatalogやProviderに保存せず、Credential factoryとして渡します。
 
 ```python
+import os
+
+from rhinestone import configure
 from rhinestone.catalogs import BUILTIN
 
 app = configure(
@@ -183,6 +187,10 @@ app = configure(
 指定します。
 
 ```python
+import os
+
+from rhinestone import Catalog, Provider, configure
+
 catalog = Catalog(
     (
         Provider(
