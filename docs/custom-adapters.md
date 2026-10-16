@@ -174,7 +174,7 @@ reason="item_skipped", resource_identifier="item-id", detail="missing_data_asset
 場合だけ、そのProviderをskipします。Provider 横断の
 ranking は行わないため、Adapter は provider 固有の結果順を保ちます。
 
-検索結果の `target` は通常の `Reference` に戻せる形にし、`metadata` と `provenance` を
+検索結果の `Resource.reference` には配信単位を再指定できる `Reference` を保持し、`metadata` と `provenance` を
 失わないようにします。検索を実装しない Adapter は `load()` だけで利用できます。
 
 形式検索に対応するには、対象データの宣言済み形式を`Resource.formats`へ保持します。
@@ -214,14 +214,14 @@ app = configure(
 data = app.open(resource, "example-runtime", runtime=example_runtime)
 ```
 
-`supports()` は Resource の形式・AccessPlanだけを見て、実際の Resource
+`supports()` は渡された AccessPlan の形式・アクセス情報だけを見て、実際の Resource
 選択を行いません。公開APIでは`app.open(..., name, runtime=...)`でAdapter名とRuntimeを
 明示します。指定した名前が未登録・非互換なら`ExecutionAdapterUnavailableError`となり、
 別のAdapterへ切り替えません。内部Selectorの優先度規則は、公開APIのRuntime自動選択を
 意味しません。Definition の `name` と生成された Adapter の `name` は一致させます。
 
 `open()` がネットワークへアクセスする場合は、通信の前に
-`destination_policy.authorize(resource.uri)` を適用するか、必要に応じて既存の
+`destination_policy.authorize(plan.uri)` を適用するか、必要に応じて既存の
 Execution Adapter 基底クラスの `authorize()` を利用してください。Core に GDAL、Rasterio、
 pyogrio などを依存させず、Execution Runtime は `open()` で注入します。
 
@@ -235,6 +235,6 @@ pyogrio などを依存させず、Execution Runtime は `open()` で注入し�
 - Provider の設定不備は `ConfigValidationError`、外部 metadata の取得失敗は
   `ProviderMetadataError`、応答形式の不備は `ProviderResponseError` に分けます。
 
-Adapter は同じ入力から決定的な `Source` を生成し、Metadata、raw metadata、Provenance を
+Source Adapter は同じ入力から決定的な `Resource` を生成し、Metadata、raw metadata、Provenance を
 保持してください。代表的な provider response fixture、成功ケース、曖昧な候補、未対応
 条件、認証・通信失敗を Adapter package のテストに含めることを推奨します。

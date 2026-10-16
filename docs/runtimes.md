@@ -10,7 +10,7 @@ Runtime が必要になる段階は二つあります。
 
 | 種類 | 必要になる段階 | 現在の Runtime |
 | --- | --- | --- |
-| Source Runtime | Source の `search()` または `resolve()` | `rdflib`（DCAT の RDF 解釈） |
+| Source Runtime | Source Adapter の `search()` または `load()` | `rdflib`（DCAT の RDF 解釈） |
 | Execution Runtime | 解決済み Resource の `open()` | `gdal`、`rasterio`、`pyogrio` |
 
 Execution Runtimeは構成時に登録しません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
@@ -149,7 +149,7 @@ OS、Python、ネイティブライブラリの組み合わせが変われば、
 
 | 外部ライブラリ | バージョン | 役割／必要な段階 | 検証環境 | 状態 |
 | --- | --- | --- | --- | --- |
-| RDFLib | 7.6.0 | Source／`search`、`resolve` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
+| RDFLib | 7.6.0 | Source／`search`、`load` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
 | Rasterio | 1.5.1 | Execution／`open` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
 | pyogrio + GeoPandas | 0.13.0 + 1.1.4 | Execution／`open` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
 | GDAL | 3.13.3 | Execution／`open` | — | 未検証（検証環境で導入できなかった） |
