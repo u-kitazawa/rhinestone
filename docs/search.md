@@ -212,9 +212,14 @@ data = app.open(resource, "rasterio", runtime=rasterio)
 国交DPFのnative targetは、取得先ProviderのReferenceと`access_plan=None`を返します。
 `app.open(resource, ...)`はReferenceから対象を取得して実行し、DPFのDiscoveryRecordを保持します。
 取得先への明示的な問い合わせには`app.load(resource)`を使えます。
-解決後のResourceや、検索時点でAccessPlanが確定したResourceは
-`resource.open("rasterio", runtime=rasterio)`でも開けます。
-未確定Resourceの`resource.open()`は取得先へ問い合わせず、明示的に失敗します。
+`app.search()`やトップレベルの`search()`が返すResourceには検索したアプリケーションの
+コンテキストが付くため、`resource.open("rasterio", runtime=rasterio)`でも開けます。
+AccessPlanが未確定なら、この呼び出しもReferenceから対象を読み込んで実行します。
+元のResourceは不変であり、呼び出し後もその`access_plan`は書き換わりません。
+
+一方、`Resource.from_dict()`で復元したResourceなど、コンテキストを持たないdetachedな値の
+`resource.open()`は、AccessPlanの有無にかかわらず問い合わせずに失敗します。
+`app.open(resource, ...)`へ渡すか、`app.bind(resource)`の戻り値で`open()`を使います。
 未知形式の配信はURLから形式を推測せず、取得後もAccessPlanが生成できなければopenに失敗します。
 
 ## 結果の順序

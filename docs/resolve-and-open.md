@@ -1,17 +1,21 @@
 # Resourceを開く
 
-通常は検索結果のResourceをそのまま開けます。
+通常は検索結果のResourceを、対応するAdapterとRuntimeを明示して開けます。
+次の例ではGDALを用意し、国土地理院のXYZタイルをGDALのWMS/XYZ定義へ翻訳して開きます。
 
 ```python
-import rasterio
+from osgeo import gdal
 from rhinestone import ProviderId, search
 
 resource = search(text="標準地図", providers=[ProviderId.GSI], limit=1)[0]
-with resource.open("rasterio", runtime=rasterio) as dataset:
-    ...
+dataset = resource.open("gdal", runtime=gdal)
+print("URI:", resource.uri)
+print("raster size:", dataset.RasterXSize, dataset.RasterYSize)
 ```
 
-独自構成では`app.open(resource, "rasterio", runtime=rasterio)`を使います。
+独自構成では`app.open(resource, "gdal", runtime=gdal)`を使います。
+Rasterio AdapterはCOG/GeoTIFFを対象とし、このXYZタイルには対応しません。
+Adapterごとの対応形式は[対応状況](compatibility.md)を参照してください。
 AccessPlanがない検索結果はReferenceからloadしてから実行します。
 形式を確定できない場合は`ExecutionAdapterUnavailableError`となり、別の形式やRuntimeへ
 自動で切り替えません。Rhinestoneはデータ解析や形式変換を行いません。
