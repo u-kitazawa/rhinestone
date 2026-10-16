@@ -48,7 +48,15 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 | `pyogrio` | representation registry で `vector` と明示された `shapefile`、`geojson`、`gpkg`、`flatgeobuf`、`gml`、`kml`、`citygml` | URI と encoding を `read_dataframe()` へ渡す。明示された ZIP AccessPlan は GDAL VSI URI に変換する。URI suffix や archive内容から形式・memberを推測せず、環境に対応 driver がない場合は `ResourceAccessError`。 |
 | `json-service` | `application/json` の ODPT service query | 組み込みHTTP runtimeとODPT用request preparerを使用する。他providerのJSON APIを汎用的に実行しない。 |
 
-STAC は Cloud-Optimized GeoTIFF media type を `cog` として扱う。その他 asset は format が明示できないため、open時に明示的に失敗する場合がある。DCAT、CKAN、PLATEAU、Direct の配布物も、format が上表の Execution Adapter に一致した場合だけ `open()` できる。
+STACはcloud-optimizedを示すmedia typeを`cog`として扱い、それ以外も共通のmedia type対応から
+形式を判定します。例えば`image/tiff`は`geotiff`、`application/geo+json`は`geojson`です。
+media typeが未指定・未知なら、URIが`.tif`で終わっていても形式を推測せず、Resourceの
+`format`と`access_plan`は`None`になります。詳細は[STACガイド](api/adapters/stac.md)を参照してください。
+
+形式の判定と実行可否は別です。例えばSTAC assetの`text/csv`は`csv`、`application/json`は
+`json`と判定されても、上表の組み込みExecution Adapterでは開けません（`json-service`はODPT専用）。
+DCAT、CKAN、PLATEAU、Directの配布物も、AccessPlanが選んだExecution Adapterに適合し、
+必要なRuntime・認証・ドライバーが利用できることが必要です。対応表は実データの取得成功を保証しません。
 
 共通の representation 定義は `rhinestone.representations` にあり、format の alias と既知の
 media type 対応を Source Adapter 間で共有する。format が明示されている場合は media type
