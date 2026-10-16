@@ -28,7 +28,7 @@ app = configure(
 ```
 
 自治体の公式辞書/APIはRhinestoneへ同梱せず、利用者のfactoryから注入します。標準Time Adapterは
-追加設定なしで利用できます。factoryは必要なSource Adapterが初めて知識を利用したときに評価されます。factoryには
+追加設定なしで利用できます。factoryは検索またはSource Adapterが初めてその種別の知識を利用したときに評価されます。factoryには
 `KnowledgeAdapterContext`が渡されます。
 
 ## 地域や自治体の識別（Identity）
@@ -45,7 +45,8 @@ Provider projection は分離され、snapshot の `snapshot_version` は eviden
 ## 空間値（Space）
 
 `BoundingBox` は axis order、範囲、明示的な `CRSRef` を持つ値オブジェクトです。既定値の
-`CRS84` は shorthand であり、core は CRS の検証・変換や antimeridian の推測を行いません。
+`CRS84` は既定の明示CRS識別子（`OGC:CRS84`）です。CRS識別子の構文、座標の有限性・順序、
+CRS84の経緯度範囲は検証しますが、CRS定義の照会・測地変換やantimeridianの推測は行いません。
 `MeshCode` は system、level、code の identity だけを保持し、geometry を導出しません。
 非 `CRS84` の値を扱えるかは各 Provider の capability と projection に委ねられ、未対応なら
 `unsupported` として閉じます。
@@ -61,6 +62,12 @@ Time Adapterは、暦年、年度、survey year、as-of dateを別の意味と�
 
 ## Source Adapterとの境界
 
-PLATEAUと基盤地図情報のSource Adapterは、設定された`municipality`と`time`をKnowledge
-Adapterで解決し、候補の`attributes["knowledge"]`へ保持します。Knowledge AdapterはProvider
-固有のresource選択、HTTP通信、Runtime、Credentialを担当しません。
+PLATEAUと基盤地図情報のSource Adapterは、`Reference.parameters`の`municipality`と`time`を
+Knowledge Adapterで解決し、返す`Resource.metadata.raw["knowledge"]`へ保持します。
+identityは`["identity"]`、timeは`["time"]`に保存され、`time_kind`の明示指定も保持します。
+これは現在の配信Resourceから参照する情報であり、旧候補モデルの属性ではありません。
+
+Knowledge AdapterはProvider固有のResource選択や実データの読み込み・実行を担当しません。
+共有知識を取得するための通信・依存・認証・宛先制限には、factoryへ渡される
+`KnowledgeAdapterContext`のPortやcallbackを使えます。Runtime実体やCredential secretを
+解決結果のmetadataに保存しません。
