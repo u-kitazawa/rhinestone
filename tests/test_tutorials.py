@@ -16,10 +16,12 @@ def tutorial_python(name: str) -> str:
 
 
 @pytest.mark.parametrize("reverse_catalog", (False, True))
+@pytest.mark.parametrize("document", ("index.md", "resolve-and-open.md"))
 def test_documentation_index_example_opens_a_compatible_resource(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     reverse_catalog: bool,
+    document: str,
 ) -> None:
     """冒頭例が決定的な検索結果を明示Runtimeで開けることを保証する。"""
 
@@ -47,8 +49,8 @@ def test_documentation_index_example_opens_a_compatible_resource(
             catalogs, "BUILTIN", catalogs.Catalog(reversed(catalogs.BUILTIN))
         )
 
-    source = documentation_python("index.md")
-    exec(compile(source, "docs/index.md", "exec"), {})
+    source = documentation_python(document)
+    exec(compile(source, f"docs/{document}", "exec"), {})
 
     assert len(opened) == 1
     assert "cyberjapandata.gsi.go.jp" in opened[0]
