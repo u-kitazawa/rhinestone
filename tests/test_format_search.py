@@ -1,6 +1,11 @@
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
+import pytest
+import rdflib
+
+import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Format, FormatPreset, Provider, configure
 from rhinestone.adapters.source.ckan import CkanAdapter
 from rhinestone.adapters.source.search_ckan_jp import SearchCkanJpAdapter
@@ -53,6 +58,63 @@ def _app():
 def test_format_search_post_filters_with_or_semantics() -> None:
     results = _app().search(format=(Format.GEOJSON, Format.CSV))
     assert {result.title for result in results} == {"Vector", "Table"}
+
+
+def test_dcat_search_filters_declared_distribution_format_before_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = (
+        Path(__file__).parent / "fixtures" / "expansion" / "catalog.ttl"
+    ).read_text(encoding="utf-8")
+
+    def get_document(uri: str) -> str:
+        return document
+
+    monkeypatch.setattr(_http, "get_text", get_document)
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider(
+                    "rdf",
+                    "dcat",
+                    {"catalog_uri": "https://fixture.example/catalog"},
+                ),
+            )
+        ),
+        dependencies={"rdflib": rdflib},
+    )
+
+    assert app.search(limit=1)[0].format == "geojson"
+    results = app.search(format=(Format.GPKG,), limit=1)
+    assert [resource.format for resource in results] == ["gpkg"]
+    assert results[0].formats == frozenset({"gpkg"})
+    assert not app.search(format=(Format.UNKNOWN,))
+
+
+def test_estat_gis_search_filters_index_format_before_limit() -> None:
+    distributions = [
+        {
+            "distribution_id": name,
+            "dataset_id": "boundaries",
+            "boundary_kind": "administrative",
+            "survey_year": 2020,
+            "level": "municipality",
+            "uri": f"https://fixture.example/{name}",
+            "format": name,
+        }
+        for name in ("gml", "kml")
+    ]
+    app = configure(
+        catalog=Catalog(
+            (Provider("gis", "estat-gis", {"distributions": distributions}),)
+        )
+    )
+
+    assert app.search(limit=1)[0].format == "gml"
+    results = app.search(format=(Format.KML,), limit=1)
+    assert [resource.format for resource in results] == ["kml"]
+    assert results[0].formats == frozenset({"kml"})
+    assert not app.search(format=(Format.UNKNOWN,))
 
 
 def test_format_preset_uses_execution_format_registry() -> None:

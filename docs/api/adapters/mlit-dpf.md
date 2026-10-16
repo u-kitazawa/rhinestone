@@ -8,7 +8,7 @@
 ## 構成
 
 組み込み定義 `BUILTIN`内の`mlit-dpf` Provider はendpointと論理Credential名だけを持ちます。APIキーは
-`credentials` から遅延取得され、`Provider`、`Resource`、`Resource`、例外には保存されません。
+`credentials` から遅延取得され、`Provider`、`Reference`、`Resource`、例外には保存されません。
 `MLIT_DPF` は組み込みCatalogに含まれますが、APIキーを登録せず横断検索した場合はDPFだけが
 `failure_type="credential"` のdiagnosticとして隔離され、他のSourceの検索は継続します。
 
@@ -51,14 +51,14 @@ app = configure(
 ```
 
 `target_rules` の各規則は `catalog_id`、任意の `dataset_id`、委譲先の登録済み
-`Provider.id`、target Configの各設定値を取得する `record` または `metadata` selectorを
-宣言します。委譲先はConfigを解決できるネイティブSourceでなければなりません。`direct` と
+`Provider.id`、委譲先Referenceの各parameterを取得する `record` または `metadata` selectorを
+宣言します。委譲先はReferenceを読み込めるネイティブProviderでなければなりません。`direct` と
 Discovery専用の別 `mlit-dpf` Providerは委譲先に指定できず、構成時に
 `ConfigValidationError` になります。dataset固有規則がcatalog規則より優先され、同じ
 組み合わせの重複は拒否されます。URL、タイトル、catalog名から提供元やIDを推測しません。
 
 ネイティブ委譲に必要な値がない場合だけ、`representations` にdatasetの形式があり、かつ
-metadataに安全な `DPF:downloadURLs` がある結果を `direct` Configへ変換します。
+metadataに安全な `DPF:downloadURLs` がある結果を `direct` のReferenceとAccessPlanを持つResourceへ変換します。
 `DPF:dataURLs` はランディングページなのでResource URIには使いません。download URLのschemeは
 大文字小文字を区別せずHTTPまたはHTTPSとして検証し、埋め込みCredentialや不正なauthorityを
 拒否します。

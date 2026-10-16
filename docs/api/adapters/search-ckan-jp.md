@@ -59,12 +59,12 @@ results = search(
 )
 ```
 
-調査根拠と変更前後の実API観測は[検索改善の調査記録](https://github.com/u-kitazawa/rhinestone/blob/develop/docs/research/search-ckan-jp.md)に
-記載しています。通信先のメタデータ、収集時期、索引によって検索結果は変わります。
+過去の実API観測と再検証方法は[Issueの引継ぎ記録](https://github.com/u-kitazawa/rhinestone/issues/213#issuecomment-6184506669)に
+記載しています。観測時の件数・順位は現在の結果を保証せず、通信先のメタデータ、収集時期、索引によって検索結果は変わります。
 
-このSourceはDiscovery専用です。検索結果の `target` は元の配布URL、形式、metadataを持つ
-`direct` Configに設定されるため、通常どおり `app.load(result)` または `resource.open(...)`
-でResourceへ解決できます。`Reference("search-ckan-jp", ...)` を直接解決することはできません。
+このProviderはDiscovery専用です。検索結果の `reference` は元の配布URL、形式、media typeを持つ
+`direct` の `Reference` であり、検索時に `AccessPlan` も生成されます。通常どおり `app.load(result)` または `resource.open(...)`
+で利用できます。`Reference("search-ckan-jp", ...)` を直接解決することはできません。
 
 検索結果には検索元の `metadata`、`raw_metadata`、`provenance` が保持されます。解決先が
 `direct` の場合、これらは `Resource.discovery` に保存され、配布物側のmetadataやprovenance
