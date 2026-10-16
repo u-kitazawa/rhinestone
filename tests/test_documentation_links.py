@@ -66,3 +66,15 @@ def test_adapter_guides_use_current_public_resource_contract() -> None:
         )
         for retired in ("`Source`", "`target`", "`resolve()`", " Config"):
             assert retired not in guide, (name, retired)
+
+
+def test_runtime_and_extension_guides_use_current_contracts() -> None:
+    """Runtime and extension instructions must use load and plan boundaries."""
+    for name in ("runtimes", "dependency-policy", "custom-adapters"):
+        guide = (ROOT / "docs" / f"{name}.md").read_text(encoding="utf-8")
+        for retired in ("`resolve()`", "`resolve`", "`target`", "`Source`"):
+            assert retired not in guide, (name, retired)
+
+    custom = (ROOT / "docs" / "custom-adapters.md").read_text(encoding="utf-8")
+    assert "destination_policy.authorize(plan.uri)" in custom
+    assert "destination_policy.authorize(resource.uri)" not in custom
