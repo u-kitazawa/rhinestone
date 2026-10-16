@@ -11,7 +11,9 @@
 
 検索結果は`app.open(resource, library, runtime=...)`、または検索コンテキストが付いた
 `resource.open(library, runtime=...)`で開きます。取得先へ明示的に問い合わせる場合は
-`app.load(resource)`を使います。利用するExecution AdapterとRuntimeは明示して選びます。
+`app.load(resource.reference)`を使います。AccessPlanを持つResourceを`app.load(resource)`へ
+渡した場合は再問い合わせせず、現在のアプリケーションへbindします。
+利用するExecution AdapterとRuntimeは明示して選びます。
 
 本文は空白区切りの各語をタイトル全体（title_string）・タグで部分一致検索し、語同士を明示的ANDで結びます。地域指定時はAPI側のarea・tags条件で
 指定地域、含有都道府県、地方、全国の順に検索し、地域無指定の通常検索を混ぜません。
