@@ -6,7 +6,9 @@
 
 ## 設定と接続先
 
-直接loadの`Reference.parameters`には`dataset_id`または`resource_id`が必須です。
+直接loadでは配信またはDatasetの識別子を指定します。Referenceの`resource_identifier`、
+または`dataset_identifier`を使えます。代わりに`Reference.parameters`の`resource_id`、
+または`dataset_id`でも指定でき、同じ識別子を両方へ重複して入れる必要はありません。
 Providerの`endpoint`はCatalogから渡され、CKAN Action APIへのHTTP通信は
 Rhinestoneの組み込みtransportを使用します。検索条件は`text`、`format`、`limit`です。
 
