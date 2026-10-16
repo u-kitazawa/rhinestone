@@ -218,11 +218,14 @@ class Rhinestone:
         """Load one concrete Resource from a Reference or deferred Resource.
 
         Raises:
+            ConfigValidationError: If value is not a Reference or Resource.
             UnsupportedSourceError: If a Reference names an unconfigured Provider.
             ProviderMetadataError: If provider metadata cannot be loaded.
             UnsupportedAccessError: If the Provider cannot produce a unique
                 portable access plan.
         """
+        if not issubclass(type(cast(object, value)), Reference | Resource):
+            raise ConfigValidationError("load value must be a Reference or Resource")
         if isinstance(value, Resource):
             if value.access_plan is not None:
                 return self.bind(value)
@@ -261,11 +264,17 @@ class Rhinestone:
             runtime: User-owned runtime object for external adapters.
 
         Raises:
+            ConfigValidationError: If value is not a Reference, Resource, or
+                AccessPlan.
             ExecutionAdapterUnavailableError: If the named adapter or injected
                 runtime is unavailable or incompatible.
             ResourceAccessError: If the runtime cannot access the resource.
             DestinationNotAllowedError: If network policy rejects the URI.
         """
+        if not issubclass(type(cast(object, value)), Reference | Resource | AccessPlan):
+            raise ConfigValidationError(
+                "open value must be a Reference, Resource, or AccessPlan"
+            )
         if isinstance(value, AccessPlan):
             return self._pipeline.open_plan(value, library, runtime=runtime)
         if isinstance(value, Resource):
