@@ -116,14 +116,14 @@ Provider、Catalog、Reference、Resource には保存されません。`credent
 
 ## `Rhinestone.search()`（データを検索する）
 
-Catalogに構成されたProvider内のデータ候補を検索し、Resultを返します。Provider自体を発見するAPIではありません。
+Catalogに構成されたProvider内の配信単位のResourceを検索し、Provider別のSearchResultsを返します。Provider自体を発見するAPIではありません。
 
 ```python
 results = app.search(text="河川", limit=10)
 result = results[0]
 ```
 
-`text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`をキーワードで指定できます。`area`は行政区域名・別名・コードを受け取り、bbox対応SourceにはCRS84 bbox、明示的なtext fallbackを持つSourceには正式区域名として投影されます。`area`と`bbox`は同時指定できず、未知区域はProvider呼び出し前に`area_resolution_failed` diagnosticになります。`SearchQuery`を直接渡す場合は
+`text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`をキーワードで指定できます。`area`は行政区域名・別名・コードを受け取り、area対応Sourceには正式区域名を直接渡します。それ以外ではbbox対応SourceにCRS84 bbox、明示的なtext fallbackを持つSourceに正式区域名として投影されます。`area`と`bbox`は同時指定できず、未知区域はProvider呼び出し前に`area_resolution_failed` diagnosticになります。`SearchQuery`を直接渡す場合は
 `rhinestone.models`からimportします。
 
 `format`は`Format`または`FormatPreset`の空でないtupleで指定し、複数値はOR条件です。
@@ -313,7 +313,8 @@ Execution Adapter がどの format を実行できるかは、各 Adapter の ca
 
 ## `Rhinestone.open()`（データを開く）
 
-Resourceを渡すか、Resource/Referenceを渡して解決とopenを一度に行えます。
+`Resource`、直接指定の`Reference`、または単独の`AccessPlan`を渡せます。
+Resource/Referenceは必要に応じてloadしてから開き、AccessPlanはProviderへ再問い合わせせず実行します。
 
 ```python
 data = app.open(result, "rasterio", runtime=rasterio)
