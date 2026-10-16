@@ -4,7 +4,7 @@
 
 - Adapter 種別（`adapter_type`）: `ogc-features`
 - Provider設定: `endpoint`と検索対象の`collection_id`。
-- 直接loadの`Reference.parameters`: `collection_id`、任意の`feature_id`。
+- 直接loadのReference: `parameters`の`collection_id`、または`dataset_identifier`が必須。Providerの検索用設定からは補いません。`feature_id`は任意。
 - 検索: `bbox`, `time`, `limit`。構築時に `collection_id` も指定します。
 - 注入: `get_json(url, params)`。`credential` に論理名を指定し、`credentials` のRegistryから認証情報を取得します。
 
