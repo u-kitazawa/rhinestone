@@ -361,10 +361,12 @@ def test_public_area_search_resolves_alias_keeps_text_and_resolves_resource(
 ) -> None:
     packages = fixture_json("geospatial_jp/search.json")["result"]["results"]
     client = Client(packages)
+    load_actions: list[tuple[str, dict[str, Any]]] = []
 
     def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
         if url.endswith("package_search"):
             return client(url, params)
+        load_actions.append((url.rsplit("/", 1)[-1], dict(params)))
         if url.endswith("resource_show"):
             return {"success": True, "result": packages[3]["resources"][0]}
         assert url.endswith("package_show")
@@ -383,6 +385,16 @@ def test_public_area_search_resolves_alias_keeps_text_and_resolves_resource(
     assert resource.provenance.provider == "geospatial-jp"
     assert resource.provenance.adapter == "geospatial-jp"
     assert resource.provenance.raw["package"]["area"] == "神奈川県"
+    assert load_actions == []
+
+    refreshed = app.load(resource.reference)
+    assert load_actions == [
+        ("resource_show", {"id": "local-0"}),
+        ("package_show", {"id": "local"}),
+    ]
+    assert refreshed.uri == resource.uri
+    assert refreshed.format == resource.format
+    assert refreshed.provenance.raw["package"]["area"] == "神奈川県"
 
 
 @pytest.mark.parametrize(

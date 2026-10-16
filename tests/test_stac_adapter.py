@@ -48,6 +48,52 @@ def test_stac_load_selects_only_the_explicit_asset_and_preserves_item() -> None:
     assert source.metadata.raw["assets"]["thumbnail"]["roles"] == ("thumbnail",)
 
 
+@pytest.mark.parametrize(
+    ("media_type", "expected_format"),
+    [
+        ("image/tiff; application=geotiff; profile=cloud-optimized", "cog"),
+        ("image/tiff", "geotiff"),
+        ("application/geo+json", "geojson"),
+        ("text/csv", "csv"),
+        ("application/json", "json"),
+        ("application/x-unknown", None),
+        (None, None),
+    ],
+)
+def test_stac_search_and_load_match_documented_media_type_contract(
+    media_type: str | None, expected_format: str | None
+) -> None:
+    """対応表が形式判定と実行可否を混同せず、URLから形式を推測しないための回帰。"""
+    endpoint = "https://stac.example"
+    item_url = endpoint + "/collections/sentinel-2/items/scene-1"
+    asset: dict[str, object] = {
+        "href": "https://assets.example/data.tif",
+        "roles": ["data"],
+    }
+    if media_type is not None:
+        asset["type"] = media_type
+    item = dict(fixture_json("stac/item.json"))
+    item["assets"] = {"data": asset}
+    client = RecordingJsonClient(
+        {endpoint + "/search": {"features": [item]}, item_url: item}
+    )
+    adapter = StacAdapter(endpoint=endpoint, get_json=client)
+
+    results = adapter.search(SearchQuery())
+    assert len(results) == 1
+    loaded = adapter.load(results[0].reference)
+    for resource in (results[0], loaded):
+        assert resource.uri == asset["href"]
+        assert resource.media_type == media_type
+        assert resource.format == expected_format
+        if expected_format is None:
+            assert resource.access_plan is None
+        else:
+            assert resource.access_plan is not None
+            assert resource.access_plan.format == expected_format
+    assert client.calls == [(endpoint + "/search", {}), (item_url, {})]
+
+
 def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
     endpoint = "https://stac.example"
     search_url = endpoint + "/search"
