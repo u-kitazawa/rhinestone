@@ -4,10 +4,14 @@
 組み込みProviderのendpointはCatalogで管理し、通信と認証は共通transportに委譲します。
 
 - Provider設定: `endpoint`、任意のcredential設定。`spatial_search`は受け付けません。
-- 解決入力: `Config("geospatial-jp", {"resource_id": "公式Resource ID"})`。
+- 直接loadの入力: `Reference("geospatial-jp", parameters={"resource_id": "公式Resource ID"})`を`app.load()`へ渡します。
 - 検索入力: `text`、正式区域名の `area`、`format`、`limit`。
-- 解決出力: packageとresourceのmetadataを保持する `Source`。
-- 検索出力: Resource単位の `Result`。同じProviderの `resource_id` Configで解決します。
+- load出力: packageとresourceのmetadataを保持する `Resource`。
+- 検索出力: 配信単位の `Resource`。各Resourceの`reference`は同じProviderの`resource_id`を持つ`Reference`です。
+
+検索結果は`app.open(resource, library, runtime=...)`、または検索コンテキストが付いた
+`resource.open(library, runtime=...)`で開きます。取得先へ明示的に問い合わせる場合は
+`app.load(resource)`を使います。利用するExecution AdapterとRuntimeは明示して選びます。
 
 本文は空白区切りの各語をタイトル全体（title_string）・タグで部分一致検索し、語同士を明示的ANDで結びます。地域指定時はAPI側のarea・tags条件で
 指定地域、含有都道府県、地方、全国の順に検索し、地域無指定の通常検索を混ぜません。
