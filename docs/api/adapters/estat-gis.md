@@ -66,7 +66,16 @@ resource = app.load(
 Knowledge Adapter で解決し、統計調査年として候補を絞ります。
 
 Adapterの`search()`は渡されたインデックス内の`text`と`limit`を扱います。
-`app.search(format=...)`はCoordinatorで絞り込みますが、現行Adapterは`Resource.formats`を
-設定しないため、形式検索では不明として扱います。特定形式の配布物を解決する場合は
-上記の`Reference.parameters["format"]`を使ってください。詳細は
+各Resourceはインデックスに明示されたShapefile、GML、KMLの形式を保持し、
+`Resource.formats`はその配信単位の形式を返します。`app.search(format=...)`はCoordinatorで
+形式を照合してから`limit`を適用します。既知の形式を`Format.UNKNOWN`として扱いません。
+
+```python
+from rhinestone import Format
+
+results = app.search(format=(Format.GML,), limit=5)
+```
+
+検索を通さず直接読み込む場合は、上記の`Reference.parameters["format"]`をselectorとして
+使えます。いずれもURIの拡張子から形式を推測しません。詳細は
 [検索能力の対照表](../../search-capabilities.md)の「形式検索の適用段階」を参照してください。
