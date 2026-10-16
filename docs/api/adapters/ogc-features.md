@@ -6,7 +6,12 @@
 
 ## 設定と検索
 
-`collection_id` が必須です。Providerの`settings`へ`endpoint`と検索対象の`collection_id`を指定し、Configの`feature_id`は任意です。検索には `bbox`、`time`、`limit` を使えます。
+検索用Providerの`settings`へ`endpoint`と検索対象の`collection_id`を指定します。
+検索には`bbox`、`time`、`limit`を使えます。
+
+直接loadでは、Reference側にも`parameters={"collection_id": "rivers"}`、または
+`dataset_identifier="rivers"`の指定が必須です。Providerの検索用`collection_id`は
+直接loadの既定値にはなりません。任意の`feature_id`は`Reference.parameters`で指定できます。
 
 `collection_id` と `feature_id` は未エンコードの論理IDとして指定します。RhinestoneはHTTP requestまたはfeature resource URIを組み立てる際に各IDを1つのpath segmentとしてpercent-encodeします。既にエンコードされたように見える値も推測で復号しないため、例えば論理IDの`%2F`はpathでは`%252F`になります。`.`と`..`だけのIDもpath traversalとして正規化されないようエンコードします。Metadataとprovenanceには元の論理IDを保持します。
 
