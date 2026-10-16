@@ -174,6 +174,10 @@ Provider別に参照できます。条件の診断は`diagnostics`、実行し�
 `Reference`または計画がまだない`Resource`を読み込みます。既にAccessPlanを持つResourceは
 Providerへ再問い合わせせず、現在のアプリケーションへbindします。発見側の情報は保持します。
 
+`load()`の値は`Reference`または`Resource`、`app.open()`の値は`Reference`、`Resource`、
+`AccessPlan`である必要があります。それ以外の型は、入力値の属性や文字列表現を参照せず、
+Providerへの通信やRuntime実行の前に`ConfigValidationError`になります。
+
 ```python
 resource = app.load(reference)
 ```

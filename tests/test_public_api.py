@@ -37,6 +37,54 @@ class FakeRasterio:
         return self.label + ":" + uri
 
 
+class InvalidResourceInput:
+    @property
+    def provider_id(self) -> str:
+        raise AssertionError("invalid input attributes must not be read")
+
+    def __str__(self) -> str:
+        raise AssertionError("invalid input must not be stringified")
+
+    def __repr__(self) -> str:
+        raise AssertionError("invalid input must not be represented")
+
+
+@pytest.mark.parametrize("operation", ["load", "open"])
+@pytest.mark.parametrize(
+    "value",
+    [None, 123, "secret-input", {}, [], object(), InvalidResourceInput()],
+    ids=["none", "integer", "string", "mapping", "list", "object", "hostile"],
+)
+def test_load_and_open_reject_invalid_value_types_before_side_effects(
+    operation: str, value: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    def unexpected_call(*args: object, **kwargs: object) -> Any:
+        calls.append("external")
+        raise AssertionError("invalid inputs must not trigger external calls")
+
+    monkeypatch.setattr(_http, "get_json", unexpected_call)
+    monkeypatch.setattr(_http, "get_text", unexpected_call)
+    app = configure(credentials={"unused": unexpected_call})
+    runtime = FakeRasterio("unused")
+
+    with pytest.raises(ConfigValidationError) as raised:
+        if operation == "load":
+            app.load(cast(Any, value))
+        else:
+            app.open(cast(Any, value), "rasterio", runtime=runtime)
+
+    allowed = (
+        "Reference or Resource"
+        if operation == "load"
+        else ("Reference, Resource, or AccessPlan")
+    )
+    assert str(raised.value) == f"{operation} value must be a {allowed}"
+    assert calls == []
+    assert runtime.calls == []
+
+
 def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
     assert rhinestone.__all__ == [
         "configure",
