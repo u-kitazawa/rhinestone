@@ -14,6 +14,9 @@ Runtime が必要になる段階は二つあります。
 | Execution Runtime | 解決済み Resource の `open()` | `gdal`、`rasterio`、`pyogrio` |
 
 Execution Runtimeは構成時に登録しません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
+GDAL、Rasterio、pyogrioではRuntime実体を渡します。`RuntimeFactory`はSource Runtime専用で、
+Execution Runtimeとして渡すと`ExecutionAdapterUnavailableError`になります。
+`json-service`だけはCore所有のRuntimeを使い、`open("json-service")`に`runtime`を渡しません。
 
 Source Runtimeのbare valueはcallableでもRuntime実体として扱います。遅延factoryを使う場合だけ明示的に
 `RuntimeFactory` で包むため、callable façadeやMockを誤って呼び出しません。
@@ -49,13 +52,30 @@ python -m pip install rasterio
 ```python
 import rasterio
 
-from rhinestone import configure
+from rhinestone import Reference, configure
 
 app = configure()
+resource = app.load(
+    Reference(
+        "direct",
+        parameters={
+            "uri": "https://example.invalid/data.tif",
+            "format": "geotiff",
+            "media_type": "image/tiff",
+        },
+    )
+)
 dataset = app.open(resource, "rasterio", runtime=rasterio)
 ```
 
-`resource` は `app.load(result)` などで取得した、format が `cog` または `geotiff` の Resource です。Rhinestone は URI を `rasterio.open()` へそのまま渡し、archive の展開や形式変換を行いません。導入時の wheel、GDAL、PROJ などの組み合わせは [Rasterio の installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) を確認してください。
+上のURIは例示用なので、実在する配信URIに置き換えてください。既知の対象は
+`app.load(Reference(...))`で読み込みます。検索から使う場合は、`app.search()`が返した
+formatが`cog`または`geotiff`のResourceを選び、そのまま`open()`へ渡せます。
+AccessPlanがない検索結果はopen時にReferenceからloadされるため、事前の`app.load()`は必須ではありません。
+Rhinestone は URI を `rasterio.open()` へそのまま渡し、archive の展開や形式変換を行いません。
+導入時の wheel、GDAL、PROJ などの組み合わせは [Rasterio の installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) を確認してください。
+対応形式であっても、Runtimeのdriver・配信先・認証によって開けない場合があります。
+実行段階の失敗は`ResourceAccessError`になります。詳細は[Resourceを開く](resolve-and-open.md)を参照してください。
 
 ### GDAL
 
@@ -133,7 +153,7 @@ app = configure(
 results = app.search(text="dataset")
 ```
 
-DCAT Source を直接構成する場合も、`dependencies={"rdflib": rdflib}` を同じように渡します。factory を使う場合は `dependencies={"rdflib": RuntimeFactory(lambda: rdflib)}` と書けます。DCAT を使わない構成では RDFLib は不要です。
+DCAT ProviderのRDF解釈には`dependencies={"rdflib": rdflib}`を使います。factory を使う場合は `dependencies={"rdflib": RuntimeFactory(lambda: rdflib)}` と書けます。DCAT を使わない構成では RDFLib は不要です。
 
 ## 現在の対象外 Runtime
 
