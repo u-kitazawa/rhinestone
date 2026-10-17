@@ -66,4 +66,23 @@ resource = app.load(
 )
 ```
 
+## 5. Resourceを開く
+
+GDALを導入した環境では、組み込みの国土地理院タイル定義からResourceを検索して開けます。
+GDALの導入方法は[Runtimeの導入ガイド](runtimes.md)を参照してください。
+
+```python
+from osgeo import gdal
+from rhinestone import ProviderId, search
+
+resource = search(text="標準地図", providers=[ProviderId.GSI], limit=1)[0]
+dataset = resource.open("gdal", runtime=gdal)
+print("URI:", resource.uri)
+print("raster size:", dataset.RasterXSize, dataset.RasterYSize)
+```
+
+この例の検索は静的な定義を使い、Providerを限定するため横断検索の結果順に依存しません。
+データを開くときはネットワークとGDALのWMS/XYZ対応が必要です。Rasterioはこのタイル形式には対応しません。
+任意の検索結果を任意のRuntimeで開けるわけではないため、[対応状況](compatibility.md)も確認してください。
+
 次は[アプリケーションを構成する](configuration.md)、[データを検索する](search.md)、[Resourceを解決して開く](resolve-and-open.md)を参照してください。

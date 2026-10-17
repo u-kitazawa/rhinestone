@@ -16,7 +16,9 @@ def tutorial_python(name: str) -> str:
 
 
 @pytest.mark.parametrize("reverse_catalog", (False, True))
-@pytest.mark.parametrize("document", ("index.md", "resolve-and-open.md"))
+@pytest.mark.parametrize(
+    "document", ("index.md", "resolve-and-open.md", "getting-started.md")
+)
 def test_documentation_index_example_opens_a_compatible_resource(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -49,7 +51,14 @@ def test_documentation_index_example_opens_a_compatible_resource(
             catalogs, "BUILTIN", catalogs.Catalog(reversed(catalogs.BUILTIN))
         )
 
-    source = documentation_python(document)
+    if document == "getting-started.md":
+        guide = (Path(__file__).parents[1] / "docs" / document).read_text(
+            encoding="utf-8"
+        )
+        section = guide.split("## 5. Resourceを開く\n", 1)[1]
+        source = section.split("```python\n", 1)[1].split("\n```", 1)[0]
+    else:
+        source = documentation_python(document)
     exec(compile(source, f"docs/{document}", "exec"), {})
 
     assert len(opened) == 1
