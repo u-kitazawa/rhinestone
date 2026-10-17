@@ -1,7 +1,7 @@
 # Custom Adapter を作る
 
 Rhinestone の Adapter は、Provider 固有の情報を配信単位の `Resource` へ変換する Source
-Adapter と、解決済みの `Resource` を外部 Runtime へ渡す Execution Adapter に分かれます。
+Adapter と、選択済みの `AccessPlan` を外部 Runtime へ渡す Execution Adapter に分かれます。
 どちらも `configure(adapters=...)` へ明示登録します。組み込み Adapter も
 「あらかじめ登録された Definition」として同じ Registry に追加されるため、Custom Adapter
 と同じ Factory／Context／選択経路を通ります。Adapter package の自動発見や process-global
@@ -189,6 +189,11 @@ Execution Adapter は Resource を選択せず、すでに選択済みの Access
 へ翻訳します。`supports` / `open` / 任意の `authorize` は `AccessPlan` を受け取ります。
 Source・Resource・provenanceへ戻って実行情報を探しません。
 
+次の例は「最小構成」の`catalog`、`ExampleSource`、`resource`とimportを使います。
+`example_runtime`には`read(uri)`を提供する利用者所有のRuntime実体を用意してください。
+新しいアプリケーションを構成するため、Catalogにある`example-source`のDefinitionも
+Execution Adapterと一緒に登録します。前のアプリケーションの登録は引き継がれません。
+
 ```python
 class ExampleExecution:
     name = "example-runtime"
@@ -204,6 +209,10 @@ class ExampleExecution:
 app = configure(
     catalog=catalog,
     adapters=(
+        SourceAdapterDefinition(
+            "example-source",
+            lambda provider, context: ExampleSource(provider, context),
+        ),
         ExecutionAdapterDefinition(
             "example-runtime",
             lambda context: ExampleExecution(),
