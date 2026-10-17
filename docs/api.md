@@ -57,11 +57,12 @@ provider = Provider(
 )
 ```
 
-`adapter_type`と`settings`はProviderを構成する拡張向け情報です。secretやRuntimeは保持しません。
-`Provider`は不変なので、設定を変更する場合は新しいProviderまたはCatalogを作成します。
 `settings`はMappingが必須で、省略時は空のMappingになります。`None`やlistなどの不正な型は
 Provider作成時に`ConfigValidationError`となり、入力値をエラー文へ含めません。
 Mapping内のネストした設定も不変化され、元のdict/listを変更してもProviderへ反映されません。
+
+`adapter_type`と`settings`はProviderを構成する拡張向け情報です。secretやRuntimeは保持しません。
+`Provider`は不変なので、設定を変更する場合は新しいProviderまたはCatalogを作成します。
 
 ## `Reference`（配信対象の識別子）
 
