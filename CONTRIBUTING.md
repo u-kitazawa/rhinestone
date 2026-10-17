@@ -9,12 +9,16 @@ Rhinestoneは、日本の公的・地理空間データを使える形へ解決�
 - 設計仕様と既存の不変条件を優先する。
 - 変更の責務を適切な層に置く。
 - CoreにGDAL、Rasterio、pyogrioなどのGIS処理系を実行時依存として追加しない。
-- Source固有の知識はSource AdapterまたはCatalogに閉じ込める。
+- Provider固有の知識はSource AdapterまたはCatalogに閉じ込める。
 - URLの推測、暗黙のフォーマット変換、HTML scrapingを追加しない。
 - 振る舞いを変更した場合は、テスト、仕様、またはドキュメントも更新する。
 - 公開APIを変更する場合は旧APIを削除し、影響と移行先をPRに明記する。後方互換のための別名、wrapper、旧引数は追加しない。
 
-Source Adapterを追加・変更する場合は、代表的なFixture、期待されるSource・Resource・AccessPlan、仕様適合テストを一緒に追加してください。組み込みSourceの接続先や静的な仕様は、可能な限りCatalogで管理します。
+Source Adapterを追加・変更する場合は、代表的なFixture、期待されるReference・Resource・AccessPlan、仕様適合テストを一緒に追加してください。
+`load(reference)`は配信単位のResourceを返し、検索能力を持つAdapterの`search(query)`も
+配信単位のResourceを返します。Providerは接続先・サービス設定、Catalogは構成するProviderの一覧です。
+組み込みProviderの接続先や静的な仕様は、可能な限りCatalogで管理します。
+拡張時の契約は[Custom Adapterを作る](docs/custom-adapters.md)を参照してください。
 
 ## 開発環境
 
@@ -35,7 +39,7 @@ uv sync --dev --locked
 - `src/rhinestone/`: パッケージ本体
 - `tests/`: テスト
 - `docs/`: 現行の利用者向けガイド、APIリファレンス、開発・リリース運用
-- `src/rhinestone/catalogs/`: 組み込みSourceのCatalog
+- `src/rhinestone/catalogs/`: 組み込みProviderのCatalog
 - `pyproject.toml`: パッケージ、開発ツール、型チェックの設定
 - `.github/workflows/`: CIとドキュメント公開の設定
 
@@ -106,7 +110,7 @@ git switch -c <type>/<short-description>
 
 ```text
 feat/add-new-source
-fix/resolve-invalid-config
+fix/reject-invalid-reference
 docs/update-contributing-guide
 ```
 
