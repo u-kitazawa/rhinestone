@@ -117,6 +117,8 @@ class Provider:
                 "adapter_type must be a non-empty string; choose a "
                 "registered source adapter type"
             )
+        if not isinstance(cast(object, self.settings), Mapping):
+            raise ConfigValidationError("Provider.settings must be a mapping")
         object.__setattr__(self, "settings", _freeze(self.settings))
 
 
