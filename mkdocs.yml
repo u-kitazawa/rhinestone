@@ -49,7 +49,6 @@ nav:
 
 exclude_docs: |
   research/*
-  spec_v4.md
 
 theme:
   name: material
