@@ -5,7 +5,7 @@ Rhinestoneは、日本の公的・地理空間データを探し、使えるデ�
 まずは次の流れだけ覚えれば使い始められます。
 
 ```text
-search -> open
+search -> Resource -> open
 ```
 
 検索結果を選び、開くまでの最小例は[はじめに](docs/getting-started.md)にあります。
@@ -117,7 +117,6 @@ HTTP通信はRhinestoneに組み込まれています。
 - [APIリファレンス](docs/api.md)
 - [対応状況](docs/compatibility.md)
 - [外部ライブラリの導入](docs/runtimes.md)
-- [実行結果つき Showcase](showcase/README.md)
 
 ## 開発環境
 
