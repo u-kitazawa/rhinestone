@@ -18,7 +18,7 @@ python -m pip install "rhinestone @ git+https://github.com/u-kitazawa/rhinestone
 ```
 
 環境を固定する場合は`develop`をコミットSHAへ置き換えます。文書の対象は
-[ドキュメントの位置付け](documentation-status.md)を参照してください。
+[API安定性とリリース運用](release-policy.md)の「文書の対象バージョン」を参照してください。
 
 ## 2. Resourceを検索する
 
