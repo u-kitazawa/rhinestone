@@ -46,9 +46,6 @@ nav:
               - pyogrio: api/adapters/pyogrio.md
               - Rasterio: api/adapters/rasterio.md
 
-exclude_docs: |
-  research/*
-
 theme:
   name: material
   language: ja
