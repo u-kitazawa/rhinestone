@@ -196,6 +196,8 @@ data = resource.open("rasterio", runtime=rasterio)
 `Resource.to_dict()`は`rhinestone.resource` schema version 3のJSON-safeな値を返します。
 `Resource.from_dict()`の復元値はdetachedです。`app.open(resource, ...)`で実行するか、
 `app.bind(resource)`でコンテキストを付けます。secret、Runtime、openerは転送しません。
+`app.bind()`の引数は`Resource`です。それ以外の型は、入力値の属性や文字列表現を
+参照せず`ConfigValidationError`になります。
 未知のschema/versionやJSON-safeでない値は`ConfigValidationError`になります。
 
 ## `Rhinestone.plan()`（転送用の実行契約を取得する）

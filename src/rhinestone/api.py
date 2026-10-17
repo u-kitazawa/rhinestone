@@ -244,7 +244,13 @@ class Rhinestone:
         return resource.access_plan
 
     def bind(self, value: Resource) -> Resource:
-        """Bind a detached portable Resource to this execution context."""
+        """Bind a detached portable Resource to this execution context.
+
+        Raises:
+            ConfigValidationError: If value is not a Resource.
+        """
+        if not issubclass(type(cast(object, value)), Resource):
+            raise ConfigValidationError("bind value must be a Resource")
         return self._pipeline.bind(value)
 
     def open(
