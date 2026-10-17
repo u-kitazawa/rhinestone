@@ -1,6 +1,8 @@
 # Execution Adapter（実行アダプター）
 
-Execution Adapter は選択済みの `Resource` を実行runtimeのAPI呼び出しへ変換します。Resource の選択やデータ形式の変換は行いません。
+Execution Adapter は選択済みの `AccessPlan` を実行runtimeのAPI呼び出しへ変換します。
+通常は`Resource.open()`が保持する計画を渡します。独立した計画は`app.open(plan, ...)`で
+Providerへ再問い合わせせず実行できます。Resource の選択やデータ形式の変換は行いません。
 
 [API リファレンス](../api.md) · [Source Adapter](source-adapters.md)
 
@@ -18,6 +20,8 @@ JSON serviceのHTTP runtimeはRhinestoneが組み込みで提供します。依�
 | [JSONサービス](adapters/json-service.md) | `json-service` | 組み込みHTTP通信 |
 
 独自 Adapter は `ExecutionAdapterDefinition` として明示登録します。factory が返す Adapter は
-`name`、`priority`、`supports(resource)`、`open(resource, runtime)` を実装します。
+`name`、`priority`、`supports(plan)`、`open(plan, runtime, *, destination_policy=...)` を実装します。
 基底クラスの継承は必須ではありません。DestinationPolicy は `ExecutionAdapterContext`、
 Runtime は `open()` の引数から取得できます。
+`supports()`の引数も`AccessPlan`です。対応判定はRuntimeのdriverや配信先の可用性まで保証せず、
+選択後の実データアクセス失敗は`ResourceAccessError`として報告します。
