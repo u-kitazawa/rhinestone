@@ -64,6 +64,17 @@ def test_ckan_guide_locates_original_format_in_resource_provenance() -> None:
     assert 'resource.provenance.raw["resource"]["format"]' in guide
 
 
+def test_discovery_guides_distinguish_missing_and_blank_text() -> None:
+    for name in ("geospatial-jp", "search-ckan-jp"):
+        guide = (ROOT / "docs" / "api" / "adapters" / f"{name}.md").read_text(
+            encoding="utf-8"
+        )
+        assert "空または空白だけの本文は通信せず空結果" not in guide
+        assert "空の本文は `q=*:*`" not in guide
+        assert "`ConfigValidationError`" in guide, name
+        assert "`text=None`" in guide, name
+
+
 def test_adapter_guides_use_current_public_resource_contract() -> None:
     """These guides must not reintroduce the retired model or method names."""
     for name in ("static", "dcat", "geospatial-jp", "search-ckan-jp", "mlit-dpf"):
