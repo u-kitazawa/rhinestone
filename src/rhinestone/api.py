@@ -271,7 +271,7 @@ class Rhinestone:
 
         Raises:
             ConfigValidationError: If value is not a Reference, Resource, or
-                AccessPlan.
+                AccessPlan, or library is not a non-empty adapter name.
             ExecutionAdapterUnavailableError: If the named adapter or injected
                 runtime is unavailable or incompatible.
             ResourceAccessError: If the runtime cannot access the resource.
@@ -280,6 +280,11 @@ class Rhinestone:
         if not issubclass(type(cast(object, value)), Reference | Resource | AccessPlan):
             raise ConfigValidationError(
                 "open value must be a Reference, Resource, or AccessPlan"
+            )
+        raw_library = cast(object, library)
+        if not isinstance(raw_library, str) or not raw_library.strip():
+            raise ConfigValidationError(
+                "library must be a non-empty execution adapter name"
             )
         if isinstance(value, AccessPlan):
             return self._pipeline.open_plan(value, library, runtime=runtime)

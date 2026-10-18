@@ -458,10 +458,16 @@ class Resource:
                 The core-owned ``json-service`` adapter supplies its own runtime.
 
         Raises:
+            ConfigValidationError: If library is not a non-empty adapter name.
             ExecutionAdapterUnavailableError: If the resource is detached, the
                 adapter is unavailable, or no compatible runtime was injected.
             ResourceAccessError: If the selected runtime cannot open the data.
         """
+        raw_library = cast(object, library)
+        if not isinstance(raw_library, str) or not raw_library.strip():
+            raise ConfigValidationError(
+                "library must be a non-empty execution adapter name"
+            )
         if self._opener is None:
             raise ExecutionAdapterUnavailableError(
                 "Resource is not bound to an execution context; use "

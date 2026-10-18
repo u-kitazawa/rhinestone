@@ -56,6 +56,10 @@ DestinationPolicyとCredential factoryで実行を認可します。Runtimeやse
 Adapter名と対応するRuntime実体は必須です。Execution Runtimeは`configure()`へ登録せず、
 `open(..., runtime=...)`へ渡します。`RuntimeFactory`は実行用には使えません。
 ODPTのJSONサービスはCoreのRuntimeを使うため`open("json-service")`で開きます。
+`app.open()`と`resource.open()`のAdapter名は空でない文字列が必須です。
+`None`・不正型・空文字・空白のみは、loadやRuntime実行より前に`ConfigValidationError`になります。
+`None`を自動選択の指定としては扱いません。非空の未登録名・非互換名は引き続き
+`ExecutionAdapterUnavailableError`です。
 
 ## 検索・解決・実行のエラー境界
 
