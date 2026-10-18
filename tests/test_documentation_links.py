@@ -67,6 +67,10 @@ def test_adapter_guides_use_current_public_resource_contract() -> None:
         for retired in ("`Source`", "`target`", "`resolve()`", " Config"):
             assert retired not in guide, (name, retired)
 
+    for path in (ROOT / "src" / "rhinestone" / "adapters").rglob("README.md"):
+        readme = path.read_text(encoding="utf-8")
+        assert re.search(r"(?<![A-Za-z])Config(?![A-Za-z])", readme) is None, path
+
 
 def test_runtime_and_extension_guides_use_current_contracts() -> None:
     """Runtime and extension instructions must use load and plan boundaries."""
