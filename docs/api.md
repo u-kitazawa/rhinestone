@@ -326,6 +326,12 @@ Resource/Referenceは必要に応じてloadしてから開き、AccessPlanはPro
 data = app.open(result, "rasterio", runtime=rasterio)
 ```
 
+`library`には空でないExecution Adapter名の文字列を明示します。`None`、文字列以外、
+空文字、空白のみの値は、load・認可・Runtime実行の前に`ConfigValidationError`になります。
+`None`によるAdapterの自動選択は行いません。この入力契約は`Resource.open()`でも共通です。
+非空の未登録名・非互換名は`ExecutionAdapterUnavailableError`になり、別のAdapterへ
+自動で切り替えません。
+
 ## `Runtime`（外部ライブラリ）
 
 GDAL、Rasterio、pyogrio、RDFLibなど、利用者が所有する外部実行環境です。RDFLibはDCATの検索・解決時に、GDAL、Rasterio、pyogrioは`Resource.open()`時に必要になります。HTTP JSON、HTTP text、JSON serviceは組み込みRuntimeを使用します。インストール例と検証済み範囲は[Runtimeの導入ガイド](runtimes.md)を参照してください。
