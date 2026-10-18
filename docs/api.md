@@ -63,6 +63,9 @@ Mapping内のネストした設定も不変化され、元のdict/listを変更�
 
 `adapter_type`と`settings`はProviderを構成する拡張向け情報です。secretやRuntimeは保持しません。
 `Provider`は不変なので、設定を変更する場合は新しいProviderまたはCatalogを作成します。
+`id`と`adapter_type`は空でない文字列が必須で、空白のみも受け付けません。
+不正な型や空欄はProvider作成時に`ConfigValidationError`となり、入力値はエラー文へ含めません。
+有効な識別子を自動でtrim・変換することはありません。
 
 ## `Reference`（配信対象の識別子）
 
