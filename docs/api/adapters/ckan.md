@@ -15,7 +15,7 @@ Providerに`spatial_search=True`を設定した場合だけ`bbox`も利用でき
 配布 URL は API response から取得し、推測しません。
 CKANが広告する `format` はExecution Adapterと共有するcanonical名へ小文字で正規化し、
 `GeoPackage`と`gpkg`はどちらも `Resource.format="gpkg"` として扱います。Providerの
-元表記はResource candidateのattributesとraw metadataに保持します。
+元表記は`resource.provenance.raw["resource"]["format"]`から確認できます。
 
 ## 解決する例
 
