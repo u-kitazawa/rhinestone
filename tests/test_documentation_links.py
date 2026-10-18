@@ -58,6 +58,12 @@ def test_example_index_lists_each_runnable_example() -> None:
     assert expected <= targets
 
 
+def test_ckan_guide_locates_original_format_in_resource_provenance() -> None:
+    guide = (ROOT / "docs" / "api" / "adapters" / "ckan.md").read_text(encoding="utf-8")
+    assert "Resource candidate" not in guide
+    assert 'resource.provenance.raw["resource"]["format"]' in guide
+
+
 def test_adapter_guides_use_current_public_resource_contract() -> None:
     """These guides must not reintroduce the retired model or method names."""
     for name in ("static", "dcat", "geospatial-jp", "search-ckan-jp", "mlit-dpf"):
