@@ -116,22 +116,33 @@ Context、および `rhinestone.adapters.ports` の Port です。内部 Registr
 process-global な登録、package 自動発見には依存しないでください。任意の third-party
 Python は利用者の trust boundary 内で、`configure()` 時に明示的に合成します。
 
-認証付き HTTP は secret を自前の header に埋め込まず、`context.credentials.get(name)` を
-使います。`context.transport.get_json()` / `get_text()` と DestinationPolicy を使うことで、
-組み込み transport のエラー分類と通信先制限を維持できます。`credential=` に渡す値は
-Credential の論理名であり、secret そのものではありません。`headers` を渡す場合も secret を
-Adapter の設定や Resource に保存しないでください。
+認証付きHTTPでは、Credential factoryを評価する前にDestinationPolicyで宛先を認可し、
+`context.credentials.get(name)`でsecretを取得します。必要な認証headerはリクエスト時だけ
+組み立て、Adapterの設定やResourceに保存しないでください。
+`context.transport`の`credential=`は宛先認可用の論理名であり、secretを自動取得・注入しません。
+transportは送信時にも宛先を認可し、通信エラーを分類します。
+
+次はBearer認証の提供元向けの例です。factoryが受け取った`provider`と`context`を渡します。
+Providerの`endpoint`には信頼済みの実行宛先、`credential`には`custom-api-key`を構成し、
+同じ論理名のCredential factoryを`configure(credentials=...)`に登録してください。
+認証headerの方式はProviderの公式仕様に合わせます。
 
 ```python
-document = context.transport.get_text(
-    "https://custom.example/catalog",
-    {"Accept": "text/turtle"},
-    credential="custom-api-key",
-)
-payload = context.transport.get_json(
-    "https://custom.example/api/items",
-    {"limit": 10},
-)
+def authenticated_document(provider, context, url):
+    name = "custom-api-key"
+    context.destination_policy.authorize(
+        url,
+        credentialed=True,
+        provider=context.provider_id,
+        service=provider.adapter_type,
+        credential=name,
+    )
+    secret = context.credentials.get(name)
+    return context.transport.get_text(
+        url,
+        {"Accept": "text/turtle", "Authorization": "Bearer " + secret},
+        credential=name,
+    )
 ```
 
 Resource の URI や Source endpoint に userinfo（`https://user:password@...`）を埋め込んでは
