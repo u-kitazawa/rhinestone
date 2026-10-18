@@ -65,9 +65,14 @@ media type 対応を Source Adapter 間で共有する。format が明示され�
 ## 共通の非対応
 
 - GDAL、Rasterio、pyogrio、PyArrow 等を使った format 変換や GIS 処理
-- HTML scraping、redirect の追跡、曖昧な Resource・format・URL の推測
+- HTML scraping、曖昧な Resource・format・URL の推測
 - GeoDataFrame、GeoJSON、Arrow、xarray 等への強制変換
 - provider API や外部runtime dependency の version 管理
 - 表にない provider、認証方式、protocol、archive 形式
+
+redirectの扱いは通信経路によって異なります。組み込みtransportの公開JSON GETは
+Python標準urllibのredirect処理を使用します。Credential付きJSON GET、text GET、
+JSON POST、CoreのJSON serviceはredirectを追跡しません。GDAL、Rasterio、pyogrioへ
+委譲した実データ通信のredirect処理は、各Runtimeの責務です。
 
 新たな対応は、Source Adapter、Resource / AccessPlan、Execution Adapter の変換、fixture による適合テストを一つの垂直スライスとして追加する。

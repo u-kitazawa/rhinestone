@@ -89,6 +89,22 @@ def test_adapter_guides_use_current_public_resource_contract() -> None:
         assert re.search(r"(?<![A-Za-z])Config(?![A-Za-z])", readme) is None, path
 
 
+def test_compatibility_distinguishes_http_redirect_boundaries() -> None:
+    guide = (ROOT / "docs" / "compatibility.md").read_text(encoding="utf-8")
+    assert "HTML scraping、redirect の追跡" not in guide
+    assert "JSON GET" in guide
+    assert "JSON POST" in guide
+    assert "JSON service" in guide
+
+
+def test_ckan_tutorial_explains_binding_a_planned_resource() -> None:
+    guide = (ROOT / "docs" / "tutorials" / "ckan-pyogrio.md").read_text(
+        encoding="utf-8"
+    )
+    assert "app.load(selected)`で配布URLを取得" not in guide
+    assert "再問い合わせせず" in guide
+
+
 def test_runtime_and_extension_guides_use_current_contracts() -> None:
     """Runtime and extension instructions must use load and plan boundaries."""
     for name in ("runtimes", "dependency-policy", "custom-adapters"):

@@ -145,12 +145,7 @@ def test_ckan_pyogrio_tutorial_filters_formats_before_opening(
                     ],
                 },
             }
-        if url.endswith("/resource_show"):
-            assert params == {"id": "vector"}
-            return {"success": True, "result": vector_resource}
-        assert url.endswith("/package_show")
-        assert params == {"id": "vector-package"}
-        return {"success": True, "result": package}
+        pytest.fail("a planned search Resource must not request metadata again")
 
     class Frame:
         columns = ("geometry", "name")
