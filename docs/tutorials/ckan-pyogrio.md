@@ -60,9 +60,11 @@ CKANのpackage検索はdataset単位の結果をdistributionごとに展開し�
 `FormatPreset.PYOGRIO`で、対象Resourceが宣言するベクター形式だけを選びます。
 raw metadataを利用者側で解釈したり、別Resourceの形式を流用したりする必要はありません。
 CKAN Adapterは形式照合後の結果に`limit=20`を適用し、必要なら次のpackage pageを取得します。
-`Resource.formats`で検索時の形式を確認できます。この検索結果は配布URLとAccessPlanを既に持つため、
-`app.load(selected)`はProviderへ再問い合わせせず、現在のアプリケーションへbindします。
-この呼び出しは必須ではなく、`selected.open("pyogrio", runtime=pyogrio)`でも開けます。
+`Resource.formats`で検索時の形式を確認できます。選択した検索結果が配布URLとAccessPlanを
+既に持つ場合、`app.load(selected)`はProviderへ再問い合わせせず、現在のアプリケーションへbindします。
+検索応答にURLがなく`selected.access_plan is None`の場合は、`resource_show`と`package_show`で
+配布情報を追加取得します。形式による絞り込みだけでは、AccessPlanの存在を保証しません。
+明示的なloadは必須ではなく、`selected.open("pyogrio", runtime=pyogrio)`でも、必要ならloadして開けます。
 `resource.open("pyogrio", runtime=pyogrio)`が選択済みURIをpyogrioへ渡します。ZIP の場合は、選択済みの
 `archive` と任意の `entry_point` から GDAL VSI URI を組み立てます。
 利用者が所有する実体は`resource.open("pyogrio", runtime=pyogrio)`へ明示的に渡します。導入方法と

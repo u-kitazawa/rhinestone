@@ -103,6 +103,8 @@ def test_ckan_tutorial_explains_binding_a_planned_resource() -> None:
     )
     assert "app.load(selected)`で配布URLを取得" not in guide
     assert "再問い合わせせず" in guide
+    assert "selected.access_plan is None" in guide
+    assert "`resource_show`と`package_show`" in guide
 
 
 def test_runtime_and_extension_guides_use_current_contracts() -> None:
