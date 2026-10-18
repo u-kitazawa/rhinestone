@@ -1,22 +1,23 @@
 # Rhinestone Showcase
 
-`showcase/` は、Rhinestone の主要フローを実行済みの Jupyter Notebook として確認するための入口です。
-各 Notebook は上から順に実行でき、保存された出力から `Resource`、`Resource`、`AccessPlan` を
-確認できます。短い使い方は [`examples/`](../examples/README.md)、手順中心の解説は
+`showcase/` は、Rhinestone の主要フローを Jupyter Notebook で確認するための入口です。
+01は実行済みの保存出力から`Resource`と`AccessPlan`を確認できます。
+02〜04はlive Providerを利用するため保存出力を空にしてあり、入力・依存を準備して上から順に実行します。
+短い使い方は [`examples/`](../examples/README.md)、手順中心の解説は
 [`docs/tutorials/`](../docs/tutorials/index.md) を参照してください。
 
 ## Notebook
 
 | Notebook | 内容 | 外部通信 | 追加 Runtime |
 | --- | --- | --- | --- |
-| [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Resource` を `Resource` へ解決して来歴と AccessPlan を確認 | 不要 | 不要 |
+| [01 Search and Resource](01_search_and_resource.ipynb) | 組み込み GSI 定義を検索し、`Resource`の来歴とAccessPlanを確認 | 不要 | 不要 |
 | [02 CKAN Search to Map](02_ckan_search_to_map.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_ckan_search_to_map.ipynb) | 公開 CKAN から明示的なベクター配布物（ZIP Shapefile を含む）を解決し、操作できる Folium ベクターレイヤーとして地理院タイル上に表示 | 必要 | pyogrio、GeoPandas、Folium |
 | [03 STAC COG Preview](03_stac_cog_preview.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_stac_cog_preview.ipynb) | 明示した STAC Item / asset を COG Resource へ解決し、Rasterio で縮小プレビューを表示 | 必要 | Rasterio、Matplotlib |
 | [04 Discovery Lineage](04_discovery_lineage.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_discovery_lineage.ipynb) | search.ckan.jp の発見 record と `direct` target の解決 record を分離して確認 | 必要 | 不要 |
 
 各 Notebook の Colab リンクから、そのまま Google Colab で開けます。ローカルでは
-リポジトリの開発環境を準備して Jupyter 互換環境から開いてください。Colab だけは Notebook 内の
-setup cell が公開パッケージを導入します。
+リポジトリの開発環境を準備して Jupyter 互換環境から開いてください。Notebook内の
+setup cellが固定コミットのRhinestoneと、必要に応じて固定バージョンの追加Runtimeを導入します。
 
 ## 02 — CKAN を検索して地図に表示する
 
@@ -30,8 +31,8 @@ G 空間情報センターの公開 CKAN を検索し、明示的に広告され
 Notebookで `Reference` や `configure()` を組み立てる必要はありません。他のProviderへの検索・通信は行いません。
 
 ```text
-search(format=PYOGRIO) -> Resource.resolve -> vector Resource -> AccessPlan
-    -> open -> GeoDataFrame -> Folium map
+search(format=PYOGRIO) -> Resource -> open(runtime=pyogrio)
+    -> GeoDataFrame -> Folium map
 ```
 
 この Notebook は live Provider を利用します。検索結果、配布 URL、公開状態は提供元によって変わるため、
@@ -85,7 +86,7 @@ URLや識別子を推測せず明示的に停止します。通常 CI では構�
   ではありません。
 - `uri` は外部データの所在地を示しますが、最初の Notebook はデータ本体を取得せず、`open()` も実行しません。
 - CKAN Notebook では、Rhinestone は検索、選択した配布物の解決、`Resource` と `AccessPlan` の決定、
-  および登録済み Runtime への委譲までを担います。明示済み ZIP AccessPlan は VSI URI に翻訳します。表示、地理院タイルの取得、操作できる地図レイヤー、
+  およびopen時に渡したRuntimeへの委譲までを担います。明示済み ZIP AccessPlan は VSI URI に翻訳します。表示、地理院タイルの取得、操作できる地図レイヤー、
   解析、形式変換は pyogrio、GeoPandas、Folium など downstream library の責務です。背景タイルは追加の
   ネットワーク接続と[地理院タイルの利用条件](https://maps.gsi.go.jp/development/ichiran.html#std)に従います。
 - Discovery lineage Notebook では、Rhinestone は発見側 record を `Resource.discovery`、解決側 record を `Resource` 本体として分離して保持します。表示や解析は行わず、live Provider の完全実行は通常 CI の必須条件にしません。
