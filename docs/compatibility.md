@@ -44,7 +44,7 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 | Execution Adapter | 対応 format / access | 非対応・注意点 |
 | --- | --- | --- |
 | `gdal` | `shapefile`、`geotiff`、`cog`、`netcdf`、`wms`、`gml`、`kml`、`citygml`、GSI XYZ tile | 明示されたZIP AccessPlanを`/vsizip/` URIへ変換する。pyogrioもZIP変換に対応する。上記以外のformatは選択しない。 |
-| `rasterio` | `cog`、`geotiff` | URI と option をそのまま `rasterio.open()` へ渡す。archive 展開や format 変換はしない。 |
+| `rasterio` | `cog`、`geotiff` | URI のみを `rasterio.open()` へ渡す。`AccessPlan.options`は引数として転送せず、archive 展開や format 変換はしない。 |
 | `pyogrio` | representation registry で `vector` と明示された `shapefile`、`geojson`、`gpkg`、`flatgeobuf`、`gml`、`kml`、`citygml` | URI と encoding を `read_dataframe()` へ渡す。明示された ZIP AccessPlan は GDAL VSI URI に変換する。URI suffix や archive内容から形式・memberを推測せず、環境に対応 driver がない場合は `ResourceAccessError`。 |
 | `json-service` | `application/json` の ODPT service query | 組み込みHTTP runtimeとODPT用request preparerを使用する。他providerのJSON APIを汎用的に実行しない。 |
 
