@@ -107,16 +107,20 @@ class Provider:
     settings: Mapping[str, Any] = field(default_factory=_empty_mapping)
 
     def __post_init__(self) -> None:
-        if not self.id:
+        raw_id = cast(object, self.id)
+        if not isinstance(raw_id, str) or not raw_id.strip():
             raise ConfigValidationError(
                 "source id must be a non-empty string; set Provider.id to the "
                 "configured source identifier"
             )
-        if not self.adapter_type:
+        raw_adapter_type = cast(object, self.adapter_type)
+        if not isinstance(raw_adapter_type, str) or not raw_adapter_type.strip():
             raise ConfigValidationError(
                 "adapter_type must be a non-empty string; choose a "
                 "registered source adapter type"
             )
+        if not isinstance(cast(object, self.settings), Mapping):
+            raise ConfigValidationError("Provider.settings must be a mapping")
         object.__setattr__(self, "settings", _freeze(self.settings))
 
 
