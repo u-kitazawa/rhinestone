@@ -54,6 +54,17 @@ def notebook_source(notebook: dict[str, Any]) -> str:
     return "".join(source)
 
 
+def test_showcase_explanations_use_current_api_and_pinned_setup() -> None:
+    readme = (SHOWCASE / "README.md").read_text(encoding="utf-8")
+    assert "Resource.resolve" not in readme
+    assert "固定コミット" in readme
+    offline = notebook_source(load_notebook(OFFLINE_NOTEBOOK))
+    assert "Resultを調べる" not in offline
+    ckan = notebook_source(load_notebook(MAP_NOTEBOOK))
+    assert "最新 develop" not in ckan
+    assert "固定コミット" in ckan
+
+
 def test_offline_showcase_has_portable_metadata_and_executed_cells() -> None:
     notebook = load_notebook(OFFLINE_NOTEBOOK)
 
