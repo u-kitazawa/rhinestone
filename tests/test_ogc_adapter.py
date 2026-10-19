@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
@@ -8,6 +10,65 @@ from tests.provider_support import (
     ResponseJsonClient,
     fixture_json,
 )
+
+
+@pytest.mark.parametrize("invalid_feature", [None, True, 1, "fixture-secret", [], [{}]])
+def test_public_ogc_search_isolates_non_object_features(
+    monkeypatch: pytest.MonkeyPatch, invalid_feature: object
+) -> None:
+    import rhinestone._http as http  # pyright: ignore[reportPrivateUsage]
+    from rhinestone import Catalog, Provider, configure
+
+    first = fixture_json("ogc/feature_collection.json")["features"][0]
+    second = {**first, "id": "river-2"}
+
+    def get_json(*args: Any, **kwargs: Any) -> dict[str, object]:
+        return {"features": [first, invalid_feature, second]}
+
+    monkeypatch.setattr(http, "get_json", get_json)
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider(
+                    "rivers",
+                    "ogc-features",
+                    {"endpoint": "https://features.example", "collection_id": "rivers"},
+                ),
+            )
+        )
+    )
+
+    results = app.search()
+
+    assert [r.reference.resource_identifier for r in results] == ["river-1", "river-2"]
+    assert results[0].metadata.raw["geometry"]["type"] == first["geometry"]["type"]
+    assert results[0].metadata.raw["geometry"]["coordinates"] == tuple(
+        tuple(point) for point in first["geometry"]["coordinates"]
+    )
+    assert len(results.diagnostics) == 1
+    diagnostic = results.diagnostics[0]
+    assert diagnostic.source_id == "rivers"
+    assert diagnostic.reason == "item_skipped"
+    assert diagnostic.detail == "invalid_feature"
+    assert diagnostic.resource_identifier is None
+    assert "fixture-secret" not in repr(results.diagnostics)
+
+
+@pytest.mark.parametrize("features", [None, "invalid", 1, False])
+def test_ogc_rejects_invalid_feature_container(features: object) -> None:
+    adapter = OgcFeaturesAdapter(
+        endpoint="https://features.example",
+        collection_id="rivers",
+        get_json=RecordingJsonClient(
+            {
+                "https://features.example/collections/rivers/items": {
+                    "features": features
+                }
+            }
+        ),
+    )
+    with pytest.raises(ProviderResponseError, match="OGC features"):
+        adapter.search(SearchQuery())
 
 
 def test_ogc_collection_items_link_becomes_service_resource() -> None:

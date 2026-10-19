@@ -9,6 +9,10 @@
 検索用Providerの`settings`へ`endpoint`と検索対象の`collection_id`を指定します。
 検索には`bbox`、`time`、`limit`を使えます。
 
+`features`配列に混在する非object値や、ID・propertiesが不正なFeatureは、
+`item_skipped` / `invalid_feature`の診断付きで除外し、正常なFeatureの順序とmetadataを保持します。
+`features`自体の欠落・null・不正な型は、応答全体の`ProviderResponseError`として扱います。
+
 直接loadでは、Reference側にも`parameters={"collection_id": "rivers"}`、または
 `dataset_identifier="rivers"`の指定が必須です。Providerの検索用`collection_id`は
 直接loadの既定値にはなりません。任意の`feature_id`は`Reference.parameters`で指定できます。

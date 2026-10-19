@@ -1,7 +1,7 @@
 """OGC API Features 1.0 source adapter."""
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from ....errors import ConfigValidationError, ProviderResponseError
 from ....models import (
@@ -110,14 +110,21 @@ class OgcFeaturesAdapter(ProviderAdapter):
         collection_path = self._encode_path_segment(self._collection_id)
         items_url = f"{endpoint}/collections/{collection_path}/items"
         response = self._request(items_url, params)
-        features = self._objects(response.get("features"), "OGC features")
+        raw_features = response.get("features")
+        features = (
+            cast(list[Any], raw_features)
+            if isinstance(raw_features, list)
+            else self._objects(raw_features, "OGC features")
+        )
         found: list[Resource] = []
         diagnostics: list[SearchDiagnostic] = []
-        for feature in features:
-            feature_id = _optional_string(feature.get("id"))
-            if feature_id is not None and not feature_id.strip():
-                feature_id = None
+        for raw_feature in features:
+            feature_id = None
             try:
+                feature = self._object(raw_feature, "OGC feature")
+                feature_id = _optional_string(feature.get("id"))
+                if feature_id is not None and not feature_id.strip():
+                    feature_id = None
                 if not feature_id:
                     raise ProviderResponseError(
                         "OGC feature id must be a non-empty string"
