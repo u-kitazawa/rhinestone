@@ -26,6 +26,59 @@ EXAMPLE_NAMES: tuple[str, ...] = (
 )
 
 
+def test_example_readmes_describe_current_reference_and_search_contracts() -> None:
+    for name in EXAMPLE_NAMES:
+        instructions = (EXAMPLES_ROOT / name / "README.md").read_text(encoding="utf-8")
+        assert "Config" not in instructions, name
+
+    gdal = (EXAMPLES_ROOT / "05_gdal_dependency" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "`Reference.parameters`" in gdal
+    search = (EXAMPLES_ROOT / "07_search_and_fetch" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "通常の解決フローへ渡す" not in search
+    assert "検索結果が1件以上" in search
+    assert "データ本体を開いたりはしません" in search
+
+
+def test_search_example_only_inspects_search_results(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import rhinestone
+    from rhinestone import Reference, Resource, configure
+
+    resource = configure().load(
+        Reference(
+            "direct",
+            parameters={
+                "uri": "https://example.invalid/data.geojson",
+                "format": "geojson",
+            },
+        )
+    )
+    queries: list[object] = []
+
+    def search(query: object) -> dict[str, list[Resource]]:
+        queries.append(query)
+        return {"geospatial-jp": [resource]}
+
+    # No load/open methods: either extra resolution or execution must fail.
+    def configure_fixture(**_: Any) -> SimpleNamespace:
+        return SimpleNamespace(search=search)
+
+    monkeypatch.setattr(rhinestone, "configure", configure_fixture)
+    monkeypatch.setenv("RHINESTONE_QUERY", "fixture")
+    runpy.run_path(str(EXAMPLES_ROOT / "07_search_and_fetch" / "example.py"))
+
+    assert len(queries) == 1
+    output = capsys.readouterr().out
+    assert f"selected resource: {resource.uri}" in output
+    assert "metadata:" in output
+    assert "provenance:" in output
+
+
 @pytest.mark.parametrize("records", [[], [{"owl:sameAs": "odpt.Station:Fixture"}]])
 def test_odpt_example_runs_with_core_json_service_without_live_network(
     monkeypatch: pytest.MonkeyPatch,
