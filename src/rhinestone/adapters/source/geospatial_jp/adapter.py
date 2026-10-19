@@ -14,7 +14,11 @@ from ....models import (
     SearchQuery,
 )
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
-from .._ckan_resources import package_objects, resource_objects
+from .._ckan_resources import (
+    filtered_resource_package,
+    package_objects,
+    resource_objects,
+)
 from ..base import JsonObject
 from ..ckan import CkanAdapter
 
@@ -294,11 +298,13 @@ class GeospatialJpAdapter(CkanAdapter):
                 groups: list[list[Resource]] = []
                 for package, request in candidates:
                     group: list[Resource] = []
-                    for resource in resource_objects(
+                    resources = resource_objects(
                         package.get("resources"), self.adapter_type, diagnostics
-                    ):
+                    )
+                    safe_package = filtered_resource_package(package, resources)
+                    for resource in resources:
                         item = self._search_resource_result(
-                            package, resource, endpoint, query, diagnostics
+                            safe_package, resource, endpoint, query, diagnostics
                         )
                         if item is None:
                             continue

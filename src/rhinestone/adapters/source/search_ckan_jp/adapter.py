@@ -22,7 +22,11 @@ from ....models import (
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
-from .._ckan_resources import package_objects, resource_objects
+from .._ckan_resources import (
+    filtered_resource_package,
+    package_objects,
+    resource_objects,
+)
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
@@ -180,7 +184,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 and (not uri or not is_valid_http_authority(uri))
             )
         }
-        safe_package: JsonObject = package
+        safe_package = filtered_resource_package(package, resources)
         if invalid_urls:
             safe_package = {
                 **package,

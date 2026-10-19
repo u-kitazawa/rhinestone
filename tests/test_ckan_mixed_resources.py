@@ -13,7 +13,8 @@ from rhinestone import Catalog, Provider, configure
     "adapter_type", ["ckan", "geospatial-jp", "plateau", "search-ckan-jp"]
 )
 @pytest.mark.parametrize(
-    "invalid_resource", [None, False, 1, "fixture-secret", [], [{}]]
+    "invalid_resource",
+    [None, False, 1, "https://user:fixture-secret@data.example/private.csv", [], [{}]],
 )
 def test_public_search_isolates_non_object_resources(
     monkeypatch: pytest.MonkeyPatch, adapter_type: str, invalid_resource: object
@@ -57,6 +58,15 @@ def test_public_search_isolates_non_object_resources(
     assert diagnostic.detail == "invalid_resource"
     assert diagnostic.resource_identifier is None
     assert "fixture-secret" not in repr(results.diagnostics)
+    for resource in results:
+        assert [r["id"] for r in resource.metadata.raw["resources"]] == [
+            "first",
+            "second",
+        ]
+        assert "fixture-secret" not in repr(resource.metadata.raw)
+        assert "fixture-secret" not in repr(resource.provenance.raw)
+        assert "fixture-secret" not in repr(resource)
+        assert "fixture-secret" not in repr(resource.to_dict())
 
 
 @pytest.mark.parametrize(

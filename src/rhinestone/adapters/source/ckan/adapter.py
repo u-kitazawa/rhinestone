@@ -23,7 +23,11 @@ from ....representations import (
 )
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
-from .._ckan_resources import package_objects, resource_objects
+from .._ckan_resources import (
+    filtered_resource_package,
+    package_objects,
+    resource_objects,
+)
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -165,7 +169,7 @@ class CkanAdapter(ProviderAdapter):
                     for index, resource in enumerate(resources)
                     if self._invalid_resource_url(resource)
                 }
-                safe_package: JsonObject = package
+                safe_package = filtered_resource_package(package, resources)
                 if invalid_urls:
                     safe_package = {
                         **package,

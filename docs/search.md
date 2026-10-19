@@ -56,7 +56,8 @@ Resource URLを返した場合、該当Resourceだけを`detail="invalid_resourc
 
 CKAN、G空間、PLATEAU、search.ckan.jpの検索では、`resources`配列に混在する
 null・文字列などの非object値を`detail="invalid_resource"`として除外し、正常な配布の
-結果順・metadata・来歴を保持します。`resources`自体がnullや数値などの不正な型の場合は
+結果順・metadata・来歴を保持します。除外した非object値は正常な配布が返すraw metadataや
+来歴にも残しません。`resources`自体がnullや数値などの不正な型の場合は
 Provider全体の応答エラーです。既存の単一object形式の受け入れは維持します。
 Dataset/package配列内の非object値も`detail="invalid_dataset"`で除外します。
 次ページの位置は除外前の受信Dataset件数で進め、正常な配布がないDatasetでも探索を継続します。

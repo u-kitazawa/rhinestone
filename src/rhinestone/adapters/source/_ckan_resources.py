@@ -55,3 +55,13 @@ def package_objects(
                 )
             )
     return tuple(found)
+
+
+def filtered_resource_package(
+    package: JsonObject, resources: tuple[JsonObject, ...]
+) -> JsonObject:
+    """Remove quarantined members from the raw metadata of valid siblings."""
+    original = package.get("resources")
+    if isinstance(original, list) and len(cast(list[Any], original)) != len(resources):
+        return {**package, "resources": list(resources)}
+    return package
