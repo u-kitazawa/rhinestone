@@ -23,7 +23,7 @@ from ....representations import (
 )
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
-from .._ckan_resources import resource_objects
+from .._ckan_resources import package_objects, resource_objects
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -151,8 +151,12 @@ class CkanAdapter(ProviderAdapter):
                 self._action(endpoint, "package_search", page_params),
                 "CKAN search result",
             )
-            packages = self._objects(result.get("results"), "CKAN search results")
+            packages = package_objects(
+                result.get("results"), self.adapter_type, diagnostics
+            )
             for package in packages:
+                if package is None:
+                    continue
                 resources = resource_objects(
                     package.get("resources"), self.adapter_type, diagnostics
                 )
