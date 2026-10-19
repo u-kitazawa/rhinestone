@@ -22,6 +22,7 @@ from ....models import (
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
+from .._ckan_resources import resource_objects
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
@@ -164,7 +165,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
         publisher = organization_title(package.get("organization"))
         license_name = optional_string(package.get("license_title"))
         site_url = optional_string(package.get("xckan_site_url"))
-        resources = self._objects(package.get("resources"), "search.ckan.jp resources")
+        resources = resource_objects(
+            package.get("resources"), self.adapter_type, diagnostics
+        )
         invalid_urls = {
             index
             for index, resource in enumerate(resources)
