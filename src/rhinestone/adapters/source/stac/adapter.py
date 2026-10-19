@@ -162,6 +162,8 @@ class StacAdapter(ProviderAdapter):
             raise ConfigValidationError(
                 f"Unsupported STAC search conditions: {', '.join(sorted(unsupported))}"
             )
+        if query.limit == 0:
+            return ProviderSearchResults((), ())
         params = self._query_parameters(query)
         if collections:
             params["collections"] = ",".join(collections)
