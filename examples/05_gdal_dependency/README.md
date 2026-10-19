@@ -17,6 +17,7 @@ export RHINESTONE_GDAL_FORMAT="geotiff"
 python examples/05_gdal_dependency/example.py
 ```
 
-リモートのZIP Shapefileを使う場合は、形式を`shapefile`にし、Configでアーカイブと文字コードを明示します。
+このスクリプトが環境変数から受け取る設定はURIと形式だけです。リモートのZIP Shapefileを使う場合は、
+`example.py`の`Reference.parameters`で形式を`shapefile`にし、`archive="zip"`と必要な`encoding`を明示してください。
 `/vsicurl/`の利用可否はGDALのビルド方法に依存します。Rhinestone CoreがGDALをインストールしたり、
 暗黙にimportしたりすることはありません。
