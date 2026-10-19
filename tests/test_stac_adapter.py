@@ -20,6 +20,58 @@ from tests.provider_support import (
 )
 
 
+@pytest.mark.parametrize("invalid_item", [None, False, 1, "fixture-secret", [], [{}]])
+def test_public_stac_search_isolates_non_object_items(
+    monkeypatch: pytest.MonkeyPatch, invalid_item: object
+) -> None:
+    import rhinestone._http as http  # pyright: ignore[reportPrivateUsage]
+    from rhinestone import Catalog, Provider, configure
+
+    first = fixture_json("stac/item_collection.json")["features"][0]
+    second = {**first, "id": "scene-2"}
+
+    def get_json(*args: Any, **kwargs: Any) -> dict[str, object]:
+        return {"features": [first, invalid_item, second]}
+
+    monkeypatch.setattr(http, "get_json", get_json)
+    app = configure(
+        catalog=Catalog(
+            (Provider("imagery", "stac", {"endpoint": "https://stac.example"}),)
+        )
+    )
+
+    results = app.search()
+
+    assert [r.reference.resource_identifier for r in results] == [
+        "scene-1:visual",
+        "scene-2:visual",
+    ]
+    assert results[0].metadata.title == "Tokyo scene"
+    assert results[0].metadata.raw["bbox"] == tuple(first["bbox"])
+    assert results[0].provenance.resource_identifier == "scene-1:visual"
+    assert len(results.diagnostics) == 1
+    diagnostic = results.diagnostics[0]
+    assert diagnostic.source_id == "imagery"
+    assert diagnostic.reason == "item_skipped"
+    assert diagnostic.detail == "invalid_item"
+    assert diagnostic.resource_identifier is None
+    assert "fixture-secret" not in repr(results.diagnostics)
+
+
+@pytest.mark.parametrize(
+    "features", [None, "invalid", 1, False, {}, {"id": "scene-1", "assets": {}}]
+)
+def test_stac_api_rejects_invalid_feature_container(features: object) -> None:
+    adapter = StacAdapter(
+        endpoint="https://stac.example",
+        get_json=RecordingJsonClient(
+            {"https://stac.example/search": {"features": features}}
+        ),
+    )
+    with pytest.raises(ProviderResponseError, match="STAC features"):
+        adapter.search(SearchQuery())
+
+
 def test_stac_load_selects_only_the_explicit_asset_and_preserves_item() -> None:
     endpoint = "https://stac.example"
     item_url = endpoint + "/collections/sentinel-2/items/scene-1"

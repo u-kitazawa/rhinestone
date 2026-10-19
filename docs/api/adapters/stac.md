@@ -17,6 +17,11 @@ Provider の `settings` へAPI型は `endpoint`、静的型は `catalog_uri` を
 静的型ではItemの配信URIを `item_href` に指定します（検索結果のReferenceには保持済み）。
 検索には `bbox`、`time`、`limit` を使えます。
 
+API型の`features`配列に混在する非object値や不正Itemは、
+`item_skipped` / `invalid_item`の診断付きで除外し、正常なItemの結果順とmetadataを保持します。
+`features`自体の欠落、またはobject・nullなどの配列以外の値は、
+応答全体の`ProviderResponseError`として扱います。
+
 静的型のbbox交差判定はItemの4座標bboxを使います。検索範囲またはItemが日付変更線を
 跨ぐ場合（`west > east`）も両側の経度区間を比較し、接する境界を含めます。
 `180°`と`-180°`は同じ境界として扱います。
