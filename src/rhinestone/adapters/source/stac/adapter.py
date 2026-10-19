@@ -168,14 +168,19 @@ class StacAdapter(ProviderAdapter):
         if collections:
             params["collections"] = ",".join(collections)
         response = self._request(f"{endpoint}/search", params)
-        items = self._objects(response.get("features"), "STAC features")
+        raw_items = response.get("features")
+        if not isinstance(raw_items, list):
+            raise ProviderResponseError("STAC features must be an array")
+        items = cast(list[Any], raw_items)
         found: list[Resource] = []
         diagnostics: list[SearchDiagnostic] = []
-        for item in items:
-            item_id = _optional_string(item.get("id"))
-            if item_id is not None and not item_id.strip():
-                item_id = None
+        for raw_item in items:
+            item_id = None
             try:
+                item = self._object(raw_item, "STAC item")
+                item_id = _optional_string(item.get("id"))
+                if item_id is not None and not item_id.strip():
+                    item_id = None
                 item_results = self._item_resources(item, f"{endpoint}/search", params)
             except (ConfigValidationError, ProviderResponseError):
                 diagnostics.append(
