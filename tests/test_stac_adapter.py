@@ -94,6 +94,36 @@ def test_stac_search_and_load_match_documented_media_type_contract(
     assert client.calls == [(endpoint + "/search", {}), (item_url, {})]
 
 
+@pytest.mark.parametrize("provider_count", [0, 1, 2])
+def test_stac_api_zero_limit_returns_no_resources_without_requests(
+    monkeypatch: pytest.MonkeyPatch, provider_count: int
+) -> None:
+    import rhinestone._http as http  # pyright: ignore[reportPrivateUsage]
+    from rhinestone import Catalog, Provider, configure
+
+    endpoint = "https://stac.example"
+    client = RecordingJsonClient(
+        {endpoint + "/search": fixture_json("stac/item_collection.json")}
+    )
+    if provider_count == 0:
+        results = StacAdapter(endpoint=endpoint, get_json=client).search(
+            SearchQuery(limit=0)
+        )
+    else:
+        monkeypatch.setattr(http, "get_json", client)
+        app = configure(
+            catalog=Catalog(
+                tuple(
+                    Provider(f"stac-{index}", "stac", {"endpoint": endpoint})
+                    for index in range(provider_count)
+                )
+            )
+        )
+        results = app.search(limit=0)
+    assert len(results) == 0
+    assert client.calls == []
+
+
 def test_stac_search_maps_spatial_temporal_and_collection_conditions() -> None:
     endpoint = "https://stac.example"
     search_url = endpoint + "/search"
