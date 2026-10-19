@@ -54,7 +54,9 @@ def test_public_ogc_search_isolates_non_object_features(
     assert "fixture-secret" not in repr(results.diagnostics)
 
 
-@pytest.mark.parametrize("features", [None, "invalid", 1, False])
+@pytest.mark.parametrize(
+    "features", [None, "invalid", 1, False, {}, {"id": "river-1", "properties": {}}]
+)
 def test_ogc_rejects_invalid_feature_container(features: object) -> None:
     adapter = OgcFeaturesAdapter(
         endpoint="https://features.example",

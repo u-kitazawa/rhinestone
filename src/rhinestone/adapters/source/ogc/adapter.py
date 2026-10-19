@@ -111,11 +111,9 @@ class OgcFeaturesAdapter(ProviderAdapter):
         items_url = f"{endpoint}/collections/{collection_path}/items"
         response = self._request(items_url, params)
         raw_features = response.get("features")
-        features = (
-            cast(list[Any], raw_features)
-            if isinstance(raw_features, list)
-            else self._objects(raw_features, "OGC features")
-        )
+        if not isinstance(raw_features, list):
+            raise ProviderResponseError("OGC features must be an array")
+        features = cast(list[Any], raw_features)
         found: list[Resource] = []
         diagnostics: list[SearchDiagnostic] = []
         for raw_feature in features:
