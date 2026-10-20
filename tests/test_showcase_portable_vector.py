@@ -14,8 +14,8 @@ from rhinestone.errors import ResourceAccessError
 from rhinestone.models import SearchDiagnostic
 
 ROOT = Path(__file__).parents[1] / "showcase"
-PRODUCER = "05_vector_discover_open.ipynb"
-RECEIVER = "06_portable_vector.ipynb"
+PRODUCER = "02_open_vector.ipynb"
+RECEIVER = "03_portable_vector.ipynb"
 URI = (
     "https://nasu-ckan.s3.amazonaws.com/ckan/resources/"
     "d94a1299-e0fb-4c9a-9a9f-aac7dcb97763/011201.json"

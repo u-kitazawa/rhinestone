@@ -6,7 +6,7 @@ from typing import Any, cast
 
 ROOT = Path(__file__).parents[1]
 SHOWCASE = ROOT / "showcase"
-LINEAGE_NOTEBOOK = SHOWCASE / "04_discovery_lineage.ipynb"
+LINEAGE_NOTEBOOK = SHOWCASE / "advanced" / "discovery_lineage.ipynb"
 
 
 def load_notebook() -> dict[str, Any]:
@@ -59,7 +59,7 @@ def test_lineage_showcase_pins_setup_compiles_and_keeps_no_output() -> None:
     notebook = load_notebook()
     source = notebook_source(notebook)
 
-    assert "@9ebdbf37126d264de0e38cc71e802b08516e376d" in source
+    assert "@9bae025b08357d23e5f5339c25a777a1445da176" in source
     assert "@develop" not in source
     assert "access_token" not in serialized.casefold()
     assert "authorization" not in serialized.casefold()
@@ -75,5 +75,5 @@ def test_showcase_readme_links_to_lineage_notebook_and_colab() -> None:
     readme = (SHOWCASE / "README.md").read_text(encoding="utf-8")
 
     assert LINEAGE_NOTEBOOK.name in readme
-    assert "blob/develop/showcase/04_discovery_lineage.ipynb" in readme
+    assert "blob/develop/showcase/advanced/discovery_lineage.ipynb" in readme
     assert "発見側と解決側" in readme

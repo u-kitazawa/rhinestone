@@ -1,327 +1,126 @@
-"""Structural checks for committed Showcase notebooks.
-
-Live Provider access and optional GIS runtimes remain outside the normal CI gate.
-"""
+"""Validate the redesigned discovery flow and the advanced STAC boundary."""
 
 import json
-import shlex
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import pytest
 
 import rhinestone
-from rhinestone import Resource
-from rhinestone import api as rhinestone_api
-from rhinestone.models import (
-    AccessPlan,
-    DiscoveryRecord,
-    Metadata,
-    Provenance,
-    Reference,
-)
+from rhinestone import SearchResults
+from rhinestone.models import SearchDiagnostic
+from tests.test_showcase_portable_vector import resource
 
-ROOT = Path(__file__).parents[1]
-SHOWCASE = ROOT / "showcase"
-OFFLINE_NOTEBOOK = SHOWCASE / "01_search_and_resource.ipynb"
-MAP_NOTEBOOK = SHOWCASE / "02_ckan_search_to_map.ipynb"
-RASTER_NOTEBOOK = SHOWCASE / "03_stac_cog_preview.ipynb"
+SHOWCASE = Path(__file__).parents[1] / "showcase"
 
 
-def load_notebook(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    assert isinstance(value, dict)
-    return cast(dict[str, Any], value)
+def notebook(path: str) -> dict[str, Any]:
+    return json.loads((SHOWCASE / path).read_text(encoding="utf-8"))
 
 
-def notebook_cells(notebook: dict[str, Any]) -> list[dict[str, Any]]:
-    value = notebook["cells"]
-    assert isinstance(value, list)
-    cells = cast(list[Any], value)
-    assert all(isinstance(cell, dict) for cell in cells)
-    return [cast(dict[str, Any], cell) for cell in cells]
+def execute(cell_id: str, namespace: dict[str, Any]) -> None:
+    cell = next(c for c in notebook("01_discover.ipynb")["cells"] if c["id"] == cell_id)
+    exec(compile("".join(cell["source"]), cell_id, "exec"), namespace)
 
 
-def notebook_source(notebook: dict[str, Any]) -> str:
-    source: list[str] = []
-    for cell in notebook_cells(notebook):
-        value = cell.get("source", [])
-        assert isinstance(value, list)
-        lines = cast(list[Any], value)
-        assert all(isinstance(line, str) for line in lines)
-        source.extend(cast(list[str], lines))
-    return "".join(source)
-
-
-def test_showcase_explanations_use_current_api_and_pinned_setup() -> None:
-    readme = (SHOWCASE / "README.md").read_text(encoding="utf-8")
-    assert "Resource.resolve" not in readme
-    assert "固定コミット" in readme
-    offline = notebook_source(load_notebook(OFFLINE_NOTEBOOK))
-    assert "Resultを調べる" not in offline
-    ckan = notebook_source(load_notebook(MAP_NOTEBOOK))
-    assert "最新 develop" not in ckan
-    assert "固定コミット" in ckan
-
-
-def test_offline_showcase_has_portable_metadata_and_executed_cells() -> None:
-    notebook = load_notebook(OFFLINE_NOTEBOOK)
-
-    assert notebook["nbformat"] == 4
-    assert notebook["metadata"]["kernelspec"]["name"] == "python3"
-    assert notebook["metadata"]["colab"]["name"] == OFFLINE_NOTEBOOK.name
-
-    code_cells = [
-        cell for cell in notebook_cells(notebook) if cell["cell_type"] == "code"
-    ]
-    assert code_cells
-    assert all(cell["execution_count"] is not None for cell in code_cells)
-    assert all("ci" in cell["metadata"].get("tags", []) for cell in code_cells)
-
-    setup_source = "".join(code_cells[0]["source"])
-    assert "@9ebdbf37126d264de0e38cc71e802b08516e376d" in setup_source
-    assert "@develop" not in setup_source
-
-
-def test_offline_showcase_code_compiles_and_runs_offline(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    notebook = load_notebook(OFFLINE_NOTEBOOK)
-    namespace: dict[str, object] = {}
-
-    for index, cell in enumerate(notebook_cells(notebook)):
-        if cell["cell_type"] != "code":
-            continue
-        source = "".join(cell["source"])
-        exec(
-            compile(source, f"{OFFLINE_NOTEBOOK.name}:cell-{index}", "exec"), namespace
-        )
-
-    output = capsys.readouterr().out
-    assert "Providers: ('gsi',)\n" in output
-    assert "Results: 1\n" in output
-    assert "Title: 標準地図\n" in output
-    assert "Provider / dataset: gsi / std\n" in output
-    assert "AccessPlan: AccessPlan (remote-dataset)\n" in output
-
-
-def test_offline_showcase_outputs_are_small_and_contain_no_credentials() -> None:
-    notebook = load_notebook(OFFLINE_NOTEBOOK)
-    outputs = [
-        output
-        for cell in notebook_cells(notebook)
-        for output in cell.get("outputs", [])
-    ]
-    serialized_outputs = json.dumps(outputs, ensure_ascii=False, sort_keys=True)
-
-    assert len(serialized_outputs.encode()) < 50_000
-    lowered = serialized_outputs.lower()
-    for marker in ("api_key", "api-token", "bearer ", "consumer_key", "secret"):
-        assert marker not in lowered
-
-
-def test_ckan_showcase_has_the_complete_explicit_flow() -> None:
-    notebook = load_notebook(MAP_NOTEBOOK)
-
-    assert notebook["nbformat"] == 4
-    assert "kernelspec" in notebook["metadata"]
-    assert any(cell.get("cell_type") == "markdown" for cell in notebook_cells(notebook))
-    source = notebook_source(notebook)
-    assert (
-        "git+https://github.com/u-kitazawa/rhinestone.git@9ebdbf37126d264de0e38cc71e802b08516e376d"
-        in source
-    )
-    for marker in (
-        'text="国土数値 ダム"',
-        'area="津市"',
-        "format=(FormatPreset.PYOGRIO,)",
-        "providers=[ProviderId.GEOSPATIAL_JP]",
-        "result",
-        'resource.open("pyogrio", runtime=pyogrio)',
-        "ZIP Shapefile",
-        "GDAL VSI URI",
-        "import folium",
-        "folium.GeoJson",
-        "map_view.fit_bounds",
-        "cyberjapandata.gsi.go.jp/xyz/std/",
-    ):
-        assert marker in source
-    assert "item.access_plan.archive is None" not in source
-
-
-def test_ckan_showcase_displays_mixed_provider_metadata(
+def test_discover_passes_user_conditions_and_lists_grouped_resources(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    records: tuple[tuple[str, dict[str, Any], str], ...] = (
-        ("geospatial-jp", {"package": {"area": "東京都"}}, "東京都"),
-        ("search-ckan-jp", {"catalog": {"area": "神奈川県"}}, "神奈川県"),
-        ("other", {}, "不明"),
-        ("other", {"package": None}, "不明"),
-    )
-    results = tuple(
-        Resource(
-            uri="https://example.org/school.geojson",
-            format="geojson",
-            media_type="application/geo+json",
-            metadata=Metadata(title="学校", raw=raw),
-            provenance=Provenance(provider=provider),
-            access_plan=AccessPlan(
-                kind="file",
-                uri="https://example.org/school.geojson",
-                format="geojson",
-                media_type="application/geo+json",
-            ),
-            reference=Reference("direct", resource_identifier="school"),
-            discovery=DiscoveryRecord(
-                source_id=provider,
-                metadata=Metadata(title="学校", raw=raw),
-                provenance=Provenance(provider=provider),
-                raw_metadata=raw,
-            ),
-        )
-        for provider, raw, _ in records
-    )
+    selected = resource()
+    results = SearchResults.from_grouped({"fixture": (selected,), "empty": ()})
+    calls: list[dict[str, Any]] = []
 
-    def search(**kwargs: Any) -> tuple[Resource, ...]:
+    def search(**kwargs: Any) -> SearchResults:
+        calls.append(kwargs)
         return results
 
     monkeypatch.setattr(rhinestone, "search", search)
-    cell = notebook_cells(load_notebook(MAP_NOTEBOOK))[4]
-    exec("".join(cell["source"]), {})
-    lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == len(records)
-    for index, (provider, _, area) in enumerate(records):
-        assert lines[index] == f"{index} {provider} 学校 ['geojson'] 地域: {area}"
-
-
-def test_ckan_showcase_keeps_no_stale_execution_output() -> None:
-    serialized = MAP_NOTEBOOK.read_text(encoding="utf-8")
-    notebook = load_notebook(MAP_NOTEBOOK)
-
-    assert "rhinestone-showcase-" not in serialized
-    assert "access_token" not in serialized.casefold()
-    assert "authorization" not in serialized.casefold()
-    assert "Access blocked" not in serialized
-    assert all(
-        cell.get("outputs", []) == []
-        for cell in notebook_cells(notebook)
-        if cell.get("cell_type") == "code"
-    )
-
-
-def test_ckan_showcase_search_and_resolution_run_with_offline_responses(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[str] = []
-
-    def get_json(
-        url: str,
-        params: Mapping[str, Any],
-        headers: Mapping[str, str] | None = None,
-    ) -> dict[str, Any]:
-        assert url.startswith("https://www.geospatial.jp/ckan/api/3/action/")
-        action = url.rsplit("/", 1)[-1]
-        calls.append(action)
-        response = cast(
-            dict[str, Any],
-            json.loads((ROOT / "tests/fixtures/ckan" / f"{action}.json").read_text()),
-        )
-        if action == "package_search":
-            response["result"]["results"][0]["area"] = "三重県_津市"
-            distribution = response["result"]["results"][0]["resources"][0]
-        elif action == "resource_show":
-            distribution = response["result"]
-        else:
-            return response
-        distribution["format"] = "GeoJSON"
-        distribution["mimetype"] = "application/geo+json"
-        distribution["url"] = "https://files.example/river.geojson"
-        return response
-
-    monkeypatch.setattr(rhinestone_api._http, "get_json", get_json)  # pyright: ignore[reportPrivateUsage]
-    rhinestone_api._default_application.cache_clear()  # pyright: ignore[reportPrivateUsage]
     namespace: dict[str, Any] = {}
-    try:
-        notebook = load_notebook(MAP_NOTEBOOK)
-        for cell in notebook_cells(notebook)[4:7]:
+    execute("inputs", namespace)
+    namespace.update(KEYWORD="学校", AREA="東京都")
+    execute("discover", namespace)
+    assert calls[0]["text"] == "学校"
+    assert calls[0]["area"] == "東京都"
+    assert calls[0]["limit"] == 3
+    output = capsys.readouterr().out
+    assert "Provider: fixture Results: 1" in output
+    assert "Provider: empty Results: 0" in output
+    assert "Parks | geojson" in output
+    assert selected.uri in output
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_discover_distinguishes_empty_from_provider_failure(
+    monkeypatch: pytest.MonkeyPatch, failure: bool
+) -> None:
+    diagnostics = (
+        (
+            SearchDiagnostic(
+                "catalog",
+                frozenset(),
+                reason="provider_failure",
+                failure_type="metadata",
+            ),
+        )
+        if failure
+        else ()
+    )
+    results = SearchResults.from_grouped({}, diagnostics=diagnostics)
+
+    def search(**kwargs: Any) -> SearchResults:
+        return results
+
+    monkeypatch.setattr(rhinestone, "search", search)
+    namespace: dict[str, Any] = {}
+    execute("inputs", namespace)
+    with pytest.raises(ValueError, match="Provider" if failure else "検索0件"):
+        execute("discover", namespace)
+
+
+def test_all_showcase_cells_compile_and_use_current_pins() -> None:
+    for path in SHOWCASE.rglob("*.ipynb"):
+        value = json.loads(path.read_text(encoding="utf-8"))
+        assert value["metadata"]["colab"]["name"] == path.name
+        sources: list[str] = []
+        for cell in value["cells"]:
+            source = "".join(cell["source"])
+            sources.append(source)
             if cell["cell_type"] == "code":
-                exec("".join(cell["source"]), namespace)
-        resource = cast(Resource, namespace["resource"])
-        assert resource.format == "geojson"
-        assert resource.uri == "https://files.example/river.geojson"
-        assert calls == ["package_search"] * 8
-    finally:
-        rhinestone_api._default_application.cache_clear()  # pyright: ignore[reportPrivateUsage]
+                compile(source, str(path), "exec")
+                assert not any(o.get("output_type") == "error" for o in cell["outputs"])
+        text = "".join(sources)
+        assert "@9bae025b08357d23e5f5339c25a777a1445da176" in text
+        assert "@develop" not in text
 
 
-def test_stac_showcase_has_the_complete_explicit_flow() -> None:
-    notebook = load_notebook(RASTER_NOTEBOOK)
+def test_main_entry_points_and_advanced_examples_are_separate() -> None:
+    readme = (SHOWCASE / "README.md").read_text(encoding="utf-8")
+    expected = {
+        "01_discover.ipynb",
+        "02_open_vector.ipynb",
+        "03_portable_vector.ipynb",
+        "04_explore.ipynb",
+    }
+    assert {p.name for p in SHOWCASE.glob("*.ipynb")} == expected
+    for name in expected:
+        assert name in readme
+        assert f"blob/develop/showcase/{name}" in readme
+    assert "advanced/stac_explicit.ipynb" in readme
+    assert "advanced/discovery_lineage.ipynb" in readme
+    assert "ライブ Provider への疎通は通常 CI の必須条件にしません" in readme
 
-    assert notebook["nbformat"] == 4
-    assert notebook["metadata"]["colab"]["name"] == RASTER_NOTEBOOK.name
-    source = notebook_source(notebook)
+
+def test_advanced_stac_keeps_explicit_selection_and_bounded_preview() -> None:
+    value = notebook("advanced/stac_explicit.ipynb")
+    source = "".join("".join(c["source"]) for c in value["cells"])
     for marker in (
-        "Provider(",
-        'adapter_type="stac"',
         '"collection_id": collection_id',
         '"item_id": item_id',
         '"asset_key": asset_key',
         'resource.open("rasterio", runtime=rasterio)',
-        "indexes=display_indexes",
         "out_shape=(len(display_indexes), preview_height, preview_width)",
         "Resampling.bilinear",
-        'resource.format != "cog"',
-        "resource.provenance.provider",
-        "resource.provenance.dataset_identifier",
-        "image = preview.transpose(1, 2, 0)",
-        'if preview.dtype != "uint8"',
-        'image = image.astype("float32")',
-        "(band - low) / (high - low)",
-        "plt.imshow",
+        "rasterio==1.5.2",
     ):
         assert marker in source
-
-
-def test_stac_showcase_pins_setup_and_keeps_no_stale_output() -> None:
-    serialized = RASTER_NOTEBOOK.read_text(encoding="utf-8")
-    notebook = load_notebook(RASTER_NOTEBOOK)
-    source = notebook_source(notebook)
-
-    assert "@9ebdbf37126d264de0e38cc71e802b08516e376d" in source
-    assert "@develop" not in source
-    assert "rasterio==1.5.1" in source
-    assert "access_token" not in serialized.casefold()
-    assert "authorization" not in serialized.casefold()
-    assert all(
-        cell.get("outputs", []) == []
-        for cell in notebook_cells(notebook)
-        if cell.get("cell_type") == "code"
-    )
-
-
-def test_showcase_notebook_code_cells_compile() -> None:
-    for notebook_path in (OFFLINE_NOTEBOOK, MAP_NOTEBOOK, RASTER_NOTEBOOK):
-        for index, cell in enumerate(notebook_cells(load_notebook(notebook_path))):
-            if cell.get("cell_type") != "code":
-                continue
-            source = "".join(cell["source"])
-            if notebook_path == MAP_NOTEBOOK and source.startswith("%pip "):
-                command = shlex.split(source.removeprefix("%pip "))
-                assert command[:2] == ["install", "-q"]
-                assert len(command) == 6
-                continue
-            compile(source, f"{notebook_path} cell {index}", "exec")
-
-
-def test_showcase_readme_lists_notebooks_and_live_boundaries() -> None:
-    readme = (SHOWCASE / "README.md").read_text(encoding="utf-8")
-
-    assert OFFLINE_NOTEBOOK.name in readme
-    assert MAP_NOTEBOOK.name in readme
-    assert RASTER_NOTEBOOK.name in readme
-    assert "colab.research.google.com" in readme
-    assert "blob/develop/showcase/02_ckan_search_to_map.ipynb" in readme
-    assert "blob/develop/showcase/03_stac_cog_preview.ipynb" in readme
-    assert "live Provider" in readme
-    assert "ライブ Provider への疎通は通常 CI の必須条件にしません" in readme
+    assert all(c.get("outputs", []) == [] for c in value["cells"])
