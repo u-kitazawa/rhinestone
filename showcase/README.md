@@ -24,6 +24,8 @@ Notebookでは候補を一覧表示してURIを明示選択し、0件・診断�
 | [04 Explore](04_explore.ipynb) | 名前の条件を「八汐」「黒磯」等へ変え、公園を絞って強調表示する | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_explore.ipynb) |
 
 各Notebookはsetupを1セル実行してから上から順に使えます。認証キーは不要です。
+01はCSVなども含めて形式を限定せずに探します。02はpyogrio対応形式で検索し直すため、
+候補が異なります。SELECTED_URIは02で表示した一覧から選んでください。
 01はRhinestoneだけ、02〜04は固定バージョンのpyogrio・GeoPandas・Matplotlibを導入します。
 固定コミットは `9bae025b08357d23e5f5339c25a777a1445da176` です。
 
