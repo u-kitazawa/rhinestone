@@ -9,6 +9,8 @@ search -> Resource -> open
 ```
 
 検索結果を選び、開くまでの最小例は[はじめに](docs/getting-started.md)にあります。
+実際の公園データの地図と、JSONだけを別Notebookへ渡す体験は
+[Showcaseの05 → 06](showcase/README.md#05-06-discover-open-portable)から試せます。
 
 ## できること
 
