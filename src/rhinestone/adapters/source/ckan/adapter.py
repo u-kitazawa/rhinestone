@@ -23,6 +23,11 @@ from ....representations import (
 )
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
+from .._ckan_resources import (
+    filtered_resource_package,
+    package_objects,
+    resource_objects,
+)
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 
@@ -150,15 +155,21 @@ class CkanAdapter(ProviderAdapter):
                 self._action(endpoint, "package_search", page_params),
                 "CKAN search result",
             )
-            packages = self._objects(result.get("results"), "CKAN search results")
+            packages = package_objects(
+                result.get("results"), self.adapter_type, diagnostics
+            )
             for package in packages:
-                resources = self._objects(package.get("resources"), "CKAN resources")
+                if package is None:
+                    continue
+                resources = resource_objects(
+                    package.get("resources"), self.adapter_type, diagnostics
+                )
                 invalid_urls = {
                     index
                     for index, resource in enumerate(resources)
                     if self._invalid_resource_url(resource)
                 }
-                safe_package: JsonObject = package
+                safe_package = filtered_resource_package(package, resources)
                 if invalid_urls:
                     safe_package = {
                         **package,

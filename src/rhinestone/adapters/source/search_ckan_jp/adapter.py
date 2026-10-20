@@ -22,6 +22,11 @@ from ....models import (
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
+from .._ckan_resources import (
+    filtered_resource_package,
+    package_objects,
+    resource_objects,
+)
 from ..base import JsonObject, JsonTransport, ProviderAdapter
 from .parsing import optional_string, organization_title, resource_format
 
@@ -83,9 +88,13 @@ class SearchCkanJpAdapter(ProviderAdapter):
             if response.get("success") is not True:
                 raise ProviderResponseError("search.ckan.jp search was not successful")
             result = self._object(response.get("result"), "search.ckan.jp result")
-            packages = self._objects(result.get("results"), "search.ckan.jp results")
+            packages = package_objects(
+                result.get("results"), self.adapter_type, diagnostics
+            )
             batches: list[deque[Resource]] = []
             for package in packages:
+                if package is None:
+                    continue
                 items: deque[Resource] = deque()
                 for item in self._package_results(
                     package, endpoint, page_params, diagnostics
@@ -164,7 +173,9 @@ class SearchCkanJpAdapter(ProviderAdapter):
         publisher = organization_title(package.get("organization"))
         license_name = optional_string(package.get("license_title"))
         site_url = optional_string(package.get("xckan_site_url"))
-        resources = self._objects(package.get("resources"), "search.ckan.jp resources")
+        resources = resource_objects(
+            package.get("resources"), self.adapter_type, diagnostics
+        )
         invalid_urls = {
             index
             for index, resource in enumerate(resources)
@@ -173,7 +184,7 @@ class SearchCkanJpAdapter(ProviderAdapter):
                 and (not uri or not is_valid_http_authority(uri))
             )
         }
-        safe_package: JsonObject = package
+        safe_package = filtered_resource_package(package, resources)
         if invalid_urls:
             safe_package = {
                 **package,

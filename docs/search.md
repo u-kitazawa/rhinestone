@@ -54,6 +54,15 @@ Resource URLを返した場合、該当Resourceだけを`detail="invalid_resourc
 不正なレコードを`detail="invalid_record"`として隔離し、正常レコードの処理と後続ページの
 取得を継続します。
 
+CKAN、G空間、PLATEAU、search.ckan.jpの検索では、`resources`配列に混在する
+null・文字列などの非object値を`detail="invalid_resource"`として除外し、正常な配布の
+結果順・metadata・来歴を保持します。除外した非object値は正常な配布が返すraw metadataや
+来歴にも残しません。`resources`自体がnullや数値などの不正な型の場合は
+Provider全体の応答エラーです。既存の単一object形式の受け入れは維持します。
+Dataset/package配列内の非object値も`detail="invalid_dataset"`で除外します。
+次ページの位置は除外前の受信Dataset件数で進め、正常な配布がないDatasetでも探索を継続します。
+空の配布配列は正常0件、不正な配布要素だけの配列は項目除外の診断付きとして区別します。
+
 `limit`はDatasetや検索応答Itemの件数ではなく、展開後のResource件数を数えます。例えば
 1つのSTAC Itemにdata assetが3件あれば3 Resource、1つのDCAT distributionにdownload URLが
 2件あれば2 Resourceです。Adapterは配信識別子で安定順序を作り、その順で上限まで返します。

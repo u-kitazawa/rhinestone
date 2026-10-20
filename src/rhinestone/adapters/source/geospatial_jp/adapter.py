@@ -14,6 +14,11 @@ from ....models import (
     SearchQuery,
 )
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
+from .._ckan_resources import (
+    filtered_resource_package,
+    package_objects,
+    resource_objects,
+)
 from ..base import JsonObject
 from ..ckan import CkanAdapter
 
@@ -250,8 +255,8 @@ class GeospatialJpAdapter(CkanAdapter):
                         self._action(endpoint, "package_search", request),
                         "G Spatial search result",
                     )
-                    packages = self._objects(
-                        response.get("results"), "G Spatial packages"
+                    packages = package_objects(
+                        response.get("results"), self.adapter_type, diagnostics
                     )
                     count = response.get("count")
                     if type(count) is not int or count < 0:
@@ -265,6 +270,8 @@ class GeospatialJpAdapter(CkanAdapter):
                     offsets[index] += len(packages)
                     active[index] = offsets[index] < count
                     for package in packages:
+                        if package is None:
+                            continue
                         if _area_priority(package, query.area) not in priorities:
                             continue
                         identifier = package.get("id")
@@ -291,11 +298,13 @@ class GeospatialJpAdapter(CkanAdapter):
                 groups: list[list[Resource]] = []
                 for package, request in candidates:
                     group: list[Resource] = []
-                    for resource in self._objects(
-                        package.get("resources"), "CKAN resources"
-                    ):
+                    resources = resource_objects(
+                        package.get("resources"), self.adapter_type, diagnostics
+                    )
+                    safe_package = filtered_resource_package(package, resources)
+                    for resource in resources:
                         item = self._search_resource_result(
-                            package, resource, endpoint, query, diagnostics
+                            safe_package, resource, endpoint, query, diagnostics
                         )
                         if item is None:
                             continue
