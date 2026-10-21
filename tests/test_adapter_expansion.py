@@ -17,6 +17,7 @@ from rhinestone.adapters import (
     PlateauAdapter,
 )
 from rhinestone.adapters.execution import GdalAdapter, JsonServiceAdapter
+from rhinestone.adapters.execution.json_service.odpt import prepare_odpt_request
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     AmbiguousResourceError,
@@ -497,15 +498,13 @@ def test_odpt_rejects_incomplete_service_plan() -> None:
         credential="odpt",
     )
     with pytest.raises(ConfigValidationError, match="incomplete"):
-        OdptAdapter.prepare_request(plan, CredentialRegistry({}))
+        prepare_odpt_request(plan, CredentialRegistry({}))
 
 
 def test_odpt_authentication_cannot_be_redirected_to_another_provider() -> None:
     plan = AccessPlan(kind="service-query", uri="https://evil.example", service="odpt")
     with pytest.raises(ConfigValidationError):
-        OdptAdapter.prepare_request(
-            plan, CredentialRegistry({"odpt": lambda: "secret"})
-        )
+        prepare_odpt_request(plan, CredentialRegistry({"odpt": lambda: "secret"}))
 
 
 @pytest.mark.parametrize(
@@ -540,7 +539,7 @@ def test_json_service_errors_are_distinct_and_redacted(
         Reference("odpt", parameters={"dataset": "station", "credential": "odpt"})
     )
     execution = JsonServiceAdapter(
-        OdptAdapter.prepare_request,
+        prepare_odpt_request,
         "odpt",
         CredentialRegistry({"odpt": lambda: "secret"}),
     )

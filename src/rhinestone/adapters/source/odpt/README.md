@@ -9,5 +9,7 @@
 
 load時にはODPT APIを呼び出しません。consumer keyは`open()`時にcredential factoryから取得し、
 Reference・Resource・AccessPlanへ保存しません。接続先とresource typeはProvider設定から渡されます。
+認証付き request の構築は JSON service 実行側の `prepare_odpt_request` が担当し、
+`OdptAdapter` を実行側から呼び出しません。宛先認可後に論理 credential を解決します。
 設定と実行例は[APIリファレンス](../../../../../docs/api/adapters/odpt.md)を参照してください。
 設定は [schema.json](schema.json) で補完・構造検証できます。

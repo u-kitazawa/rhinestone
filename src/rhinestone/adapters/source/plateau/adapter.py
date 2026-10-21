@@ -13,7 +13,7 @@ from ....registry import CredentialRegistry
 from ....representations import canonical_format
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
-from ...knowledge import KnowledgeAdapterRegistry
+from ...knowledge import KnowledgeAdapterRegistry, KnowledgePort
 from .._knowledge import entry_point, resolve_knowledge, string
 from ..base import JsonTransport
 from ..ckan import CkanAdapter
@@ -34,7 +34,7 @@ class PlateauAdapter(CkanAdapter):
         credentials: CredentialRegistry | None = None,
         destination_policy: DestinationPolicy | None = None,
         provider_id: str | None = None,
-        knowledge: KnowledgeAdapterRegistry | None = None,
+        knowledge: KnowledgePort | None = None,
     ) -> None:
         if not isinstance(endpoint, str) or not endpoint.strip():
             raise ConfigValidationError("PLATEAU endpoint must be configured")
@@ -48,7 +48,7 @@ class PlateauAdapter(CkanAdapter):
             destination_policy=destination_policy,
             provider_id=provider_id,
         )
-        self._knowledge = knowledge or KnowledgeAdapterRegistry()
+        self._knowledge = KnowledgeAdapterRegistry() if knowledge is None else knowledge
 
     def _package_search_params(self, query: SearchQuery) -> dict[str, Any]:
         """Restrict package search to the catalog's explicit PLATEAU tag."""

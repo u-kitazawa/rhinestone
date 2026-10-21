@@ -116,6 +116,11 @@ Context、および `rhinestone.adapters.ports` の Port です。内部 Registr
 process-global な登録、package 自動発見には依存しないでください。任意の third-party
 Python は利用者の trust boundary 内で、`configure()` 時に明示的に合成します。
 
+地域・識別子・時間の解決は `context.knowledge` の `KnowledgePort` 契約を使います。
+PLATEAU、GSI Fundamental、e-Stat GIS もこの契約を消費し、Registry の具体型や内部状態を
+要求しません。各 Adapter の `knowledge=` に独自の Port 実装を直接渡すこともできます。
+省略時だけ既定の Registry を使い、渡された Port の真偽値で置換しません。
+
 認証付きHTTPでは、Credential factoryを評価する前にDestinationPolicyで宛先を認可し、
 `context.credentials.get(name)`でsecretを取得します。必要な認証headerはリクエスト時だけ
 組み立て、Adapterの設定やResourceに保存しないでください。

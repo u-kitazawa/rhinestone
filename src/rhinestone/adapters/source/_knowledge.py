@@ -5,7 +5,7 @@ from pathlib import PurePosixPath
 from typing import Any, cast
 
 from ...errors import ConfigValidationError
-from ..knowledge import KnowledgeAdapterRegistry, TimeKind
+from ..knowledge import KnowledgePort, TimeKind
 
 
 def string(settings: Mapping[str, Any], name: str) -> str:
@@ -29,7 +29,7 @@ def entry_point(settings: Mapping[str, Any]) -> str | None:
 
 
 def resolve_knowledge(
-    settings: Mapping[str, Any], registry: KnowledgeAdapterRegistry
+    settings: Mapping[str, Any], registry: KnowledgePort
 ) -> Mapping[str, Mapping[str, object]]:
     """Resolve explicit shared knowledge settings without guessing provider data."""
     resolved: dict[str, Mapping[str, object]] = {}

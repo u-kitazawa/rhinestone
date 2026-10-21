@@ -19,9 +19,10 @@ from .adapters.execution import (
     PyogrioAdapter,
     RasterioAdapter,
 )
+from .adapters.execution.json_service.odpt import prepare_odpt_request
 from .adapters.knowledge import (
     KnowledgeAdapterDefinition,
-    KnowledgeAdapterRegistry,
+    KnowledgePort,
     StandardTimeAdapter,
     StaticAdministrativeAreaAdapter,
 )
@@ -365,7 +366,7 @@ def _build_plateau(
         get_json=_json_transport(context),
         credentials=cast(CredentialRegistry, context.credentials),
         destination_policy=context.destination_policy,
-        knowledge=cast(KnowledgeAdapterRegistry, context.knowledge),
+        knowledge=context.knowledge,
         provider_id=provider.id,
         **_settings(
             provider,
@@ -409,9 +410,7 @@ def _build_mlit_dpf(
 
 def _build_gsi(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
     _settings(provider, ())
-    return GsiFundamentalAdapter(
-        knowledge=cast(KnowledgeAdapterRegistry, context.knowledge)
-    )
+    return GsiFundamentalAdapter(knowledge=context.knowledge)
 
 
 def _build_estat(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
@@ -423,7 +422,7 @@ def _build_estat(provider: Provider, context: SourceAdapterContext) -> ProviderA
         )
     return EstatGisAdapter(
         cast(Iterable[Mapping[str, Any]], distributions),
-        knowledge=cast(KnowledgeAdapterRegistry, context.knowledge),
+        knowledge=context.knowledge,
     )
 
 
@@ -584,7 +583,7 @@ def source_context(
     provider: Provider,
     definitions: Mapping[str, SourceAdapterDefinition],
     dependencies: DependencyRegistry,
-    knowledge: KnowledgeAdapterRegistry,
+    knowledge: KnowledgePort,
     credentials: CredentialRegistry,
     destination_policy: DestinationPolicy,
 ) -> SourceAdapterContext:
@@ -621,9 +620,9 @@ def execution_definitions(
         ExecutionAdapterDefinition(
             "json-service",
             lambda context: JsonServiceAdapter(
-                OdptAdapter.prepare_request,
+                prepare_odpt_request,
                 "odpt",
-                credentials=cast(CredentialRegistry, context.credentials),
+                credentials=context.credentials,
                 destination_policy=context.destination_policy,
             ),
         ),

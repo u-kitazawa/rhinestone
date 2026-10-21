@@ -7,7 +7,7 @@ from typing import Any, cast
 from ....errors import ResourceNotFoundError
 from ....models import Metadata, Provenance, Reference, Resource
 from ....resolution import resource_from_delivery
-from ...knowledge import KnowledgeAdapterRegistry
+from ...knowledge import KnowledgeAdapterRegistry, KnowledgePort
 from .._knowledge import entry_point, resolve_knowledge, string
 from ..base import ProviderAdapter
 
@@ -17,9 +17,9 @@ class GsiFundamentalAdapter(ProviderAdapter):
 
     adapter_type = "gsi-fundamental"
 
-    def __init__(self, knowledge: KnowledgeAdapterRegistry | None = None) -> None:
+    def __init__(self, knowledge: KnowledgePort | None = None) -> None:
         super().__init__(get_json=lambda url, params: None)
-        self._knowledge = knowledge or KnowledgeAdapterRegistry()
+        self._knowledge = KnowledgeAdapterRegistry() if knowledge is None else knowledge
 
     def load(self, reference: Reference) -> Resource:
         """Build a Resource for the configured local GML data file."""

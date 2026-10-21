@@ -4,8 +4,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from ....errors import ConfigValidationError
-from ....models import AccessPlan, Metadata, Provenance, Reference, Resource
-from ....registry import CredentialRegistry
+from ....models import Metadata, Provenance, Reference, Resource
 from ....resolution import resource_from_delivery
 from .._knowledge import string
 from ..base import ProviderAdapter
@@ -94,27 +93,3 @@ class OdptAdapter(ProviderAdapter):
             service=self.adapter_type,
             credential=credential,
         )
-
-    @staticmethod
-    def prepare_request(
-        plan: AccessPlan,
-        credentials: CredentialRegistry,
-    ) -> tuple[Mapping[str, Any], Mapping[str, str]]:
-        """Convert an ODPT service plan into request parameters and headers."""
-        expected_uri = plan.options.get("endpoint")
-        if (
-            plan.kind != "service-query"
-            or plan.service != OdptAdapter.adapter_type
-            or not isinstance(expected_uri, str)
-            or plan.uri != expected_uri
-        ):
-            raise ConfigValidationError(
-                "Credential destination is not an ODPT endpoint"
-            )
-        params_value = plan.options.get("params")
-        credential = plan.credential
-        if not isinstance(params_value, Mapping) or not isinstance(credential, str):
-            raise ConfigValidationError("ODPT service plan is incomplete")
-        params: dict[str, Any] = dict(cast(Mapping[str, Any], params_value))
-        params["acl:consumerKey"] = credentials.get(credential)
-        return params, {}

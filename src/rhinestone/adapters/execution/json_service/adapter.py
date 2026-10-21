@@ -7,10 +7,11 @@ from ....errors import ProviderResponseError, ResourceAccessError
 from ....models import AccessPlan
 from ....registry import CredentialRegistry
 from ....security import DestinationPolicy
+from ...ports import CredentialPort
 from ..base import ExecutionAdapter
 
 RequestPreparer = Callable[
-    [AccessPlan, CredentialRegistry], tuple[Mapping[str, Any], Mapping[str, str]]
+    [AccessPlan, CredentialPort], tuple[Mapping[str, Any], Mapping[str, str]]
 ]
 
 
@@ -24,15 +25,17 @@ class JsonServiceAdapter(ExecutionAdapter):
         self,
         prepare_request: RequestPreparer,
         service: str,
-        credentials: CredentialRegistry | None = None,
+        credentials: CredentialPort | None = None,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
         super().__init__(destination_policy)
         self._prepare_request = prepare_request
         self._service = service
-        self._credentials = credentials or CredentialRegistry({})
+        self._credentials = (
+            CredentialRegistry({}) if credentials is None else credentials
+        )
 
-    def bind_credentials(self, credentials: CredentialRegistry) -> "JsonServiceAdapter":
+    def bind_credentials(self, credentials: CredentialPort) -> "JsonServiceAdapter":
         """Return a copy bound to the application's credential registry."""
         return JsonServiceAdapter(
             self._prepare_request,

@@ -12,8 +12,8 @@ from rhinestone import (
     configure,
 )
 from rhinestone.adapters.execution.json_service import JsonServiceAdapter
+from rhinestone.adapters.execution.json_service.odpt import prepare_odpt_request
 from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.adapters.source.odpt import OdptAdapter
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,
@@ -248,7 +248,7 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
     with pytest.raises(DestinationNotAllowedError):
         assert tampered.access_plan is not None
         JsonServiceAdapter(
-            OdptAdapter.prepare_request,
+            prepare_odpt_request,
             "odpt",
             CredentialRegistry(
                 {"odpt": lambda: factory_calls.append(True) or "secret"}
@@ -484,7 +484,7 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
     with pytest.raises(DestinationNotAllowedError):
         assert tampered.access_plan is not None
         JsonServiceAdapter(
-            OdptAdapter.prepare_request,
+            prepare_odpt_request,
             "odpt",
             CredentialRegistry(
                 {"odpt": lambda: credential_calls.append(True) or "secret"}

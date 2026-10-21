@@ -31,7 +31,7 @@ from ....models import (
 )
 from ....representations import CANONICAL_FORMATS, canonical_format
 from ....resolution import resource_from_delivery
-from ...knowledge import KnowledgeAdapterRegistry
+from ...knowledge import KnowledgeAdapterRegistry, KnowledgePort
 from .._knowledge import entry_point, resolve_knowledge
 from ..base import ProviderAdapter
 
@@ -92,10 +92,10 @@ class EstatGisAdapter(ProviderAdapter):
     def __init__(
         self,
         distributions: Iterable[Mapping[str, Any]],
-        knowledge: KnowledgeAdapterRegistry | None = None,
+        knowledge: KnowledgePort | None = None,
     ) -> None:
         super().__init__(get_json=lambda url, params: None)
-        self._knowledge = knowledge or KnowledgeAdapterRegistry()
+        self._knowledge = KnowledgeAdapterRegistry() if knowledge is None else knowledge
         self._raw_distributions, self._distributions = self._validate_distributions(
             distributions
         )
