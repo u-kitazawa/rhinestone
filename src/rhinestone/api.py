@@ -258,12 +258,11 @@ class Rhinestone:
                 )
             return execution
 
-        # Preserve existing explicit factory timing. Installed definitions are
-        # loaded and instantiated only by an explicit library selection.
+        # Preserve explicit application factory timing. Built-in and installed
+        # Runtime implementations are needed only by a library selection.
         configured_executions = {
-            name: build_execution(execution_definitions[name])
-            for name in execution_definitions
-            if execution_definitions.origin(name) is None
+            definition.name: build_execution(definition)
+            for definition in customexecution_definitions
         }
         adapter_registry = AdapterRegistry(
             source_adapters,
@@ -445,7 +444,7 @@ def configure(
             catalog destinations; ``"none"`` disables destination restrictions.
         adapters: Additional Source, Execution, or Knowledge Adapter
             definitions. Installed Provider and Runtime Entry Points are also
-            discovered; external Runtime adapters load only when selected by
+            discovered; built-in and external Runtime adapters load only when selected by
             the explicit library name passed to open().
         knowledge: Explicit adapter identity for each shared knowledge kind.
             Unspecified area/time kinds use built-in defaults. Installing or

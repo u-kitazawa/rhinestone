@@ -45,7 +45,9 @@ export型・identity・factory結果のload契約不一致は `AdapterContractEr
 `AdapterRegistrationError`を返します。
 
 Provider・Runtime・Knowledgeの3つのgroupを選択・生成へ接続しています。
-名称統一、組み込みimportの遅延化は #214 の残件です。
+組み込みの実装も選択したProvider、明示したRuntime、初めて利用するKnowledge種別だけを
+読み込みます。公開packageの個別exportも明示import時に読み込みます。
+名称統一は #214 の残件です。
 Rhinestone独自のインストーラや依存解決、未信頼Pythonコードの隔離は提供しません。
 選択したpackageは利用者のtrust boundary内で実行されます。
 
@@ -88,7 +90,8 @@ AdapterのインストールはRuntime実体のインストール・import・生
 利用者は既存の契約どおりRuntimeオブジェクトを `runtime=` で渡します。`dependencies=`へ
 Runtime Adapter名を登録することはできません。公開open APIはlibrary名の明示を要求し、
 指定したAdapterが非対応でも他のAdapterへfallbackしません。
-組み込み・明示Definitionのfactory評価は従来どおりconfigure時で、外部Entry Pointだけが選択時です。
+組み込み・外部Runtimeのfactoryは選択時に評価します。
+明示Definitionのfactoryは従来どおりconfigure時に評価します。
 
 選択後は通常の実行経路へ渡すため、任意の `authorize()` 能力、宛先認可、credentialの
 Port、独立したJSON Plan実行を維持します。未使用Adapterの `supports()` も呼び出しません。

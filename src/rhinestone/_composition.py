@@ -1,50 +1,28 @@
 """Internal composition of built-in and custom adapters."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from . import _http
 from ._entry_points import DefinitionIndex
 from .adapters.contracts import (
     AdapterDefinition,
+    ExecutionAdapter,
+    ExecutionAdapterContext,
     ExecutionAdapterDefinition,
     SearchableSourceAdapter,
     SourceAdapter,
     SourceAdapterContext,
     SourceAdapterDefinition,
 )
-from .adapters.execution import (
-    GdalAdapter,
-    JsonServiceAdapter,
-    PyogrioAdapter,
-    RasterioAdapter,
-)
-from .adapters.execution.json_service.odpt import prepare_odpt_request
 from .adapters.knowledge import (
+    KnowledgeAdapter,
+    KnowledgeAdapterContext,
     KnowledgeAdapterDefinition,
     KnowledgePort,
-    StandardTimeAdapter,
-    StaticAdministrativeAreaAdapter,
-)
-from .adapters.knowledge._japan_administrative_areas import (
-    JAPAN_ADMINISTRATIVE_AREAS,
-)
-from .adapters.source import (
-    CkanAdapter,
-    DcatAdapter,
-    DirectAdapter,
-    EstatGisAdapter,
-    GeospatialJpAdapter,
-    GsiFundamentalAdapter,
-    MlitDpfAdapter,
-    OdptAdapter,
-    OgcFeaturesAdapter,
-    PlateauAdapter,
-    ProviderAdapter,
-    SearchCkanJpAdapter,
-    StacAdapter,
-    StaticAdapter,
 )
 from .errors import (
     AdapterContractError,
@@ -62,6 +40,9 @@ from .models import (
 )
 from .registry import CredentialRegistry, DependencyRegistry
 from .security import DestinationPolicy
+
+if TYPE_CHECKING:
+    from .adapters.source.base import ProviderAdapter
 
 
 class ConfiguredSourceAdapter:
@@ -285,6 +266,8 @@ def _json_transport(context: SourceAdapterContext) -> Any:
 
 
 def _build_ckan(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.ckan import CkanAdapter
+
     return CkanAdapter(
         get_json=_json_transport(context),
         credentials=cast(CredentialRegistry, context.credentials),
@@ -306,6 +289,8 @@ def _build_ckan(provider: Provider, context: SourceAdapterContext) -> ProviderAd
 def _build_geospatial_jp(
     provider: Provider, context: SourceAdapterContext
 ) -> ProviderAdapter:
+    from .adapters.source.geospatial_jp import GeospatialJpAdapter
+
     return GeospatialJpAdapter(
         get_json=_json_transport(context),
         credentials=cast(CredentialRegistry, context.credentials),
@@ -324,6 +309,8 @@ def _build_geospatial_jp(
 
 
 def _build_stac(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.stac import StacAdapter
+
     return StacAdapter(
         get_json=_json_transport(context),
         credentials=cast(CredentialRegistry, context.credentials),
@@ -344,6 +331,8 @@ def _build_stac(provider: Provider, context: SourceAdapterContext) -> ProviderAd
 
 
 def _build_ogc(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.ogc import OgcFeaturesAdapter
+
     return OgcFeaturesAdapter(
         get_json=_json_transport(context),
         credentials=cast(CredentialRegistry, context.credentials),
@@ -365,6 +354,8 @@ def _build_ogc(provider: Provider, context: SourceAdapterContext) -> ProviderAda
 def _build_plateau(
     provider: Provider, context: SourceAdapterContext
 ) -> ProviderAdapter:
+    from .adapters.source.plateau import PlateauAdapter
+
     return PlateauAdapter(
         get_json=_json_transport(context),
         credentials=cast(CredentialRegistry, context.credentials),
@@ -379,6 +370,8 @@ def _build_plateau(
 
 
 def _build_static(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.static import StaticAdapter
+
     items = _settings(provider, ("items",)).get("items")
     if not isinstance(items, Mapping):
         raise ConfigValidationError(
@@ -391,6 +384,8 @@ def _build_static(provider: Provider, context: SourceAdapterContext) -> Provider
 def _build_search_ckan_jp(
     provider: Provider, context: SourceAdapterContext
 ) -> ProviderAdapter:
+    from .adapters.source.search_ckan_jp import SearchCkanJpAdapter
+
     return SearchCkanJpAdapter(
         get_json=_json_transport(context),
         destination_policy=context.destination_policy,
@@ -401,6 +396,8 @@ def _build_search_ckan_jp(
 def _build_mlit_dpf(
     provider: Provider, context: SourceAdapterContext
 ) -> ProviderAdapter:
+    from .adapters.source.mlit_dpf import MlitDpfAdapter
+
     return MlitDpfAdapter(
         post_json=context.transport.post_json,
         credentials=cast(CredentialRegistry, context.credentials),
@@ -412,11 +409,15 @@ def _build_mlit_dpf(
 
 
 def _build_gsi(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.gsi_fundamental import GsiFundamentalAdapter
+
     _settings(provider, ())
     return GsiFundamentalAdapter(knowledge=context.knowledge)
 
 
 def _build_estat(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.estat_gis import EstatGisAdapter
+
     distributions = _settings(provider, ("distributions",)).get("distributions")
     if not isinstance(distributions, list | tuple):
         raise ConfigValidationError(
@@ -430,6 +431,8 @@ def _build_estat(provider: Provider, context: SourceAdapterContext) -> ProviderA
 
 
 def _build_dcat(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.dcat import DcatAdapter
+
     settings = _settings(provider, ("catalog_uri", "serialization"))
 
     def get_document(uri: str) -> str:
@@ -447,6 +450,8 @@ def _build_dcat(provider: Provider, context: SourceAdapterContext) -> ProviderAd
 
 
 def _build_odpt(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.odpt import OdptAdapter
+
     return OdptAdapter(
         **_settings(
             provider,
@@ -455,10 +460,16 @@ def _build_odpt(provider: Provider, context: SourceAdapterContext) -> ProviderAd
     )
 
 
+def _build_direct(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
+    from .adapters.source.direct import DirectAdapter
+
+    return DirectAdapter()
+
+
 BUILTIN_SOURCE_ADAPTER_FACTORIES: Mapping[
     str, Callable[[Provider, SourceAdapterContext], ProviderAdapter]
 ] = {
-    "direct": lambda _provider, _context: DirectAdapter(),
+    "direct": _build_direct,
     "ckan": _build_ckan,
     "geospatial-jp": _build_geospatial_jp,
     "stac": _build_stac,
@@ -607,28 +618,44 @@ def source_context(
     )
 
 
+def _build_gdal(context: ExecutionAdapterContext) -> ExecutionAdapter:
+    from .adapters.execution.gdal import GdalAdapter
+
+    return GdalAdapter(context.destination_policy)
+
+
+def _build_rasterio(context: ExecutionAdapterContext) -> ExecutionAdapter:
+    from .adapters.execution.rasterio import RasterioAdapter
+
+    return RasterioAdapter(context.destination_policy)
+
+
+def _build_pyogrio(context: ExecutionAdapterContext) -> ExecutionAdapter:
+    from .adapters.execution.pyogrio import PyogrioAdapter
+
+    return PyogrioAdapter(context.destination_policy)
+
+
+def _build_json_service(context: ExecutionAdapterContext) -> ExecutionAdapter:
+    from .adapters.execution.json_service import JsonServiceAdapter
+    from .adapters.execution.json_service.odpt import prepare_odpt_request
+
+    return JsonServiceAdapter(
+        prepare_odpt_request,
+        "odpt",
+        credentials=context.credentials,
+        destination_policy=context.destination_policy,
+    )
+
+
 def execution_definitions(
     custom_definitions: Iterable[ExecutionAdapterDefinition],
 ) -> tuple[ExecutionAdapterDefinition, ...]:
     built_in_definitions = (
-        ExecutionAdapterDefinition(
-            "gdal", lambda context: GdalAdapter(context.destination_policy)
-        ),
-        ExecutionAdapterDefinition(
-            "rasterio", lambda context: RasterioAdapter(context.destination_policy)
-        ),
-        ExecutionAdapterDefinition(
-            "pyogrio", lambda context: PyogrioAdapter(context.destination_policy)
-        ),
-        ExecutionAdapterDefinition(
-            "json-service",
-            lambda context: JsonServiceAdapter(
-                prepare_odpt_request,
-                "odpt",
-                credentials=context.credentials,
-                destination_policy=context.destination_policy,
-            ),
-        ),
+        ExecutionAdapterDefinition("gdal", _build_gdal),
+        ExecutionAdapterDefinition("rasterio", _build_rasterio),
+        ExecutionAdapterDefinition("pyogrio", _build_pyogrio),
+        ExecutionAdapterDefinition("json-service", _build_json_service),
     )
     names = {definition.name for definition in built_in_definitions}
     definitions = list(built_in_definitions)
@@ -643,6 +670,21 @@ def execution_definitions(
     return tuple(definitions)
 
 
+def _build_area(context: KnowledgeAdapterContext) -> KnowledgeAdapter:
+    from .adapters.knowledge._japan_administrative_areas import (
+        JAPAN_ADMINISTRATIVE_AREAS,
+    )
+    from .adapters.knowledge.area import StaticAdministrativeAreaAdapter
+
+    return StaticAdministrativeAreaAdapter(JAPAN_ADMINISTRATIVE_AREAS)
+
+
+def _build_time(context: KnowledgeAdapterContext) -> KnowledgeAdapter:
+    from .adapters.knowledge.time import StandardTimeAdapter
+
+    return StandardTimeAdapter()
+
+
 def knowledge_definitions(
     custom_definitions: Iterable[KnowledgeAdapterDefinition],
 ) -> Mapping[str, KnowledgeAdapterDefinition]:
@@ -650,14 +692,12 @@ def knowledge_definitions(
     built_in_definitions = (
         KnowledgeAdapterDefinition(
             "japan-administrative-area",
-            lambda _context: StaticAdministrativeAreaAdapter(
-                JAPAN_ADMINISTRATIVE_AREAS
-            ),
+            _build_area,
             "area",
         ),
         KnowledgeAdapterDefinition(
             "standard-time",
-            lambda _context: StandardTimeAdapter(),
+            _build_time,
             "time",
         ),
     )
