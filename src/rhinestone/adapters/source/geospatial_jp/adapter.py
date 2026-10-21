@@ -13,14 +13,16 @@ from ....models import (
     SearchDiagnostic,
     SearchQuery,
 )
+from ....registry import CredentialRegistry
+from ....security import DestinationPolicy
 from ...knowledge._japan_administrative_areas import JAPAN_ADMINISTRATIVE_AREAS
+from .._ckan import CkanClient, search_results
 from .._ckan_resources import (
     filtered_resource_package,
     package_objects,
     resource_objects,
 )
-from ..base import JsonObject
-from ..ckan import CkanAdapter
+from ..base import JsonObject, JsonTransport, ProviderAdapter
 
 # These are regional relationships, not assumptions about indexed Solr fields.
 _REGIONS = {
@@ -189,7 +191,7 @@ def _area_searches(
     return tuple(groups)
 
 
-class GeospatialJpAdapter(CkanAdapter):
+class GeospatialJpAdapter(ProviderAdapter):
     """Rank G Spatial candidates locally while retaining resource-level results.
 
     Area filters run from the requested area to containing regions and Japan.
@@ -199,9 +201,36 @@ class GeospatialJpAdapter(CkanAdapter):
 
     adapter_type = "geospatial-jp"
     search_conditions = frozenset({"text", "area", "format", "limit"})
+    area_text_fallback = True
+
+    def __init__(
+        self,
+        get_json: JsonTransport,
+        endpoint: str | None = None,
+        credential: str | None = None,
+        credential_header: str | None = None,
+        credential_scheme: str | None = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
+        provider_id: str | None = None,
+    ) -> None:
+        super().__init__(
+            get_json=get_json,
+            endpoint=endpoint,
+            credential=credential,
+            credential_header=credential_header,
+            credential_scheme="" if credential_scheme is None else credential_scheme,
+            credentials=credentials,
+            destination_policy=destination_policy,
+            provider_id=provider_id,
+        )
+        self._ckan = CkanClient(self._request, self.adapter_type)
 
     def load(self, reference: Reference) -> Resource:
-        resource = super().load(reference)
+        settings = self._reference_parameters(reference, resource_key="resource_id")
+        endpoint = self._endpoint_from(settings)
+        resource_id = self._required_string(settings, "resource_id")
+        resource = self._ckan.load(reference, endpoint, resource_id)
         return replace(
             resource,
             provenance=replace(
@@ -252,7 +281,7 @@ class GeospatialJpAdapter(CkanAdapter):
                         continue
                     request = {**base, **params, "start": offsets[index]}
                     response = self._object(
-                        self._action(endpoint, "package_search", request),
+                        self._ckan.action(endpoint, "package_search", request),
                         "G Spatial search result",
                     )
                     packages = package_objects(
@@ -303,7 +332,7 @@ class GeospatialJpAdapter(CkanAdapter):
                     )
                     safe_package = filtered_resource_package(package, resources)
                     for resource in resources:
-                        item = self._search_resource_result(
+                        item = self._ckan.search_resource_result(
                             safe_package, resource, endpoint, query, diagnostics
                         )
                         if item is None:
@@ -337,7 +366,7 @@ class GeospatialJpAdapter(CkanAdapter):
                             continue
                         found.append(item)
                         if query.limit is not None and len(found) == query.limit:
-                            return self._search_results(found, diagnostics)
+                            return search_results(found, diagnostics)
                 if query.limit is None:
                     break
-        return self._search_results(found, diagnostics)
+        return search_results(found, diagnostics)

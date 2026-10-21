@@ -1,6 +1,8 @@
 # PLATEAUの提供元アダプター
 
 `PlateauAdapter` はG空間情報センターのCKANカタログから、配信単位の`Resource`を生成します。
+CKANの通信・ページング・Resource展開は共通clientを使い、`CkanAdapter`を継承・呼び出しません。
+PLATEAUタグによる検索範囲と、直接loadでの配信選択・Knowledge付加はこのAdapterが所有します。
 
 - Adapter 種別（`adapter_type`）: `plateau`
 - Provider設定: `endpoint`。

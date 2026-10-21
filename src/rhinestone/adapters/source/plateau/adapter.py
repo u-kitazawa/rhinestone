@@ -8,21 +8,30 @@ from ....errors import (
     ConfigValidationError,
     ResourceNotFoundError,
 )
-from ....models import Metadata, Provenance, Reference, Resource, SearchQuery
+from ....models import (
+    Metadata,
+    Provenance,
+    ProviderSearchResults,
+    Reference,
+    Resource,
+    SearchQuery,
+)
 from ....registry import CredentialRegistry
 from ....representations import canonical_format
 from ....resolution import resource_from_delivery
 from ....security import DestinationPolicy
 from ...knowledge import KnowledgeAdapterRegistry, KnowledgePort
+from .._ckan import CkanClient, package_search_params
 from .._knowledge import entry_point, resolve_knowledge, string
-from ..base import JsonTransport
-from ..ckan import CkanAdapter
+from ..base import JsonTransport, ProviderAdapter
 
 
-class PlateauAdapter(CkanAdapter):
+class PlateauAdapter(ProviderAdapter):
     """Interpret PLATEAU datasets exposed through a CKAN-compatible API."""
 
     adapter_type = "plateau"
+    search_conditions = frozenset({"text", "format", "limit"})
+    area_text_fallback = True
 
     def __init__(
         self,
@@ -43,18 +52,27 @@ class PlateauAdapter(CkanAdapter):
             endpoint=endpoint,
             credential=credential,
             credential_header=credential_header,
-            credential_scheme=credential_scheme,
+            credential_scheme="" if credential_scheme is None else credential_scheme,
             credentials=credentials,
             destination_policy=destination_policy,
             provider_id=provider_id,
         )
         self._knowledge = KnowledgeAdapterRegistry() if knowledge is None else knowledge
+        self._ckan = CkanClient(self._request, self.adapter_type)
 
-    def _package_search_params(self, query: SearchQuery) -> dict[str, Any]:
-        """Restrict package search to the catalog's explicit PLATEAU tag."""
-        params = super()._package_search_params(query)
+    def search(
+        self, query: SearchQuery
+    ) -> tuple[Resource, ...] | ProviderSearchResults:
+        """Restrict CKAN package expansion to the explicit PLATEAU tag."""
+        endpoint = self._endpoint_from({}, self._endpoint)
+        unsupported = query.supplied_conditions - self.search_conditions
+        if unsupported:
+            raise ConfigValidationError(
+                f"Unsupported CKAN search conditions: {', '.join(sorted(unsupported))}"
+            )
+        params = package_search_params(query)
         params["fq"] = "tags:PLATEAU"
-        return params
+        return self._ckan.search(endpoint, query, params)
 
     def load(self, reference: Reference) -> Resource:
         """Load one PLATEAU resource and preserve its CityGML metadata."""
@@ -70,14 +88,14 @@ class PlateauAdapter(CkanAdapter):
         if "resource_id" in settings:
             resource_id = string(settings, "resource_id")
             resource = self._object(
-                self._action(endpoint, "resource_show", {"id": resource_id}),
+                self._ckan.action(endpoint, "resource_show", {"id": resource_id}),
                 "CKAN resource",
             )
             package_id = string(resource, "package_id")
         else:
             package_id = string(settings, "dataset_id")
         package = self._object(
-            self._action(endpoint, "package_show", {"id": package_id}),
+            self._ckan.action(endpoint, "package_show", {"id": package_id}),
             "CKAN package",
         )
         resources = self._objects(package.get("resources"), "CKAN resources")

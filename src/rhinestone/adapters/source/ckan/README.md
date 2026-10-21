@@ -1,6 +1,8 @@
 # CKANの提供元アダプター
 
 `CkanAdapter` は CKAN Action API の配信情報を `Resource` に変換します。
+G空間・PLATEAUとは、注入された認可済みrequestを使う共通clientでAPI解析とResource展開を共有します。
+各Providerの設定・認証・検索戦略を他の具象Adapterへ委譲しません。
 
 - Adapter 種別（`adapter_type`）: `ckan`
 - Provider設定: `endpoint`。`spatial_search=True`で対応サイトのbbox検索を有効にできます。

@@ -2,6 +2,8 @@
 
 `GeospatialJpAdapter`（種別 `geospatial-jp`）はG空間情報センターのCKAN Action APIを使用します。
 組み込みProviderのendpointはCatalogで管理し、通信と認証は共通transportに委譲します。
+CKANの通信・応答解析・Resource展開は共通clientを使いますが、`CkanAdapter`を継承・呼び出しません。
+地域順の探索、地域照合、巡回展開はこのAdapterが所有します。
 
 - Provider設定: `endpoint`、任意のcredential設定。`spatial_search`は受け付けません。
 - 直接loadの入力: `Reference("geospatial-jp", parameters={"resource_id": "公式Resource ID"})`を`app.load()`へ渡します。
