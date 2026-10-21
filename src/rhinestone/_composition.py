@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import Any, cast
 
 from . import _http
+from ._entry_points import DefinitionIndex
 from .adapters.contracts import (
     AdapterDefinition,
     ExecutionAdapterDefinition,
@@ -46,6 +47,8 @@ from .adapters.source import (
     StaticAdapter,
 )
 from .errors import (
+    AdapterContractError,
+    AdapterFactoryError,
     AdapterRegistrationError,
     ConfigValidationError,
     ProviderMetadataError,
@@ -687,4 +690,23 @@ def build_source_adapter(
     context: SourceAdapterContext,
 ) -> SourceAdapter:
     definition = definitions[source.adapter_type]
-    return definition.factory(source, context)
+    origin = (
+        definitions.origin(source.adapter_type)
+        if isinstance(definitions, DefinitionIndex)
+        else None
+    )
+    try:
+        adapter = definition.factory(source, context)
+    except Exception:
+        if origin is None:
+            raise
+        raise AdapterFactoryError(
+            f"Installed adapter factory failed: {origin}; inspect its factory "
+            "and declared dependencies"
+        ) from None
+    if not callable(getattr(adapter, "load", None)):
+        raise AdapterContractError(
+            f"Provider adapter factory must return an object implementing load: "
+            f"{origin or source.adapter_type}"
+        )
+    return adapter

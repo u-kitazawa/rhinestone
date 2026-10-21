@@ -2,10 +2,54 @@
 
 Rhinestone の Adapter は、Provider 固有の情報を配信単位の `Resource` へ変換する Source
 Adapter と、選択済みの `AccessPlan` を外部 Runtime へ渡す Execution Adapter に分かれます。
-どちらも `configure(adapters=...)` へ明示登録します。組み込み Adapter も
+外部Provider Adapterは、インストールされたPython packageのEntry Pointsから発見できます。
+Provider / Execution / KnowledgeのDefinitionを `configure(adapters=...)` へ明示登録することもできます。組み込み Adapter も
 「あらかじめ登録された Definition」として同じ Registry に追加されるため、Custom Adapter
-と同じ Factory／Context／選択経路を通ります。Adapter package の自動発見や process-global
-な登録は行いません。
+と同じ Factory／Context／選択経路を通ります。process-globalな可変登録状態は持ちません。
+
+## インストール済みProvider Adapter
+
+外部packageはDefinitionオブジェクトを1つexportし、Entry Point名と
+`SourceAdapterDefinition.adapter_type`を一致させます。export先はfactoryそのものではありません。
+
+```toml
+[project.entry-points."rhinestone.provider_adapters"]
+example-source = "example_package:definition"
+```
+
+```python
+# example_package/__init__.py
+from rhinestone.adapters.contracts import SourceAdapterDefinition
+from .adapter import make_adapter
+
+definition = SourceAdapterDefinition("example-source", make_adapter)
+```
+
+利用側は通常のpip/uvでpackageをインストールし、Catalogで選択します。
+
+```python
+app = configure(catalog=Catalog((Provider("example", "example-source"),)))
+```
+
+`configure()`は `importlib.metadata.entry_points()` でmetadataだけを読み、
+Catalogの `Provider.adapter_type` で選んだexportだけをloadします。未使用の外部Providerや
+任意依存はimportしません。同じ種類を複数Providerへ使う場合、Definitionのloadは
+アプリケーションごとに1回、factoryによるAdapter生成はProviderごとに行います。
+
+Entry Point名の重複（外部同士・組み込み・明示登録との衝突）は選択前に
+`AdapterDiscoveryError`で拒否します。選択時のimport失敗は `AdapterLoadError`、
+export型・identity・factory結果のload契約不一致は `AdapterContractError`、
+インストール済みfactoryの実行失敗は `AdapterFactoryError`です。
+これらは `AdapterRegistrationError`の派生型です。診断にはdistribution / group / identityを
+含め、import/factory例外の任意payloadは表示しません。欠落したProviderの選択には従来の
+`AdapterRegistrationError`を返します。
+
+現在、3 groupのmetadataを列挙しますが、実際の選択・生成へ接続しているのは
+`rhinestone.provider_adapters`です。`rhinestone.runtime_adapters` と
+`rhinestone.knowledge_adapters` は引き続き明示Definitionを使用します。
+Runtime/Knowledgeの自動選択、名称統一、組み込みimportの遅延化は #214 の残件です。
+Rhinestone独自のインストーラや依存解決、未信頼Pythonコードの隔離は提供しません。
+選択したpackageは利用者のtrust boundary内で実行されます。
 
 ```text
 Provider / Reference
@@ -113,8 +157,8 @@ Credential secret は `Provider`、`Reference`、`AccessPlan`、`Resource` に�
 
 外部 Adapter の安定した拡張境界は `rhinestone.adapters.contracts` の Definition と
 Context、および `rhinestone.adapters.ports` の Port です。内部 Registry の storage、
-process-global な登録、package 自動発見には依存しないでください。任意の third-party
-Python は利用者の trust boundary 内で、`configure()` 時に明示的に合成します。
+process-globalな登録には依存しないでください。Providerの自動発見は上記の標準Entry Pointsを使い、
+任意のthird-party Pythonは利用者のtrust boundary内で、Catalogの選択時に合成します。
 
 地域・識別子・時間の解決は `context.knowledge` の `KnowledgePort` 契約を使います。
 PLATEAU、GSI Fundamental、e-Stat GIS もこの契約を消費し、Registry の具体型や内部状態を

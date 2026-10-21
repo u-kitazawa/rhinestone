@@ -122,6 +122,22 @@ class AdapterRegistrationError(RhinestoneError):
     """
 
 
+class AdapterDiscoveryError(AdapterRegistrationError):
+    """Installed package metadata contains ambiguous adapter identities."""
+
+
+class AdapterLoadError(AdapterRegistrationError):
+    """A selected Entry Point export cannot be imported."""
+
+
+class AdapterContractError(AdapterRegistrationError):
+    """A selected export or factory result violates its adapter contract."""
+
+
+class AdapterFactoryError(AdapterRegistrationError):
+    """A selected installed adapter factory failed during composition."""
+
+
 class KnowledgeAdapterUnavailableError(RhinestoneError):
     """A required shared-knowledge adapter is not configured.
 

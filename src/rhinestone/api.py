@@ -23,10 +23,12 @@ from ._composition import (
 from ._composition import (
     source_definitions as compose_source_definitions,
 )
+from ._entry_points import PROVIDER_GROUP, DefinitionIndex, discover
 from .adapters.contracts import (
     AdapterDefinition,
     ExecutionAdapter,
     ExecutionAdapterContext,
+    SourceAdapterDefinition,
 )
 from .adapters.knowledge import (
     KnowledgeAdapterContext,
@@ -96,7 +98,13 @@ class Rhinestone:
             customexecution_definitions,
             customknowledge_definitions,
         ) = split_definitions(adapters)
-        source_definitions = compose_source_definitions(customsource_definitions)
+        discovered = discover()
+        source_definitions = DefinitionIndex(
+            compose_source_definitions(customsource_definitions),
+            discovered[PROVIDER_GROUP],
+            SourceAdapterDefinition,
+            lambda definition: definition.adapter_type,
+        )
         execution_definitions = compose_execution_definitions(
             customexecution_definitions
         )

@@ -52,8 +52,10 @@ def test_custom_auth_example_authorizes_before_loading_credential(
     contexts: list[Any] = []
 
     def factory(provider: Provider, context: Any) -> Any:
+        from tests.test_custom_adapters import custom_source
+
         contexts.append(context)
-        return object()
+        return custom_source(provider, context)
 
     provider = Provider(
         "custom",
