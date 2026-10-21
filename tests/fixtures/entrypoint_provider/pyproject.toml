@@ -14,3 +14,7 @@ unused-broken = "rhinestone_entrypoint_fixture.broken:definition"
 [project.entry-points."rhinestone.runtime_adapters"]
 installed-runtime = "rhinestone_entrypoint_fixture.runtime:definition"
 unused-runtime = "rhinestone_entrypoint_fixture.broken:definition"
+
+[project.entry-points."rhinestone.knowledge_adapters"]
+installed-time = "rhinestone_entrypoint_fixture.knowledge:definition"
+unused-knowledge = "rhinestone_entrypoint_fixture.broken:definition"

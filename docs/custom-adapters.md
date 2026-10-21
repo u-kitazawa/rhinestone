@@ -44,11 +44,29 @@ export型・identity・factory結果のload契約不一致は `AdapterContractEr
 含め、import/factory例外の任意payloadは表示しません。欠落したProviderの選択には従来の
 `AdapterRegistrationError`を返します。
 
-ProviderとRuntimeのgroupは選択・生成へ接続しています。
-`rhinestone.knowledge_adapters`は現在metadata列挙のみで、引き続き明示Definitionを使用します。
-Knowledgeの明示選択接続、名称統一、組み込みimportの遅延化は #214 の残件です。
+Provider・Runtime・Knowledgeの3つのgroupを選択・生成へ接続しています。
+名称統一、組み込みimportの遅延化は #214 の残件です。
 Rhinestone独自のインストーラや依存解決、未信頼Pythonコードの隔離は提供しません。
 選択したpackageは利用者のtrust boundary内で実行されます。
+
+## インストール済みKnowledge Adapter
+
+`KnowledgeAdapterDefinition`をexportし、Entry Point名と`adapter_type`を一致させます。
+
+```toml
+[project.entry-points."rhinestone.knowledge_adapters"]
+example-time = "example_package.knowledge:definition"
+```
+
+利用側は`configure(knowledge={"time": "example-time"})`のように種別ごとに選択します。
+種別は`area`、`identity`、`time`です。既定のarea/timeは組み込みを使い、identityは未選択です。
+同種別の候補を複数インストール・明示登録しても自動的には置き換えません。
+重複identityはmetadataで検査し、選択されたexportだけをconfigure時にloadして
+Definitionの型・identity・kindを検証します。factoryはその種別の最初の利用時に評価され、
+アプリケーションごとにキャッシュされます。依存は宣言された範囲だけContextへ渡します。
+インストール済みfactoryの失敗は`AdapterFactoryError`、種別に必要なmethodの欠落は
+`AdapterContractError`となり、診断にはdistribution / group / identityを含めます。
+解決結果のcanonical値の検証は既存のKnowledge契約に従います。
 
 ## インストール済みRuntime Adapter
 

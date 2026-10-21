@@ -645,18 +645,8 @@ def execution_definitions(
 
 def knowledge_definitions(
     custom_definitions: Iterable[KnowledgeAdapterDefinition],
-) -> tuple[KnowledgeAdapterDefinition, ...]:
-    """Return built-in knowledge definitions plus user replacements."""
-    custom_definitions_tuple = tuple(custom_definitions)
-    custom_by_kind: dict[str, KnowledgeAdapterDefinition] = {}
-    for definition in custom_definitions_tuple:
-        if definition.kind in custom_by_kind:
-            raise AdapterRegistrationError(
-                f"Knowledge adapter kind {definition.kind!r} is registered more "
-                "than once; provide one definition per kind"
-            )
-        custom_by_kind[definition.kind] = definition
-
+) -> Mapping[str, KnowledgeAdapterDefinition]:
+    """Index available identities without choosing a replacement by kind."""
     built_in_definitions = (
         KnowledgeAdapterDefinition(
             "japan-administrative-area",
@@ -671,17 +661,17 @@ def knowledge_definitions(
             "time",
         ),
     )
-    built_in_kinds = frozenset(definition.kind for definition in built_in_definitions)
-    definitions = [
-        custom_by_kind.get(definition.kind, definition)
-        for definition in built_in_definitions
-    ]
-    definitions.extend(
-        definition
-        for definition in custom_definitions_tuple
-        if definition.kind not in built_in_kinds
-    )
-    return tuple(definitions)
+    definitions = {
+        definition.adapter_type: definition for definition in built_in_definitions
+    }
+    for definition in custom_definitions:
+        if definition.adapter_type in definitions:
+            raise AdapterRegistrationError(
+                f"Knowledge adapter identity {definition.adapter_type!r} is registered "
+                "more than once; identities must be unique"
+            )
+        definitions[definition.adapter_type] = definition
+    return definitions
 
 
 def build_source_adapter(

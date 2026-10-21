@@ -1,6 +1,7 @@
 """Provider export for the independent extension wheel."""
 
 from rhinestone.adapters.contracts import SourceAdapterContext, SourceAdapterDefinition
+from rhinestone.adapters.knowledge import KnowledgePort
 from rhinestone.models import (
     Metadata,
     Provenance,
@@ -17,6 +18,9 @@ calls: list[str] = []
 class InstalledProvider:
     search_conditions = frozenset({"text", "limit"})
 
+    def __init__(self, knowledge: KnowledgePort) -> None:
+        self.knowledge = knowledge
+
     def load(self, reference: Reference) -> Resource:
         calls.append("load")
         return resource_from_delivery(
@@ -24,7 +28,13 @@ class InstalledProvider:
             uri="https://fixture.example/installed.tif",
             format="geotiff",
             media_type="image/tiff",
-            metadata=Metadata(title="Installed", raw={"package": "independent wheel"}),
+            metadata=Metadata(
+                title="Installed",
+                raw={
+                    "package": "independent wheel",
+                    "resolved_year": self.knowledge.resolve_time("2020").year,
+                },
+            ),
             provenance=Provenance(provider="installed-provider"),
         )
 
@@ -36,7 +46,7 @@ class InstalledProvider:
 def factory(provider: Provider, context: SourceAdapterContext) -> InstalledProvider:
     assert context.provider_id == provider.id
     calls.append("factory")
-    return InstalledProvider()
+    return InstalledProvider(context.knowledge)
 
 
 definition = SourceAdapterDefinition("installed-provider", factory)

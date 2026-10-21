@@ -23,7 +23,14 @@ from ._composition import (
 from ._composition import (
     source_definitions as compose_source_definitions,
 )
-from ._entry_points import PROVIDER_GROUP, RUNTIME_GROUP, DefinitionIndex, discover
+from ._entry_points import (
+    KNOWLEDGE_GROUP,
+    PROVIDER_GROUP,
+    RUNTIME_GROUP,
+    DefinitionIndex,
+    discover,
+)
+from ._knowledge_adapters import select_knowledge
 from ._runtime_adapters import ExecutionInstances
 from .adapters.contracts import (
     AdapterDefinition,
@@ -34,7 +41,9 @@ from .adapters.contracts import (
 )
 from .adapters.knowledge import (
     KnowledgeAdapterContext,
+    KnowledgeAdapterDefinition,
     KnowledgeAdapterRegistry,
+    KnowledgeKind,
 )
 from .catalogs import Catalog
 from .errors import (
@@ -92,6 +101,7 @@ class Rhinestone:
         credentials: Mapping[str, Callable[[], str]] | None = None,
         network_policy: NetworkPolicyLevel = "credentialed",
         adapters: Iterable[AdapterDefinition] = (),
+        knowledge: Mapping[KnowledgeKind, str] | None = None,
     ) -> None:
         selected_sources = tuple(catalog) if catalog is not None else ()
 
@@ -120,9 +130,13 @@ class Rhinestone:
             ExecutionAdapterDefinition,
             lambda definition: definition.name,
         )
-        knowledge_definitions = compose_knowledge_definitions(
-            customknowledge_definitions
+        knowledge_definitions = DefinitionIndex(
+            compose_knowledge_definitions(customknowledge_definitions),
+            discovered[KNOWLEDGE_GROUP],
+            KnowledgeAdapterDefinition,
+            lambda definition: definition.adapter_type,
         )
+        selected_knowledge = select_knowledge(knowledge_definitions, knowledge)
         runtime_dependencies = dict(dependencies or {})
         execution_runtime_names = frozenset(execution_definitions)
         invalid_dependencies = execution_runtime_names.intersection(
@@ -139,7 +153,7 @@ class Rhinestone:
             selected_sources, level=network_policy
         )
         knowledge_registry = KnowledgeAdapterRegistry(
-            knowledge_definitions,
+            selected_knowledge,
             KnowledgeAdapterContext(
                 get_json=_http.get_json,
                 get_text=_http.get_text,
@@ -147,6 +161,12 @@ class Rhinestone:
                 dependencies=source_dependency_registry,
                 destination_policy=destination_policy,
             ),
+            origins={
+                definition.kind: origin
+                for definition in selected_knowledge
+                if (origin := knowledge_definitions.origin(definition.adapter_type))
+                is not None
+            },
         )
 
         configured_sources: list[ConfiguredSourceAdapter] = []
@@ -411,6 +431,7 @@ def configure(
     credentials: Mapping[str, Callable[[], str]] | None = None,
     network_policy: NetworkPolicyLevel = "credentialed",
     adapters: Iterable[AdapterDefinition] = (),
+    knowledge: Mapping[KnowledgeKind, str] | None = None,
 ) -> Rhinestone:
     """Create an isolated Rhinestone application.
 
@@ -426,6 +447,9 @@ def configure(
             definitions. Installed Provider and Runtime Entry Points are also
             discovered; external Runtime adapters load only when selected by
             the explicit library name passed to open().
+        knowledge: Explicit adapter identity for each shared knowledge kind.
+            Unspecified area/time kinds use built-in defaults. Installing or
+            registering an adapter never replaces a default by itself.
 
     Returns:
         A configured application whose ``search``, ``load``, ``plan``, and ``open``
@@ -442,6 +466,7 @@ def configure(
         credentials=credentials,
         network_policy=network_policy,
         adapters=adapters,
+        knowledge=knowledge,
     )
 
 

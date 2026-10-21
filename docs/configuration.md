@@ -98,7 +98,8 @@ Credential PortとDestinationPolicyを渡します。Execution Runtimeは`open(.
 
 共有知識をSource Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
 追加設定なしで西暦・年度・元号を利用できます。自治体辞書など独自の公式データを使う場合は、
-`adapters`へ`KnowledgeAdapterDefinition`を渡します。独自定義は同じ種別の標準実装を置き換えます。
+`adapters`へ`KnowledgeAdapterDefinition`を候補として渡し、`knowledge`で種類ごとに明示選択します。
+インストールや登録だけでは標準実装を置き換えません。
 
 ```python
 from rhinestone import configure
@@ -112,7 +113,8 @@ app = configure(
         KnowledgeAdapterDefinition(
             "official-municipality", make_municipality_adapter, "identity"
         ),
-    )
+    ),
+    knowledge={"identity": "official-municipality"},
 )
 ```
 

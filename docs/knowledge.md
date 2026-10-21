@@ -10,8 +10,12 @@ Source Adapter -> KnowledgeAdapterRegistry -> Identity / Time Adapter
 ## 構成
 
 `KnowledgeAdapterDefinition`は、Source/Execution Adapter Definitionと同じくadapter type、factory、
-依存関係を持ち、Knowledge種別を追加で宣言します。標準のTime Adapterは自動登録されます。
-独自のKnowledge Adapterを使う場合だけ`configure(adapters=...)`へ指定し、同じ種別の標準実装を置き換えます。
+依存関係を持ち、Knowledge種別を追加で宣言します。既定ではareaに
+`japan-administrative-area`、timeに`standard-time`を使い、identityは明示選択が必要です。
+独自のDefinitionは`configure(adapters=...)`で候補として登録し、
+`knowledge={"種別": "adapter type"}`で利用するものを選択します。
+インストールや登録だけでは既定の解釈を変更しません。同じ種別の候補を複数登録できますが、
+adapter typeは組み込み・明示登録・Entry Pointsを通じて一意でなければなりません。
 
 ```python
 from rhinestone import configure
@@ -23,7 +27,8 @@ app = configure(
         KnowledgeAdapterDefinition(
             "official-municipality", make_municipality_adapter, "identity"
         ),
-    )
+    ),
+    knowledge={"identity": "official-municipality"},
 )
 ```
 

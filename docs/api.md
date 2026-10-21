@@ -112,6 +112,7 @@ app = configure(
 | `credentials` | 認証情報を取得するfactory |
 | `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
 | `adapters` | `SourceAdapterDefinition`／`ExecutionAdapterDefinition`／`KnowledgeAdapterDefinition` の iterable。組み込みは自動登録され、独自定義だけを指定する |
+| `knowledge` | `area`／`identity`／`time`からadapter identityへの明示選択。未指定のarea/timeは組み込み、identityは未選択。登録だけでは既定を置き換えない |
 
 独自構成が必要なコードでは`catalog`を使ってください。
 Source Runtimeの遅延読み込みには`RuntimeFactory(factory)`を指定します。Execution Runtimeは`open(..., runtime=...)`で実体を渡します。
