@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from threading import RLock
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from ._adapter_contracts import RegisteredSourceAdapter
 from .adapters.contracts import ExecutionAdapter
@@ -136,13 +136,15 @@ class AdapterRegistry:
     def __init__(
         self,
         source_adapters: Iterable[RegisteredSourceAdapter],
-        execution_adapters: Iterable[ExecutionAdapter],
+        execution_adapters: Iterable[ExecutionAdapter] | Mapping[str, ExecutionAdapter],
     ) -> None:
         self._source_adapters = self._index(
             source_adapters, lambda adapter: adapter.source_id
         )
-        self._execution_adapters = self._index(
-            execution_adapters, lambda adapter: adapter.name
+        self._execution_adapters: Mapping[str, ExecutionAdapter] = (
+            cast(Mapping[str, ExecutionAdapter], execution_adapters)
+            if isinstance(execution_adapters, Mapping)
+            else self._index(execution_adapters, lambda adapter: adapter.name)
         )
 
     @staticmethod
@@ -181,6 +183,6 @@ class AdapterRegistry:
             )
 
     @property
-    def execution_adapters(self) -> tuple[ExecutionAdapter, ...]:
-        """Return registered Execution Adapters in deterministic order."""
-        return tuple(self._execution_adapters.values())
+    def execution_adapters(self) -> Mapping[str, ExecutionAdapter]:
+        """Expose adapter identities without instantiating unused installed ones."""
+        return self._execution_adapters

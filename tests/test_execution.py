@@ -1,6 +1,6 @@
 import pytest
 
-from rhinestone.errors import ExecutionAdapterUnavailableError
+from rhinestone.errors import AdapterRegistrationError, ExecutionAdapterUnavailableError
 from rhinestone.execution import ExecutionAdapterSelector
 from rhinestone.models import (
     AccessPlan,
@@ -68,3 +68,10 @@ def test_no_compatible_automatic_adapter_fails_explicitly() -> None:
 
     with pytest.raises(ExecutionAdapterUnavailableError, match="No execution"):
         ExecutionAdapterSelector((gdal,)).select(resource("geojson"))
+
+
+def test_selector_rejects_duplicate_names_instead_of_overwriting() -> None:
+    first = FakeExecutionAdapter("same", priority=10, supported_format="shapefile")
+    second = FakeExecutionAdapter("same", priority=20, supported_format="shapefile")
+    with pytest.raises(AdapterRegistrationError, match="unique"):
+        ExecutionAdapterSelector((first, second))

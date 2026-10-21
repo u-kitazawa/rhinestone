@@ -23,11 +23,13 @@ from ._composition import (
 from ._composition import (
     source_definitions as compose_source_definitions,
 )
-from ._entry_points import PROVIDER_GROUP, DefinitionIndex, discover
+from ._entry_points import PROVIDER_GROUP, RUNTIME_GROUP, DefinitionIndex, discover
+from ._runtime_adapters import ExecutionInstances
 from .adapters.contracts import (
     AdapterDefinition,
     ExecutionAdapter,
     ExecutionAdapterContext,
+    ExecutionAdapterDefinition,
     SourceAdapterDefinition,
 )
 from .adapters.knowledge import (
@@ -36,6 +38,8 @@ from .adapters.knowledge import (
 )
 from .catalogs import Catalog
 from .errors import (
+    AdapterContractError,
+    AdapterFactoryError,
     AdapterRegistrationError,
     ConfigValidationError,
     ExecutionAdapterUnavailableError,
@@ -105,16 +109,22 @@ class Rhinestone:
             SourceAdapterDefinition,
             lambda definition: definition.adapter_type,
         )
-        execution_definitions = compose_execution_definitions(
-            customexecution_definitions
+        execution_definitions = DefinitionIndex(
+            {
+                definition.name: definition
+                for definition in compose_execution_definitions(
+                    customexecution_definitions
+                )
+            },
+            discovered[RUNTIME_GROUP],
+            ExecutionAdapterDefinition,
+            lambda definition: definition.name,
         )
         knowledge_definitions = compose_knowledge_definitions(
             customknowledge_definitions
         )
         runtime_dependencies = dict(dependencies or {})
-        execution_runtime_names = frozenset(
-            definition.name for definition in execution_definitions
-        )
+        execution_runtime_names = frozenset(execution_definitions)
         invalid_dependencies = execution_runtime_names.intersection(
             runtime_dependencies
         )
@@ -194,24 +204,52 @@ class Rhinestone:
                 return adapter.bind_credentials(credential_registry)
             return adapter
 
-        configured_executions: list[ExecutionAdapter] = []
-        for definition in execution_definitions:
-            execution = definition.factory(
-                ExecutionAdapterContext(
-                    credentials=credential_registry,
-                    destination_policy=destination_policy,
+        def build_execution(definition: ExecutionAdapterDefinition) -> ExecutionAdapter:
+            origin = execution_definitions.origin(definition.name)
+            try:
+                execution = definition.factory(
+                    ExecutionAdapterContext(
+                        credentials=credential_registry,
+                        destination_policy=destination_policy,
+                    )
                 )
-            )
-            if execution.name != definition.name:
-                raise AdapterRegistrationError(
-                    f"Execution adapter factory returned {execution.name!r}; "
+                execution = bind_credentials(execution)
+            except Exception:
+                if origin is None:
+                    raise
+                raise AdapterFactoryError(
+                    f"Installed adapter factory failed: {origin}; inspect its factory"
+                ) from None
+            name = getattr(execution, "name", None)
+            if name != definition.name:
+                raise AdapterContractError(
+                    "Execution adapter factory returned an inconsistent name; "
                     f"expected {definition.name!r}; return an adapter whose name "
-                    "matches its ExecutionAdapterDefinition"
+                    f"matches its ExecutionAdapterDefinition ({origin or definition.name})"
                 )
-            configured_executions.append(execution)
+            if (
+                type(getattr(execution, "priority", None)) is not int
+                or not callable(getattr(execution, "supports", None))
+                or not callable(getattr(execution, "open", None))
+            ):
+                raise AdapterContractError(
+                    f"Runtime adapter must implement priority, supports, and open: "
+                    f"{origin or definition.name}"
+                )
+            return execution
+
+        # Preserve existing explicit factory timing. Installed definitions are
+        # loaded and instantiated only by an explicit library selection.
+        configured_executions = {
+            name: build_execution(execution_definitions[name])
+            for name in execution_definitions
+            if execution_definitions.origin(name) is None
+        }
         adapter_registry = AdapterRegistry(
             source_adapters,
-            (bind_credentials(adapter) for adapter in configured_executions),
+            ExecutionInstances(
+                execution_definitions, build_execution, configured_executions
+            ),
         )
         self._pipeline = AccessPipeline(
             adapter_registry=adapter_registry,
@@ -385,7 +423,9 @@ def configure(
         network_policy: ``"credentialed"`` (default) authorizes requests from
             catalog destinations; ``"none"`` disables destination restrictions.
         adapters: Additional Source, Execution, or Knowledge Adapter
-            definitions.
+            definitions. Installed Provider and Runtime Entry Points are also
+            discovered; external Runtime adapters load only when selected by
+            the explicit library name passed to open().
 
     Returns:
         A configured application whose ``search``, ``load``, ``plan``, and ``open``

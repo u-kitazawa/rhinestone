@@ -44,12 +44,36 @@ export型・identity・factory結果のload契約不一致は `AdapterContractEr
 含め、import/factory例外の任意payloadは表示しません。欠落したProviderの選択には従来の
 `AdapterRegistrationError`を返します。
 
-現在、3 groupのmetadataを列挙しますが、実際の選択・生成へ接続しているのは
-`rhinestone.provider_adapters`です。`rhinestone.runtime_adapters` と
-`rhinestone.knowledge_adapters` は引き続き明示Definitionを使用します。
-Runtime/Knowledgeの自動選択、名称統一、組み込みimportの遅延化は #214 の残件です。
+ProviderとRuntimeのgroupは選択・生成へ接続しています。
+`rhinestone.knowledge_adapters`は現在metadata列挙のみで、引き続き明示Definitionを使用します。
+Knowledgeの明示選択接続、名称統一、組み込みimportの遅延化は #214 の残件です。
 Rhinestone独自のインストーラや依存解決、未信頼Pythonコードの隔離は提供しません。
 選択したpackageは利用者のtrust boundary内で実行されます。
+
+## インストール済みRuntime Adapter
+
+次のgroupでは `ExecutionAdapterDefinition` オブジェクトをexportします。
+Entry Point名とDefinitionの `name` を一致させます。
+
+```toml
+[project.entry-points."rhinestone.runtime_adapters"]
+example-runtime = "example_package.runtime:definition"
+```
+
+`configure()`では名前の重複だけをmetadataで検査し、外部Runtime Adapterをimport・生成しません。
+`app.open(resource_or_plan, "example-runtime", runtime=my_runtime)`で指定したAdapterだけを
+load・生成し、同じアプリケーション内でキャッシュします。外部Providerと同じexport検証と
+エラー分類を使います。factory結果にはDefinitionと一致する `name`、整数の `priority`、
+callableな `supports` / `open` が必要です。
+
+AdapterのインストールはRuntime実体のインストール・import・生成を意味しません。
+利用者は既存の契約どおりRuntimeオブジェクトを `runtime=` で渡します。`dependencies=`へ
+Runtime Adapter名を登録することはできません。公開open APIはlibrary名の明示を要求し、
+指定したAdapterが非対応でも他のAdapterへfallbackしません。
+組み込み・明示Definitionのfactory評価は従来どおりconfigure時で、外部Entry Pointだけが選択時です。
+
+選択後は通常の実行経路へ渡すため、任意の `authorize()` 能力、宛先認可、credentialの
+Port、独立したJSON Plan実行を維持します。未使用Adapterの `supports()` も呼び出しません。
 
 ```text
 Provider / Reference

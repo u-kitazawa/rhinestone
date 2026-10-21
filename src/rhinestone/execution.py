@@ -1,10 +1,10 @@
 """Deterministic selection of execution adapters."""
 
-from collections.abc import Iterable
-from typing import Protocol, runtime_checkable
+from collections.abc import Iterable, Mapping
+from typing import Protocol, cast, runtime_checkable
 
 from .adapters.contracts import ExecutionAdapter
-from .errors import ExecutionAdapterUnavailableError
+from .errors import AdapterRegistrationError, ExecutionAdapterUnavailableError
 from .models import AccessPlan, LibraryName
 from .security import DestinationPolicy
 
@@ -26,8 +26,17 @@ class AuthorizingExecutionAdapter(Protocol):
 class ExecutionAdapterSelector:
     """Select the highest-priority compatible execution adapter."""
 
-    def __init__(self, adapters: Iterable[ExecutionAdapter]) -> None:
-        self._adapters = tuple(adapters)
+    def __init__(
+        self, adapters: Iterable[ExecutionAdapter] | Mapping[str, ExecutionAdapter]
+    ) -> None:
+        self._adapters: Mapping[str, ExecutionAdapter]
+        if isinstance(adapters, Mapping):
+            self._adapters = cast(Mapping[str, ExecutionAdapter], adapters)
+        else:
+            declared = tuple(adapters)
+            self._adapters = {adapter.name: adapter for adapter in declared}
+            if len(self._adapters) != len(declared):
+                raise AdapterRegistrationError("Execution adapter names must be unique")
 
     def select(
         self,
@@ -40,16 +49,22 @@ class ExecutionAdapterSelector:
         no library is requested, priority and name determine a deterministic
         choice among compatible adapters.
         """
-        compatible = [adapter for adapter in self._adapters if adapter.supports(plan)]
         if requested is not None:
-            compatible = [
-                adapter for adapter in compatible if adapter.name == requested
-            ]
+            # Identity is metadata. Check it before touching supports/priority,
+            # which may require loading a selected installed package.
+            adapter = self._adapters.get(requested)
+            compatible = (
+                [adapter] if adapter is not None and adapter.supports(plan) else []
+            )
             if not compatible:
                 raise ExecutionAdapterUnavailableError(
                     f"Execution adapter {requested!r} is unavailable or "
                     "incompatible with the selected plan"
                 )
+        else:
+            compatible = [
+                adapter for adapter in self._adapters.values() if adapter.supports(plan)
+            ]
         if not compatible:
             raise ExecutionAdapterUnavailableError(
                 "No execution adapter supports the selected plan with the "
