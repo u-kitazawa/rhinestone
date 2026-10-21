@@ -2,7 +2,7 @@
 
 `PlateauAdapter` は G 空間情報センターの CKAN catalog から PLATEAU 配布物を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `plateau`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `plateau`
 
 ## 設定と接続先
 
@@ -27,7 +27,7 @@ Adapterを直接構築する内部テストや再利用用途では、transport 
 
 ## 直接loadでの配信選択
 
-Source Adapterは、指定したresource IDと任意の`format`で配信を絞り、1件のResourceを返します。
+Provider Adapterは、指定したresource IDと任意の`format`で配信を絞り、1件のResourceを返します。
 dataset指定で複数の配信が一致すれば`AmbiguousResourceError`、一致する配信がなければ
 `ResourceNotFoundError`になります。市区町村・年度や先頭順から配布物を推測しません。
 

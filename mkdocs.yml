@@ -25,7 +25,7 @@ nav:
       - APIリファレンス:
           - 概要: api.md
           - 提供元アダプター:
-              - 概要: api/source-adapters.md
+              - 概要: api/provider-adapters.md
               - CKAN: api/adapters/ckan.md
               - G空間情報センター: api/adapters/geospatial-jp.md
               - DCAT: api/adapters/dcat.md
@@ -40,7 +40,7 @@ nav:
               - STAC: api/adapters/stac.md
               - Static: api/adapters/static.md
           - 実行アダプター:
-              - 概要: api/execution-adapters.md
+              - 概要: api/runtime-adapters.md
               - GDAL: api/adapters/gdal.md
               - JSONサービス: api/adapters/json-service.md
               - pyogrio: api/adapters/pyogrio.md

@@ -3,17 +3,17 @@
 from collections.abc import Callable, Iterator, Mapping
 from threading import RLock
 
-from .adapters.contracts import ExecutionAdapter, ExecutionAdapterDefinition
+from .adapters.contracts import RuntimeAdapter, RuntimeAdapterDefinition
 
 
-class ExecutionInstances(Mapping[str, ExecutionAdapter]):
+class RuntimeInstances(Mapping[str, RuntimeAdapter]):
     """Keep metadata identities separate from selected adapter construction."""
 
     def __init__(
         self,
-        definitions: Mapping[str, ExecutionAdapterDefinition],
-        build: Callable[[ExecutionAdapterDefinition], ExecutionAdapter],
-        instances: Mapping[str, ExecutionAdapter],
+        definitions: Mapping[str, RuntimeAdapterDefinition],
+        build: Callable[[RuntimeAdapterDefinition], RuntimeAdapter],
+        instances: Mapping[str, RuntimeAdapter],
     ) -> None:
         self._definitions = definitions
         self._build = build
@@ -29,7 +29,7 @@ class ExecutionInstances(Mapping[str, ExecutionAdapter]):
     def __contains__(self, name: object) -> bool:
         return name in self._definitions
 
-    def __getitem__(self, name: str) -> ExecutionAdapter:
+    def __getitem__(self, name: str) -> RuntimeAdapter:
         with self._lock:
             if name not in self._instances:
                 definition = self._definitions[name]

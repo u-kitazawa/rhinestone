@@ -23,7 +23,7 @@ class ConfigValidationError(RhinestoneError):
     """
 
 
-class UnsupportedSourceError(RhinestoneError):
+class UnsupportedProviderError(RhinestoneError):
     """The requested source ID is not configured in this application.
 
     Check the ``Catalog`` passed to :func:`rhinestone.configure`
@@ -32,7 +32,7 @@ class UnsupportedSourceError(RhinestoneError):
 
 
 class UnsupportedSearchConditionError(RhinestoneError):
-    """A source adapter cannot apply a supplied search condition.
+    """A provider adapter cannot apply a supplied search condition.
 
     Use the search diagnostics to identify the skipped condition, or restrict
     the query to conditions supported by that source.
@@ -73,8 +73,8 @@ class UnsupportedAccessError(RhinestoneError):
     """
 
 
-class ExecutionAdapterUnavailableError(RhinestoneError):
-    """No requested or compatible execution adapter is available.
+class RuntimeAdapterUnavailableError(RhinestoneError):
+    """No requested or compatible runtime adapter is available.
 
     Install or inject the required runtime, choose a compatible library name,
     or omit the explicit library request when automatic selection is suitable.
@@ -90,7 +90,7 @@ class DependencyUnavailableError(RhinestoneError):
 
 
 class ResourceAccessError(RhinestoneError):
-    """The selected resource could not be opened by its execution adapter.
+    """The selected resource could not be opened by its runtime adapter.
 
     Inspect the underlying cause, URI policy, runtime configuration, and access
     plan.  This error is raised after resource selection has succeeded.

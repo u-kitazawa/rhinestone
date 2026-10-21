@@ -41,6 +41,6 @@ Credentialはsecretを返すfactoryとして構成します。ReferenceやAccess
 
 ## Adapter
 
-Source AdapterはProvider固有の識別子・配信情報をResourceへ変換します。
-Execution AdapterはAccessPlanを解釈して利用者のRuntimeへ渡します。
+Provider AdapterはProvider固有の識別子・配信情報をResourceへ変換します。
+Runtime AdapterはAccessPlanを解釈して利用者のRuntimeへ渡します。
 CoreはProvider固有の候補選択やデータ解析を行いません。

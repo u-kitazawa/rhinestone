@@ -2,7 +2,7 @@
 
 `DirectAdapter` は、完全に記述された単一 Resource を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `direct`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `direct`
 
 ## 設定
 

@@ -3,7 +3,7 @@
 `SearchCkanJpAdapter` は search.ckan.jp Backend API を使って複数のCKANカタログを検索し、
 元の配布物を解決する `Resource` を返します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `search-ckan-jp`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `search-ckan-jp`
 
 ## 設定と検索
 
@@ -77,4 +77,4 @@ results = search(
 - search.ckan.jpが返すpackage/resourceの識別情報と公式配布URLを利用します。
 - resourceの形式またはMIME typeが明示されている結果だけを返します。
 - HTMLの解析、配布URLの推測、検索結果からのprovider secretの取得は行いません。
-- 検索結果に含まれる元カタログURLは出典として保持しますが、検索専用Sourceから直接取得は行いません。
+- 検索結果に含まれる元カタログURLは出典として保持しますが、検索専用Providerから直接取得は行いません。

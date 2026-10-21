@@ -14,5 +14,5 @@
 - `odpt.json`: ODPT駅応答の語彙と配列形式:
   https://developer.odpt.org/documents
 
-適合テストでは、Source、候補、AccessPlan、open結果を明示的に検証します。GMLサンプルは読み込み機能との
+適合テストでは、Provider、候補、AccessPlan、open結果を明示的に検証します。GMLサンプルは読み込み機能との
 互換性を確認するもので、PLATEAUや基盤地図情報の完全な検証ではありません。

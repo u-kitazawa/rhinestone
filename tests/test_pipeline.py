@@ -4,7 +4,7 @@ from rhinestone.errors import (
     AdapterRegistrationError,
     ConfigValidationError,
     ProviderMetadataError,
-    UnsupportedSourceError,
+    UnsupportedProviderError,
 )
 from rhinestone.models import Metadata, Provenance, Reference, Resource
 from rhinestone.pipeline import AccessPipeline
@@ -12,7 +12,7 @@ from rhinestone.registry import AdapterRegistry
 from rhinestone.resolution import resource_from_delivery
 
 
-class RecordingSourceAdapter:
+class RecordingProviderAdapter:
     source_id = "fixture"
 
     def __init__(self, events: list[str]) -> None:
@@ -33,7 +33,7 @@ class RecordingSourceAdapter:
 def test_access_pipeline_delegates_unique_resource_selection_to_provider() -> None:
     events: list[str] = []
     pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((RecordingSourceAdapter(events),), ())
+        adapter_registry=AdapterRegistry((RecordingProviderAdapter(events),), ())
     )
     config = Reference(provider_id="fixture", parameters={"dataset": "data-1"})
 
@@ -47,7 +47,7 @@ def test_access_pipeline_delegates_unique_resource_selection_to_provider() -> No
 
 def test_unconfigured_pipeline_cannot_open_an_existing_resource() -> None:
     pipeline = AccessPipeline(
-        adapter_registry=AdapterRegistry((RecordingSourceAdapter([]),), ())
+        adapter_registry=AdapterRegistry((RecordingProviderAdapter([]),), ())
     )
     resource = pipeline.load(Reference(provider_id="fixture", parameters={}))
 
@@ -58,7 +58,7 @@ def test_unconfigured_pipeline_cannot_open_an_existing_resource() -> None:
 def test_unknown_provider_has_a_specific_failure() -> None:
     pipeline = AccessPipeline(adapter_registry=AdapterRegistry((), ()))
 
-    with pytest.raises(UnsupportedSourceError, match="unknown"):
+    with pytest.raises(UnsupportedProviderError, match="unknown"):
         pipeline.load(Reference("unknown"))
 
 
@@ -98,11 +98,11 @@ def test_pipeline_does_not_wrap_an_expected_domain_error() -> None:
     assert captured.value is expected
 
 
-def test_duplicate_source_adapters_are_rejected_by_pipeline() -> None:
+def test_duplicate_provider_adapters_are_rejected_by_pipeline() -> None:
     events: list[str] = []
     with pytest.raises(AdapterRegistrationError, match="fixture"):
         AccessPipeline(
             adapter_registry=AdapterRegistry(
-                (RecordingSourceAdapter(events), RecordingSourceAdapter(events)), ()
+                (RecordingProviderAdapter(events), RecordingProviderAdapter(events)), ()
             )
         )

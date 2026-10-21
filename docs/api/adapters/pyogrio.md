@@ -2,7 +2,7 @@
 
 `PyogrioAdapter` は選択済み vector AccessPlan を利用者提供の pyogrio runtime で読み込みます。
 
-[Execution Adapter 一覧](../execution-adapters.md) · 選択名: `pyogrio` · priority: `10`
+[Runtime Adapter 一覧](../runtime-adapters.md) · 選択名: `pyogrio` · priority: `10`
 
 Rhinestone の representation registry で `vector` と明示された Shapefile、GeoJSON、
 GeoPackage、FlatGeobuf、GML、KML、CityGML に対応します。runtime は

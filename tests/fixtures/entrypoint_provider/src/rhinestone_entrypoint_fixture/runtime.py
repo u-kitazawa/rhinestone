@@ -3,8 +3,8 @@
 from typing import Any
 
 from rhinestone.adapters.contracts import (
-    ExecutionAdapterContext,
-    ExecutionAdapterDefinition,
+    RuntimeAdapterContext,
+    RuntimeAdapterDefinition,
 )
 from rhinestone.models import AccessPlan
 from rhinestone.security import DestinationPolicy
@@ -30,9 +30,9 @@ class InstalledRuntimeAdapter:
         return runtime.read(plan.uri)
 
 
-def factory(context: ExecutionAdapterContext) -> InstalledRuntimeAdapter:
+def factory(context: RuntimeAdapterContext) -> InstalledRuntimeAdapter:
     calls.append("factory")
     return InstalledRuntimeAdapter()
 
 
-definition = ExecutionAdapterDefinition("installed-runtime", factory)
+definition = RuntimeAdapterDefinition("installed-runtime", factory)

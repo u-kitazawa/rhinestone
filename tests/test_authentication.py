@@ -3,9 +3,9 @@ from typing import Any
 
 import pytest
 
-from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
-from rhinestone.adapters.source.stac import StacAdapter
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.provider.ogc import OgcFeaturesAdapter
+from rhinestone.adapters.provider.stac import StacAdapter
 from rhinestone.models import Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
 from tests.provider_support import fixture_json

@@ -8,7 +8,7 @@ import pytest
 
 import rhinestone._http as http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Catalog, Format, Provider, Reference, configure
-from rhinestone.adapters.source.plateau import PlateauAdapter
+from rhinestone.adapters.provider.plateau import PlateauAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import AccessPlan, SearchQuery
 from tests.provider_support import fixture_json

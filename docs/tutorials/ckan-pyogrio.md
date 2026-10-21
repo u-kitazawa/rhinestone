@@ -15,7 +15,7 @@ export RHINESTONE_CKAN_RESULT_INDEX="0"
 G空間情報センターの公開CKAN APIへ接続するため、ネットワーク接続が必要です。検索結果から、
 Rhinestone の representation registry で `vector` と明示された形式として提供されている
 distributionを選べる検索語を指定してください。ZIP Shapefile を選ぶ場合も、
-`archive="zip"`（必要なら ZIP 内の `entry_point`）が Source で明示されていれば同じ例で開けます。
+`archive="zip"`（必要なら ZIP 内の `entry_point`）が Provider で明示されていれば同じ例で開けます。
 
 ## 検索、distribution選択、pyogrioへの受け渡し
 
@@ -43,7 +43,7 @@ if not results:
 
 for index, result in enumerate(results):
     print(f"[{index}] {result.title}")
-    print("    resource id:", result.provenance.resource_identifier)
+    print("    reProvider.id:", result.provenance.resource_identifier)
     print("    formats:", sorted(result.formats))
 
 selected = results[int(os.environ.get("RHINESTONE_CKAN_RESULT_INDEX", "0"))]

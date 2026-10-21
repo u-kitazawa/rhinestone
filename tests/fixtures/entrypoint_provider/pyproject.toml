@@ -8,7 +8,7 @@ requires = ["uv_build>=0.12.9,<0.13"]
 build-backend = "uv_build"
 
 [project.entry-points."rhinestone.provider_adapters"]
-installed-provider = "rhinestone_entrypoint_fixture.source:definition"
+installed-provider = "rhinestone_entrypoint_fixture.provider:definition"
 unused-broken = "rhinestone_entrypoint_fixture.broken:definition"
 
 [project.entry-points."rhinestone.runtime_adapters"]

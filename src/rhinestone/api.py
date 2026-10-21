@@ -8,20 +8,20 @@ from typing import Protocol, cast, runtime_checkable
 
 from . import _http
 from ._composition import (
-    ConfiguredSourceAdapter,
-    build_source_adapter,
-    source_context,
+    ConfiguredProviderAdapter,
+    build_provider_adapter,
+    provider_context,
     split_definitions,
     validate_mlit_dpf_targets,
-)
-from ._composition import (
-    execution_definitions as compose_execution_definitions,
 )
 from ._composition import (
     knowledge_definitions as compose_knowledge_definitions,
 )
 from ._composition import (
-    source_definitions as compose_source_definitions,
+    provider_definitions as compose_provider_definitions,
+)
+from ._composition import (
+    runtime_definitions as compose_runtime_definitions,
 )
 from ._entry_points import (
     KNOWLEDGE_GROUP,
@@ -31,13 +31,13 @@ from ._entry_points import (
     discover,
 )
 from ._knowledge_adapters import select_knowledge
-from ._runtime_adapters import ExecutionInstances
+from ._runtime_adapters import RuntimeInstances
 from .adapters.contracts import (
     AdapterDefinition,
-    ExecutionAdapter,
-    ExecutionAdapterContext,
-    ExecutionAdapterDefinition,
-    SourceAdapterDefinition,
+    ProviderAdapterDefinition,
+    RuntimeAdapter,
+    RuntimeAdapterContext,
+    RuntimeAdapterDefinition,
 )
 from .adapters.knowledge import (
     KnowledgeAdapterContext,
@@ -51,9 +51,8 @@ from .errors import (
     AdapterFactoryError,
     AdapterRegistrationError,
     ConfigValidationError,
-    ExecutionAdapterUnavailableError,
+    RuntimeAdapterUnavailableError,
 )
-from .execution import ExecutionAdapterSelector
 from .models import (
     AccessPlan,
     DependencyValue,
@@ -67,15 +66,16 @@ from .models import (
 from .pipeline import AccessPipeline
 from .registry import AdapterRegistry, CredentialRegistry, DependencyRegistry
 from .representations import Format, FormatPreset
+from .runtime import RuntimeAdapterSelector
 from .search import SearchCoordinator, SearchResults
 from .security import DestinationPolicy, NetworkPolicyLevel
 
 
 @runtime_checkable
-class _CredentialBindableExecutionAdapter(Protocol):
+class _CredentialBindableRuntimeAdapter(Protocol):
     """Optional capability for adapters using application credentials."""
 
-    def bind_credentials(self, credentials: CredentialRegistry) -> ExecutionAdapter:
+    def bind_credentials(self, credentials: CredentialRegistry) -> RuntimeAdapter:
         """Return an adapter bound to the application credential registry."""
         ...
 
@@ -83,7 +83,7 @@ class _CredentialBindableExecutionAdapter(Protocol):
 class Rhinestone:
     """An isolated application context for discovery, planning, and access.
 
-    Each instance owns its configured Providers, Source runtimes, credential
+    Each instance owns its configured Providers, Provider dependencies, credential
     factories, network policy, and adapter registry. It is safe to create
     separate instances with different credentials or runtime objects in the
     same process.
@@ -108,26 +108,24 @@ class Rhinestone:
         validate_mlit_dpf_targets(selected_sources)
 
         (
-            customsource_definitions,
-            customexecution_definitions,
+            customprovider_definitions,
+            customruntime_definitions,
             customknowledge_definitions,
         ) = split_definitions(adapters)
         discovered = discover()
-        source_definitions = DefinitionIndex(
-            compose_source_definitions(customsource_definitions),
+        provider_definitions = DefinitionIndex(
+            compose_provider_definitions(customprovider_definitions),
             discovered[PROVIDER_GROUP],
-            SourceAdapterDefinition,
+            ProviderAdapterDefinition,
             lambda definition: definition.adapter_type,
         )
-        execution_definitions = DefinitionIndex(
+        runtime_definitions = DefinitionIndex(
             {
                 definition.name: definition
-                for definition in compose_execution_definitions(
-                    customexecution_definitions
-                )
+                for definition in compose_runtime_definitions(customruntime_definitions)
             },
             discovered[RUNTIME_GROUP],
-            ExecutionAdapterDefinition,
+            RuntimeAdapterDefinition,
             lambda definition: definition.name,
         )
         knowledge_definitions = DefinitionIndex(
@@ -138,13 +136,11 @@ class Rhinestone:
         )
         selected_knowledge = select_knowledge(knowledge_definitions, knowledge)
         runtime_dependencies = dict(dependencies or {})
-        execution_runtime_names = frozenset(execution_definitions)
-        invalid_dependencies = execution_runtime_names.intersection(
-            runtime_dependencies
-        )
+        runtime_adapter_names = frozenset(runtime_definitions)
+        invalid_dependencies = runtime_adapter_names.intersection(runtime_dependencies)
         if invalid_dependencies:
             raise ConfigValidationError(
-                "Execution runtime names are not valid configure dependencies: "
+                "Runtime names are not valid configure dependencies: "
                 + ", ".join(sorted(invalid_dependencies))
             )
         source_dependency_registry = DependencyRegistry(runtime_dependencies)
@@ -169,18 +165,18 @@ class Rhinestone:
             },
         )
 
-        configured_sources: list[ConfiguredSourceAdapter] = []
+        configured_sources: list[ConfiguredProviderAdapter] = []
         configured_ids = {"direct"}
         direct_provider = Provider("direct", "direct")
         configured_sources.append(
-            ConfiguredSourceAdapter(
+            ConfiguredProviderAdapter(
                 "direct",
-                build_source_adapter(
+                build_provider_adapter(
                     direct_provider,
-                    source_definitions,
-                    source_context(
+                    provider_definitions,
+                    provider_context(
                         direct_provider,
-                        source_definitions,
+                        provider_definitions,
                         source_dependency_registry,
                         knowledge_registry,
                         credential_registry,
@@ -199,14 +195,14 @@ class Rhinestone:
                 )
             configured_ids.add(source_id)
             configured_sources.append(
-                ConfiguredSourceAdapter(
+                ConfiguredProviderAdapter(
                     source_id,
-                    build_source_adapter(
+                    build_provider_adapter(
                         source_definition,
-                        source_definitions,
-                        source_context(
+                        provider_definitions,
+                        provider_context(
                             source_definition,
-                            source_definitions,
+                            provider_definitions,
                             source_dependency_registry,
                             knowledge_registry,
                             credential_registry,
@@ -217,18 +213,18 @@ class Rhinestone:
                 )
             )
 
-        source_adapters = tuple(configured_sources)
+        provider_adapters = tuple(configured_sources)
 
-        def bind_credentials(adapter: ExecutionAdapter) -> ExecutionAdapter:
-            if isinstance(adapter, _CredentialBindableExecutionAdapter):
+        def bind_credentials(adapter: RuntimeAdapter) -> RuntimeAdapter:
+            if isinstance(adapter, _CredentialBindableRuntimeAdapter):
                 return adapter.bind_credentials(credential_registry)
             return adapter
 
-        def build_execution(definition: ExecutionAdapterDefinition) -> ExecutionAdapter:
-            origin = execution_definitions.origin(definition.name)
+        def build_runtime(definition: RuntimeAdapterDefinition) -> RuntimeAdapter:
+            origin = runtime_definitions.origin(definition.name)
             try:
                 execution = definition.factory(
-                    ExecutionAdapterContext(
+                    RuntimeAdapterContext(
                         credentials=credential_registry,
                         destination_policy=destination_policy,
                     )
@@ -243,9 +239,9 @@ class Rhinestone:
             name = getattr(execution, "name", None)
             if name != definition.name:
                 raise AdapterContractError(
-                    "Execution adapter factory returned an inconsistent name; "
+                    "Runtime adapter factory returned an inconsistent name; "
                     f"expected {definition.name!r}; return an adapter whose name "
-                    f"matches its ExecutionAdapterDefinition ({origin or definition.name})"
+                    f"matches its RuntimeAdapterDefinition ({origin or definition.name})"
                 )
             if (
                 type(getattr(execution, "priority", None)) is not int
@@ -260,31 +256,27 @@ class Rhinestone:
 
         # Preserve explicit application factory timing. Built-in and installed
         # Runtime implementations are needed only by a library selection.
-        configured_executions = {
-            definition.name: build_execution(definition)
-            for definition in customexecution_definitions
+        configured_runtimes = {
+            definition.name: build_runtime(definition)
+            for definition in customruntime_definitions
         }
         adapter_registry = AdapterRegistry(
-            source_adapters,
-            ExecutionInstances(
-                execution_definitions, build_execution, configured_executions
-            ),
+            provider_adapters,
+            RuntimeInstances(runtime_definitions, build_runtime, configured_runtimes),
         )
         self._pipeline = AccessPipeline(
             adapter_registry=adapter_registry,
-            execution_selector=ExecutionAdapterSelector(
-                adapter_registry.execution_adapters
-            ),
+            runtime_selector=RuntimeAdapterSelector(adapter_registry.runtime_adapters),
             destination_policy=destination_policy,
         )
-        self._search = SearchCoordinator(source_adapters, knowledge_registry)
+        self._search = SearchCoordinator(provider_adapters, knowledge_registry)
 
     def load(self, value: Reference | Resource) -> Resource:
         """Load one concrete Resource from a Reference or deferred Resource.
 
         Raises:
             ConfigValidationError: If value is not a Reference or Resource.
-            UnsupportedSourceError: If a Reference names an unconfigured Provider.
+            UnsupportedProviderError: If a Reference names an unconfigured Provider.
             ProviderMetadataError: If provider metadata cannot be loaded.
             UnsupportedAccessError: If the Provider cannot produce a unique
                 portable access plan.
@@ -302,7 +294,7 @@ class Rhinestone:
         """Return a portable execution plan, loading a deferred Reference if needed."""
         resource = self.load(value)
         if resource.access_plan is None:
-            raise ExecutionAdapterUnavailableError(
+            raise RuntimeAdapterUnavailableError(
                 "Resource has no AccessPlan; the Provider must declare its format "
                 "or access kind"
             )
@@ -330,14 +322,14 @@ class Rhinestone:
         Args:
             value: A ``Resource``, direct ``Reference``, or a
                 standalone ``AccessPlan``.
-            library: Execution adapter name such as ``"rasterio"`` or
+            library: Runtime adapter name such as ``"rasterio"`` or
                 ``"pyogrio"``.
             runtime: User-owned runtime object for external adapters.
 
         Raises:
             ConfigValidationError: If value is not a Reference, Resource, or
                 AccessPlan, or library is not a non-empty adapter name.
-            ExecutionAdapterUnavailableError: If the named adapter or injected
+            RuntimeAdapterUnavailableError: If the named adapter or injected
                 runtime is unavailable or incompatible.
             ResourceAccessError: If the runtime cannot access the resource.
             DestinationNotAllowedError: If network policy rejects the URI.
@@ -349,7 +341,7 @@ class Rhinestone:
         raw_library = cast(object, library)
         if not isinstance(raw_library, str) or not raw_library.strip():
             raise ConfigValidationError(
-                "library must be a non-empty execution adapter name"
+                "library must be a non-empty runtime adapter name"
             )
         if isinstance(value, AccessPlan):
             return self._pipeline.open_plan(value, library, runtime=runtime)
@@ -436,8 +428,8 @@ def configure(
 
     Args:
         catalog: Immutable Provider collection to enable.
-        dependencies: User-owned Source runtime objects or ``RuntimeFactory``
-            values, keyed by runtime name. Execution runtime names are rejected.
+        dependencies: User-owned Provider dependency objects or ``RuntimeFactory``
+            values, keyed by runtime name. Runtime names are rejected.
         credentials: Lazy factories keyed by logical credential name. Secrets
             are not retained in public models.
         network_policy: ``"credentialed"`` (default) authorizes requests from

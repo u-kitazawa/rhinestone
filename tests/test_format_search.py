@@ -7,9 +7,9 @@ import rdflib
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Format, FormatPreset, Provider, configure
-from rhinestone.adapters.source._ckan import matches_query_formats
-from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.adapters.source.search_ckan_jp import SearchCkanJpAdapter
+from rhinestone.adapters.provider._ckan import matches_query_formats
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.provider.search_ckan_jp import SearchCkanJpAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery

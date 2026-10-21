@@ -11,9 +11,9 @@ from rhinestone import Catalog, _http, configure
 from rhinestone.catalogs import BUILTIN
 from rhinestone.errors import (
     DestinationNotAllowedError,
-    ExecutionAdapterUnavailableError,
     ProviderMetadataError,
     ResourceAccessError,
+    RuntimeAdapterUnavailableError,
 )
 from rhinestone.models import AccessPlan, RuntimeFactory
 from rhinestone.pipeline import AccessPipeline
@@ -72,7 +72,7 @@ def test_restored_plan_runs_without_resource_or_provider(
 
 @pytest.mark.parametrize("runtime", [None, RuntimeFactory(lambda: object())])
 def test_plan_requires_runtime_object(runtime: object) -> None:
-    with pytest.raises(ExecutionAdapterUnavailableError, match="must be supplied"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="must be supplied"):
         configure(catalog=Catalog(())).open(
             AccessPlan(kind="file", uri="/a.tif", format="cog"),
             "rasterio",
@@ -135,7 +135,7 @@ def test_restored_service_plan_uses_internal_runtime(
     )
     assert app.open(plan, "json-service") == []
     assert calls[0][1]["allow_redirects"] is False
-    with pytest.raises(ExecutionAdapterUnavailableError, match="omit runtime"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="omit runtime"):
         app.open(plan, "json-service", runtime=object())
 
 

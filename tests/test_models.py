@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailableError
+from rhinestone.errors import ConfigValidationError, RuntimeAdapterUnavailableError
 from rhinestone.models import (
     AccessPlan,
     Metadata,
@@ -332,7 +332,7 @@ def test_unbound_resource_cannot_open_without_execution_context() -> None:
         reference=Reference("direct", resource_identifier="/data/a.csv"),
     )
 
-    with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="not bound"):
         resource.open("gdal")
 
 

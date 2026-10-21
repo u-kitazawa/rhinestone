@@ -1,16 +1,20 @@
 # Custom Adapter を作る
 
-Rhinestone の Adapter は、Provider 固有の情報を配信単位の `Resource` へ変換する Source
-Adapter と、選択済みの `AccessPlan` を外部 Runtime へ渡す Execution Adapter に分かれます。
+Rhinestone の Adapter は、Provider 固有の情報を配信単位の `Resource` へ変換する Provider
+Adapter と、選択済みの `AccessPlan` を外部 Runtime へ渡す Runtime Adapter に分かれます。
 外部Provider Adapterは、インストールされたPython packageのEntry Pointsから発見できます。
-Provider / Execution / KnowledgeのDefinitionを `configure(adapters=...)` へ明示登録することもできます。組み込み Adapter も
+Provider / Runtime / KnowledgeのDefinitionを `configure(adapters=...)` へ明示登録することもできます。組み込み Adapter も
 「あらかじめ登録された Definition」として同じ Registry に追加されるため、Custom Adapter
 と同じ Factory／Context／選択経路を通ります。process-globalな可変登録状態は持ちません。
+
+構造的な契約は`rhinestone.adapters.contracts.ProviderAdapter`／`RuntimeAdapter`のProtocolです。
+共通実装を継承する場合は`rhinestone.adapters.provider.ProviderAdapter`／
+`rhinestone.adapters.runtime.RuntimeAdapter`の基底クラスを利用できます。継承は必須ではありません。
 
 ## インストール済みProvider Adapter
 
 外部packageはDefinitionオブジェクトを1つexportし、Entry Point名と
-`SourceAdapterDefinition.adapter_type`を一致させます。export先はfactoryそのものではありません。
+`ProviderAdapterDefinition.adapter_type`を一致させます。export先はfactoryそのものではありません。
 
 ```toml
 [project.entry-points."rhinestone.provider_adapters"]
@@ -19,10 +23,10 @@ example-source = "example_package:definition"
 
 ```python
 # example_package/__init__.py
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 from .adapter import make_adapter
 
-definition = SourceAdapterDefinition("example-source", make_adapter)
+definition = ProviderAdapterDefinition("example-source", make_adapter)
 ```
 
 利用側は通常のpip/uvでpackageをインストールし、Catalogで選択します。
@@ -47,7 +51,6 @@ export型・identity・factory結果のload契約不一致は `AdapterContractEr
 Provider・Runtime・Knowledgeの3つのgroupを選択・生成へ接続しています。
 組み込みの実装も選択したProvider、明示したRuntime、初めて利用するKnowledge種別だけを
 読み込みます。公開packageの個別exportも明示import時に読み込みます。
-名称統一は #214 の残件です。
 Rhinestone独自のインストーラや依存解決、未信頼Pythonコードの隔離は提供しません。
 選択したpackageは利用者のtrust boundary内で実行されます。
 
@@ -72,7 +75,7 @@ Definitionの型・identity・kindを検証します。factoryはその種別の
 
 ## インストール済みRuntime Adapter
 
-次のgroupでは `ExecutionAdapterDefinition` オブジェクトをexportします。
+次のgroupでは `RuntimeAdapterDefinition` オブジェクトをexportします。
 Entry Point名とDefinitionの `name` を一致させます。
 
 ```toml
@@ -99,28 +102,28 @@ Port、独立したJSON Plan実行を維持します。未使用Adapterの `supp
 ```text
 Provider / Reference
       ↓
-SourceAdapter
+ProviderAdapter
       ↓
 Resource (Reference + AccessPlan)
                          ↓
-                  ExecutionAdapter → user runtime
+                  RuntimeAdapter → user runtime
 ```
 
 ## 最小構成
 
 `adapter_type` は実装の種類、`Provider.id` は Catalog 内での接続先の名前です。同じ
-Source Adapter を複数の Provider に再利用できます。
+Provider Adapter を複数の Provider に再利用できます。
 
 ```python
 from rhinestone import Catalog, Reference, Provider, configure
 from rhinestone.adapters.contracts import (
-    ExecutionAdapterDefinition,
-    SourceAdapterDefinition,
+    RuntimeAdapterDefinition,
+    ProviderAdapterDefinition,
 )
 from rhinestone.models import AccessPlan, Metadata, Provenance, Resource
 
 
-class ExampleSource:
+class ExampleProvider:
     def __init__(self, provider, context):
         self.provider = provider
         self.context = context
@@ -148,9 +151,9 @@ catalog = Catalog((Provider("example", "example-source"),))
 app = configure(
     catalog=catalog,
     adapters=(
-        SourceAdapterDefinition(
+        ProviderAdapterDefinition(
             "example-source",
-            lambda provider, context: ExampleSource(provider, context),
+            lambda provider, context: ExampleProvider(provider, context),
         ),
     ),
 )
@@ -158,32 +161,32 @@ app = configure(
 resource = app.load(Reference("example", parameters={"title": "Example"}))
 ```
 
-Source Adapter は `load(reference) -> Resource` を必ず実装します。選択と配信形式の
+Provider Adapter は `load(reference) -> Resource` を必ず実装します。選択と配信形式の
 解釈はAdapterの責務です。複数候補が残る場合は`AmbiguousResourceError`、0件なら
 `ResourceNotFoundError`を返します。URLや形式を推測しません。
 
-## SourceAdapterContext（提供元アダプターへ渡す情報）
+## ProviderAdapterContext（提供元アダプターへ渡す情報）
 
-Source factory には `SourceAdapterContext` が渡されます。
+Provider factory には `ProviderAdapterContext` が渡されます。
 
 | 属性 | 用途 |
 | --- | --- |
 | `transport` | 組み込み HTTP transport。`get_json()` / `get_text()` と宛先認可を一つの Port として提供 |
 | `credentials` | 論理名から Credential を取得する読み取り専用 Port |
-| `dependencies` | Definition が宣言した Source Runtime を取得する読み取り専用 Port |
+| `dependencies` | Definition が宣言した Provider依存ライブラリ を取得する読み取り専用 Port |
 | `knowledge` | Identity / Time などを解決する読み取り専用 Knowledge Port |
 | `destination_policy` | 通信先を認可する Policy |
 | `provider_id` | 現在構成している `Provider.id` |
 
-Source Definition の `dependencies` に Runtime 名を宣言すると、その名前の依存が
+Provider Definition の `dependencies` に Runtime 名を宣言すると、その名前の依存が
 Context に渡されます。
 
 ```python
 from rhinestone.catalogs import Catalog
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 from rhinestone.models import RuntimeFactory
 
-definition = SourceAdapterDefinition(
+definition = ProviderAdapterDefinition(
     "rdf-source",
     make_rdf_adapter,
     dependencies=frozenset({"rdflib"}),
@@ -239,7 +242,7 @@ def authenticated_document(provider, context, url):
     )
 ```
 
-Resource の URI や Source endpoint に userinfo（`https://user:password@...`）を埋め込んでは
+Resource の URI や Provider endpoint に userinfo（`https://user:password@...`）を埋め込んでは
 いけません。Rhinestone はこの形式を検証時に拒否します。File の `archive` は `zip` のみを
 扱い、`entry_point` を指定する場合は安全な相対 archive path として
 `AccessPlan.options` に保持してください。
@@ -256,7 +259,7 @@ Runtime factory は複数スレッドから安全に呼び出せるものを渡�
 from rhinestone.models import SearchQuery
 
 
-class SearchableExampleSource(ExampleSource):
+class SearchableExampleProvider(ExampleProvider):
     search_conditions = frozenset({"text", "limit"})
     required_search_conditions = frozenset()
 
@@ -266,7 +269,7 @@ class SearchableExampleSource(ExampleSource):
         ...
 ```
 
-`SearchableSourceAdapter.search()` の戻り値は `tuple[Resource, ...] | ProviderSearchResults` です。
+`SearchableProviderAdapter.search()` の戻り値は `tuple[Resource, ...] | ProviderSearchResults` です。
 `ProviderSearchResults(results=(...), diagnostics=(...))` により、取得できたResourceと
 Item単位の診断を同じ呼び出しで返せます。例えば対象Itemに選択可能な配布物がない場合は、
 `SearchDiagnostic(source_id="adapter-type", skipped_conditions=frozenset(),
@@ -288,19 +291,19 @@ ranking は行わないため、Adapter は provider 固有の結果順を保ち
 `Format.UNKNOWN`の明示指定、照合後の`limit`を扱います。
 URIや隣接する別データの形式から対象の形式を推測しません。
 
-## Execution Adapter（実行アダプター）
+## Runtime Adapter（実行アダプター）
 
-Execution Adapter は Resource を選択せず、すでに選択済みの AccessPlan を Runtime
+Runtime Adapter は Resource を選択せず、すでに選択済みの AccessPlan を Runtime
 へ翻訳します。`supports` / `open` / 任意の `authorize` は `AccessPlan` を受け取ります。
-Source・Resource・provenanceへ戻って実行情報を探しません。
+Provider・Resource・provenanceへ戻って実行情報を探しません。
 
-次の例は「最小構成」の`catalog`、`ExampleSource`、`resource`とimportを使います。
+次の例は「最小構成」の`catalog`、`ExampleProvider`、`resource`とimportを使います。
 `example_runtime`には`read(uri)`を提供する利用者所有のRuntime実体を用意してください。
 新しいアプリケーションを構成するため、Catalogにある`example-source`のDefinitionも
-Execution Adapterと一緒に登録します。前のアプリケーションの登録は引き継がれません。
+Runtime Adapterと一緒に登録します。前のアプリケーションの登録は引き継がれません。
 
 ```python
-class ExampleExecution:
+class ExampleRuntime:
     name = "example-runtime"
     priority = 100
 
@@ -314,13 +317,13 @@ class ExampleExecution:
 app = configure(
     catalog=catalog,
     adapters=(
-        SourceAdapterDefinition(
+        ProviderAdapterDefinition(
             "example-source",
-            lambda provider, context: ExampleSource(provider, context),
+            lambda provider, context: ExampleProvider(provider, context),
         ),
-        ExecutionAdapterDefinition(
+        RuntimeAdapterDefinition(
             "example-runtime",
-            lambda context: ExampleExecution(),
+            lambda context: ExampleRuntime(),
         ),
     ),
 )
@@ -330,25 +333,25 @@ data = app.open(resource, "example-runtime", runtime=example_runtime)
 
 `supports()` は渡された AccessPlan の形式・アクセス情報だけを見て、実際の Resource
 選択を行いません。公開APIでは`app.open(..., name, runtime=...)`でAdapter名とRuntimeを
-明示します。指定した名前が未登録・非互換なら`ExecutionAdapterUnavailableError`となり、
+明示します。指定した名前が未登録・非互換なら`RuntimeAdapterUnavailableError`となり、
 別のAdapterへ切り替えません。内部Selectorの優先度規則は、公開APIのRuntime自動選択を
 意味しません。Definition の `name` と生成された Adapter の `name` は一致させます。
 
 `open()` がネットワークへアクセスする場合は、通信の前に
 `destination_policy.authorize(plan.uri)` を適用するか、必要に応じて既存の
-Execution Adapter 基底クラスの `authorize()` を利用してください。Core に GDAL、Rasterio、
-pyogrio などを依存させず、Execution Runtime は `open()` で注入します。
+Runtime Adapter 基底クラスの `authorize()` を利用してください。Core に GDAL、Rasterio、
+pyogrio などを依存させず、Runtime は `open()` で注入します。
 
 ## 登録時の制約とエラー
 
-- 同じ Source `adapter_type` を組み込み・custom 間で重複登録できません。
-- 同じ custom Source `adapter_type` を複数登録できません。
-- Execution の組み込み名、または custom 名の重複登録はできません。
+- 同じ Provider `adapter_type` を組み込み・custom 間で重複登録できません。
+- 同じ custom Provider `adapter_type` を複数登録できません。
+- Runtime の組み込み名、または custom 名の重複登録はできません。
 - 未登録の `adapter_type` は暗黙に別 Adapter や URL へフォールバックしません。
 - Definition の不備は `AdapterRegistrationError` または `ValueError` として早期に検出されます。
 - Provider の設定不備は `ConfigValidationError`、外部 metadata の取得失敗は
   `ProviderMetadataError`、応答形式の不備は `ProviderResponseError` に分けます。
 
-Source Adapter は同じ入力から決定的な `Resource` を生成し、Metadata、raw metadata、Provenance を
+Provider Adapter は同じ入力から決定的な `Resource` を生成し、Metadata、raw metadata、Provenance を
 保持してください。代表的な provider response fixture、成功ケース、曖昧な候補、未対応
 条件、認証・通信失敗を Adapter package のテストに含めることを推奨します。

@@ -6,15 +6,15 @@ from collections.abc import Callable, Iterable, Mapping
 from threading import RLock
 from typing import Any, TypeVar, cast
 
-from ._adapter_contracts import RegisteredSourceAdapter
-from .adapters.contracts import ExecutionAdapter
+from ._adapter_contracts import RegisteredProviderAdapter
+from .adapters.contracts import RuntimeAdapter
 from .errors import (
     AdapterRegistrationError,
     CredentialLoadError,
     CredentialUnavailableError,
     DependencyUnavailableError,
-    ExecutionAdapterUnavailableError,
-    UnsupportedSourceError,
+    RuntimeAdapterUnavailableError,
+    UnsupportedProviderError,
 )
 from .models import DependencyValue, RuntimeFactory
 
@@ -131,20 +131,20 @@ _Adapter = TypeVar("_Adapter")
 
 
 class AdapterRegistry:
-    """Index configured Source and Execution Adapters by their public identity."""
+    """Index configured Provider and Runtime Adapters by their public identity."""
 
     def __init__(
         self,
-        source_adapters: Iterable[RegisteredSourceAdapter],
-        execution_adapters: Iterable[ExecutionAdapter] | Mapping[str, ExecutionAdapter],
+        provider_adapters: Iterable[RegisteredProviderAdapter],
+        runtime_adapters: Iterable[RuntimeAdapter] | Mapping[str, RuntimeAdapter],
     ) -> None:
-        self._source_adapters = self._index(
-            source_adapters, lambda adapter: adapter.source_id
+        self._provider_adapters = self._index(
+            provider_adapters, lambda adapter: adapter.source_id
         )
-        self._execution_adapters: Mapping[str, ExecutionAdapter] = (
-            cast(Mapping[str, ExecutionAdapter], execution_adapters)
-            if isinstance(execution_adapters, Mapping)
-            else self._index(execution_adapters, lambda adapter: adapter.name)
+        self._runtime_adapters: Mapping[str, RuntimeAdapter] = (
+            cast(Mapping[str, RuntimeAdapter], runtime_adapters)
+            if isinstance(runtime_adapters, Mapping)
+            else self._index(runtime_adapters, lambda adapter: adapter.name)
         )
 
     @staticmethod
@@ -162,27 +162,27 @@ class AdapterRegistry:
             indexed[adapter_identity] = adapter
         return indexed
 
-    def source(self, source_id: str) -> RegisteredSourceAdapter:
-        """Return the configured Source Adapter for ``source_id``."""
+    def provider(self, source_id: str) -> RegisteredProviderAdapter:
+        """Return the configured Provider Adapter for ``source_id``."""
         try:
-            return self._source_adapters[source_id]
+            return self._provider_adapters[source_id]
         except KeyError:
-            raise UnsupportedSourceError(
+            raise UnsupportedProviderError(
                 f"Source {source_id!r} is not configured; add it to the "
                 "application Catalog or sources iterable"
             )
 
-    def execution(self, name: str) -> ExecutionAdapter:
-        """Return the registered Execution Adapter named ``name``."""
+    def runtime(self, name: str) -> RuntimeAdapter:
+        """Return the registered Runtime Adapter named ``name``."""
         try:
-            return self._execution_adapters[name]
+            return self._runtime_adapters[name]
         except KeyError:
-            raise ExecutionAdapterUnavailableError(
-                f"Execution adapter {name!r} is not registered; provide a "
-                "matching ExecutionAdapterDefinition"
+            raise RuntimeAdapterUnavailableError(
+                f"Runtime adapter {name!r} is not registered; provide a "
+                "matching RuntimeAdapterDefinition"
             )
 
     @property
-    def execution_adapters(self) -> Mapping[str, ExecutionAdapter]:
+    def runtime_adapters(self) -> Mapping[str, RuntimeAdapter]:
         """Expose adapter identities without instantiating unused installed ones."""
-        return self._execution_adapters
+        return self._runtime_adapters

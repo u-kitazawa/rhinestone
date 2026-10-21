@@ -11,8 +11,8 @@ import pytest
     "package",
     (
         "rhinestone.adapters",
-        "rhinestone.adapters.source",
-        "rhinestone.adapters.execution",
+        "rhinestone.adapters.provider",
+        "rhinestone.adapters.runtime",
         "rhinestone.adapters.knowledge",
     ),
 )
@@ -32,21 +32,21 @@ def test_cold_application_loads_only_selected_builtin_implementations() -> None:
 import sys
 from types import SimpleNamespace
 from rhinestone import Catalog, Provider, Reference, configure
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 
-assert not any(name.startswith("rhinestone.adapters.source") for name in sys.modules)
-assert not any(name.startswith("rhinestone.adapters.execution") for name in sys.modules)
+assert not any(name.startswith("rhinestone.adapters.provider") for name in sys.modules)
+assert not any(name.startswith("rhinestone.adapters.runtime") for name in sys.modules)
 assert "rhinestone.adapters.knowledge.time" not in sys.modules
 assert "rhinestone.adapters.knowledge.area" not in sys.modules
 assert "rhinestone.adapters.knowledge._japan_administrative_areas" not in sys.modules
 
 configure()
-assert "rhinestone.adapters.source.direct.adapter" in sys.modules
-assert not any(name.startswith("rhinestone.adapters.execution") for name in sys.modules)
+assert "rhinestone.adapters.provider.direct.adapter" in sys.modules
+assert not any(name.startswith("rhinestone.adapters.runtime") for name in sys.modules)
 assert "rhinestone.adapters.knowledge.time" not in sys.modules
 assert "rhinestone.adapters.knowledge.area" not in sys.modules
 
-from rhinestone.adapters.source.direct import DirectAdapter
+from rhinestone.adapters.provider.direct import DirectAdapter
 ports = []
 def capture(provider, context):
     ports.append(context.knowledge)
@@ -55,12 +55,12 @@ def capture(provider, context):
 app = configure(
     catalog=Catalog((Provider("chosen", "stac", {"endpoint":"https://fixture.example"}),
                      Provider("capture", "capture"))),
-    adapters=(SourceAdapterDefinition("capture", capture),),
+    adapters=(ProviderAdapterDefinition("capture", capture),),
 )
-assert "rhinestone.adapters.source.stac.adapter" in sys.modules
+assert "rhinestone.adapters.provider.stac.adapter" in sys.modules
 for name in ("ckan", "dcat", "estat_gis", "geospatial_jp", "gsi_fundamental",
              "mlit_dpf", "odpt", "ogc", "plateau", "search_ckan_jp", "static"):
-    assert "rhinestone.adapters.source." + name not in sys.modules, name
+    assert "rhinestone.adapters.provider." + name not in sys.modules, name
 assert "rhinestone.adapters.knowledge.time" not in sys.modules
 assert ports[0].resolve_time("2020").year == 2020
 assert "rhinestone.adapters.knowledge.time" in sys.modules
@@ -72,11 +72,11 @@ resource = app.load(Reference("direct", parameters={
     "uri":"https://fixture.example/one.tif", "format":"geotiff"
 }))
 plan = app.plan(resource)
-assert not any(name.startswith("rhinestone.adapters.execution") for name in sys.modules)
+assert not any(name.startswith("rhinestone.adapters.runtime") for name in sys.modules)
 assert app.open(plan, "rasterio", runtime=SimpleNamespace(open=lambda uri:uri)) == plan.uri
-assert "rhinestone.adapters.execution.rasterio.adapter" in sys.modules
+assert "rhinestone.adapters.runtime.rasterio.adapter" in sys.modules
 for name in ("gdal", "pyogrio", "json_service"):
-    assert "rhinestone.adapters.execution." + name not in sys.modules, name
+    assert "rhinestone.adapters.runtime." + name not in sys.modules, name
 assert not {"rasterio", "osgeo", "pyogrio", "rdflib"}.intersection(sys.modules)
 """
     result = subprocess.run(

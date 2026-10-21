@@ -88,7 +88,7 @@ class DiagnosticSearchableAdapter:
 
 
 def test_search_calls_only_adapters_declaring_search_capability() -> None:
-    """検索不能な Source Adapter を federated search が誤って呼ばないために必要である。"""
+    """検索不能な Provider Adapter を federated search が誤って呼ばないために必要である。"""
     searchable = SearchableAdapter()
     resolve_only = ResolveOnlyAdapter()
     coordinator = SearchCoordinator((resolve_only, searchable))

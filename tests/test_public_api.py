@@ -19,8 +19,8 @@ from rhinestone.catalogs import BUILTIN
 from rhinestone.errors import (
     AdapterRegistrationError,
     ConfigValidationError,
-    ExecutionAdapterUnavailableError,
-    UnsupportedSourceError,
+    RuntimeAdapterUnavailableError,
+    UnsupportedProviderError,
 )
 from rhinestone.models import RuntimeFactory, SearchQuery
 
@@ -134,7 +134,7 @@ def direct_config() -> Reference:
     )
 
 
-def test_direct_and_execution_adapters_are_built_in() -> None:
+def test_direct_and_runtime_adapters_are_built_in() -> None:
     runtime = FakeRasterio("opened")
     app = configure()
 
@@ -214,7 +214,7 @@ def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
     assert all(source.id != "direct" for source in BUILTIN.providers)
 
 
-def test_source_definitions_do_not_store_runtime_or_secret_values() -> None:
+def test_provider_definitions_do_not_store_runtime_or_secret_values() -> None:
     for source in BUILTIN.providers:
         assert "credentials" not in source.settings
         assert "dependencies" not in source.settings
@@ -245,7 +245,7 @@ def test_configure_one_source_only_enables_that_source_and_direct() -> None:
         == "gsi"
     )
     assert app.load(direct_config()).provenance.provider == "direct"
-    with pytest.raises(UnsupportedSourceError, match="geospatial-jp"):
+    with pytest.raises(UnsupportedProviderError, match="geospatial-jp"):
         app.load(Reference("geospatial-jp", parameters={"resource_id": "x"}))
 
 
@@ -551,15 +551,15 @@ def test_concrete_runtime_object_is_accepted_at_open() -> None:
 
 @pytest.mark.parametrize("name", ("gdal", "rasterio", "pyogrio", "json-service"))
 def test_configure_rejects_execution_runtime_dependencies(name: str) -> None:
-    with pytest.raises(ConfigValidationError, match="Execution runtime names"):
+    with pytest.raises(ConfigValidationError, match="Runtime names"):
         configure(dependencies={name: object()})
 
 
 def test_open_requires_an_execution_runtime_object() -> None:
     resource = configure().load(direct_config())
-    with pytest.raises(ExecutionAdapterUnavailableError, match="must be supplied"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="must be supplied"):
         resource.open("rasterio")
-    with pytest.raises(ExecutionAdapterUnavailableError, match="must be supplied"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="must be supplied"):
         resource.open("rasterio", runtime=RuntimeFactory(lambda: object()))
 
 
@@ -640,7 +640,7 @@ def test_removed_compatibility_modules_and_model_aliases_are_unavailable() -> No
 
     from rhinestone import models
 
-    for module in ("rhinestone.sources", "rhinestone.adapters.source.ckan.format"):
+    for module in ("rhinestone.sources", "rhinestone.adapters.provider.ckan.format"):
         with pytest.raises(ModuleNotFoundError):
             importlib.import_module(module)
     assert not hasattr(models, "SourceDefinition")

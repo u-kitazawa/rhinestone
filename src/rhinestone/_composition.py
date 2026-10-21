@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from . import _http
 from ._entry_points import DefinitionIndex
 from .adapters.contracts import (
     AdapterDefinition,
-    ExecutionAdapter,
-    ExecutionAdapterContext,
-    ExecutionAdapterDefinition,
-    SearchableSourceAdapter,
-    SourceAdapter,
-    SourceAdapterContext,
-    SourceAdapterDefinition,
+    ProviderAdapter,
+    ProviderAdapterContext,
+    ProviderAdapterDefinition,
+    RuntimeAdapter,
+    RuntimeAdapterContext,
+    RuntimeAdapterDefinition,
+    SearchableProviderAdapter,
 )
 from .adapters.knowledge import (
     KnowledgeAdapter,
@@ -41,22 +41,19 @@ from .models import (
 from .registry import CredentialRegistry, DependencyRegistry
 from .security import DestinationPolicy
 
-if TYPE_CHECKING:
-    from .adapters.source.base import ProviderAdapter
 
-
-class ConfiguredSourceAdapter:
+class ConfiguredProviderAdapter:
     """Bind one public source id to one built-in adapter instance."""
 
     def __init__(
         self,
         source_id: str,
-        source_adapter: SourceAdapter,
+        source_adapter: ProviderAdapter,
         adapter_type: str,
     ) -> None:
         self.source_id = source_id
         self.adapter_type = adapter_type
-        self.searchable = isinstance(source_adapter, SearchableSourceAdapter)
+        self.searchable = isinstance(source_adapter, SearchableProviderAdapter)
         empty_conditions: frozenset[str] = frozenset()
         self.search_conditions = cast(
             frozenset[str],
@@ -99,7 +96,7 @@ class ConfiguredSourceAdapter:
     def search(
         self, query: SearchQuery
     ) -> tuple[Resource, ...] | ProviderSearchResults:
-        source_adapter = cast(SearchableSourceAdapter, self._source_adapter)
+        source_adapter = cast(SearchableProviderAdapter, self._source_adapter)
         raw_results = source_adapter.search(query)
         mapped_results = tuple(
             replace(
@@ -139,7 +136,7 @@ class ConfiguredSourceAdapter:
         )
 
 
-class _SourceTransport:
+class _ProviderTransport:
     """Bind the core HTTP transport to one configured provider boundary."""
 
     def __init__(
@@ -233,14 +230,14 @@ class _NoRedirectHeaders(dict[str, str]):
     _rhinestone_no_redirects = True
 
 
-def _source_transport(
+def _provider_transport(
     provider: Provider, destination_policy: DestinationPolicy
-) -> _SourceTransport:
+) -> _ProviderTransport:
     configured_credential = provider.settings.get("credential")
     credential = (
         configured_credential if isinstance(configured_credential, str) else None
     )
-    return _SourceTransport(
+    return _ProviderTransport(
         destination_policy,
         source_id=provider.id,
         adapter_type=provider.adapter_type,
@@ -254,7 +251,7 @@ def _settings(provider: Provider, allowed: tuple[str, ...]) -> dict[str, Any]:
     return settings
 
 
-def _json_transport(context: SourceAdapterContext) -> Any:
+def _json_transport(context: ProviderAdapterContext) -> Any:
     def get_json(
         url: str,
         params: Mapping[str, Any],
@@ -265,8 +262,8 @@ def _json_transport(context: SourceAdapterContext) -> Any:
     return get_json
 
 
-def _build_ckan(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.ckan import CkanAdapter
+def _build_ckan(provider: Provider, context: ProviderAdapterContext) -> ProviderAdapter:
+    from .adapters.provider.ckan import CkanAdapter
 
     return CkanAdapter(
         get_json=_json_transport(context),
@@ -287,9 +284,9 @@ def _build_ckan(provider: Provider, context: SourceAdapterContext) -> ProviderAd
 
 
 def _build_geospatial_jp(
-    provider: Provider, context: SourceAdapterContext
+    provider: Provider, context: ProviderAdapterContext
 ) -> ProviderAdapter:
-    from .adapters.source.geospatial_jp import GeospatialJpAdapter
+    from .adapters.provider.geospatial_jp import GeospatialJpAdapter
 
     return GeospatialJpAdapter(
         get_json=_json_transport(context),
@@ -308,8 +305,8 @@ def _build_geospatial_jp(
     )
 
 
-def _build_stac(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.stac import StacAdapter
+def _build_stac(provider: Provider, context: ProviderAdapterContext) -> ProviderAdapter:
+    from .adapters.provider.stac import StacAdapter
 
     return StacAdapter(
         get_json=_json_transport(context),
@@ -330,8 +327,8 @@ def _build_stac(provider: Provider, context: SourceAdapterContext) -> ProviderAd
     )
 
 
-def _build_ogc(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.ogc import OgcFeaturesAdapter
+def _build_ogc(provider: Provider, context: ProviderAdapterContext) -> ProviderAdapter:
+    from .adapters.provider.ogc import OgcFeaturesAdapter
 
     return OgcFeaturesAdapter(
         get_json=_json_transport(context),
@@ -352,9 +349,9 @@ def _build_ogc(provider: Provider, context: SourceAdapterContext) -> ProviderAda
 
 
 def _build_plateau(
-    provider: Provider, context: SourceAdapterContext
+    provider: Provider, context: ProviderAdapterContext
 ) -> ProviderAdapter:
-    from .adapters.source.plateau import PlateauAdapter
+    from .adapters.provider.plateau import PlateauAdapter
 
     return PlateauAdapter(
         get_json=_json_transport(context),
@@ -369,8 +366,10 @@ def _build_plateau(
     )
 
 
-def _build_static(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.static import StaticAdapter
+def _build_static(
+    provider: Provider, context: ProviderAdapterContext
+) -> ProviderAdapter:
+    from .adapters.provider.static import StaticAdapter
 
     items = _settings(provider, ("items",)).get("items")
     if not isinstance(items, Mapping):
@@ -382,9 +381,9 @@ def _build_static(provider: Provider, context: SourceAdapterContext) -> Provider
 
 
 def _build_search_ckan_jp(
-    provider: Provider, context: SourceAdapterContext
+    provider: Provider, context: ProviderAdapterContext
 ) -> ProviderAdapter:
-    from .adapters.source.search_ckan_jp import SearchCkanJpAdapter
+    from .adapters.provider.search_ckan_jp import SearchCkanJpAdapter
 
     return SearchCkanJpAdapter(
         get_json=_json_transport(context),
@@ -394,9 +393,9 @@ def _build_search_ckan_jp(
 
 
 def _build_mlit_dpf(
-    provider: Provider, context: SourceAdapterContext
+    provider: Provider, context: ProviderAdapterContext
 ) -> ProviderAdapter:
-    from .adapters.source.mlit_dpf import MlitDpfAdapter
+    from .adapters.provider.mlit_dpf import MlitDpfAdapter
 
     return MlitDpfAdapter(
         post_json=context.transport.post_json,
@@ -408,15 +407,17 @@ def _build_mlit_dpf(
     )
 
 
-def _build_gsi(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.gsi_fundamental import GsiFundamentalAdapter
+def _build_gsi(provider: Provider, context: ProviderAdapterContext) -> ProviderAdapter:
+    from .adapters.provider.gsi_fundamental import GsiFundamentalAdapter
 
     _settings(provider, ())
     return GsiFundamentalAdapter(knowledge=context.knowledge)
 
 
-def _build_estat(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.estat_gis import EstatGisAdapter
+def _build_estat(
+    provider: Provider, context: ProviderAdapterContext
+) -> ProviderAdapter:
+    from .adapters.provider.estat_gis import EstatGisAdapter
 
     distributions = _settings(provider, ("distributions",)).get("distributions")
     if not isinstance(distributions, list | tuple):
@@ -430,8 +431,8 @@ def _build_estat(provider: Provider, context: SourceAdapterContext) -> ProviderA
     )
 
 
-def _build_dcat(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.dcat import DcatAdapter
+def _build_dcat(provider: Provider, context: ProviderAdapterContext) -> ProviderAdapter:
+    from .adapters.provider.dcat import DcatAdapter
 
     settings = _settings(provider, ("catalog_uri", "serialization"))
 
@@ -449,8 +450,8 @@ def _build_dcat(provider: Provider, context: SourceAdapterContext) -> ProviderAd
     )
 
 
-def _build_odpt(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.odpt import OdptAdapter
+def _build_odpt(provider: Provider, context: ProviderAdapterContext) -> ProviderAdapter:
+    from .adapters.provider.odpt import OdptAdapter
 
     return OdptAdapter(
         **_settings(
@@ -460,14 +461,16 @@ def _build_odpt(provider: Provider, context: SourceAdapterContext) -> ProviderAd
     )
 
 
-def _build_direct(provider: Provider, context: SourceAdapterContext) -> ProviderAdapter:
-    from .adapters.source.direct import DirectAdapter
+def _build_direct(
+    provider: Provider, context: ProviderAdapterContext
+) -> ProviderAdapter:
+    from .adapters.provider.direct import DirectAdapter
 
     return DirectAdapter()
 
 
-BUILTIN_SOURCE_ADAPTER_FACTORIES: Mapping[
-    str, Callable[[Provider, SourceAdapterContext], ProviderAdapter]
+BUILTIN_PROVIDER_ADAPTER_FACTORIES: Mapping[
+    str, Callable[[Provider, ProviderAdapterContext], ProviderAdapter]
 ] = {
     "direct": _build_direct,
     "ckan": _build_ckan,
@@ -499,56 +502,56 @@ def _reject_options(
 def split_definitions(
     definitions: Iterable[AdapterDefinition],
 ) -> tuple[
-    tuple[SourceAdapterDefinition, ...],
-    tuple[ExecutionAdapterDefinition, ...],
+    tuple[ProviderAdapterDefinition, ...],
+    tuple[RuntimeAdapterDefinition, ...],
     tuple[KnowledgeAdapterDefinition, ...],
 ]:
-    source_definitions: list[SourceAdapterDefinition] = []
-    execution_definitions: list[ExecutionAdapterDefinition] = []
+    provider_definitions: list[ProviderAdapterDefinition] = []
+    runtime_definitions: list[RuntimeAdapterDefinition] = []
     knowledge_definitions: list[KnowledgeAdapterDefinition] = []
     for definition in definitions:
         candidate = cast(Any, definition)
-        if isinstance(candidate, SourceAdapterDefinition):
-            source_definitions.append(candidate)
-        elif isinstance(candidate, ExecutionAdapterDefinition):
-            execution_definitions.append(candidate)
+        if isinstance(candidate, ProviderAdapterDefinition):
+            provider_definitions.append(candidate)
+        elif isinstance(candidate, RuntimeAdapterDefinition):
+            runtime_definitions.append(candidate)
         elif isinstance(candidate, KnowledgeAdapterDefinition):
             knowledge_definitions.append(candidate)
         else:
             raise AdapterRegistrationError(
-                "Unknown adapter definition; expected a SourceAdapterDefinition, "
-                "ExecutionAdapterDefinition, or KnowledgeAdapterDefinition"
+                "Unknown adapter definition; expected a ProviderAdapterDefinition, "
+                "RuntimeAdapterDefinition, or KnowledgeAdapterDefinition"
             )
     return (
-        tuple(source_definitions),
-        tuple(execution_definitions),
+        tuple(provider_definitions),
+        tuple(runtime_definitions),
         tuple(knowledge_definitions),
     )
 
 
-def source_definitions(
-    custom_definitions: Iterable[SourceAdapterDefinition],
-) -> Mapping[str, SourceAdapterDefinition]:
+def provider_definitions(
+    custom_definitions: Iterable[ProviderAdapterDefinition],
+) -> Mapping[str, ProviderAdapterDefinition]:
     definitions = {
-        adapter_type: SourceAdapterDefinition(
+        adapter_type: ProviderAdapterDefinition(
             adapter_type,
             factory,
             dependencies=(
                 frozenset({"rdflib"}) if adapter_type == "dcat" else frozenset()
             ),
         )
-        for adapter_type, factory in BUILTIN_SOURCE_ADAPTER_FACTORIES.items()
+        for adapter_type, factory in BUILTIN_PROVIDER_ADAPTER_FACTORIES.items()
     }
     custom_types: set[str] = set()
     for definition in custom_definitions:
         if definition.adapter_type in custom_types:
             raise AdapterRegistrationError(
-                f"Source adapter {definition.adapter_type!r} is registered more "
+                f"Provider adapter {definition.adapter_type!r} is registered more "
                 "than once; adapter_type must be unique"
             )
         if definition.adapter_type in definitions:
             raise AdapterRegistrationError(
-                f"Source adapter {definition.adapter_type!r} is registered more "
+                f"Provider adapter {definition.adapter_type!r} is registered more "
                 "than once; built-in adapter types cannot be replaced"
             )
         custom_types.add(definition.adapter_type)
@@ -593,23 +596,23 @@ def validate_mlit_dpf_targets(sources: tuple[Provider, ...]) -> None:
                 )
 
 
-def source_context(
+def provider_context(
     provider: Provider,
-    definitions: Mapping[str, SourceAdapterDefinition],
+    definitions: Mapping[str, ProviderAdapterDefinition],
     dependencies: DependencyRegistry,
     knowledge: KnowledgePort,
     credentials: CredentialRegistry,
     destination_policy: DestinationPolicy,
-) -> SourceAdapterContext:
+) -> ProviderAdapterContext:
     try:
         definition = definitions[provider.adapter_type]
     except KeyError:
         raise AdapterRegistrationError(
-            f"Source adapter {provider.adapter_type!r} is not registered; add a "
-            "matching SourceAdapterDefinition"
+            f"Provider adapter {provider.adapter_type!r} is not registered; add a "
+            "matching ProviderAdapterDefinition"
         ) from None
-    return SourceAdapterContext(
-        transport=_source_transport(provider, destination_policy),
+    return ProviderAdapterContext(
+        transport=_provider_transport(provider, destination_policy),
         credentials=credentials,
         dependencies=dependencies.scoped(definition.dependencies),
         knowledge=knowledge,
@@ -618,27 +621,27 @@ def source_context(
     )
 
 
-def _build_gdal(context: ExecutionAdapterContext) -> ExecutionAdapter:
-    from .adapters.execution.gdal import GdalAdapter
+def _build_gdal(context: RuntimeAdapterContext) -> RuntimeAdapter:
+    from .adapters.runtime.gdal import GdalAdapter
 
     return GdalAdapter(context.destination_policy)
 
 
-def _build_rasterio(context: ExecutionAdapterContext) -> ExecutionAdapter:
-    from .adapters.execution.rasterio import RasterioAdapter
+def _build_rasterio(context: RuntimeAdapterContext) -> RuntimeAdapter:
+    from .adapters.runtime.rasterio import RasterioAdapter
 
     return RasterioAdapter(context.destination_policy)
 
 
-def _build_pyogrio(context: ExecutionAdapterContext) -> ExecutionAdapter:
-    from .adapters.execution.pyogrio import PyogrioAdapter
+def _build_pyogrio(context: RuntimeAdapterContext) -> RuntimeAdapter:
+    from .adapters.runtime.pyogrio import PyogrioAdapter
 
     return PyogrioAdapter(context.destination_policy)
 
 
-def _build_json_service(context: ExecutionAdapterContext) -> ExecutionAdapter:
-    from .adapters.execution.json_service import JsonServiceAdapter
-    from .adapters.execution.json_service.odpt import prepare_odpt_request
+def _build_json_service(context: RuntimeAdapterContext) -> RuntimeAdapter:
+    from .adapters.runtime.json_service import JsonServiceAdapter
+    from .adapters.runtime.json_service.odpt import prepare_odpt_request
 
     return JsonServiceAdapter(
         prepare_odpt_request,
@@ -648,21 +651,21 @@ def _build_json_service(context: ExecutionAdapterContext) -> ExecutionAdapter:
     )
 
 
-def execution_definitions(
-    custom_definitions: Iterable[ExecutionAdapterDefinition],
-) -> tuple[ExecutionAdapterDefinition, ...]:
+def runtime_definitions(
+    custom_definitions: Iterable[RuntimeAdapterDefinition],
+) -> tuple[RuntimeAdapterDefinition, ...]:
     built_in_definitions = (
-        ExecutionAdapterDefinition("gdal", _build_gdal),
-        ExecutionAdapterDefinition("rasterio", _build_rasterio),
-        ExecutionAdapterDefinition("pyogrio", _build_pyogrio),
-        ExecutionAdapterDefinition("json-service", _build_json_service),
+        RuntimeAdapterDefinition("gdal", _build_gdal),
+        RuntimeAdapterDefinition("rasterio", _build_rasterio),
+        RuntimeAdapterDefinition("pyogrio", _build_pyogrio),
+        RuntimeAdapterDefinition("json-service", _build_json_service),
     )
     names = {definition.name for definition in built_in_definitions}
     definitions = list(built_in_definitions)
     for definition in custom_definitions:
         if definition.name in names:
             raise AdapterRegistrationError(
-                f"Execution adapter {definition.name!r} is registered more than "
+                f"Runtime adapter {definition.name!r} is registered more than "
                 "once; adapter names must be unique"
             )
         names.add(definition.name)
@@ -714,11 +717,11 @@ def knowledge_definitions(
     return definitions
 
 
-def build_source_adapter(
+def build_provider_adapter(
     source: Provider,
-    definitions: Mapping[str, SourceAdapterDefinition],
-    context: SourceAdapterContext,
-) -> SourceAdapter:
+    definitions: Mapping[str, ProviderAdapterDefinition],
+    context: ProviderAdapterContext,
+) -> ProviderAdapter:
     definition = definitions[source.adapter_type]
     origin = (
         definitions.origin(source.adapter_type)

@@ -11,16 +11,16 @@ from rhinestone._entry_points import (
     RUNTIME_GROUP,  # pyright: ignore[reportPrivateUsage]
 )
 from rhinestone._runtime_adapters import (
-    ExecutionInstances,  # pyright: ignore[reportPrivateUsage]
+    RuntimeInstances,  # pyright: ignore[reportPrivateUsage]
 )
-from rhinestone.adapters.contracts import ExecutionAdapterDefinition
+from rhinestone.adapters.contracts import RuntimeAdapterDefinition
 from rhinestone.errors import (
     AdapterContractError,
     AdapterDiscoveryError,
     AdapterFactoryError,
     AdapterLoadError,
     ConfigValidationError,
-    ExecutionAdapterUnavailableError,
+    RuntimeAdapterUnavailableError,
 )
 from rhinestone.models import AccessPlan
 from rhinestone.registry import AdapterRegistry
@@ -62,10 +62,10 @@ def test_installed_runtime_is_loaded_only_when_its_name_is_selected(
         point("custom-runtime", group=RUNTIME_GROUP),
         point("unused", "missing_optional:definition", group=RUNTIME_GROUP),
     )
-    export(monkeypatch, ExecutionAdapterDefinition("custom-runtime", factory))
+    export(monkeypatch, RuntimeAdapterDefinition("custom-runtime", factory))
     first, second = app(), app()
     assert made == []
-    with pytest.raises(ExecutionAdapterUnavailableError, match="unknown"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="unknown"):
         first.open(plan(), "unknown", runtime=runtime())
     assert made == []
     assert first.open(plan(), "custom-runtime", runtime=runtime()) == plan().uri
@@ -85,7 +85,7 @@ def test_runtime_metadata_collision_is_rejected_before_load(
         monkeypatch, point(name, "missing:definition", group=RUNTIME_GROUP)
     )
     custom = (
-        (ExecutionAdapterDefinition(name, lambda context: CustomExecution()),)
+        (RuntimeAdapterDefinition(name, lambda context: CustomExecution()),)
         if name == "custom-runtime"
         else ()
     )
@@ -95,7 +95,7 @@ def test_runtime_metadata_collision_is_rejected_before_load(
 
 @pytest.mark.parametrize(
     "definition",
-    (object(), ExecutionAdapterDefinition("wrong", lambda context: CustomExecution())),
+    (object(), RuntimeAdapterDefinition("wrong", lambda context: CustomExecution())),
 )
 def test_runtime_export_contract_is_checked_on_selection(
     monkeypatch: pytest.MonkeyPatch, definition: object
@@ -114,7 +114,7 @@ def test_runtime_factory_failure_is_classified_without_its_payload(
         raise ValueError("factory-secret")
 
     install_metadata(monkeypatch, point("selected", group=RUNTIME_GROUP))
-    export(monkeypatch, ExecutionAdapterDefinition("selected", factory))
+    export(monkeypatch, RuntimeAdapterDefinition("selected", factory))
     configured = app()
     with pytest.raises(AdapterFactoryError, match="selected") as error:
         configured.open(plan(), "selected", runtime=runtime())
@@ -127,7 +127,7 @@ def test_explicit_runtime_factory_retains_its_existing_error_boundary() -> None:
         raise ValueError("application factory failed")
 
     with pytest.raises(ValueError, match="application factory failed"):
-        configure(adapters=(ExecutionAdapterDefinition("explicit", factory),))
+        configure(adapters=(RuntimeAdapterDefinition("explicit", factory),))
 
 
 def test_incompatible_installed_runtime_does_not_fall_back(
@@ -136,10 +136,10 @@ def test_incompatible_installed_runtime_does_not_fall_back(
     install_metadata(monkeypatch, point("custom-runtime", group=RUNTIME_GROUP))
     export(
         monkeypatch,
-        ExecutionAdapterDefinition("custom-runtime", lambda context: CustomExecution()),
+        RuntimeAdapterDefinition("custom-runtime", lambda context: CustomExecution()),
     )
     incompatible = AccessPlan(kind="file", uri=plan().uri, format="geotiff")
-    with pytest.raises(ExecutionAdapterUnavailableError, match="custom-runtime"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="custom-runtime"):
         app().open(incompatible, "custom-runtime", runtime=runtime())
 
 
@@ -156,7 +156,7 @@ def test_runtime_factory_result_contract_is_checked(
     monkeypatch: pytest.MonkeyPatch, value: Any
 ) -> None:
     install_metadata(monkeypatch, point("selected", group=RUNTIME_GROUP))
-    export(monkeypatch, ExecutionAdapterDefinition("selected", lambda context: value))
+    export(monkeypatch, RuntimeAdapterDefinition("selected", lambda context: value))
     with pytest.raises(AdapterContractError):
         app().open(plan(), "selected", runtime=runtime())
 
@@ -200,11 +200,11 @@ def test_selected_runtime_keeps_pre_open_authorization_and_json_plan_execution(
     install_metadata(monkeypatch, point("custom-runtime", group=RUNTIME_GROUP))
     export(
         monkeypatch,
-        ExecutionAdapterDefinition("custom-runtime", lambda context: Authorizing()),
+        RuntimeAdapterDefinition("custom-runtime", lambda context: Authorizing()),
     )
     transferred = AccessPlan.from_dict(json.loads(json.dumps(plan().to_dict())))
     configured = app()
-    with pytest.raises(ExecutionAdapterUnavailableError, match="supplied as an object"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="supplied as an object"):
         configured.open(transferred, "custom-runtime")
     assert calls == ["authorize"]
     assert (
@@ -215,20 +215,20 @@ def test_selected_runtime_keeps_pre_open_authorization_and_json_plan_execution(
 
 def test_instance_catalog_metadata_and_registry_access_are_lazy() -> None:
     built: list[str] = []
-    definition = ExecutionAdapterDefinition(
+    definition = RuntimeAdapterDefinition(
         "custom-runtime", lambda context: CustomExecution()
     )
 
-    def build(value: ExecutionAdapterDefinition) -> CustomExecution:
+    def build(value: RuntimeAdapterDefinition) -> CustomExecution:
         built.append(value.name)
         return CustomExecution()
 
-    catalog = ExecutionInstances({definition.name: definition}, build, {})
+    catalog = RuntimeInstances({definition.name: definition}, build, {})
     registry = AdapterRegistry((), catalog)
     assert len(catalog) == 1
-    assert tuple(registry.execution_adapters) == ("custom-runtime",)
+    assert tuple(registry.runtime_adapters) == ("custom-runtime",)
     assert "custom-runtime" in catalog
     assert built == []
-    assert registry.execution("custom-runtime").name == "custom-runtime"
-    assert registry.execution("custom-runtime").name == "custom-runtime"
+    assert registry.runtime("custom-runtime").name == "custom-runtime"
+    assert registry.runtime("custom-runtime").name == "custom-runtime"
     assert built == ["custom-runtime"]

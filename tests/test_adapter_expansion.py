@@ -16,8 +16,8 @@ from rhinestone.adapters import (
     OdptAdapter,
     PlateauAdapter,
 )
-from rhinestone.adapters.execution import GdalAdapter, JsonServiceAdapter
-from rhinestone.adapters.execution.json_service.odpt import prepare_odpt_request
+from rhinestone.adapters.runtime import GdalAdapter, JsonServiceAdapter
+from rhinestone.adapters.runtime.json_service.odpt import prepare_odpt_request
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     AmbiguousResourceError,
@@ -25,11 +25,11 @@ from rhinestone.errors import (
     CredentialLoadError,
     CredentialUnavailableError,
     DependencyUnavailableError,
-    ExecutionAdapterUnavailableError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceAccessError,
     ResourceNotFoundError,
+    RuntimeAdapterUnavailableError,
     UnsupportedSearchConditionError,
 )
 from rhinestone.models import AccessPlan, Metadata, Provenance, SearchQuery
@@ -456,7 +456,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource(
     assert resource.access_plan is not None
     assert resource.access_plan.kind == "service-query"
     assert resource.open("json-service") == data
-    with pytest.raises(ExecutionAdapterUnavailableError, match="core-owned"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="core-owned"):
         resource.open("json-service", runtime=object())
     assert calls["params"] == {"dc:title": "東京", "acl:consumerKey": "rotating-secret"}
     assert calls["allow_redirects"] is False

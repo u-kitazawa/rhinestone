@@ -11,9 +11,9 @@ from rhinestone import (
     Reference,
     configure,
 )
-from rhinestone.adapters.execution.json_service import JsonServiceAdapter
-from rhinestone.adapters.execution.json_service.odpt import prepare_odpt_request
-from rhinestone.adapters.source.ckan import CkanAdapter
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.runtime.json_service import JsonServiceAdapter
+from rhinestone.adapters.runtime.json_service.odpt import prepare_odpt_request
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,

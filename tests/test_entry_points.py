@@ -18,8 +18,8 @@ from rhinestone._entry_points import (  # pyright: ignore[reportPrivateUsage]
     discover,
 )
 from rhinestone.adapters.contracts import (
-    ExecutionAdapterDefinition,
-    SourceAdapterDefinition,
+    ProviderAdapterDefinition,
+    RuntimeAdapterDefinition,
 )
 from rhinestone.errors import (
     AdapterContractError,
@@ -61,9 +61,9 @@ def export(monkeypatch: pytest.MonkeyPatch, definition: object) -> None:
     monkeypatch.setitem(sys.modules, module.__name__, module)
 
 
-def index(*points: metadata.EntryPoint) -> DefinitionIndex[SourceAdapterDefinition]:
+def index(*points: metadata.EntryPoint) -> DefinitionIndex[ProviderAdapterDefinition]:
     return DefinitionIndex(
-        {}, points, SourceAdapterDefinition, lambda d: d.adapter_type
+        {}, points, ProviderAdapterDefinition, lambda d: d.adapter_type
     )
 
 
@@ -85,12 +85,12 @@ def test_discovery_reads_all_groups_once_without_loading(
 def test_identity_iteration_membership_and_cache_do_not_load_other_exports(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    definition = SourceAdapterDefinition("selected", custom_source)
+    definition = ProviderAdapterDefinition("selected", custom_source)
     export(monkeypatch, definition)
     definitions = DefinitionIndex(
-        {"explicit": SourceAdapterDefinition("explicit", custom_source)},
+        {"explicit": ProviderAdapterDefinition("explicit", custom_source)},
         (point("unused", "missing_optional:definition"), point("selected")),
-        SourceAdapterDefinition,
+        ProviderAdapterDefinition,
         lambda d: d.adapter_type,
     )
     assert len(definitions) == 3
@@ -121,7 +121,7 @@ def test_duplicates_are_rejected_before_any_export_is_loaded(
         metadata.EntryPoint, "dist", metadata.distribution("rhinestone")
     )
     definitions = (
-        (SourceAdapterDefinition("custom", custom_source),)
+        (ProviderAdapterDefinition("custom", custom_source),)
         if duplicate == "custom"
         else ()
     )
@@ -146,7 +146,7 @@ def test_selected_import_error_is_distinct_and_redacted(
 
 
 @pytest.mark.parametrize(
-    "value", (object(), SourceAdapterDefinition("wrong", custom_source))
+    "value", (object(), ProviderAdapterDefinition("wrong", custom_source))
 )
 def test_selected_export_contract_and_identity_are_checked(
     monkeypatch: pytest.MonkeyPatch, value: object
@@ -164,7 +164,7 @@ def test_selected_factory_error_is_distinct_and_does_not_expose_payload(
         raise ValueError("secret-in-factory")
 
     install_metadata(monkeypatch, point("selected"))
-    export(monkeypatch, SourceAdapterDefinition("selected", factory))
+    export(monkeypatch, ProviderAdapterDefinition("selected", factory))
     with pytest.raises(AdapterFactoryError, match="selected") as error:
         configure(catalog=Catalog((Provider("chosen", "selected"),)))
     assert "secret-in-factory" not in str(error.value)
@@ -175,7 +175,10 @@ def test_selected_factory_error_is_distinct_and_does_not_expose_payload(
 def test_all_provider_factories_require_the_same_load_contract(
     monkeypatch: pytest.MonkeyPatch, installed: bool
 ) -> None:
-    definition = SourceAdapterDefinition("selected", lambda provider, context: object())  # type: ignore[arg-type]
+    def invalid_factory(provider: Any, context: Any) -> Any:
+        return object()
+
+    definition = ProviderAdapterDefinition("selected", invalid_factory)
     install_metadata(monkeypatch, *((point("selected"),) if installed else ()))
     export(monkeypatch, definition)
     with pytest.raises(AdapterContractError, match="implementing load"):
@@ -209,7 +212,7 @@ def test_installed_provider_uses_the_public_pipeline_and_instance_isolation(
     install_metadata(
         monkeypatch, point("selected"), point("unused", "missing:definition")
     )
-    export(monkeypatch, SourceAdapterDefinition("selected", factory))
+    export(monkeypatch, ProviderAdapterDefinition("selected", factory))
     catalog = Catalog((Provider("chosen", "selected"),))
     first, second = configure(catalog=catalog), configure(catalog=catalog)
     assert made == ["chosen", "chosen"]
@@ -224,7 +227,7 @@ def test_installed_provider_uses_the_public_pipeline_and_instance_isolation(
     receiver = configure(
         catalog=Catalog((Provider("file", "direct", {"uri": resource.uri}),)),
         adapters=(
-            ExecutionAdapterDefinition(
+            RuntimeAdapterDefinition(
                 "custom-runtime", lambda context: CustomExecution()
             ),
         ),

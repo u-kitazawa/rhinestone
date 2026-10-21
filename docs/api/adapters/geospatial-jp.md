@@ -1,6 +1,6 @@
 # GeospatialJpAdapter（G空間情報センター）
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `geospatial-jp`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `geospatial-jp`
 
 組み込みProvider `geospatial-jp` は専用Adapterを使用します。
 CKANの `resource_show` / `package_show` による解決処理を共有し、検索戦略だけを独立させています。

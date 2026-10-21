@@ -17,7 +17,7 @@ print("raster size:", dataset.RasterXSize, dataset.RasterYSize)
 Rasterio AdapterはCOG/GeoTIFFを対象とし、このXYZタイルには対応しません。
 Adapterごとの対応形式は[対応状況](compatibility.md)を参照してください。
 AccessPlanがない検索結果はReferenceからloadしてから実行します。
-形式を確定できない場合は`ExecutionAdapterUnavailableError`となり、別の形式やRuntimeへ
+形式を確定できない場合は`RuntimeAdapterUnavailableError`となり、別の形式やRuntimeへ
 自動で切り替えません。Rhinestoneはデータ解析や形式変換を行いません。
 
 ## 既知の対象を読み込む
@@ -53,13 +53,13 @@ DestinationPolicyとCredential factoryで実行を認可します。Runtimeやse
 
 ## Runtimeの指定
 
-Adapter名と対応するRuntime実体は必須です。Execution Runtimeは`configure()`へ登録せず、
+Adapter名と対応するRuntime実体は必須です。Runtimeは`configure()`へ登録せず、
 `open(..., runtime=...)`へ渡します。`RuntimeFactory`は実行用には使えません。
 ODPTのJSONサービスはCoreのRuntimeを使うため`open("json-service")`で開きます。
 `app.open()`と`resource.open()`のAdapter名は空でない文字列が必須です。
 `None`・不正型・空文字・空白のみは、loadやRuntime実行より前に`ConfigValidationError`になります。
 `None`を自動選択の指定としては扱いません。非空の未登録名・非互換名は引き続き
-`ExecutionAdapterUnavailableError`です。
+`RuntimeAdapterUnavailableError`です。
 
 ## 検索・解決・実行のエラー境界
 
@@ -70,12 +70,12 @@ ODPTのJSONサービスはCoreのRuntimeを使うため`open("json-service")`で
 | --- | --- | --- | --- |
 | 検索 | Providerへの接続・認証・応答形式 | `SearchResults.diagnostics`の`reason="provider_failure"` | `failure_type`からmetadata・response・credentialを判別する |
 | 解決 | 候補なし・候補が複数・AccessPlanを確定できない | `ResourceNotFoundError` / `AmbiguousResourceError` / `UnsupportedAccessError` | 明示的なResource選択や形式を指定する |
-| 実行準備 | 対応AdapterまたはRuntimeがない | `ExecutionAdapterUnavailableError` | 対応するAdapter・形式・Runtimeを指定する |
+| 実行準備 | 対応AdapterまたはRuntimeがない | `RuntimeAdapterUnavailableError` | 対応するAdapter・形式・Runtimeを指定する |
 | 実行 | 選択済みデータをRuntimeが開けない | `ResourceAccessError` | URI、権限、Runtimeのdriver対応、元の例外を確認する |
 | 実行認可 | 接続先がDestinationPolicyで許可されない | `DestinationNotAllowedError` | 信頼済み接続先とpolicy設定を確認する |
 
-検索時のProvider障害はSource単位で隔離され、他のSourceの結果とともに返ります。
-全Sourceが失敗した場合も、空の`SearchResults`とdiagnosticsを返します。
+検索時のProvider障害はProvider単位で隔離され、他のProviderの結果とともに返ります。
+全Providerが失敗した場合も、空の`SearchResults`とdiagnosticsを返します。
 Adapterが形式に対応していても、利用環境のdriver、ZIP内の対象ファイル、データ配信先の
 可用性や認証まで保証するものではありません。これらの実データアクセス失敗は
 `ResourceAccessError`として扱い、別のResourceやRuntimeへ自動で切り替えません。

@@ -10,7 +10,7 @@ from rhinestone import (
     Reference,
     configure,
 )
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 from rhinestone.adapters.knowledge import (
     KnowledgeAdapterContext,
     KnowledgeAdapterDefinition,
@@ -19,8 +19,8 @@ from rhinestone.adapters.knowledge import (
     StandardTimeAdapter,
     TimeSemantic,
 )
-from rhinestone.adapters.source.gsi_fundamental import GsiFundamentalAdapter
-from rhinestone.adapters.source.plateau import PlateauAdapter
+from rhinestone.adapters.provider.gsi_fundamental import GsiFundamentalAdapter
+from rhinestone.adapters.provider.plateau import PlateauAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     AdapterRegistrationError,
@@ -422,7 +422,7 @@ def test_knowledge_registry_rejects_invalid_definition_values() -> None:
         KnowledgeAdapterDefinition("adapter", cast(Any, None), "time")
 
 
-def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
+def test_two_provider_adapters_consume_the_same_knowledge_registry() -> None:
     registry = knowledge_registry()
     plateau = PlateauAdapter(
         plateau_client,
@@ -452,7 +452,7 @@ def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
     assert gsi_knowledge["time"]["year"] == 2020
 
 
-def test_source_adapters_preserve_explicit_time_kind() -> None:
+def test_provider_adapters_preserve_explicit_time_kind() -> None:
     registry = knowledge_registry()
     plateau_source = PlateauAdapter(
         plateau_client,
@@ -479,7 +479,7 @@ def test_source_adapters_preserve_explicit_time_kind() -> None:
 
 
 def test_source_knowledge_rejects_unknown_time_kind() -> None:
-    from rhinestone.adapters.source._knowledge import resolve_knowledge
+    from rhinestone.adapters.provider._knowledge import resolve_knowledge
 
     with pytest.raises(ConfigValidationError, match="time_kind"):
         resolve_knowledge(
@@ -510,7 +510,7 @@ def test_knowledge_factory_is_not_loaded_until_source_uses_it() -> None:
     assert calls == []
 
 
-def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
+def test_public_provider_context_receives_the_shared_knowledge_registry() -> None:
     seen: list[KnowledgeAdapterRegistry] = []
 
     def source_factory(provider: Provider, context: Any) -> Any:
@@ -535,7 +535,7 @@ def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
     app = configure(
         catalog=Catalog((Provider("custom", "custom-knowledge"),)),
         adapters=(
-            SourceAdapterDefinition("custom-knowledge", source_factory),
+            ProviderAdapterDefinition("custom-knowledge", source_factory),
             registry_definition,
         ),
         knowledge={"time": "standard"},

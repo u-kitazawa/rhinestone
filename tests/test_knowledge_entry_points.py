@@ -8,7 +8,7 @@ from rhinestone import Catalog, Provider, Rhinestone, configure
 from rhinestone._entry_points import (
     KNOWLEDGE_GROUP,  # pyright: ignore[reportPrivateUsage]
 )
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 from rhinestone.adapters.knowledge import (
     KnowledgeAdapterDefinition,
     KnowledgePort,
@@ -39,7 +39,7 @@ def configured(**kwargs: Any) -> tuple[Rhinestone, KnowledgePort]:
     definitions = tuple(kwargs.pop("adapters", ()))
     app = configure(
         catalog=Catalog((Provider("capture", "capture"),)),
-        adapters=(SourceAdapterDefinition("capture", factory), *definitions),
+        adapters=(ProviderAdapterDefinition("capture", factory), *definitions),
         **kwargs,
     )
     return app, seen[0]

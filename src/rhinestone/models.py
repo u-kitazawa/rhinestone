@@ -19,11 +19,11 @@ from typing import (
 )
 
 from ._uri import is_valid_http_authority
-from .errors import ConfigValidationError, ExecutionAdapterUnavailableError
+from .errors import ConfigValidationError, RuntimeAdapterUnavailableError
 from .representations.types import Format, FormatPreset, expand_formats
 
 LibraryName = str
-"""Execution runtime name accepted by the public open API."""
+"""Runtime name accepted by the public open API."""
 
 
 class ProviderId(str, Enum):
@@ -50,7 +50,7 @@ class RuntimeFactory:
 
 
 DependencyValue = object | RuntimeFactory
-"""An injected Source Runtime object or an explicit lazy RuntimeFactory."""
+"""An injected Provider dependency object or an explicit lazy RuntimeFactory."""
 
 Runtime = DependencyValue
 """A Runtime object or an explicit lazy RuntimeFactory."""
@@ -69,10 +69,10 @@ class _GeoDataFrame(Protocol):
 
 
 class Dependencies(TypedDict, total=False):
-    """IDE-discoverable names for Source runtimes."""
+    """IDE-discoverable names for Provider dependencies."""
 
     rdflib: DependencyValue
-    """Source Runtime used when searching or resolving a DCAT catalog."""
+    """Provider dependency used when searching or resolving a DCAT catalog."""
 
 
 def _freeze(value: Any) -> Any:
@@ -97,7 +97,7 @@ class Provider:
     """Describe one configured data provider.
 
     ``id`` is the application-local identifier used by ``Reference`` and search
-    diagnostics. ``adapter_type`` selects the Source Adapter that interprets
+    diagnostics. ``adapter_type`` selects the Provider Adapter that interprets
     ``settings``. Runtime objects and secrets belong in ``configure`` inputs,
     not in this immutable value.
     """
@@ -117,7 +117,7 @@ class Provider:
         if not isinstance(raw_adapter_type, str) or not raw_adapter_type.strip():
             raise ConfigValidationError(
                 "adapter_type must be a non-empty string; choose a "
-                "registered source adapter type"
+                "registered provider adapter type"
             )
         if not isinstance(cast(object, self.settings), Mapping):
             raise ConfigValidationError("Provider.settings must be a mapping")
@@ -204,10 +204,10 @@ class Provenance:
 
 @dataclass(frozen=True)
 class DiscoveryRecord:
-    """Retain the record produced by a Source that discovered a result.
+    """Retain the record produced by a Provider that discovered a result.
 
     Cross-source resolution must not overwrite the metadata or provenance
-    produced by the target Source.  A resolved ``Resource`` keeps its target
+    produced by the target Provider.  A resolved ``Resource`` keeps its target
     record in the usual ``metadata`` / ``provenance`` fields and stores this
     discovery-side record separately.
     """
@@ -452,24 +452,24 @@ class Resource:
         """Open this resource through the explicitly selected runtime.
 
         Args:
-            library: Registered execution adapter name, such as ``"gdal"``,
+            library: Registered runtime adapter name, such as ``"gdal"``,
                 ``"rasterio"``, ``"pyogrio"``, or ``"json-service"``.
             runtime: User-owned runtime object required by external adapters.
                 The core-owned ``json-service`` adapter supplies its own runtime.
 
         Raises:
             ConfigValidationError: If library is not a non-empty adapter name.
-            ExecutionAdapterUnavailableError: If the resource is detached, the
+            RuntimeAdapterUnavailableError: If the resource is detached, the
                 adapter is unavailable, or no compatible runtime was injected.
             ResourceAccessError: If the selected runtime cannot open the data.
         """
         raw_library = cast(object, library)
         if not isinstance(raw_library, str) or not raw_library.strip():
             raise ConfigValidationError(
-                "library must be a non-empty execution adapter name"
+                "library must be a non-empty runtime adapter name"
             )
         if self._opener is None:
-            raise ExecutionAdapterUnavailableError(
+            raise RuntimeAdapterUnavailableError(
                 "Resource is not bound to an execution context; use "
                 "app.bind(resource) before calling Resource.open"
             )

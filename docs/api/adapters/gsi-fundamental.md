@@ -3,7 +3,7 @@
 `GsiFundamentalAdapter` は、取得済みの基盤地図情報 GML をローカル Resource として
 解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `gsi-fundamental`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `gsi-fundamental`
 
 ## 設定
 

@@ -7,8 +7,6 @@ from typing import Any
 import pytest
 
 from rhinestone import Reference
-from rhinestone.adapters.execution.json_service import JsonServiceAdapter
-from rhinestone.adapters.execution.json_service.odpt import prepare_odpt_request
 from rhinestone.adapters.knowledge import (
     AdministrativeArea,
     KnowledgeKind,
@@ -17,9 +15,11 @@ from rhinestone.adapters.knowledge import (
     TimeKind,
     TimeSemantic,
 )
-from rhinestone.adapters.source.estat_gis import EstatGisAdapter
-from rhinestone.adapters.source.gsi_fundamental import GsiFundamentalAdapter
-from rhinestone.adapters.source.plateau import PlateauAdapter
+from rhinestone.adapters.provider.estat_gis import EstatGisAdapter
+from rhinestone.adapters.provider.gsi_fundamental import GsiFundamentalAdapter
+from rhinestone.adapters.provider.plateau import PlateauAdapter
+from rhinestone.adapters.runtime.json_service import JsonServiceAdapter
+from rhinestone.adapters.runtime.json_service.odpt import prepare_odpt_request
 from rhinestone.models import AccessPlan
 from rhinestone.security import DestinationPolicy
 from tests.test_adapter_expansion import (

@@ -4,10 +4,10 @@ from typing import Any, cast
 import pytest
 
 from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
-    ConfiguredSourceAdapter,
+    ConfiguredProviderAdapter,
 )
-from rhinestone.adapters.source.stac import StacAdapter
-from rhinestone.adapters.source.stac.adapter import (
+from rhinestone.adapters.provider.stac import StacAdapter
+from rhinestone.adapters.provider.stac.adapter import (
     _comparable_interval,  # pyright: ignore[reportPrivateUsage]
     _stac_datetime,  # pyright: ignore[reportPrivateUsage]
 )
@@ -861,7 +861,7 @@ def test_configured_stac_search_rebinds_item_diagnostic_source() -> None:
         ),
     )
 
-    results = ConfiguredSourceAdapter("earth-observation", adapter, "stac").search(
+    results = ConfiguredProviderAdapter("earth-observation", adapter, "stac").search(
         SearchQuery()
     )
 
