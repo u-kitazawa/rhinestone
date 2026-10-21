@@ -66,6 +66,8 @@ metadataに安全な `DPF:downloadURLs` がある結果を `direct` のReference
 ## 検索と実行
 
 `text`、`area`、WGS84の `bbox=(west, south, east, north)`、`format`、`limit` に対応します。
+共通のbbox経緯度範囲・南北順序の検証に加え、DPFのrectangleでは日付変更線跨ぎ
+（`west > east`）を`ConfigValidationError`で拒否します。分割・並べ替えは行いません。
 `time` は未対応として検索diagnosticに記録されます。`limit=None` の返却上限は50 Resource、
 `limit=0` はCredential取得も通信もしません。公開検索モデル・Coordinator・解決経路は変更しません。
 

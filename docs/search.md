@@ -37,7 +37,8 @@ results = app.search(text="人口", limit=10)
 - `text`: 空白だけではない`str`、または未指定を表す`None`
 - `area`: 行政区域の正式名、別名、または全国地方公共団体コード
 - `limit`: `bool`を除く0以上の整数または`None`（ProviderごとのResource上限）
-- `bbox`: 有限の数値4要素のtuple
+- `bbox`: CRS84の経緯度を`(west, south, east, north)`で指定する有限の数値4要素のtuple。
+  経度は`[-180, 180]`、緯度は`[-90, 90]`、`south <= north`が必要
 - `time`: `datetime`または`None`を2要素で保持するtuple。両端を指定する場合は
   timezone-aware同士またはnaive同士とし、開始日時を終了日時以前にする
 - `format`: `Format`または`FormatPreset`を1つ以上保持するtuple（OR条件）
@@ -45,7 +46,10 @@ results = app.search(text="人口", limit=10)
 不正な値はProviderへリクエストする前に`ConfigValidationError`になります。明示的な空文字・
 空白だけの`text`は不正入力であり、全件検索へ変換しません。検索語を指定しない全件検索は
 `text=None`または`SearchQuery()`で表します。`area`と`bbox`は同時に指定できません。
-`bbox`の既存の4数値tuple契約は変更されません。
+`west > east`は日付変更線をまたぐ範囲を表し、共通の検索条件では受け入れます。
+例えば`(170, -10, -170, 10)`を指定できます。対応しないProvider（MLIT DPF）は
+`ConfigValidationError`で拒否し、座標の並べ替えや暗黙の範囲分割は行いません。
+境界値と幅・高さが0の範囲も受け入れます。範囲外の値を補正・正規化しません。
 
 Provider応答内の一部Resourceだけが不正な場合、可能な範囲でそのResourceを除外し、
 `reason="item_skipped"`のdiagnosticを残します。例えばsearch.ckan.jpが資格情報を埋め込んだ
