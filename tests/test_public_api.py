@@ -456,6 +456,9 @@ def test_public_search_skips_search_ckan_jp_without_required_text(
     (
         {"limit": -1},
         {"bbox": (139.0, 35.0, 140.0)},
+        {"bbox": (181, 35, 140, 36)},
+        {"bbox": (139, -91, 140, 36)},
+        {"bbox": (139, 36, 140, 35)},
         {"time": ("2024-01-01", None)},
     ),
 )
