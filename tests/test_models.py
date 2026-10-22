@@ -154,6 +154,16 @@ def test_search_query_rejects_invalid_limits(limit: object) -> None:
         (0, float("inf"), 2, 3),
         (0, 1, float("-inf"), 3),
         [0, 1, 2, 3],
+        (-181, 0, 1, 1),
+        (181, 0, 1, 1),
+        (0, 0, -181, 1),
+        (0, 0, 181, 1),
+        (0, -91, 1, 1),
+        (0, 91, 1, 1),
+        (0, 0, 1, -91),
+        (0, 0, 1, 91),
+        (0, 2, 1, 1),
+        (10**400, 0, 1, 1),
     ),
 )
 def test_search_query_rejects_invalid_bboxes(bbox: object) -> None:
@@ -168,6 +178,23 @@ def test_search_query_bbox_error_does_not_call_element_repr() -> None:
 
     with pytest.raises(ConfigValidationError, match="invalid length or element type"):
         SearchQuery(bbox=cast(Any, (0, 1, 2, Unrepresentable())))
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    (
+        (-180, -90, 180, 90),
+        (180, -90, -180, 90),
+        (170.5, -10.5, -170.5, 10.5),
+        (139, 35, 139, 35),
+    ),
+)
+def test_search_query_preserves_boundary_and_antimeridian_bboxes(
+    bbox: tuple[float, float, float, float],
+) -> None:
+    query = SearchQuery(bbox=bbox)
+    assert query.bbox == bbox
+    assert query.project(frozenset({"bbox"})).bbox == bbox
 
 
 @pytest.mark.parametrize(

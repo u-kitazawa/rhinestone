@@ -495,7 +495,9 @@ class SearchQuery:
 
     ``area`` is an administrative-area name, alias, or code resolved before
     provider dispatch. ``bbox`` remains ``(west, south, east, north)`` and is
-    mutually exclusive with ``area``. ``time`` is a ``(start, end)`` pair where
+    expressed in CRS84 degrees and mutually exclusive with ``area``. Longitudes
+    are within [-180, 180], latitudes within [-90, 90], and south <= north.
+    West > east denotes an antimeridian-crossing box. ``time`` is a pair where
     either endpoint may be ``None``. Unsupported supplied criteria
     are reported through ``SearchResults.diagnostics``.
     """
@@ -572,6 +574,19 @@ class SearchQuery:
             ):
                 raise ConfigValidationError(
                     "bbox coordinates must be finite numbers (SearchQuery.bbox)"
+                )
+            west, south, east, north = bbox_values
+            if not (-180 <= west <= 180 and -180 <= east <= 180):
+                raise ConfigValidationError(
+                    "bbox longitudes must be within [-180, 180] (SearchQuery.bbox)"
+                )
+            if not (-90 <= south <= 90 and -90 <= north <= 90):
+                raise ConfigValidationError(
+                    "bbox latitudes must be within [-90, 90] (SearchQuery.bbox)"
+                )
+            if south > north:
+                raise ConfigValidationError(
+                    "bbox south must not exceed north (SearchQuery.bbox)"
                 )
         raw_time = cast(object, self.time)
         if raw_time is not None:

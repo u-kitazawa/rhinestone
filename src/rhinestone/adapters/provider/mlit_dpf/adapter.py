@@ -391,9 +391,9 @@ def _build_query(
         arguments.append("attributeFilter: { AND: [" + ", ".join(filters) + "] }")
     if query.bbox is not None:
         west, south, east, north = query.bbox
-        if not (-180 <= west <= east <= 180 and -90 <= south <= north <= 90):
+        if west > east:
             raise ConfigValidationError(
-                "mlit-dpf bbox must be ordered WGS84 coordinates within valid ranges"
+                "mlit-dpf bbox does not support antimeridian-crossing coordinates"
             )
         arguments.append(
             "locationFilter: { rectangle: { "
