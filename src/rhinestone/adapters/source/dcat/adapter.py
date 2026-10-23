@@ -25,7 +25,6 @@ _DCT = "http://purl.org/dc/terms/"
 _RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 
 
-
 def _reject_external_jsonld_contexts(document: str) -> None:
     """Reject JSON-LD references that would make RDFLib fetch more resources."""
     try:
