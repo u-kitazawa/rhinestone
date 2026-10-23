@@ -104,6 +104,7 @@ def test_json_service_rejects_non_http_before_credential_release(uri: str) -> No
     assert preparer_calls == []
     assert runtime_calls == []
 
+
 def test_dcat_preserves_json_literal_keys_as_data() -> None:
     document = json.dumps(
         {
