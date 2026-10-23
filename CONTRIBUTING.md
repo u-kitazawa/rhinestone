@@ -32,6 +32,23 @@ uv sync --dev --locked
 
 ロックファイルを更新する必要がある場合は、変更理由をPRに記載してください。
 
+### 依存関係の脆弱性監査
+
+Python 3.12とuvがある環境で `python scripts/audit_dependencies.py` を実行します。
+`uv.lock` の直接・間接・dev依存と、Python/OS別の全解決バージョンを
+PyPIの既知脆弱性情報と照合します。未公開のローカルプロジェクト自身は対象外です。
+監査ツールは固定版pip-auditを隔離環境で実行し、Core依存には追加しません。
+終了コード0は完全な監査の成功、1は既知脆弱性の検出、2は通信・ツール・lock不整合などによる
+監査未完了です。未完了を「脆弱性なし」として扱わず、診断を確認して再実行してください。
+通常の `scripts/check.sh` とは分け、Dependency audit CIでPR・pushと毎日実行します。
+定期workflowはGitHubの既定ブランチ上で動くため、既定ブランチへの反映後に有効になります。
+
+Dependabot version updatesはuvの更新PRをdevelop向けに週次作成する設定です。
+設定ファイルを既定ブランチにも反映する必要があります。Dependabot alerts/security updatesの
+有効化はリポジトリ設定・権限に依存し、この設定だけで有効化したとはみなしません。
+alertsは既定ブランチの依存グラフを対象とし、developの監査CIを代替しません。
+urllib3のセキュリティ下限値はuvのconstraintに置き、Coreの直接依存を増やさず維持します。
+
 ## リポジトリ構成
 
 主なディレクトリとファイルは次のとおりです。
