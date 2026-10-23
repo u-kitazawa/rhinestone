@@ -1,5 +1,6 @@
 """DCAT RDF catalog interpretation using a user-owned RDFLib runtime."""
 
+import json
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -22,6 +23,35 @@ from ..base import ProviderAdapter
 _DCAT = "http://www.w3.org/ns/dcat#"
 _DCT = "http://purl.org/dc/terms/"
 _RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+
+
+
+def _reject_external_jsonld_contexts(document: str) -> None:
+    """Reject JSON-LD references that would make RDFLib fetch more resources."""
+    try:
+        pending = [json.loads(document)]
+    except (ValueError, RecursionError) as error:
+        raise ProviderResponseError("Invalid RDF catalog") from error
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key == "@import" or (
+                    key == "@context"
+                    and (
+                        isinstance(item, str)
+                        or (
+                            isinstance(item, list)
+                            and any(isinstance(entry, str) for entry in item)
+                        )
+                    )
+                ):
+                    raise ProviderResponseError(
+                        "DCAT JSON-LD external contexts are not supported"
+                    )
+                pending.append(item)
+        elif isinstance(value, list):
+            pending.extend(value)
 
 
 class DcatAdapter(ProviderAdapter):
@@ -69,6 +99,8 @@ class DcatAdapter(ProviderAdapter):
             document = self._document_loader(uri)
         except Exception as error:
             raise ProviderMetadataError("Could not load RDF catalog") from error
+        if serialization == "json-ld":
+            _reject_external_jsonld_contexts(document)
         try:
             graph = rdf.Graph()
             graph.parse(data=document, format=serialization, publicID=uri)

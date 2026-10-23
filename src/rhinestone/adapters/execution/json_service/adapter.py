@@ -3,10 +3,14 @@
 from collections.abc import Callable, Mapping
 from typing import Any, cast
 
-from ....errors import ProviderResponseError, ResourceAccessError
+from ....errors import (
+    DestinationNotAllowedError,
+    ProviderResponseError,
+    ResourceAccessError,
+)
 from ....models import AccessPlan
 from ....registry import CredentialRegistry
-from ....security import DestinationPolicy
+from ....security import DestinationPolicy, DestinationRule
 from ..base import ExecutionAdapter
 
 RequestPreparer = Callable[
@@ -109,6 +113,10 @@ class JsonServiceAdapter(ExecutionAdapter):
         plan: AccessPlan,
         destination_policy: DestinationPolicy | None,
     ) -> None:
+        if DestinationRule.from_url(plan.uri) is None:
+            raise DestinationNotAllowedError(
+                "JSON service requests require a valid HTTP(S) destination"
+            )
         credential = plan.credential
         (destination_policy or self._destination_policy).authorize(
             plan.uri,

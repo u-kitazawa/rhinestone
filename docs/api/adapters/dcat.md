@@ -8,6 +8,8 @@
 
 `Reference.parameters` は catalog の `uri` と Dataset URI の `dataset` が必須です。
 `serialization` は `json-ld`、`turtle`、`xml`、`distribution` は任意です。
+JSON-LDでは外部の `@context` 参照（URL・`file://`・`@import`）を拒否します。
+RDFLibが文書内の参照先を追加取得しないよう、必要なコンテキストは文書内に埋め込んでください。
 
 `configure(catalog=...)` で利用する場合は、Provider設定の `catalog_uri` が信頼できる取得先です。
 解決時の `Reference.parameters["uri"]` がこの値と一致しない場合は、取得前に拒否されます。
