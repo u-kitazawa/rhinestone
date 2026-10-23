@@ -9,6 +9,9 @@ import pytest
 from rhinestone import Provider
 from rhinestone.adapters.execution.json_service import JsonServiceAdapter
 from rhinestone.adapters.source.dcat import DcatAdapter
+from rhinestone.adapters.source.dcat.adapter import (
+    _reject_external_jsonld_contexts,  # pyright: ignore[reportPrivateUsage]
+)
 from rhinestone.errors import DestinationNotAllowedError, ProviderResponseError
 from rhinestone.models import AccessPlan, SearchQuery
 from rhinestone.registry import CredentialRegistry
@@ -100,3 +103,20 @@ def test_json_service_rejects_non_http_before_credential_release(uri: str) -> No
     assert credential_calls == []
     assert preparer_calls == []
     assert runtime_calls == []
+
+def test_dcat_preserves_json_literal_keys_as_data() -> None:
+    document = json.dumps(
+        {
+            "@context": {"ex": "https://example.test/"},
+            "@id": "https://example.test/dataset",
+            "ex:metadata": {
+                "@type": "@json",
+                "@value": {
+                    "@context": "literal, not a URL",
+                    "@import": "also literal",
+                    "nested": [{"@context": "still literal"}],
+                },
+            },
+        }
+    )
+    _reject_external_jsonld_contexts(document)
