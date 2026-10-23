@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, cast
 
 from ....errors import (
     AmbiguousResourceError,
@@ -34,14 +34,21 @@ def _reject_external_jsonld_contexts(document: str) -> None:
     while pending:
         value = pending.pop()
         if isinstance(value, dict):
-            for key, item in value.items():
+            mapping = cast(dict[str, Any], value)
+            for key, item in mapping.items():
+                # JSON-LD 1.1 @json values are data, not nested JSON-LD syntax.
+                if key == "@value" and mapping.get("@type") == "@json":
+                    continue
                 if key == "@import" or (
                     key == "@context"
                     and (
                         isinstance(item, str)
                         or (
                             isinstance(item, list)
-                            and any(isinstance(entry, str) for entry in item)
+                            and any(
+                                isinstance(entry, str)
+                                for entry in cast(list[Any], item)
+                            )
                         )
                     )
                 ):
@@ -50,7 +57,7 @@ def _reject_external_jsonld_contexts(document: str) -> None:
                     )
                 pending.append(item)
         elif isinstance(value, list):
-            pending.extend(value)
+            pending.extend(cast(list[Any], value))
 
 
 class DcatAdapter(ProviderAdapter):
