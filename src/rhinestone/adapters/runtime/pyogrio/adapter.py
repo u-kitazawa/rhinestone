@@ -1,0 +1,76 @@
+"""Pyogrio runtime adapter."""
+
+from typing import Any
+from urllib.parse import urlparse
+
+from ....errors import ResourceAccessError
+from ....models import AccessPlan
+from ....representations import FORMAT_CATEGORIES, canonical_format
+from ....security import DestinationPolicy
+from ..base import RuntimeAdapter
+
+
+class PyogrioAdapter(RuntimeAdapter):
+    """Delegate vector AccessPlans to a supplied pyogrio module."""
+
+    name = "pyogrio"
+    priority = 10
+    # Provider adapters must declare ``AccessPlan.format``; this registry never
+    # infers a format from a URI or from an archive member.  Keeping the
+    # compatibility boundary in the shared representation vocabulary lets new
+    # explicitly supported vector formats reach the injected pyogrio runtime.
+    _formats = frozenset(
+        format_name
+        for format_name, category in FORMAT_CATEGORIES.items()
+        if category == "vector"
+    )
+
+    def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
+        super().__init__(destination_policy)
+
+    def supports(self, plan: AccessPlan) -> bool:
+        """Return whether pyogrio can be tried for an explicit vector format.
+
+        Runtime driver availability is environment-specific.  This selection
+        check admits only the maintained, explicitly declared vector registry;
+        a missing driver or an unsupported geometry/field type is reported by
+        :meth:`open` as :class:`~rhinestone.errors.ResourceAccessError`.
+        """
+        return canonical_format(plan.format) in self._formats
+
+    def open(
+        self,
+        plan: AccessPlan,
+        runtime: Any,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> Any:
+        """Read the selected vector AccessPlan with ``runtime.read_dataframe``."""
+        options: dict[str, Any] = {}
+        encoding = plan.options.get("encoding")
+        if isinstance(encoding, str):
+            options["encoding"] = encoding
+        try:
+            return runtime.read_dataframe(self._runtime_uri(plan), **options)
+        except Exception as error:
+            raise ResourceAccessError(f"pyogrio could not open {plan.uri!r}") from error
+
+    @staticmethod
+    def _runtime_uri(plan: AccessPlan) -> str:
+        """Translate an explicit ZIP access plan to GDAL's VSI URI syntax."""
+        archive = plan.options.get("archive")
+        if archive != "zip":
+            return plan.uri
+
+        uri = plan.uri
+        prefix = (
+            "/vsizip//vsicurl/"
+            if urlparse(uri).scheme.casefold()
+            in {
+                "http",
+                "https",
+            }
+            else "/vsizip/"
+        )
+        member = plan.options.get("entry_point")
+        return prefix + uri + ("/" + member if isinstance(member, str) else "")

@@ -1,6 +1,6 @@
 import pytest
 
-from rhinestone.adapters.source.direct import DirectAdapter
+from rhinestone.adapters.provider.direct import DirectAdapter
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import Reference
 

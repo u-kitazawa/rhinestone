@@ -17,7 +17,7 @@ from .knowledge.base import KnowledgeAdapterDefinition, KnowledgePort
 from .ports import CredentialPort, DependencyPort, TransportPort
 
 
-class SourceAdapter(Protocol):
+class ProviderAdapter(Protocol):
     """Minimal contract for a Provider adapter that loads one Resource."""
 
     def load(self, reference: Reference) -> Resource:
@@ -26,8 +26,8 @@ class SourceAdapter(Protocol):
 
 
 @runtime_checkable
-class SearchableSourceAdapter(SourceAdapter, Protocol):
-    """Optional Source Adapter contract for provider-backed search."""
+class SearchableProviderAdapter(ProviderAdapter, Protocol):
+    """Optional Provider Adapter contract for provider-backed search."""
 
     search_conditions: frozenset[str]
 
@@ -38,7 +38,7 @@ class SearchableSourceAdapter(SourceAdapter, Protocol):
         ...
 
 
-class ExecutionAdapter(Protocol):
+class RuntimeAdapter(Protocol):
     """Translate an explicit AccessPlan into a user-owned runtime call."""
 
     name: str
@@ -60,8 +60,8 @@ class ExecutionAdapter(Protocol):
 
 
 @dataclass(frozen=True)
-class SourceAdapterContext:
-    """Framework services injected into a Source Adapter factory.
+class ProviderAdapterContext:
+    """Framework services injected into a Provider Adapter factory.
 
     The context supplies transport, scoped dependencies, credential lookup,
     network authorization, provider identity, and shared knowledge adapters.
@@ -77,10 +77,10 @@ class SourceAdapterContext:
 
 
 @dataclass(frozen=True)
-class ExecutionAdapterContext:
-    """Framework services injected into an Execution Adapter factory.
+class RuntimeAdapterContext:
+    """Framework services injected into an Runtime Adapter factory.
 
-    Execution adapters receive credential lookup and the destination policy.
+    Runtime adapters receive credential lookup and the destination policy.
     They select no Resource; selection belongs to
     the Resolver and execution selector.
     """
@@ -89,13 +89,13 @@ class ExecutionAdapterContext:
     destination_policy: DestinationPolicy
 
 
-SourceAdapterFactory = Callable[[Provider, SourceAdapterContext], SourceAdapter]
-ExecutionAdapterFactory = Callable[[ExecutionAdapterContext], ExecutionAdapter]
+ProviderAdapterFactory = Callable[[Provider, ProviderAdapterContext], ProviderAdapter]
+RuntimeAdapterFactory = Callable[[RuntimeAdapterContext], RuntimeAdapter]
 
 
 @dataclass(frozen=True)
-class SourceAdapterDefinition:
-    """Register one reusable provider-specific Source Adapter factory.
+class ProviderAdapterDefinition:
+    """Register one reusable provider-specific Provider Adapter factory.
 
     ``adapter_type`` must be unique within the application. ``dependencies``
     limits which injected runtime names are visible to the factory and its
@@ -103,7 +103,7 @@ class SourceAdapterDefinition:
     """
 
     adapter_type: str
-    factory: SourceAdapterFactory
+    factory: ProviderAdapterFactory
     dependencies: frozenset[str] = field(default_factory=lambda: frozenset[str]())
 
     def __post_init__(self) -> None:
@@ -115,15 +115,15 @@ class SourceAdapterDefinition:
 
 
 @dataclass(frozen=True)
-class ExecutionAdapterDefinition:
-    """Register one user-owned Execution Adapter factory.
+class RuntimeAdapterDefinition:
+    """Register one user-owned Runtime Adapter factory.
 
     The factory must return an adapter whose ``name`` exactly matches this
     definition's ``name``; names already provided by built-ins cannot be reused.
     """
 
     name: str
-    factory: ExecutionAdapterFactory
+    factory: RuntimeAdapterFactory
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -133,7 +133,7 @@ class ExecutionAdapterDefinition:
 
 
 AdapterDefinition = (
-    SourceAdapterDefinition | ExecutionAdapterDefinition | KnowledgeAdapterDefinition
+    ProviderAdapterDefinition | RuntimeAdapterDefinition | KnowledgeAdapterDefinition
 )
 
 
@@ -141,14 +141,14 @@ __all__ = [
     "AdapterDefinition",
     "CredentialPort",
     "DependencyPort",
-    "ExecutionAdapter",
-    "ExecutionAdapterContext",
-    "ExecutionAdapterDefinition",
-    "ExecutionAdapterFactory",
-    "SearchableSourceAdapter",
-    "SourceAdapter",
-    "SourceAdapterContext",
-    "SourceAdapterDefinition",
-    "SourceAdapterFactory",
+    "RuntimeAdapter",
+    "RuntimeAdapterContext",
+    "RuntimeAdapterDefinition",
+    "RuntimeAdapterFactory",
+    "SearchableProviderAdapter",
+    "ProviderAdapter",
+    "ProviderAdapterContext",
+    "ProviderAdapterDefinition",
+    "ProviderAdapterFactory",
     "TransportPort",
 ]

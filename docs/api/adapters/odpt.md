@@ -2,7 +2,7 @@
 
 `OdptAdapter` は ODPT v4 の service query を解決します。データ取得は行わず、`JsonServiceAdapter` が実行します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `odpt`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `odpt`
 
 ## 設定
 

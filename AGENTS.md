@@ -20,10 +20,10 @@
 
 ## アーキテクチャ規則
 
-- アクセスパイプライン `search -> Resource -> open -> Execution Adapter -> Data`。直接指定は `Reference -> Source Adapter.load -> Resource`、転送は `plan(Resource) -> AccessPlan -> open(plan)` を維持する。
-- 責務を分離する。Source Adapter は配信元を解釈し、配信単位の Reference・Resource・AccessPlan を生成する。Execution Adapter は選択済み AccessPlan を既存 OSS 向けに翻訳し、Resource の選択は行わない。
+- アクセスパイプライン `search -> Resource -> open -> Runtime Adapter -> Data`。直接指定は `Reference -> Provider Adapter.load -> Resource`、転送は `plan(Resource) -> AccessPlan -> open(plan)` を維持する。
+- 責務を分離する。Provider Adapter は配信元を解釈し、配信単位の Reference・Resource・AccessPlan を生成する。Runtime Adapter は選択済み AccessPlan を既存 OSS 向けに翻訳し、Resource の選択は行わない。
 - プロバイダー固有の振る舞いを Domain 層に持ち込まない。フォーマットやプロトコル処理を再実装するのではなく、既存の標準や OSS ライブラリを優先する。
-- 暗黙のフォーマット変換、URL の推測、HTML スクレイピングを避ける。検索は Search Coordinator と検索 Capability を持つ Source Adapter が公式 API を通して行う。確実に判断できない場合は、明示的に失敗させるかオプトインを要求する。
+- 暗黙のフォーマット変換、URL の推測、HTML スクレイピングを避ける。検索は Search Coordinator と検索 Capability を持つ Provider Adapter が公式 API を通して行う。確実に判断できない場合は、明示的に失敗させるかオプトインを要求する。
 - 異なる失敗原因を `RuntimeError` にまとめず、それぞれ異なるエラー型を使用する。
 - 解決処理を決定的かつ説明可能に保つ。同じ Reference、メタデータ、Capability からは同じ `AccessPlan` が生成されなければならない。
 
@@ -32,7 +32,7 @@
 - PRの粒度と継続作業は[貢献ガイド](CONTRIBUTING.md#prの粒度と継続作業)に従う。同じ目的の実装・テスト・文書は既存の未マージPRへ集約し、定期実行やセッションの区切りでPRを分割しない。対象範囲を横断して調査し、分割が必要な場合は理由と各PRの完了条件を明記する。
 - 後方互換だけを目的とする別名、wrapper、旧引数、旧形式への分岐を追加・維持しない。現行APIに統一し、利用例、テスト、公開文書を同じ変更で更新する。
 
-- 実例による仕様化、仕様適合テスト、垂直スライスに従う。新しい Source Adapter には、代表的な Fixture、期待される Reference・Resource・AccessPlan、仕様適合テストを追加する。
+- 実例による仕様化、仕様適合テスト、垂直スライスに従う。新しい Provider Adapter には、代表的な Fixture、期待される Reference・Resource・AccessPlan、仕様適合テストを追加する。
 - Reference・Resource・AccessPlan を不変に保ち、Resource と DiscoveryRecord が保持する Metadata、raw metadata、Provenance を後続処理で破棄しない。
 - 実装パターンが繰り返され、必要性が裏付けられるまでは外部 Adapter API を設計しない。初期段階では内部 Adapter Registry で十分である。
 - 変更を最小限に抑え、振る舞いを変更した場合は仕様またはドキュメントを更新する。

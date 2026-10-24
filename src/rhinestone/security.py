@@ -1,4 +1,4 @@
-"""Destination authorization derived from trusted Source definitions."""
+"""Destination authorization derived from trusted Provider definitions."""
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -95,7 +95,7 @@ class CredentialDestinationRule:
 
 @dataclass(frozen=True)
 class DestinationPolicy:
-    """Authorize network destinations at Source and execution boundaries.
+    """Authorize network destinations at Provider and Runtime boundaries.
 
     The default ``credentialed`` level permits ordinary public requests while
     requiring catalog-derived authorization before credential release.

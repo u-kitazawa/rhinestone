@@ -5,12 +5,12 @@ from typing import Any, cast
 import pytest
 
 from rhinestone import Catalog, Provider, Reference, configure
-from rhinestone.adapters.source.static import StaticAdapter
+from rhinestone.adapters.provider.static import StaticAdapter
 from rhinestone.errors import (
     AmbiguousResourceError,
     ConfigValidationError,
-    ExecutionAdapterUnavailableError,
     ResourceNotFoundError,
+    RuntimeAdapterUnavailableError,
 )
 from rhinestone.models import AccessPlan, Metadata, Provenance, Resource
 
@@ -196,9 +196,9 @@ def test_unresolved_resource_is_loaded_or_rejected_before_open() -> None:
         )
     )
     bound = unknown_app.bind(unresolved(reference=Reference("fixture", "data")))
-    with pytest.raises(ExecutionAdapterUnavailableError, match="no AccessPlan"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="no AccessPlan"):
         bound.open("gdal", runtime=object())
-    with pytest.raises(ExecutionAdapterUnavailableError, match="no AccessPlan"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="no AccessPlan"):
         app._pipeline.open_resource(unresolved(), "gdal", runtime=object())  # pyright: ignore[reportPrivateUsage]
 
 
@@ -242,7 +242,7 @@ def test_dcat_explicit_missing_distribution_is_not_found() -> None:
 
 
 def test_estat_reference_identifies_the_distribution() -> None:
-    from rhinestone.adapters.source.estat_gis import EstatGisAdapter
+    from rhinestone.adapters.provider.estat_gis import EstatGisAdapter
 
     adapter = EstatGisAdapter(
         [
@@ -261,7 +261,7 @@ def test_estat_reference_identifies_the_distribution() -> None:
 
 
 def test_geospatial_direct_reference_preserves_provider_on_access_plan() -> None:
-    from rhinestone.adapters.source import GeospatialJpAdapter
+    from rhinestone.adapters.provider import GeospatialJpAdapter
 
     def client(url: str, params: Any) -> Any:
         if url.endswith("resource_show"):
@@ -285,7 +285,7 @@ def test_geospatial_direct_reference_preserves_provider_on_access_plan() -> None
 
 
 def test_stac_opaque_resource_id_uses_explicit_item_and_asset() -> None:
-    from rhinestone.adapters.source.stac import StacAdapter
+    from rhinestone.adapters.provider.stac import StacAdapter
     from tests.provider_support import RecordingJsonClient, fixture_json
 
     endpoint = "https://stac.example"

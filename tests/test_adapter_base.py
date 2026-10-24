@@ -19,8 +19,8 @@ from rhinestone.adapters import (
     ProviderAdapter,
     StacAdapter,
 )
-from rhinestone.adapters.source._knowledge import string
-from rhinestone.adapters.source._uri import has_embedded_credentials
+from rhinestone.adapters.provider._knowledge import string
+from rhinestone.adapters.provider._uri import has_embedded_credentials
 from rhinestone.errors import (
     ConfigValidationError,
     ProviderMetadataError,
@@ -29,20 +29,20 @@ from rhinestone.errors import (
 from rhinestone.models import Reference, Resource
 
 ADAPTER_PACKAGES = (
-    "source/ckan",
-    "source/dcat",
-    "source/direct",
-    "source/gsi_fundamental",
-    "source/odpt",
-    "source/ogc",
-    "source/plateau",
-    "source/search_ckan_jp",
-    "source/stac",
-    "source/static",
-    "execution/gdal",
-    "execution/json_service",
-    "execution/pyogrio",
-    "execution/rasterio",
+    "provider/ckan",
+    "provider/dcat",
+    "provider/direct",
+    "provider/gsi_fundamental",
+    "provider/odpt",
+    "provider/ogc",
+    "provider/plateau",
+    "provider/search_ckan_jp",
+    "provider/stac",
+    "provider/static",
+    "runtime/gdal",
+    "runtime/json_service",
+    "runtime/pyogrio",
+    "runtime/rasterio",
 )
 
 
@@ -184,7 +184,7 @@ def test_public_base_class_requires_load_implementation() -> None:
         StacAdapter,
     ),
 )
-def test_builtin_source_adapters_implement_the_public_base(adapter: Any) -> None:
+def test_builtin_provider_adapters_implement_the_public_base(adapter: Any) -> None:
     assert issubclass(adapter, ProviderAdapter)
 
 

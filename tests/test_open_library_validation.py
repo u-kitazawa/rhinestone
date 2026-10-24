@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import Metadata, Provenance
 
@@ -48,7 +48,9 @@ def test_invalid_library_is_rejected_before_load_or_runtime(
     app = configure(
         catalog=Catalog((Provider("example", "test-source"),)),
         adapters=(
-            SourceAdapterDefinition("test-source", lambda provider, context: Source()),
+            ProviderAdapterDefinition(
+                "test-source", lambda provider, context: Source()
+            ),
         ),
     )
 
@@ -59,5 +61,5 @@ def test_invalid_library_is_rejected_before_load_or_runtime(
             value = {"reference": reference, "resource": resource, "plan": plan}[entry]
             app.open(value, library, runtime=Runtime())
 
-    assert str(raised.value) == "library must be a non-empty execution adapter name"
+    assert str(raised.value) == "library must be a non-empty runtime adapter name"
     assert calls == []

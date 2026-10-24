@@ -6,7 +6,7 @@
 表にない提供元、通信仕様、形式は、
 対応しているとは限りません。RhinestoneはURLの拡張子や応答内容だけから形式を推測しません。
 
-「Source Adapter」は提供元のAPIやメタデータを読み取る部分、「Execution Adapter」は確定した
+「Provider Adapter」は提供元のAPIやメタデータを読み取る部分、「Runtime Adapter」は確定した
 ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
 ## 実行環境
@@ -14,14 +14,14 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 | 対象 | 対応範囲 | 補足 |
 | --- | --- | --- |
 | Python | 3.10 以上 | CI は 3.10〜3.13 を対象にする。 |
-| HTTP | Python標準ライブラリ | Sourceメタデータ、DCAT文書、ODPT JSONサービスのHTTP通信はRhinestoneに組み込まれています。 |
+| HTTP | Python標準ライブラリ | Providerメタデータ、DCAT文書、ODPT JSONサービスのHTTP通信はRhinestoneに組み込まれています。 |
 | GDAL / Rasterio / pyogrio | 利用者が供給する版 | Rhinestone は version を固定・管理しない。各 adapter が呼ぶ API と対象 format の互換性は利用者側で確認する。検証済み範囲は[Runtimeの導入ガイド](runtimes.md)に記載する。 |
 
 この表は、Rhinestoneが対応する提供元、形式、APIの範囲を示します。外部ライブラリのインストール可能性や
 ネイティブライブラリの組み合わせを保証するものではありません。ライブラリごとの導入方法、管理方法、
 検証済みバージョンは[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
-## Source Adapter（提供元アダプター）
+## Provider Adapter（提供元アダプター）
 
 | source type | 対応する提供仕様・版 | 解決できる対象 | 明示的な制限 |
 | --- | --- | --- | --- |
@@ -35,13 +35,13 @@ ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[R
 | `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Reference 内の secret、他 resource type は非対応。 |
 | `ogc-features` | OGC API Features 1.0 | collection または feature の service query | WFS、他 OGC API、built-in data reader は非対応。 |
 | `plateau` | G 空間情報センター CKAN Action API | 指定 dataset / resource の配布物 | 市区町村・年度からの配布物推測、ZIP 以外の archive は非対応。 |
-| `mlit-dpf` | 国土交通DPF GraphQL API v1 | 明示規則で解決可能な既存Sourceへ委譲できる検索結果、または形式宣言済みの恒久download URL | Discovery専用。Direct・別DPFへの規則委譲、`time`、署名付きfile download、半径・属性検索、landing page利用、ID・形式推測は非対応。 |
-| `search-ckan-jp` | search.ckan.jp Backend API | 元CKAN catalogの明示された配布物を指す検索結果 | Discovery専用。`text`が必須で、HTML解析、配布URLの推測、Source自体の直接解決は非対応。 |
+| `mlit-dpf` | 国土交通DPF GraphQL API v1 | 明示規則で解決可能な既存Providerへ委譲できる検索結果、または形式宣言済みの恒久download URL | Discovery専用。Direct・別DPFへの規則委譲、`time`、署名付きfile download、半径・属性検索、landing page利用、ID・形式推測は非対応。 |
+| `search-ckan-jp` | search.ckan.jp Backend API | 元CKAN catalogの明示された配布物を指す検索結果 | Discovery専用。`text`が必須で、HTML解析、配布URLの推測、Provider自体の直接解決は非対応。 |
 | `stac` | STAC API 1.0、リンク準拠の静的STAC Catalog | collection item の明示 asset、検索 | API検索は`/search`、静的検索は有界・循環安全な`child` / `item`探索を使用。media typeが未知・未指定でもResourceは生成するが、形式が未確定ならAccessPlanは生成しない。asset の URL / format 推測は非対応。 |
 
-## Execution Adapter と format
+## Runtime Adapter と format
 
-| Execution Adapter | 対応 format / access | 非対応・注意点 |
+| Runtime Adapter | 対応 format / access | 非対応・注意点 |
 | --- | --- | --- |
 | `gdal` | `shapefile`、`geotiff`、`cog`、`netcdf`、`wms`、`gml`、`kml`、`citygml`、GSI XYZ tile | 明示されたZIP AccessPlanを`/vsizip/` URIへ変換する。pyogrioもZIP変換に対応する。上記以外のformatは選択しない。 |
 | `rasterio` | `cog`、`geotiff` | URI のみを `rasterio.open()` へ渡す。`AccessPlan.options`は引数として転送せず、archive 展開や format 変換はしない。 |
@@ -54,12 +54,12 @@ media typeが未指定・未知なら、URIが`.tif`で終わっていても形�
 `format`と`access_plan`は`None`になります。詳細は[STACガイド](api/adapters/stac.md)を参照してください。
 
 形式の判定と実行可否は別です。例えばSTAC assetの`text/csv`は`csv`、`application/json`は
-`json`と判定されても、上表の組み込みExecution Adapterでは開けません（`json-service`はODPT専用）。
-DCAT、CKAN、PLATEAU、Directの配布物も、AccessPlanが選んだExecution Adapterに適合し、
+`json`と判定されても、上表の組み込みRuntime Adapterでは開けません（`json-service`はODPT専用）。
+DCAT、CKAN、PLATEAU、Directの配布物も、AccessPlanが選んだRuntime Adapterに適合し、
 必要なRuntime・認証・ドライバーが利用できることが必要です。対応表は実データの取得成功を保証しません。
 
 共通の representation 定義は `rhinestone.representations` にあり、format の alias と既知の
-media type 対応を Source Adapter 間で共有する。format が明示されている場合は media type
+media type 対応を Provider Adapter 間で共有する。format が明示されている場合は media type
 より優先し、URL suffix からの推測は行わない。
 
 ## 共通の非対応
@@ -75,4 +75,4 @@ Python標準urllibのredirect処理を使用します。Credential付きJSON GET
 JSON POST、CoreのJSON serviceはredirectを追跡しません。GDAL、Rasterio、pyogrioへ
 委譲した実データ通信のredirect処理は、各Runtimeの責務です。
 
-新たな対応は、Source Adapter、Resource / AccessPlan、Execution Adapter の変換、fixture による適合テストを一つの垂直スライスとして追加する。
+新たな対応は、Provider Adapter、Resource / AccessPlan、Runtime Adapter の変換、fixture による適合テストを一つの垂直スライスとして追加する。

@@ -8,7 +8,7 @@ API型は`endpoint`から`/search`を呼びます。静的型は`catalog_uri`か
 明示的に失敗します。相対リンクとasset hrefは、それぞれを含むレスポンスURIを基準に
 解決されます。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `stac`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `stac`
 
 ## 設定と検索
 
