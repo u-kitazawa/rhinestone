@@ -37,7 +37,7 @@ dev = [
     "rdflib>=6,<7",
     "pyright>=1.1.339,<1.1.390",
     "pytest>=9.0.3,<10",
-    "pytest-cov>=4.1,<5",
+    "pytest-cov>=4.1,<8",
     "ruff>=0.12.12,<0.13",
     "mkdocs-material>=9.7.7",
 ]
