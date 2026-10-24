@@ -5,11 +5,10 @@ from typing import Any
 
 from . import _http
 from .errors import (
-    ExecutionAdapterUnavailableError,
     ProviderMetadataError,
     RhinestoneError,
+    RuntimeAdapterUnavailableError,
 )
-from .execution import AuthorizingExecutionAdapter, ExecutionAdapterSelector
 from .models import (
     AccessPlan,
     LibraryName,
@@ -18,6 +17,7 @@ from .models import (
     RuntimeFactory,
 )
 from .registry import AdapterRegistry
+from .runtime import AuthorizingRuntimeAdapter, RuntimeAdapterSelector
 from .security import DestinationPolicy
 
 
@@ -27,18 +27,18 @@ class AccessPipeline:
     def __init__(
         self,
         adapter_registry: AdapterRegistry,
-        execution_selector: ExecutionAdapterSelector | None = None,
+        runtime_selector: RuntimeAdapterSelector | None = None,
         destination_policy: DestinationPolicy | None = None,
     ) -> None:
         self._adapter_registry = adapter_registry
-        self._execution_adapter_selector = execution_selector
+        self._execution_adapter_selector = runtime_selector
         self._destination_policy = (
             destination_policy or DestinationPolicy.unrestricted()
         )
 
     def load(self, reference: Reference) -> Resource:
         """Load the unique Resource identified by a Reference."""
-        adapter = self._adapter_registry.source(reference.provider_id)
+        adapter = self._adapter_registry.provider(reference.provider_id)
         try:
             resource = adapter.load(reference)
         except RhinestoneError:
@@ -64,7 +64,7 @@ class AccessPipeline:
             if loader is not None:
                 value = loader(value.reference)
             if value.access_plan is None:
-                raise ExecutionAdapterUnavailableError(
+                raise RuntimeAdapterUnavailableError(
                     "Resource has no AccessPlan; load its Reference through the "
                     "target Provider before opening it"
                 )
@@ -101,7 +101,7 @@ class AccessPipeline:
                 "application with configure() before opening a Resource"
             )
         if resource.access_plan is None:
-            raise ExecutionAdapterUnavailableError(
+            raise RuntimeAdapterUnavailableError(
                 "Resource has no AccessPlan; resolve its Reference first"
             )
         return self._open_plan(
@@ -131,7 +131,7 @@ class AccessPipeline:
     def _open_plan(
         plan: AccessPlan,
         library: LibraryName,
-        selector: ExecutionAdapterSelector,
+        selector: RuntimeAdapterSelector,
         destination_policy: DestinationPolicy,
         runtime: object | None,
     ) -> Any:
@@ -140,17 +140,17 @@ class AccessPipeline:
             requested=library,
         )
         destination_policy.authorize(plan.uri)
-        if isinstance(selected, AuthorizingExecutionAdapter):
+        if isinstance(selected, AuthorizingRuntimeAdapter):
             selected.authorize(plan, destination_policy=destination_policy)
         if selected.name == "json-service":
             if runtime is not None:
-                raise ExecutionAdapterUnavailableError(
+                raise RuntimeAdapterUnavailableError(
                     "json-service uses the core-owned runtime; omit runtime"
                 )
             runtime = _http.JsonServiceRuntime()
         elif runtime is None or isinstance(runtime, RuntimeFactory):
-            raise ExecutionAdapterUnavailableError(
-                f"Execution runtime for {selected.name!r} must be supplied as an object"
+            raise RuntimeAdapterUnavailableError(
+                f"Runtime for {selected.name!r} must be supplied as an object"
             )
         return selected.open(
             plan,

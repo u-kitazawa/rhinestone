@@ -8,13 +8,13 @@ from rhinestone import Provider, configure
 from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
     validate_mlit_dpf_targets,  # pyright: ignore[reportPrivateUsage]
 )
-from rhinestone.adapters.source.mlit_dpf import MlitDpfAdapter
+from rhinestone.adapters.provider.mlit_dpf import MlitDpfAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     ConfigValidationError,
-    ExecutionAdapterUnavailableError,
     ProviderResponseError,
-    UnsupportedSourceError,
+    RuntimeAdapterUnavailableError,
+    UnsupportedProviderError,
 )
 from rhinestone.models import ProviderSearchResults, Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
@@ -238,7 +238,7 @@ def test_bbox_validation_rejects_unsafe_coordinates(
 
 
 def test_load_is_explicitly_unsupported() -> None:
-    with pytest.raises(UnsupportedSourceError, match="discovery-only"):
+    with pytest.raises(UnsupportedProviderError, match="discovery-only"):
         _adapter(_response()).load(Reference("mlit-dpf", parameters={}))
 
 
@@ -314,7 +314,7 @@ def test_direct_result_resolves_with_discovery_and_requires_explicit_runtime(
     assert resource.open("pyogrio", runtime=PyogrioRuntime()) == (
         "opened:https://downloads.example/roads.gpkg"
     )
-    with pytest.raises(ExecutionAdapterUnavailableError):
+    with pytest.raises(RuntimeAdapterUnavailableError):
         app.open(result, "rasterio")
     assert "secret-value" not in repr(result)
     assert requests[0][2] == {"apikey": "secret-value"}
@@ -578,7 +578,7 @@ def test_invalid_adapter_configuration_is_rejected(
         )
 
 
-def test_source_transport_failure_is_metadata_diagnostic_without_secret(
+def test_provider_transport_failure_is_metadata_diagnostic_without_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fail(*_args: Any, **_kwargs: Any) -> Any:

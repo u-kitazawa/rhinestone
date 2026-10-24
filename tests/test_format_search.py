@@ -7,8 +7,9 @@ import rdflib
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Format, FormatPreset, Provider, configure
-from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.adapters.source.search_ckan_jp import SearchCkanJpAdapter
+from rhinestone.adapters.provider._ckan import matches_query_formats
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.provider.search_ckan_jp import SearchCkanJpAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery
@@ -199,7 +200,7 @@ def test_ckan_format_filter_uses_selected_resource_and_keeps_paging() -> None:
 
 def test_native_format_matchers_handle_unknown_explicitly() -> None:
     query = SearchQuery(format=(Format.UNKNOWN,))
-    assert CkanAdapter._matches_query_formats(frozenset(), query)  # pyright: ignore[reportPrivateUsage]
+    assert matches_query_formats(frozenset(), query)
     assert SearchCkanJpAdapter._matches_query_formats(  # pyright: ignore[reportPrivateUsage]
         frozenset(), query
     )

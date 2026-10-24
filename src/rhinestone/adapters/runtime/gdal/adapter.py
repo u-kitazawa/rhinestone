@@ -1,0 +1,94 @@
+"""Built-in adapters that delegate selected AccessPlans to user-owned runtimes."""
+
+from collections.abc import Mapping
+from typing import Any, cast
+from urllib.parse import urlparse
+
+from ....errors import ResourceAccessError
+from ....models import AccessPlan
+from ....representations import canonical_format
+from ....security import DestinationPolicy
+from ..base import RuntimeAdapter
+from .tile import tile_xml as build_tile_xml
+
+
+class GdalAdapter(RuntimeAdapter):
+    """Translate AccessPlans into calls understood by a supplied GDAL module."""
+
+    name = "gdal"
+    priority = 20
+    _formats = frozenset(
+        {"shapefile", "geotiff", "cog", "netcdf", "wms", "gml", "kml", "citygml"}
+    )
+
+    def __init__(self, destination_policy: DestinationPolicy | None = None) -> None:
+        super().__init__(destination_policy)
+
+    def supports(self, plan: AccessPlan) -> bool:
+        """Return whether GDAL and the AccessPlan's format are compatible."""
+        tile = plan.options.get("tile")
+        return canonical_format(plan.format) in self._formats or (
+            isinstance(tile, Mapping)
+            and cast(Mapping[str, Any], tile).get("scheme") == "xyz"
+        )
+
+    def open(
+        self,
+        plan: AccessPlan,
+        runtime: Any,
+        *,
+        destination_policy: DestinationPolicy | None = None,
+    ) -> Any:
+        """Open the selected AccessPlan with ``runtime.OpenEx``."""
+        options: list[str] = []
+        encoding = plan.options.get("encoding")
+        if isinstance(encoding, str):
+            options.append("ENCODING=" + encoding.upper())
+        try:
+            uri = self._runtime_uri(plan)
+            runtime_options: dict[str, Any] = {"open_options": tuple(options)}
+            result = runtime.OpenEx(uri, **runtime_options)
+            if result is None:
+                raise ResourceAccessError(
+                    "GDAL returned no dataset; verify the selected AccessPlan and "
+                    "GDAL-supported format"
+                )
+            return result
+        except ResourceAccessError:
+            raise
+        except Exception as error:
+            raise ResourceAccessError(f"GDAL could not open {plan.uri!r}") from error
+
+    @staticmethod
+    def _runtime_uri(plan: AccessPlan) -> str:
+        uri = plan.uri
+        tile = plan.options.get("tile")
+        if tile is not None:
+            if not isinstance(tile, Mapping):
+                raise ResourceAccessError(
+                    "GDAL tile options must be an object; provide explicit tile "
+                    "configuration in AccessPlan.options"
+                )
+            tile = cast(Mapping[str, Any], tile)
+            tile_url = tile.get("url")
+            if not isinstance(tile_url, str):
+                raise ResourceAccessError(
+                    "GDAL tile URL must be a string; provide a valid tile endpoint"
+                )
+            uri = build_tile_xml(tile)
+        archive = plan.options.get("archive")
+        if archive == "zip":
+            uri = (
+                "/vsizip//vsicurl/" + uri
+                if urlparse(uri).scheme.casefold() in {"http", "https"}
+                else "/vsizip/" + uri
+            )
+            member = plan.options.get("entry_point")
+            if member:
+                uri += "/" + member
+        return uri
+
+    @staticmethod
+    def tile_xml(tile: Mapping[str, Any]) -> str:
+        """Build GDAL WMS/XYZ tile XML from explicit tile options."""
+        return build_tile_xml(tile)

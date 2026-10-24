@@ -3,7 +3,7 @@
 `StaticAdapter` は、リポジトリまたは利用者が管理する静的なサービス定義を
 `Resource` として読み込みます。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `static`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `static`
 
 ## 設定
 

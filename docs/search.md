@@ -23,7 +23,7 @@ resource = results[0]
 未知または未構成のIDは通信前に`ConfigValidationError`になります。
 
 `app.search()`と`SearchQuery(providers=[...])`でも同じ指定が使えます。
-Provider選択はSource固有の検索条件ではないため、Adapterへ投影するQueryには含めません。
+Provider選択はProvider固有の検索条件ではないため、Adapterへ投影するQueryには含めません。
 
 ## 文字列と検索パラメータ
 
@@ -77,10 +77,10 @@ results = app.search(text="河川", area="神奈川県", limit=10)
 ```
 
 `area`は検索前に組み込みKnowledge Adapterが正式区域名とCRS84のbboxへ解決します。
-`area`対応Sourceには正式区域名をそのまま渡します。組み込みG空間情報センターはこの経路で
-地域条件を独立して扱います。bbox対応Sourceには
+`area`対応Providerには正式区域名をそのまま渡します。組み込みG空間情報センターはこの経路で
+地域条件を独立して扱います。bbox対応Providerには
 そのbboxを渡し、通常のCKAN、PLATEAU、DCAT、search.ckan.jp、Staticのように明示的なtext
-fallbackを持つSourceでは正式区域名を`text`へ追加します。それ以外では`area`を
+fallbackを持つProviderでは正式区域名を`text`へ追加します。それ以外では`area`を
 `unsupported` diagnosticとして残すため、地理条件が無言で失われることはありません。
 
 区域スナップショットは47都道府県と1,918件の市区町村・特別区・政令指定都市の区／市を収録します。
@@ -95,7 +95,7 @@ bbox算出：Rhinestone）。原本の形状を直接集計したものではな
 市区町村は正式名（例：`神奈川県横浜市`）または5桁コードで指定できます。
 短い地名が複数の区域に一致する場合は、正式名またはコードを指定してください。
 曖昧一致や外部geocoderは使用しません。
-未知の区域はProviderへアクセスせず、全Sourceに
+未知の区域はProviderへアクセスせず、全Providerに
 `reason="area_resolution_failed"`を返します。
 
 CKANに`ckanext-spatial`の`spatial_query`が導入されていることを確認できた場合だけ、
@@ -158,7 +158,7 @@ files = app.search(format=(Format.GEOJSON, Format.CSV))
 unknown = app.search(format=(Format.UNKNOWN,))
 ```
 
-Presetは検索候補集合であり、Runtimeでのopen成功を保証しません。最終判定は解決後のExecution
+Presetは検索候補集合であり、Runtimeでのopen成功を保証しません。最終判定は解決後のRuntime
 Adapterが行います。collection、asset、provider固有の詳細検索は共通引数にしていません。
 
 Coordinatorによる絞り込みは`Resource.formats`だけを照合し、raw metadataやURIから形式を
@@ -186,7 +186,7 @@ CKAN と search.ckan.jp は `limit` を Resource 数として満たすまで pac
 `mlit-dpf` は `text`、`area`、`bbox`、`format`、`limit` に対応します。
 地域は行政コードで検索し、本文はDPFのフレーズ検索を優先して通常検索で補います。
 解決可能なcatalog / datasetを検索前に絞り、形式照合後の必要件数までページングします。明示的なtarget ruleが成立する結果は
-CKAN、PLATEAU、STAC、OGC等の構成済みSourceへ委譲され、それ以外は明示representationと
+CKAN、PLATEAU、STAC、OGC等の構成済みProviderへ委譲され、それ以外は明示representationと
 `DPF:downloadURLs` が揃う場合だけDirectへfallbackします。`time` は未対応diagnosticになり、
 landing pageだけの結果は返しません。Directは明示形式を保持し、Nativeの形式は検索時点では不明です。
 [DPFの詳細と制約](api/adapters/mlit-dpf.md)を参照してください。Directはfallback専用なので、
@@ -248,13 +248,13 @@ Provider の検索は同期 API の内部で最大4件まで並行実行しま�
 Providerの先頭結果であり、Providerを横断した「最も関連度が高い結果」ではありません。
 
 Rhinestoneは共通scoreやrerankerを持たないため、異なるProviderのrankingを比較しません。
-Source IDの辞書順もrankingには使われず、Source IDをrenameしても構成位置が同じなら
+Provider IDの辞書順もrankingには使われず、Provider IDをrenameしても構成位置が同じなら
 iteration順は変わりません。Provider固有のrankingを扱う場合は、
 `results.items()`、`results.keys()`、`results["provider-id"]`でgroupごとに参照してください。
 
 ## 検索条件
 
-各Sourceは対応する条件だけを受け取ります。例えば`text`に対応するCKANと`bbox`に対応するSTACを構成している場合、両方を指定しても検索全体は失敗せず、各Sourceへ理解できる条件だけが渡されます。
+各Providerは対応する条件だけを受け取ります。例えば`text`に対応するCKANと`bbox`に対応するSTACを構成している場合、両方を指定しても検索全体は失敗せず、各Providerへ理解できる条件だけが渡されます。
 
 STAC検索では、`data` roleのassetをそれぞれ別Resourceへ展開します。対象assetがないItemは`detail="missing_data_asset"`、ID・collection・properties・assets・配信metadataが不正なItemは`detail="invalid_item"`としてスキップします。CKANとG空間情報センターの検索では必須のresource IDが欠けたitemを、G空間情報センターではDataset IDが欠けたDatasetも、OGC Features検索ではID欠損や不正なpropertiesを持つFeatureを、他の正常な結果を失わせずにスキップします。CKANの空文字・型不正・資格情報埋め込みなど不正なResource URLは`detail="invalid_resource_url"`として項目単位で隔離し、同じDatasetの正常なResourceへ保持されるraw metadataでは拒否URLを`[redacted]`へ置換します。`SearchResults.diagnostics`の`reason="item_skipped"`、`resource_identifier`、`detail`から対象Itemと理由を確認できます。識別子自体が欠けている場合、`resource_identifier`は`None`になり、`detail`が安定した理由コードを示します。
 
@@ -270,9 +270,9 @@ for diagnostic in results.diagnostics:
     )
 ```
 
-指定条件とSourceの対応が一つもないSourceは、空の検索を実行せずスキップします。Sourceに必須条件がある場合、その条件が指定されていないSourceも検索せずスキップします。`diagnostic.reason`は通常`unsupported`または`missing_required`で、後者では`missing_conditions`に不足条件が入ります。地名を解決できなかった場合は`area_resolution_failed`です。
+指定条件とProviderの対応が一つもないProviderは、空の検索を実行せずスキップします。Providerに必須条件がある場合、その条件が指定されていないProviderも検索せずスキップします。`diagnostic.reason`は通常`unsupported`または`missing_required`で、後者では`missing_conditions`に不足条件が入ります。地名を解決できなかった場合は`area_resolution_failed`です。
 
-Providerの通信・metadata取得・response解釈に失敗した場合は、失敗したSourceだけを隔離し、他のSourceの検索結果を返します。この場合は`reason="provider_failure"`となり、`failure_type`に`metadata`または`response`が入ります。検索に必要なCredentialが未登録の場合も同様に隔離し、`failure_type="credential"`を返します。これにより、APIキーを設定していない組み込みSourceがあっても、他のSourceの横断検索は継続します。Provider障害の診断には例外メッセージやtracebackを含めません。全Sourceがこの種の障害になった場合も、空の`SearchResults`と診断を返します。一方、検索クエリの検証失敗、Credential factoryの故障、予期しないプログラムエラーはProvider障害として握りつぶしません。
+Providerの通信・metadata取得・response解釈に失敗した場合は、失敗したProviderだけを隔離し、他のProviderの検索結果を返します。この場合は`reason="provider_failure"`となり、`failure_type`に`metadata`または`response`が入ります。検索に必要なCredentialが未登録の場合も同様に隔離し、`failure_type="credential"`を返します。これにより、APIキーを設定していない組み込みProviderがあっても、他のProviderの横断検索は継続します。Provider障害の診断には例外メッセージやtracebackを含めません。全Providerがこの種の障害になった場合も、空の`SearchResults`と診断を返します。一方、検索クエリの検証失敗、Credential factoryの故障、予期しないプログラムエラーはProvider障害として握りつぶしません。
 
 ## 実行時間と対応表
 

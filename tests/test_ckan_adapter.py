@@ -3,8 +3,8 @@ from typing import Any
 
 import pytest
 
-from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
-from rhinestone.adapters.source.ckan import CkanAdapter
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.runtime.pyogrio import PyogrioAdapter
 from rhinestone.errors import ProviderResponseError
 from rhinestone.models import AccessPlan, ProviderSearchResults, Reference, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json

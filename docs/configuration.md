@@ -1,7 +1,7 @@
 # アプリケーションを構成する
 
-Rhinestoneのアプリケーションは、使うデータ提供元、検索・解決用のSource Runtime、認証情報を組み合わせて作ります。
-データを開くExecution Runtimeは、構成時ではなく`open()`の呼び出しごとに渡します。
+Rhinestoneのアプリケーションは、使うデータ提供元、検索・解決用のProvider依存ライブラリ、認証情報を組み合わせて作ります。
+データを開くRuntimeは、構成時ではなく`open()`の呼び出しごとに渡します。
 組み込みCatalogを検索するだけなら、[トップレベルのsearch()](api.md)も利用できます。
 
 ## Catalogを指定する
@@ -52,24 +52,24 @@ app = configure(catalog=catalog)
 
 詳しい実装手順、Context、検索、エラー処理は[Custom Adapter を作る](custom-adapters.md)を参照してください。
 
-Source と Execution は、組み込みと同じパイプラインへ明示的に登録できます。
+Provider と Runtime は、組み込みと同じパイプラインへ明示的に登録できます。
 次は登録構造の例です。`...`のメソッド本体は独自の処理に置き換えてください。
 
 ```python
 from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
 from rhinestone.adapters.contracts import (
-    ExecutionAdapterDefinition,
-    SourceAdapterDefinition,
+    RuntimeAdapterDefinition,
+    ProviderAdapterDefinition,
 )
 
 catalog = Catalog((Provider("example", "example-source"),))
 
 
-class ExampleSource:
+class ExampleProvider:
     def load(self, reference: Reference) -> Resource: ...
 
 
-class ExampleExecution:
+class ExampleRuntime:
     name = "example-runtime"
     priority = 100
 
@@ -80,25 +80,26 @@ class ExampleExecution:
 app = configure(
     catalog=catalog,
     adapters=(
-        SourceAdapterDefinition(
+        ProviderAdapterDefinition(
             "example-source",
-            lambda provider, context: ExampleSource(),
+            lambda provider, context: ExampleProvider(),
         ),
-        ExecutionAdapterDefinition(
+        RuntimeAdapterDefinition(
             "example-runtime",
-            lambda context: ExampleExecution(),
+            lambda context: ExampleRuntime(),
         ),
     ),
 )
 ```
 
-Source factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
-`SourceAdapterContext`として渡します。Execution factoryの`ExecutionAdapterContext`には
-Credential PortとDestinationPolicyを渡します。Execution Runtimeは`open(..., runtime=...)`へ渡します。
+Provider factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
+`ProviderAdapterContext`として渡します。Runtime factoryの`RuntimeAdapterContext`には
+Credential PortとDestinationPolicyを渡します。Runtimeは`open(..., runtime=...)`へ渡します。
 
-共有知識をSource Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
+共有知識をProvider Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
 追加設定なしで西暦・年度・元号を利用できます。自治体辞書など独自の公式データを使う場合は、
-`adapters`へ`KnowledgeAdapterDefinition`を渡します。独自定義は同じ種別の標準実装を置き換えます。
+`adapters`へ`KnowledgeAdapterDefinition`を候補として渡し、`knowledge`で種類ごとに明示選択します。
+インストールや登録だけでは標準実装を置き換えません。
 
 ```python
 from rhinestone import configure
@@ -112,17 +113,18 @@ app = configure(
         KnowledgeAdapterDefinition(
             "official-municipality", make_municipality_adapter, "identity"
         ),
-    )
+    ),
+    knowledge={"identity": "official-municipality"},
 )
 ```
 
-Knowledge Adapter factoryにはSource/Execution Adapterと同じくContextが渡されます。Source Adapter Contextの`knowledge`から必要なadapterだけを取得します。Knowledge Adapterは
+Knowledge Adapter factoryにはProvider/Runtime Adapterと同じくContextが渡されます。Provider Adapter Contextの`knowledge`から必要なadapterだけを取得します。Knowledge Adapterは
 Metadata/Provenanceやcanonical valueを扱いますが、Credential、Runtime、データ処理は保持しません。
-同じ`adapter_type`またはExecution名を複数登録することはできません。
+同じ`adapter_type`またはRuntime名を複数登録することはできません。
 
 ## 外部ライブラリ（Runtime）
 
-外部Runtimeは利用者が所有します。Source Runtimeは`dependencies`へ実体または`RuntimeFactory`として渡し、Execution Runtime実体は`open(..., runtime=...)`へ渡します。
+外部Runtimeは利用者が所有します。Provider依存ライブラリは`dependencies`へ実体または`RuntimeFactory`として渡し、Runtime実体は`open(..., runtime=...)`へ渡します。
 
 ```python
 import rdflib
@@ -158,11 +160,11 @@ app = configure(
 
 | 種類 | 用途 | 供給・評価時点 | 例 |
 | --- | --- | --- | --- |
-| Source Runtime | provider / protocol metadataの解釈 | `dependencies`へ実体または`RuntimeFactory`を登録。factoryは初めて必要になった時に評価 | `rdflib` |
-| Execution Runtime | 解決済みResourceを開く | `open(..., runtime=...)`へ実体を渡す。`RuntimeFactory`は受け付けない | `gdal`、`rasterio`、`pyogrio` |
+| Provider依存ライブラリ | provider / protocol metadataの解釈 | `dependencies`へ実体または`RuntimeFactory`を登録。factoryは初めて必要になった時に評価 | `rdflib` |
+| Runtime | 解決済みResourceを開く | `open(..., runtime=...)`へ実体を渡す。`RuntimeFactory`は受け付けない | `gdal`、`rasterio`、`pyogrio` |
 
-`configure()`は Source Runtimeの`RuntimeFactory`を評価しません。Resourceは実行コンテキストを引き継ぎますが、Execution Runtime実体は保持しません。
-`dependencies`に`gdal`、`rasterio`、`pyogrio`、`json-service`などのExecution名を
+`configure()`は Provider依存ライブラリの`RuntimeFactory`を評価しません。Resourceは実行コンテキストを引き継ぎますが、Runtime実体は保持しません。
+`dependencies`に`gdal`、`rasterio`、`pyogrio`、`json-service`などのRuntime名を
 登録すると`ConfigValidationError`になります。
 
 ## 認証情報（Credential）
@@ -183,7 +185,7 @@ app = configure(
 )
 ```
 
-認証付き CKAN、STAC、OGC Source は、Provider に secret ではなく Credential の論理名を
+認証付き CKAN、STAC、OGC Provider は、Provider に secret ではなく Credential の論理名を
 指定します。
 
 ```python

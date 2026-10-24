@@ -41,7 +41,7 @@ KnowledgeAdapter = (
 
 
 class KnowledgePort(Protocol):
-    """Read-only shared knowledge service exposed to source adapters."""
+    """Read-only shared knowledge service exposed to provider adapters."""
 
     @property
     def available(self) -> tuple[KnowledgeKind, ...]:

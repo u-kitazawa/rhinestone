@@ -16,7 +16,8 @@ from rhinestone.adapters import (
     OdptAdapter,
     PlateauAdapter,
 )
-from rhinestone.adapters.execution import GdalAdapter, JsonServiceAdapter
+from rhinestone.adapters.runtime import GdalAdapter, JsonServiceAdapter
+from rhinestone.adapters.runtime.json_service.odpt import prepare_odpt_request
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     AmbiguousResourceError,
@@ -24,11 +25,11 @@ from rhinestone.errors import (
     CredentialLoadError,
     CredentialUnavailableError,
     DependencyUnavailableError,
-    ExecutionAdapterUnavailableError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceAccessError,
     ResourceNotFoundError,
+    RuntimeAdapterUnavailableError,
     UnsupportedSearchConditionError,
 )
 from rhinestone.models import AccessPlan, Metadata, Provenance, SearchQuery
@@ -455,7 +456,7 @@ def test_odpt_credentials_are_lazy_isolated_and_not_stored_in_resource(
     assert resource.access_plan is not None
     assert resource.access_plan.kind == "service-query"
     assert resource.open("json-service") == data
-    with pytest.raises(ExecutionAdapterUnavailableError, match="core-owned"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="core-owned"):
         resource.open("json-service", runtime=object())
     assert calls["params"] == {"dc:title": "東京", "acl:consumerKey": "rotating-secret"}
     assert calls["allow_redirects"] is False
@@ -497,15 +498,13 @@ def test_odpt_rejects_incomplete_service_plan() -> None:
         credential="odpt",
     )
     with pytest.raises(ConfigValidationError, match="incomplete"):
-        OdptAdapter.prepare_request(plan, CredentialRegistry({}))
+        prepare_odpt_request(plan, CredentialRegistry({}))
 
 
 def test_odpt_authentication_cannot_be_redirected_to_another_provider() -> None:
     plan = AccessPlan(kind="service-query", uri="https://evil.example", service="odpt")
     with pytest.raises(ConfigValidationError):
-        OdptAdapter.prepare_request(
-            plan, CredentialRegistry({"odpt": lambda: "secret"})
-        )
+        prepare_odpt_request(plan, CredentialRegistry({"odpt": lambda: "secret"}))
 
 
 @pytest.mark.parametrize(
@@ -540,7 +539,7 @@ def test_json_service_errors_are_distinct_and_redacted(
         Reference("odpt", parameters={"dataset": "station", "credential": "odpt"})
     )
     execution = JsonServiceAdapter(
-        OdptAdapter.prepare_request,
+        prepare_odpt_request,
         "odpt",
         CredentialRegistry({"odpt": lambda: "secret"}),
     )

@@ -1,6 +1,6 @@
 # Rhinestoneへの貢献
 
-Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Source Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
+Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Provider Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
 
 Rhinestoneは、日本の公的・地理空間データを使える形へ解決するPythonライブラリです。変更を始める前に、[README](README.md)と本ガイドを確認してください。
 
@@ -9,12 +9,12 @@ Rhinestoneは、日本の公的・地理空間データを使える形へ解決�
 - 設計仕様と既存の不変条件を優先する。
 - 変更の責務を適切な層に置く。
 - CoreにGDAL、Rasterio、pyogrioなどのGIS処理系を実行時依存として追加しない。
-- Provider固有の知識はSource AdapterまたはCatalogに閉じ込める。
+- Provider固有の知識はProvider AdapterまたはCatalogに閉じ込める。
 - URLの推測、暗黙のフォーマット変換、HTML scrapingを追加しない。
 - 振る舞いを変更した場合は、テスト、仕様、またはドキュメントも更新する。
 - 公開APIを変更する場合は旧APIを削除し、影響と移行先をPRに明記する。後方互換のための別名、wrapper、旧引数は追加しない。
 
-Source Adapterを追加・変更する場合は、代表的なFixture、期待されるReference・Resource・AccessPlan、仕様適合テストを一緒に追加してください。
+Provider Adapterを追加・変更する場合は、代表的なFixture、期待されるReference・Resource・AccessPlan、仕様適合テストを一緒に追加してください。
 `load(reference)`は配信単位のResourceを返し、検索能力を持つAdapterの`search(query)`も
 配信単位のResourceを返します。Providerは接続先・サービス設定、Catalogは構成するProviderの一覧です。
 組み込みProviderの接続先や静的な仕様は、可能な限りCatalogで管理します。
