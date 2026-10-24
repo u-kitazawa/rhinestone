@@ -3,7 +3,7 @@
 `EstatGisAdapter` は、利用者が用意した e-Stat Statistics GIS の配布物インデックスから、
 明示された配布物を一般的な GIS `Resource` として解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `estat-gis`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `estat-gis`
 
 ## 方針
 
@@ -62,7 +62,7 @@ resource = app.load(
 
 利用できる selector は `distribution_id`、`dataset_id`、`boundary_kind`、
 `survey_year`、`time`、`time_kind="survey_year"`、`level`、`region_code`、`format` です。
-複数候補が残る場合はSource Adapterが曖昧さとして扱います。`time` を指定すると共有 Time
+複数候補が残る場合はProvider Adapterが曖昧さとして扱います。`time` を指定すると共有 Time
 Knowledge Adapter で解決し、統計調査年として候補を絞ります。
 
 Adapterの`search()`は渡されたインデックス内の`text`と`limit`を扱います。

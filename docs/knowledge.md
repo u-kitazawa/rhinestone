@@ -1,17 +1,21 @@
 # Knowledge Adapter（共有知識アダプター）
 
-Rhinestoneの共有知識は、Source Adapterに直接埋め込まず、独立したKnowledge Adapterとして
+Rhinestoneの共有知識は、Provider Adapterに直接埋め込まず、独立したKnowledge Adapterとして
 注入できます。現在の対象は自治体 identity、time semantics、明示的な space value です。
 
 ```text
-Source Adapter -> KnowledgeAdapterRegistry -> Identity / Time Adapter
+Provider Adapter -> KnowledgeAdapterRegistry -> Identity / Time Adapter
 ```
 
 ## 構成
 
-`KnowledgeAdapterDefinition`は、Source/Execution Adapter Definitionと同じくadapter type、factory、
-依存関係を持ち、Knowledge種別を追加で宣言します。標準のTime Adapterは自動登録されます。
-独自のKnowledge Adapterを使う場合だけ`configure(adapters=...)`へ指定し、同じ種別の標準実装を置き換えます。
+`KnowledgeAdapterDefinition`は、Provider/Runtime Adapter Definitionと同じくadapter type、factory、
+依存関係を持ち、Knowledge種別を追加で宣言します。既定ではareaに
+`japan-administrative-area`、timeに`standard-time`を使い、identityは明示選択が必要です。
+独自のDefinitionは`configure(adapters=...)`で候補として登録し、
+`knowledge={"種別": "adapter type"}`で利用するものを選択します。
+インストールや登録だけでは既定の解釈を変更しません。同じ種別の候補を複数登録できますが、
+adapter typeは組み込み・明示登録・Entry Pointsを通じて一意でなければなりません。
 
 ```python
 from rhinestone import configure
@@ -23,12 +27,13 @@ app = configure(
         KnowledgeAdapterDefinition(
             "official-municipality", make_municipality_adapter, "identity"
         ),
-    )
+    ),
+    knowledge={"identity": "official-municipality"},
 )
 ```
 
 自治体の公式辞書/APIはRhinestoneへ同梱せず、利用者のfactoryから注入します。標準Time Adapterは
-追加設定なしで利用できます。factoryは検索またはSource Adapterが初めてその種別の知識を利用したときに評価されます。factoryには
+追加設定なしで利用できます。factoryは検索またはProvider Adapterが初めてその種別の知識を利用したときに評価されます。factoryには
 `KnowledgeAdapterContext`が渡されます。
 
 ## 地域や自治体の識別（Identity）
@@ -60,9 +65,9 @@ Time Adapterは、暦年、年度、survey year、as-of dateを別の意味と�
 `令和元年5月1日`はas-of date 2019-05-01として扱い、元号の開始日前や次の元号開始日以後の
 日付は拒否します。これはtimezone処理を行う機能ではありません。
 
-## Source Adapterとの境界
+## Provider Adapterとの境界
 
-PLATEAUと基盤地図情報のSource Adapterは、`Reference.parameters`の`municipality`と`time`を
+PLATEAUと基盤地図情報のProvider Adapterは、`Reference.parameters`の`municipality`と`time`を
 Knowledge Adapterで解決し、返す`Resource.metadata.raw["knowledge"]`へ保持します。
 identityは`["identity"]`、timeは`["time"]`に保存され、`time_kind`の明示指定も保持します。
 これは現在の配信Resourceから参照する情報であり、旧候補モデルの属性ではありません。

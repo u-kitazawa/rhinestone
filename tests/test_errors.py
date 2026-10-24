@@ -5,15 +5,15 @@ from rhinestone.errors import (
     ConfigValidationError,
     CredentialLoadError,
     DependencyUnavailableError,
-    ExecutionAdapterUnavailableError,
     IntegrityError,
     ProviderMetadataError,
     ProviderResponseError,
     ResourceAccessError,
     RhinestoneError,
+    RuntimeAdapterUnavailableError,
     UnsupportedAccessError,
+    UnsupportedProviderError,
     UnsupportedSearchConditionError,
-    UnsupportedSourceError,
 )
 from rhinestone.models import Provider, Reference, SearchQuery
 from rhinestone.registry import CredentialRegistry
@@ -23,13 +23,13 @@ def test_expected_failure_causes_have_distinct_error_types() -> None:
     """Spec が列挙する失敗原因を RuntimeError 一種類へ潰さないために必要である。"""
     error_types = {
         ConfigValidationError,
-        UnsupportedSourceError,
+        UnsupportedProviderError,
         UnsupportedSearchConditionError,
         ProviderMetadataError,
         ProviderResponseError,
         AmbiguousResourceError,
         UnsupportedAccessError,
-        ExecutionAdapterUnavailableError,
+        RuntimeAdapterUnavailableError,
         DependencyUnavailableError,
         ResourceAccessError,
         IntegrityError,
@@ -44,7 +44,7 @@ def test_public_errors_explain_recovery_without_exposing_secrets() -> None:
     with pytest.raises(ConfigValidationError) as config_error:
         Provider("source", "")
     assert "adapter_type" in str(config_error.value)
-    assert "registered source adapter type" in str(config_error.value)
+    assert "registered provider adapter type" in str(config_error.value)
 
     with pytest.raises(ConfigValidationError) as query_error:
         SearchQuery(text=42)  # type: ignore[arg-type]

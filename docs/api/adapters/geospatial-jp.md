@@ -1,9 +1,10 @@
 # GeospatialJpAdapter（G空間情報センター）
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `geospatial-jp`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `geospatial-jp`
 
 組み込みProvider `geospatial-jp` は専用Adapterを使用します。
 CKANの `resource_show` / `package_show` による解決処理を共有し、検索戦略だけを独立させています。
+具象 `CkanAdapter` の継承ではなく、共通のCKAN clientを構成して利用します。
 他のCKAN ProviderとPLATEAU専用Providerの検索挙動は変更しません。
 
 ## 設定と入出力

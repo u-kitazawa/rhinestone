@@ -2,9 +2,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
-from rhinestone.adapters.source.stac import StacAdapter
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.provider.ogc import OgcFeaturesAdapter
+from rhinestone.adapters.provider.stac import StacAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Reference, SearchQuery
 from tests.provider_support import RecordingJsonClient

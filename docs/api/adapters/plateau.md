@@ -2,7 +2,7 @@
 
 `PlateauAdapter` は G 空間情報センターの CKAN catalog から PLATEAU 配布物を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `plateau`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `plateau`
 
 ## 設定と接続先
 
@@ -20,11 +20,14 @@ Rhinestoneの組み込みtransportを使用します。検索条件は`text`、`
 Action APIの`fq`で指定します。同じendpointを使う`geospatial-jp`はタグで限定せず、
 G空間情報センター全体を検索します。endpointの共有は、検索対象が同じことを意味しません。
 
+CKANの通信・応答解析・ページングは共通clientを構成して共有します。
+`CkanAdapter`の継承や別Adapterの生成は行わず、PLATEAU固有の検索条件と配信選択を維持します。
+
 Adapterを直接構築する内部テストや再利用用途では、transport callbackをconstructorへ注入できます。標準の`configure()`経路で利用者がHTTP callbackを登録する必要はありません。
 
 ## 直接loadでの配信選択
 
-Source Adapterは、指定したresource IDと任意の`format`で配信を絞り、1件のResourceを返します。
+Provider Adapterは、指定したresource IDと任意の`format`で配信を絞り、1件のResourceを返します。
 dataset指定で複数の配信が一致すれば`AmbiguousResourceError`、一致する配信がなければ
 `ResourceNotFoundError`になります。市区町村・年度や先頭順から配布物を推測しません。
 

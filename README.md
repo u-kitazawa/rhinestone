@@ -108,6 +108,10 @@ HTTP通信はRhinestoneに組み込まれています。
 既知の対象は`app.load(Reference(...))`、別プロセスへ実行契約を渡す場合は
 `app.plan(resource)`と`AccessPlan.to_dict()` / `from_dict()`を使います。
 
+外部のProvider／Runtime／Knowledge Adapterは、通常のpip/uvでパッケージをインストールし、
+Python標準Entry Pointsから利用できます。拡張側のDefinition・Context・公開契約と選択方法は
+[Custom Adapterを作る](docs/custom-adapters.md)を参照してください。
+
 ## 次に読む
 
 - [実行済みNotebook（Showcase）](showcase/README.md)

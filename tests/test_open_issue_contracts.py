@@ -4,7 +4,7 @@ from typing import Any, cast
 import pytest
 
 from rhinestone import Provider, Reference, configure
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 from rhinestone.adapters.knowledge import (
     CRS84,
     AreaCode,
@@ -17,7 +17,7 @@ from rhinestone.adapters.knowledge import (
     StaticMunicipalityAdapter,
     require_lossless_crs84,
 )
-from rhinestone.adapters.source.estat_gis import EstatGisAdapter
+from rhinestone.adapters.provider.estat_gis import EstatGisAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     AmbiguousResourceError,
@@ -556,7 +556,7 @@ def test_custom_adapter_context_uses_public_ports_only() -> None:
 
     app = configure(
         catalog=Catalog((Provider("external", "external-source"),)),
-        adapters=(SourceAdapterDefinition("external-source", source_factory),),
+        adapters=(ProviderAdapterDefinition("external-source", source_factory),),
     )
     app.load(Reference("external", parameters={}))
     assert seen == [(True, True)]
@@ -680,7 +680,7 @@ def test_custom_source_receives_one_core_managed_transport_port(
                 ),
             )
         ),
-        adapters=(SourceAdapterDefinition("custom-source", factory),),
+        adapters=(ProviderAdapterDefinition("custom-source", factory),),
     )
     assert calls[0] == ("https://custom.example/data", {}, None)
     assert calls[1][0:2] == ("https://custom.example/data", {})
@@ -734,7 +734,7 @@ def test_custom_transport_preserves_text_headers_and_normalizes_network_errors(
                 ),
             )
         ),
-        adapters=(SourceAdapterDefinition("custom-source", factory),),
+        adapters=(ProviderAdapterDefinition("custom-source", factory),),
     )
     app.load(Reference("custom", parameters={}))
     assert seen == {
@@ -769,7 +769,7 @@ def test_custom_transport_normalizes_network_errors(
                 ),
             )
         ),
-        adapters=(SourceAdapterDefinition("custom-source", factory),),
+        adapters=(ProviderAdapterDefinition("custom-source", factory),),
     )
     with pytest.raises(ProviderMetadataError, match="Provider metadata request failed"):
         app.load(Reference("custom", parameters={}))

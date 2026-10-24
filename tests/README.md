@@ -8,13 +8,13 @@
 
 - 通常の経路は`search → Resource → open`、既知の対象は`Reference → app.load()`です。
   検索は配信単位のResourceを返し、metadata、raw metadata、provenance、discoveryを保持します。
-- `configure()`は分離されたアプリケーションを作ります。Source Runtimeは`dependencies=`へ、
-  遅延factoryは明示的な`RuntimeFactory`で渡します。Execution Runtimeは
+- `configure()`は分離されたアプリケーションを作ります。Provider依存ライブラリは`dependencies=`へ、
+  遅延factoryは明示的な`RuntimeFactory`で渡します。Runtimeは
   `app.open(resource, name, runtime=...)`または`resource.open(name, runtime=...)`へ実体を渡します。
   Core所有の`json-service` Runtimeは省略できます。Runtimeを暗黙に選びません。
 - 公開する名前とシグネチャは[公開APIテスト](test_public_api.py)で確認します。
   詳細なモデルは`rhinestone.models`、原因別エラーは`rhinestone.errors`に置きます。
-- Source/Execution Adapterの拡張境界は`rhinestone.adapters.contracts`のDefinition/Contextと
+- Provider/Runtime Adapterの拡張境界は`rhinestone.adapters.contracts`のDefinition/Contextと
   `rhinestone.adapters.ports`です。[Custom Adapterテスト](test_custom_adapters.py)では、
   公開構成経路で登録・依存・認証の境界を検証します。内部Registryの配置を外部契約にしません。
 - Knowledge Adapterの`KnowledgeAdapterDefinition`と`KnowledgeAdapterContext`は
@@ -23,12 +23,12 @@
 
 ## Providerと実行の検証
 
-同じAdapter型を異なる`Provider.id`で構成でき、Source Adapterは`Reference`を配信単位の
-`Resource`へ読み込みます。Source Adapterの直接テストでは、小さなfixtureとfake transportで
+同じAdapter型を異なる`Provider.id`で構成でき、Provider Adapterは`Reference`を配信単位の
+`Resource`へ読み込みます。Provider Adapterの直接テストでは、小さなfixtureとfake transportで
 要求、選択、情報保持、曖昧性、異常応答を確認し、公開search/load経路も別途検証します。
 e-Stat統計GISは明示distribution indexを扱い、統計表APIの実装を前提にしません。
 
-Execution Adapterは選択済み`AccessPlan`を受け取り、Resourceを再選択せず、既存Runtimeの
+Runtime Adapterは選択済み`AccessPlan`を受け取り、Resourceを再選択せず、既存Runtimeの
 呼び出しへ翻訳します。形式・ZIP entry point等を推測せず、失敗原因と宛先認可を検証します。
 [AccessPlan実行テスト](test_plan_execution.py)では、JSONから復元した計画を、元のResourceや
 Providerへの再問い合わせなしで開くことを確認します。[直列化テスト](test_portable.py)では、

@@ -1,11 +1,13 @@
 """Registry for injectable shared knowledge adapters."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from threading import RLock
 from typing import cast
 
 from ...errors import (
+    AdapterContractError,
+    AdapterFactoryError,
     AdapterRegistrationError,
     DependencyUnavailableError,
     KnowledgeAdapterUnavailableError,
@@ -50,11 +52,14 @@ class KnowledgeAdapterRegistry:
         self,
         definitions: Iterable[KnowledgeAdapterDefinition] = (),
         context: KnowledgeAdapterContext | None = None,
+        *,
+        origins: Mapping[KnowledgeKind, str] | None = None,
     ) -> None:
         self._lock = RLock()
         self._definitions: dict[KnowledgeKind, KnowledgeAdapterDefinition] = {}
         self._instances: dict[KnowledgeKind, KnowledgeAdapter] = {}
         self._context = context
+        self._origins = dict(origins or {})
         for definition in definitions:
             if definition.kind in self._definitions:
                 raise AdapterRegistrationError(
@@ -75,33 +80,33 @@ class KnowledgeAdapterRegistry:
     def area(self) -> AreaKnowledgeAdapter:
         """Return the configured administrative-area adapter."""
         adapter = self._get("area")
-        if not callable(getattr(adapter, "resolve_area", None)):
-            raise KnowledgeResolutionError(
-                "area knowledge adapter does not implement resolve_area; "
-                "implement the AreaKnowledgeAdapter contract"
-            )
+        self._require_method(adapter, "area", "resolve_area")
         return cast(AreaKnowledgeAdapter, adapter)
 
     def identity(self) -> IdentityKnowledgeAdapter:
         """Return the configured adapter for municipality identity resolution."""
         adapter = self._get("identity")
-        if not callable(getattr(adapter, "resolve_municipality", None)):
-            raise KnowledgeResolutionError(
-                "identity knowledge adapter does not implement "
-                "resolve_municipality; implement the IdentityKnowledgeAdapter "
-                "contract"
-            )
+        self._require_method(adapter, "identity", "resolve_municipality")
         return cast(IdentityKnowledgeAdapter, adapter)
 
     def time(self) -> TimeKnowledgeAdapter:
         """Return the configured adapter for time-semantic resolution."""
         adapter = self._get("time")
-        if not callable(getattr(adapter, "resolve_time", None)):
-            raise KnowledgeResolutionError(
-                "time knowledge adapter does not implement resolve_time; "
-                "implement the TimeKnowledgeAdapter contract"
-            )
+        self._require_method(adapter, "time", "resolve_time")
         return cast(TimeKnowledgeAdapter, adapter)
+
+    def _require_method(
+        self, adapter: KnowledgeAdapter, kind: KnowledgeKind, method: str
+    ) -> None:
+        if not callable(getattr(adapter, method, None)):
+            origin = self._origins.get(kind)
+            error = (
+                AdapterContractError if origin is not None else KnowledgeResolutionError
+            )
+            raise error(
+                f"{kind} knowledge adapter does not implement {method}; "
+                f"implement its public contract ({origin or kind})"
+            )
 
     def resolve_area(self, value: str) -> AdministrativeArea:
         """Resolve and validate one administrative-area expression."""
@@ -161,6 +166,12 @@ class KnowledgeAdapterRegistry:
             try:
                 adapter = definition.factory(context)
             except Exception as error:
+                origin = self._origins.get(kind)
+                if origin is not None:
+                    raise AdapterFactoryError(
+                        f"Installed adapter factory failed: {origin}; inspect its factory "
+                        "and declared dependencies"
+                    ) from None
                 raise KnowledgeResolutionError(
                     f"Knowledge adapter {definition.adapter_type!r} could not be "
                     "loaded; inspect its factory and declared dependencies"

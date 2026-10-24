@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
+from rhinestone.adapters.provider.ogc import OgcFeaturesAdapter
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Reference, SearchQuery
 from tests.provider_support import (

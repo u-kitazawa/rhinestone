@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from rhinestone import AccessPlan, Catalog, Provider, Resource, Rhinestone, configure
-from rhinestone.errors import ExecutionAdapterUnavailableError, ResourceAccessError
+from rhinestone.errors import ResourceAccessError, RuntimeAdapterUnavailableError
 
 
 def searched_resource(format_name: str) -> tuple[Rhinestone, Resource]:
@@ -118,7 +118,7 @@ def test_execution_preparation_failures_do_not_call_runtime(
         return object()
 
     runtime = SimpleNamespace(open=record) if format_name == "unknown" else None
-    with pytest.raises(ExecutionAdapterUnavailableError):
+    with pytest.raises(RuntimeAdapterUnavailableError):
         open_selected(app, resource, route, "rasterio", runtime)
     assert calls == []
 

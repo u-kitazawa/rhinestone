@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from rhinestone import Provider, configure
-from rhinestone.adapters.source.ckan.adapter import CkanAdapter
+from rhinestone.adapters.provider.ckan.adapter import CkanAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery
