@@ -7,11 +7,12 @@ from typing import Any
 import pytest
 
 from rhinestone import Provider
-from rhinestone.adapters.execution.json_service import JsonServiceAdapter
-from rhinestone.adapters.source.dcat import DcatAdapter
-from rhinestone.adapters.source.dcat.adapter import (
+from rhinestone.adapters import CredentialPort
+from rhinestone.adapters.provider.dcat import DcatAdapter
+from rhinestone.adapters.provider.dcat.adapter import (
     _reject_external_jsonld_contexts,  # pyright: ignore[reportPrivateUsage]
 )
+from rhinestone.adapters.runtime.json_service import JsonServiceAdapter
 from rhinestone.errors import DestinationNotAllowedError, ProviderResponseError
 from rhinestone.models import AccessPlan, SearchQuery
 from rhinestone.registry import CredentialRegistry
@@ -70,7 +71,7 @@ def test_json_service_rejects_non_http_before_credential_release(uri: str) -> No
     preparer_calls: list[bool] = []
 
     def prepare(
-        plan: AccessPlan, credentials: CredentialRegistry
+        plan: AccessPlan, credentials: CredentialPort
     ) -> tuple[dict[str, Any], dict[str, str]]:
         preparer_calls.append(True)
         return {"key": credentials.get("secret")}, {}
