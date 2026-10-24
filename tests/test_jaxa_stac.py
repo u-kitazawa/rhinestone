@@ -46,6 +46,9 @@ def test_jaxa_sample_search_open_and_independent_plan(
         {
             catalog_uri: {
                 "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
                 "links": [{"rel": "item", "href": "./S90.00-N90.00.json"}],
             },
             item_uri: item,
