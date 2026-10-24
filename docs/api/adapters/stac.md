@@ -8,6 +8,22 @@ API型は`endpoint`から`/search`を呼びます。静的型は`catalog_uri`か
 明示的に失敗します。相対リンクとasset hrefは、それぞれを含むレスポンスURIを基準に
 解決されます。
 
+標準文書（Catalog / Collection / Item）の解釈とLink / Assetの相対href解決は
+PySTACへ委譲します。配布依存は拡張パッケージ群を含まない`pystac-core>=1.15.2,<2`
+（import名は`pystac`）です。GIS Runtimeや`pystac-client`はCore依存へ追加しません。
+HTTP取得・認証・destination policy、幅優先の探索・上限・訪問管理、検索条件、
+assetの明示選択とResource/AccessPlan変換はRhinestoneが担当します。
+PySTACの自動再帰探索・既定I/O・ネットワークschema検証・暗黙の旧版migrationは使いません。
+未選択の親・root・collection・extension schemaへの追加通信は行いません。
+
+取得時の文書はraw metadataにそのまま保持し、PySTACによる再シリアライズ結果で置換しません。
+Itemの`stac_version`・`type`・日時等をPySTACが解釈できない場合、検索では
+`item_skipped` / `invalid_item`、直接loadでは`ProviderResponseError`となります。
+Catalog / Collectionの解釈失敗は応答全体の`ProviderResponseError`です。
+これは全STAC schemaへの適合検証を保証するものではありません。
+redirect後のURIも訪問済みとして管理し、同じ文書への別名リンクから重複候補を作りません。
+文書内の`self`リンクより実際のレスポンスURIを相対解決の基準として優先します。
+
 [Provider Adapter 一覧](../provider-adapters.md) · adapter type: `stac`
 
 ## 設定と検索

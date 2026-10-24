@@ -731,6 +731,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pystac-core"
+version = "1.15.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a3/67/892aaa463188a259b9538d9d49f420d761ba8fcb8464bf0d8b2cb0a2ef56/pystac_core-1.15.2.tar.gz", hash = "sha256:3720485dd06334e6536afe8f2b8bb0def5c65437170e0251b3417abb89d6b3f3", size = 93857, upload-time = "2026-07-27T15:47:53.04Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c0/d6/3c65df53ac66532e4451917ed63dcc7c260db30eed0d5c5f1782fcc4128e/pystac_core-1.15.2-py3-none-any.whl", hash = "sha256:96e4acf5eb08ba8be543729b59c3072103bffa7b90283c7497cb25fbff70e6cf", size = 117305, upload-time = "2026-07-27T15:47:51.866Z" },
+]
+
+[[package]]
 name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -898,6 +910,7 @@ version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
+    { name = "pystac-core" },
 ]
 
 [package.dev-dependencies]
@@ -911,7 +924,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "jsonschema", specifier = ">=4.18,<5" }]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.18,<5" },
+    { name = "pystac-core", specifier = ">=1.15.2,<2" },
+]
 
 [package.metadata.requires-dev]
 dev = [
