@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, cast
 
+import pystac
 import pytest
 
 from rhinestone._composition import (  # pyright: ignore[reportPrivateUsage]
@@ -217,9 +218,12 @@ def test_stac_search_returns_each_data_asset_and_skips_missing_data() -> None:
 
     def item(item_id: str, assets: dict[str, object]) -> dict[str, object]:
         return {
+            "type": "Feature",
+            "stac_version": "1.0.0",
+            "geometry": None,
             "id": item_id,
             "collection": "imagery",
-            "properties": {"title": item_id},
+            "properties": {"title": item_id, "datetime": "2024-01-01T00:00:00Z"},
             "assets": assets,
         }
 
@@ -274,9 +278,12 @@ def test_stac_search_isolates_invalid_items() -> None:
 
     def item(item_id: str, **overrides: object) -> dict[str, object]:
         value: dict[str, object] = {
+            "type": "Feature",
+            "stac_version": "1.0.0",
+            "geometry": None,
             "id": item_id,
             "collection": "imagery",
-            "properties": {"title": item_id},
+            "properties": {"title": item_id, "datetime": "2024-01-01T00:00:00Z"},
             "assets": {
                 "visual": {
                     "href": f"https://assets.example/{item_id}.tif",
@@ -289,7 +296,11 @@ def test_stac_search_isolates_invalid_items() -> None:
 
     response: dict[str, object] = {
         "features": [
-            {"collection": "imagery", "properties": {}, "assets": {}},
+            {
+                "collection": "imagery",
+                "properties": {"datetime": "2024-01-01T00:00:00Z"},
+                "assets": {},
+            },
             item("   "),
             item("bad-collection", collection="   "),
             item("bad-properties", properties=None),
@@ -346,6 +357,9 @@ def test_static_stac_search_traverses_links_and_returns_reloadable_resource() ->
     item_uri = "https://static.example/collections/elevation/items/tokyo.json"
     root = {
         "type": "Catalog",
+        "stac_version": "1.0.0",
+        "id": "fixture",
+        "description": "Fixture catalog",
         "links": [
             {"rel": "self", "href": catalog_uri},
             {"rel": "child", "href": "./collections/elevation/collection.json"},
@@ -353,6 +367,13 @@ def test_static_stac_search_traverses_links_and_returns_reloadable_resource() ->
     }
     collection = {
         "type": "Collection",
+        "stac_version": "1.0.0",
+        "description": "Fixture collection",
+        "license": "proprietary",
+        "extent": {
+            "spatial": {"bbox": [[-180, -90, 180, 90]]},
+            "temporal": {"interval": [[None, None]]},
+        },
         "id": "elevation",
         "links": [
             {"rel": "root", "href": "../../catalog.json"},
@@ -361,6 +382,8 @@ def test_static_stac_search_traverses_links_and_returns_reloadable_resource() ->
     }
     item = {
         "type": "Feature",
+        "stac_version": "1.0.0",
+        "geometry": None,
         "id": "tokyo-dem",
         "collection": "elevation",
         "bbox": [139.0, 35.0, 140.0, 36.0],
@@ -419,10 +442,16 @@ def test_static_stac_search_is_bounded_and_cycle_safe() -> None:
         {
             catalog_uri: {
                 "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
                 "links": [{"rel": "child", "href": child_uri}],
             },
             child_uri: {
                 "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
                 "links": [
                     {"rel": "child", "href": catalog_uri},
                     {"rel": "child", "href": "https://static.example/third.json"},
@@ -540,6 +569,9 @@ def test_static_stac_reports_invalid_and_missing_data_items() -> None:
         {
             catalog_uri: {
                 "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
                 "links": [
                     {"rel": "item", "href": invalid_uri},
                     {"rel": "item", "href": missing_uri},
@@ -547,15 +579,19 @@ def test_static_stac_reports_invalid_and_missing_data_items() -> None:
             },
             invalid_uri: {
                 "type": "Feature",
+                "stac_version": "1.0.0",
+                "geometry": None,
                 "collection": "elevation",
-                "properties": {},
+                "properties": {"datetime": "2024-01-01T00:00:00Z"},
                 "assets": {},
             },
             missing_uri: {
                 "type": "Feature",
+                "stac_version": "1.0.0",
+                "geometry": None,
                 "id": "missing",
                 "collection": "elevation",
-                "properties": {},
+                "properties": {"datetime": "2024-01-01T00:00:00Z"},
                 "assets": {},
             },
         }
@@ -579,13 +615,22 @@ def test_static_stac_skips_duplicate_and_non_traversal_links() -> None:
         {
             catalog_uri: {
                 "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
                 "links": [
                     {"rel": "self", "href": catalog_uri},
                     {"rel": "child", "href": child_uri},
                     {"rel": "child", "href": child_uri},
                 ],
             },
-            child_uri: {"type": "Catalog", "links": []},
+            child_uri: {
+                "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
+                "links": [],
+            },
         }
     )
 
@@ -606,13 +651,18 @@ def test_static_stac_preserves_catalog_trailing_slash_for_relative_links() -> No
         {
             catalog_uri: {
                 "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
                 "links": [{"rel": "item", "href": "item.json"}],
             },
             item_uri: {
                 "type": "Feature",
+                "stac_version": "1.0.0",
+                "geometry": None,
                 "id": "item",
                 "collection": "elevation",
-                "properties": {},
+                "properties": {"datetime": "2024-01-01T00:00:00Z"},
                 "assets": {},
             },
         }
@@ -630,6 +680,9 @@ def test_static_stac_rejects_malformed_link_href() -> None:
             {
                 catalog_uri: {
                     "type": "Catalog",
+                    "stac_version": "1.0.0",
+                    "id": "fixture",
+                    "description": "Fixture catalog",
                     "links": [{"rel": "child", "href": "https://[invalid"}],
                 }
             }
@@ -637,7 +690,7 @@ def test_static_stac_rejects_malformed_link_href() -> None:
         catalog_uri=catalog_uri,
     )
 
-    with pytest.raises(ProviderResponseError, match="link href"):
+    with pytest.raises(ProviderResponseError, match="Catalog document"):
         adapter.search(SearchQuery())
 
 
@@ -665,10 +718,12 @@ def test_static_stac_filters_nonmatching_or_invalid_bboxes(
     item_uri = "https://static.example/item.json"
     item = {
         "type": "Feature",
+        "stac_version": "1.0.0",
+        "geometry": None,
         "id": "outside",
         "collection": "elevation",
         "bbox": item_bbox,
-        "properties": {},
+        "properties": {"datetime": "2024-01-01T00:00:00Z"},
         "assets": {
             "dem": {
                 "href": "./dem.tif",
@@ -681,6 +736,9 @@ def test_static_stac_filters_nonmatching_or_invalid_bboxes(
             {
                 catalog_uri: {
                     "type": "Catalog",
+                    "stac_version": "1.0.0",
+                    "id": "fixture",
+                    "description": "Fixture catalog",
                     "links": [{"rel": "item", "href": item_uri}],
                 },
                 item_uri: item,
@@ -723,14 +781,19 @@ def test_static_stac_bbox_intersection_preserves_antimeridian_semantics(
             {
                 catalog_uri: {
                     "type": "Catalog",
+                    "stac_version": "1.0.0",
+                    "id": "fixture",
+                    "description": "Fixture catalog",
                     "links": [{"rel": "item", "href": item_uri}],
                 },
                 item_uri: {
                     "type": "Feature",
+                    "stac_version": "1.0.0",
+                    "geometry": None,
                     "id": "selected",
                     "collection": "sample",
                     "bbox": item_bbox,
-                    "properties": {},
+                    "properties": {"datetime": "2024-01-01T00:00:00Z"},
                     "assets": {"data": {"href": "./data.tif", "roles": ["data"]}},
                 },
             }
@@ -750,6 +813,8 @@ def test_static_stac_filters_collection_and_time() -> None:
     )
     item = {
         "type": "Feature",
+        "stac_version": "1.0.0",
+        "geometry": None,
         "id": "tokyo",
         "collection": "elevation",
         "bbox": [139.0, 35.0, 140.0, 36.0],
@@ -852,7 +917,7 @@ def test_configured_stac_search_rebinds_item_diagnostic_source() -> None:
                         {
                             "id": "ambiguous",
                             "collection": "imagery",
-                            "properties": {},
+                            "properties": {"datetime": "2024-01-01T00:00:00Z"},
                             "assets": {},
                         }
                     ]
@@ -939,7 +1004,10 @@ def test_stac_relative_href_uses_rfc3986_query_and_fragment_rules() -> None:
     adapter = StacAdapter(get_json=RecordingJsonClient({}))
     uri, _, _ = adapter._delivery(  # pyright: ignore[reportPrivateUsage]
         {"href": "./asset.tif", "type": "image/tiff"},
-        "https://stac.example/items/scene-1?token=x#old",
+        _parsed_delivery_item(
+            "./asset.tif", "https://stac.example/items/scene-1?token=x#old"
+        ),
+        "visual",
     )
 
     assert uri == "https://stac.example/items/asset.tif"
@@ -977,7 +1045,10 @@ def test_stac_preserves_absolute_non_http_asset_href() -> None:
     adapter = StacAdapter(get_json=RecordingJsonClient({}))
     uri, _, _ = adapter._delivery(  # pyright: ignore[reportPrivateUsage]
         {"href": "s3://bucket/asset.tif", "type": "image/tiff"},
-        "https://stac.example/items/scene-1",
+        _parsed_delivery_item(
+            "s3://bucket/asset.tif", "https://stac.example/items/scene-1"
+        ),
+        "visual",
     )
 
     assert uri == "s3://bucket/asset.tif"
@@ -1059,3 +1130,115 @@ def test_stac_search_result_keeps_logical_identifiers_for_encoded_load() -> None
     assert client.calls == [(search_url, {"limit": 1}), (item_url, {})]
     assert source.provenance.dataset_identifier == collection_id
     assert source.provenance.resource_identifier == f"{item_id}:visual"
+
+
+def _parsed_delivery_item(href: str, uri: str) -> "pystac.Item":
+    import pystac
+
+    item = fixture_json("stac/item.json")
+    item["assets"]["visual"]["href"] = href
+    return pystac.Item.from_dict(dict(item), href=uri, migrate=False)
+
+
+def test_pystac_redirect_aliases_share_a_visit_without_extra_io(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Final URI identity prevents duplicate candidates and false budget failures."""
+    from copy import deepcopy
+
+    root = "https://static.example/catalog.json"
+    alias = "https://static.example/alias.json"
+    final = "https://cdn.example/item.json"
+    second_alias = "https://static.example/another.json"
+    item = dict(fixture_json("stac/item.json"))
+    item["links"] = [{"rel": "self", "href": "https://untrusted.example/wrong.json"}]
+    item["assets"]["visual"]["href"] = "./chosen.tif"
+    original = deepcopy(item)
+    catalog = {
+        "type": "Catalog",
+        "id": "root",
+        "description": "Fixture",
+        "stac_version": "1.0.0",
+        "links": [
+            {"rel": "item", "href": href} for href in (alias, final, second_alias)
+        ],
+    }
+    client = ResponseJsonClient(
+        {root: catalog, alias: item, second_alias: item},
+        {root: root, alias: final, second_alias: final},
+    )
+
+    def forbidden_io() -> pystac.StacIO:
+        raise AssertionError("PySTAC must not create network/file I/O")
+
+    monkeypatch.setattr(pystac.StacIO, "default", forbidden_io)
+    results = StacAdapter(get_json=client, catalog_uri=root, max_documents=3).search(
+        SearchQuery()
+    )
+    assert len(results) == 1
+    assert results[0].uri == "https://cdn.example/chosen.tif"
+    assert results[0].reference.parameters["item_href"] == final
+    assert (
+        results[0].metadata.raw["links"][0]["href"]
+        == "https://untrusted.example/wrong.json"
+    )
+    assert item == original
+    assert [uri for uri, _ in client.calls] == [root, alias, second_alias]
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "",
+        "ftp://static.example/item.json",
+        "https://user:secret@static.example/item.json",
+    ],
+)
+def test_static_stac_rejects_unsafe_link_before_transport(href: str) -> None:
+    root = "https://static.example/catalog.json"
+    client = RecordingJsonClient(
+        {
+            root: {
+                "type": "Catalog",
+                "id": "root",
+                "description": "Fixture",
+                "stac_version": "1.0.0",
+                "links": [{"rel": "child", "href": href}],
+            }
+        }
+    )
+    with pytest.raises(ProviderResponseError, match="STAC") as caught:
+        StacAdapter(get_json=client, catalog_uri=root).search(SearchQuery())
+    assert "secret" not in str(caught.value)
+    assert client.calls == [(root, {})]
+
+
+def test_pystac_document_failure_is_isolated_without_inventing_stac_fields() -> None:
+    first = dict(fixture_json("stac/item.json"))
+    invalid = {**first, "id": "invalid"}
+    invalid.pop("stac_version")
+    endpoint = "https://stac.example"
+    results = StacAdapter(
+        get_json=RecordingJsonClient(
+            {endpoint + "/search": {"features": [invalid, first]}}
+        ),
+        endpoint=endpoint,
+    ).search(SearchQuery())
+    assert len(results) == 1
+    assert [(d.resource_identifier, d.detail) for d in results.diagnostics] == [
+        ("invalid", "invalid_item")
+    ]
+    assert "stac_version" not in invalid
+
+
+def test_stac_api_relative_asset_uses_final_search_response_uri() -> None:
+    endpoint = "https://stac.example"
+    item = dict(fixture_json("stac/item.json"))
+    item["assets"]["visual"]["href"] = "./raster.tif"
+    client = ResponseJsonClient(
+        {endpoint + "/search": {"features": [item]}},
+        {endpoint + "/search": "https://cdn.example/results/search"},
+    )
+    resource = StacAdapter(get_json=client, endpoint=endpoint).search(SearchQuery())[0]
+    assert resource.uri == "https://cdn.example/results/raster.tif"
+    assert resource.metadata.raw["assets"]["visual"]["href"] == "./raster.tif"

@@ -2,6 +2,10 @@
 
 `StacAdapter` は STAC APIと静的STACのItem assetを配信単位の `Resource` に変換します。
 
+標準文書の解釈・相対Link/Asset解決はPySTAC（`pystac-core`）へ委譲します。
+取得・認可・巡回上限と訪問管理・選択・Resource/Plan変換はRhinestoneが担当し、
+PySTACの自動I/Oや再帰巡回は利用しません。raw metadataは取得文書を保持します。
+
 - Adapter 種別（`adapter_type`）: `stac`
 - Provider設定: API型は `endpoint`、静的型は `catalog_uri`（排他的）。
 - 直接loadのReference: `collection_id`, `item_id`, `asset_key`。静的型では `item_href` も必要。

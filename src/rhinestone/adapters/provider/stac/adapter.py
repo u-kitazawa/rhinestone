@@ -5,6 +5,9 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from math import isfinite
 from typing import Any, cast
+from urllib.parse import urlsplit
+
+import pystac
 
 from ...._uri import is_valid_http_authority
 from ....errors import ConfigValidationError, ProviderResponseError
@@ -118,8 +121,9 @@ class StacAdapter(ProviderAdapter):
             item_url = f"{endpoint}/collections/{collection_path}/items/{item_path}"
             api_endpoint = endpoint
         item, response_uri = self._request_with_uri(item_url, {})
+        parsed = self._parse_item(item, response_uri)
         asset = self._asset(item, asset_key)
-        uri, format_name, media_type = self._delivery(asset, response_uri)
+        uri, format_name, media_type = self._delivery(asset, parsed, asset_key)
         properties = self._object(item.get("properties"), "STAC properties")
         metadata = Metadata(
             title=_optional_string(properties.get("title")) or item_id,
@@ -167,7 +171,7 @@ class StacAdapter(ProviderAdapter):
         params = self._query_parameters(query)
         if collections:
             params["collections"] = ",".join(collections)
-        response = self._request(f"{endpoint}/search", params)
+        response, response_uri = self._request_with_uri(f"{endpoint}/search", params)
         raw_items = response.get("features")
         if not isinstance(raw_items, list):
             raise ProviderResponseError("STAC features must be an array")
@@ -181,7 +185,7 @@ class StacAdapter(ProviderAdapter):
                 item_id = _optional_string(item.get("id"))
                 if item_id is not None and not item_id.strip():
                     item_id = None
-                item_results = self._item_resources(item, f"{endpoint}/search", params)
+                item_results = self._item_resources(item, response_uri, params)
             except (ConfigValidationError, ProviderResponseError):
                 diagnostics.append(
                     SearchDiagnostic(
@@ -225,13 +229,26 @@ class StacAdapter(ProviderAdapter):
             raise AssertionError("static STAC catalog is not configured")
         queue: deque[str] = deque((catalog_uri,))
         discovered: set[str] = {catalog_uri}
+        visited: set[str] = set()
         documents_read = 0
         found: list[Resource] = []
         diagnostics: list[SearchDiagnostic] = []
-        while queue and documents_read < self._max_documents:
+        while queue:
             requested_uri = queue.popleft()
+            if requested_uri in visited:
+                continue
+            if documents_read >= self._max_documents:
+                raise ProviderResponseError(
+                    "Static STAC traversal exceeded max_documents before completing"
+                )
             document, response_uri = self._request_with_uri(requested_uri, {})
             documents_read += 1
+            # Redirect targets are visited identities too. The final response URI
+            # anchors relative links, never an untrusted advertised self link.
+            if response_uri in visited:
+                continue
+            visited.update((requested_uri, response_uri))
+            discovered.add(response_uri)
             document_type = document.get("type")
             if document_type == "Feature":
                 item_id = _optional_string(document.get("id"))
@@ -270,12 +287,14 @@ class StacAdapter(ProviderAdapter):
                     if query.limit is not None and len(found) >= query.limit:
                         return ProviderSearchResults(tuple(found), tuple(diagnostics))
                 continue
-            for link in self._links(document):
-                if link.get("rel") not in {"child", "item"}:
+            parsed_catalog = self._parse_catalog(document, response_uri)
+            for link in parsed_catalog.links:
+                if link.rel not in {"child", "item"}:
                     continue
-                href = self._required_string(link, "href")
                 try:
-                    target = resolve_response_href(response_uri, href)
+                    target = self._http_href(
+                        link.get_absolute_href() if link.get_target_str() else None
+                    )
                 except ValueError as error:
                     raise ProviderResponseError(
                         "Static STAC link href is invalid"
@@ -283,10 +302,6 @@ class StacAdapter(ProviderAdapter):
                 if target not in discovered:
                     discovered.add(target)
                     queue.append(target)
-        if queue:
-            raise ProviderResponseError(
-                "Static STAC traversal exceeded max_documents before completing"
-            )
         return ProviderSearchResults(tuple(found), tuple(diagnostics))
 
     def _item_resources(
@@ -304,11 +319,12 @@ class StacAdapter(ProviderAdapter):
         if collection_id is None or not collection_id.strip():
             raise ProviderResponseError("STAC collection must be a non-empty string")
         properties = self._object(item.get("properties"), "STAC properties")
+        parsed = self._parse_item(item, response_uri)
         title = _optional_string(properties.get("title")) or item_id
         results: list[Resource] = []
         for asset_key in self._data_asset_keys(item):
             asset = self._asset(item, asset_key)
-            uri, format_name, media_type = self._delivery(asset, response_uri)
+            uri, format_name, media_type = self._delivery(asset, parsed, asset_key)
             parameters = {
                 "collection_id": collection_id,
                 "item_id": item_id,
@@ -407,8 +423,55 @@ class StacAdapter(ProviderAdapter):
                 return False
         return True
 
-    def _links(self, document: JsonObject) -> tuple[JsonObject, ...]:
-        return self._objects(document.get("links"), "STAC links")
+    @staticmethod
+    def _parse_item(document: JsonObject, response_uri: str) -> pystac.Item:
+        try:
+            # Parsing only: no migration, schema fetching, link resolution I/O,
+            # or global StacIO changes. PySTAC preserves the input dictionary.
+            return pystac.Item.from_dict(
+                dict(document), href=response_uri, migrate=False
+            )
+        except (
+            pystac.STACError,
+            pystac.STACTypeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            AttributeError,
+        ) as error:
+            raise ProviderResponseError("Invalid STAC Item document") from error
+
+    @staticmethod
+    def _parse_catalog(document: JsonObject, response_uri: str) -> pystac.Catalog:
+        try:
+            if document.get("type") == "Collection":
+                return pystac.Collection.from_dict(
+                    dict(document), href=response_uri, migrate=False
+                )
+            return pystac.Catalog.from_dict(
+                dict(document), href=response_uri, migrate=False
+            )
+        except (
+            pystac.STACError,
+            pystac.STACTypeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            AttributeError,
+        ) as error:
+            raise ProviderResponseError(
+                "Invalid static STAC Catalog document"
+            ) from error
+
+    @staticmethod
+    def _http_href(href: str | None) -> str:
+        if (
+            not isinstance(href, str)
+            or not href.casefold().startswith(("https://", "http://"))
+            or not is_valid_http_authority(href)
+        ):
+            raise ValueError("STAC href must have a valid HTTP(S) authority")
+        return href
 
     @staticmethod
     def _query_parameters(query: SearchQuery) -> dict[str, Any]:
@@ -432,11 +495,14 @@ class StacAdapter(ProviderAdapter):
         return self._object(assets[key], f"STAC asset {key!r}")
 
     def _delivery(
-        self, asset: JsonObject, response_uri: str
+        self, asset: JsonObject, item: pystac.Item, asset_key: str
     ) -> tuple[str, str | None, str | None]:
-        href = self._required_string(asset, "href")
+        self._required_string(asset, "href")
         try:
-            uri = resolve_response_href(response_uri, href)
+            # The parsed Asset has a non-empty href and an Item with an
+            # absolute response URI, so PySTAC can always resolve it.
+            uri = cast(str, item.assets[asset_key].get_absolute_href())
+            urlsplit(uri)  # Reject malformed authorities; preserve non-HTTP schemes.
         except ValueError as error:
             raise ProviderResponseError("STAC asset href is invalid") from error
         media_type = _optional_string(asset.get("type"))
