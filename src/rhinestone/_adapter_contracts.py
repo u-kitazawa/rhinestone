@@ -5,8 +5,8 @@ from typing import Protocol, TypeGuard, runtime_checkable
 from .models import ProviderSearchResults, Reference, Resource, SearchQuery
 
 
-class RegisteredSourceAdapter(Protocol):
-    """Source adapter bound to an application-local source identity."""
+class RegisteredProviderAdapter(Protocol):
+    """Provider adapter bound to an application-local source identity."""
 
     source_id: str
 
@@ -22,7 +22,7 @@ class SearchParticipant(Protocol):
 
 
 @runtime_checkable
-class SearchableRegisteredSourceAdapter(Protocol):
+class SearchableRegisteredProviderAdapter(Protocol):
     """Configured source with the complete federated-search capability."""
 
     source_id: str
@@ -38,8 +38,10 @@ class SearchableRegisteredSourceAdapter(Protocol):
         ...
 
 
-def is_searchable_source(
+def is_searchable_provider(
     adapter: SearchParticipant,
-) -> TypeGuard[SearchableRegisteredSourceAdapter]:
+) -> TypeGuard[SearchableRegisteredProviderAdapter]:
     """Narrow a configured source to the federated-search contract."""
-    return isinstance(adapter, SearchableRegisteredSourceAdapter) and adapter.searchable
+    return (
+        isinstance(adapter, SearchableRegisteredProviderAdapter) and adapter.searchable
+    )

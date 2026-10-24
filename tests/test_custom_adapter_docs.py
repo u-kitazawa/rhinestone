@@ -1,4 +1,4 @@
-"""Run the Source and Execution examples together as documented."""
+"""Run the Provider and Runtime examples together as documented."""
 
 import re
 from pathlib import Path
@@ -11,7 +11,7 @@ def test_custom_execution_example_opens_previously_loaded_resource() -> None:
     document = (Path(__file__).parents[1] / "docs" / "custom-adapters.md").read_text(
         encoding="utf-8"
     )
-    sections = ("最小構成", "Execution Adapter（実行アダプター）")
+    sections = ("最小構成", "Runtime Adapter（実行アダプター）")
     namespace: dict[str, Any] = {}
     calls: list[str] = []
     result = object()
@@ -36,7 +36,7 @@ def test_custom_auth_example_authorizes_before_loading_credential(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from rhinestone import Catalog, Provider, _http, configure
-    from rhinestone.adapters.contracts import SourceAdapterDefinition
+    from rhinestone.adapters.contracts import ProviderAdapterDefinition
     from rhinestone.errors import DestinationNotAllowedError
 
     document = (Path(__file__).parents[1] / "docs" / "custom-adapters.md").read_text(
@@ -52,8 +52,10 @@ def test_custom_auth_example_authorizes_before_loading_credential(
     contexts: list[Any] = []
 
     def factory(provider: Provider, context: Any) -> Any:
+        from tests.test_custom_adapters import custom_source
+
         contexts.append(context)
-        return object()
+        return custom_source(provider, context)
 
     provider = Provider(
         "custom",
@@ -68,7 +70,7 @@ def test_custom_auth_example_authorizes_before_loading_credential(
 
     configure(
         catalog=Catalog((provider,)),
-        adapters=(SourceAdapterDefinition("custom-source", factory),),
+        adapters=(ProviderAdapterDefinition("custom-source", factory),),
         credentials={"custom-api-key": credential},
     )
     requests: list[str] = []

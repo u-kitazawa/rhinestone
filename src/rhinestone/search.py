@@ -1,4 +1,4 @@
-"""Federated search over capable source adapters."""
+"""Federated search over capable provider adapters."""
 
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -8,9 +8,9 @@ from time import perf_counter
 from typing import overload
 
 from ._adapter_contracts import (
-    SearchableRegisteredSourceAdapter,
+    SearchableRegisteredProviderAdapter,
     SearchParticipant,
-    is_searchable_source,
+    is_searchable_provider,
 )
 from .adapters.knowledge import AreaKnowledgeAdapter
 from .adapters.knowledge.models import AdministrativeArea
@@ -175,7 +175,7 @@ class SearchCoordinator:
         searchable_adapters = [
             adapter
             for adapter in self._adapters
-            if is_searchable_source(adapter)
+            if is_searchable_provider(adapter)
             and (selected is None or adapter.source_id in selected)
         ]
         if not searchable_adapters:
@@ -205,7 +205,7 @@ class SearchCoordinator:
                 )
 
         def search_provider(
-            adapter: SearchableRegisteredSourceAdapter,
+            adapter: SearchableRegisteredProviderAdapter,
         ) -> SearchResults:
             return self._search_provider(adapter, query, resolved_area)
 
@@ -223,7 +223,7 @@ class SearchCoordinator:
 
     @staticmethod
     def _search_provider(
-        adapter: SearchableRegisteredSourceAdapter,
+        adapter: SearchableRegisteredProviderAdapter,
         query: SearchQuery,
         resolved_area: AdministrativeArea | None,
     ) -> SearchResults:

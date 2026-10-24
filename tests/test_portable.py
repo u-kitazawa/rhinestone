@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from rhinestone import Reference, configure
-from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailableError
+from rhinestone.errors import ConfigValidationError, RuntimeAdapterUnavailableError
 from rhinestone.models import AccessPlan, DiscoveryRecord, Resource
 
 
@@ -61,7 +61,7 @@ def test_resource_json_round_trip_is_versioned_detached_and_rebindable() -> None
     assert encoded["reference"]["provider_id"] == "direct"
     assert "_opener" not in json.dumps(encoded)
     assert detached == original
-    with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="not bound"):
         detached.open("rasterio", runtime=FakeRasterio())
 
     rebound = configure().bind(detached)

@@ -1,8 +1,8 @@
 # APIリファレンス
 
 このページは、通常の利用で使う公開APIを説明します。初めて使う場合は先に[はじめに](getting-started.md)を読んでください。
-用語は[用語と概念](concepts.md)、Adapterを追加する場合は[Source Adapter](api/source-adapters.md)と
-[Execution Adapter](api/execution-adapters.md)を参照してください。
+用語は[用語と概念](concepts.md)、Adapterを追加する場合は[Provider Adapter](api/provider-adapters.md)と
+[Runtime Adapter](api/runtime-adapters.md)を参照してください。
 
 ## `search()`（標準構成で検索する）
 
@@ -21,7 +21,7 @@ resource = results[0]
 ```
 
 `text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`の意味と診断は`Rhinestone.search()`と同じです。
-独自Provider、Credential、Source Runtime、NetworkPolicy、Adapterが必要な場合は
+独自Provider、Credential、Provider依存ライブラリ、NetworkPolicy、Adapterが必要な場合は
 `configure()`で独立したアプリケーションを作成します。
 
 ## `ProviderId`（組み込み提供元のID）
@@ -89,8 +89,8 @@ resource = app.load(reference)
 
 ## `configure()`（アプリケーションを作る）
 
-Catalog、Source Runtime、Credentialを組み合わせて`Rhinestone`アプリケーションを作ります。
-Execution Runtimeは`open()`で渡します。
+Catalog、Provider依存ライブラリ、Credentialを組み合わせて`Rhinestone`アプリケーションを作ります。
+Runtimeは`open()`で渡します。
 
 ```python
 import os
@@ -108,16 +108,17 @@ app = configure(
 | 引数 | 説明 |
 | --- | --- |
 | `catalog` | 利用するProviderのCatalog |
-| `dependencies` | 検索・解決用のSource Runtime実体または`RuntimeFactory`。Execution Runtimeは受け付けない |
+| `dependencies` | 検索・解決用のProvider依存ライブラリ実体または`RuntimeFactory`。open用Runtimeは`runtime=`へ渡す |
 | `credentials` | 認証情報を取得するfactory |
 | `network_policy` | 宛先制限。`none` または `credentialed`（既定） |
-| `adapters` | `SourceAdapterDefinition`／`ExecutionAdapterDefinition`／`KnowledgeAdapterDefinition` の iterable。組み込みは自動登録され、独自定義だけを指定する |
+| `adapters` | `ProviderAdapterDefinition`／`RuntimeAdapterDefinition`／`KnowledgeAdapterDefinition` の iterable。組み込みは自動登録され、独自定義だけを指定する |
+| `knowledge` | `area`／`identity`／`time`からadapter identityへの明示選択。未指定のarea/timeは組み込み、identityは未選択。登録だけでは既定を置き換えない |
 
 独自構成が必要なコードでは`catalog`を使ってください。
-Source Runtimeの遅延読み込みには`RuntimeFactory(factory)`を指定します。Execution Runtimeは`open(..., runtime=...)`で実体を渡します。
+Provider依存ライブラリの遅延読み込みには`RuntimeFactory(factory)`を指定します。Runtimeは`open(..., runtime=...)`で実体を渡します。
 
 Provider の `settings` に `credential` を論理名として指定すると、CKAN、STAC、OGC
-などの HTTP Source へ Credential factory を遅延注入できます。secret 自体は
+などの HTTP Provider へ Credential factory を遅延注入できます。secret 自体は
 Provider、Catalog、Reference、Resource には保存されません。`credentialed` では、factory の
 評価前に Catalog 由来の endpoint へ送信できることを検証します。
 
@@ -130,7 +131,7 @@ results = app.search(text="河川", limit=10)
 result = results[0]
 ```
 
-`text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`をキーワードで指定できます。`area`は行政区域名・別名・コードを受け取り、area対応Sourceには正式区域名を直接渡します。それ以外ではbbox対応SourceにCRS84 bbox、明示的なtext fallbackを持つSourceに正式区域名として投影されます。`area`と`bbox`は同時指定できず、未知区域はProvider呼び出し前に`area_resolution_failed` diagnosticになります。`SearchQuery`を直接渡す場合は
+`text`、`area`、`bbox`、`time`、`format`、`limit`、`providers`をキーワードで指定できます。`area`は行政区域名・別名・コードを受け取り、area対応Providerには正式区域名を直接渡します。それ以外ではbbox対応ProviderにCRS84 bbox、明示的なtext fallbackを持つProviderに正式区域名として投影されます。`area`と`bbox`は同時指定できず、未知区域はProvider呼び出し前に`area_resolution_failed` diagnosticになります。`SearchQuery`を直接渡す場合は
 `rhinestone.models`からimportします。
 
 `format`は`Format`または`FormatPreset`の空でないtupleで指定し、複数値はOR条件です。
@@ -163,7 +164,7 @@ Resourceになります。通常は`app.open(resource, library, runtime=...)`、
 `title`、`description`、`formats`、`reference`、`metadata`、`provenance`を参照できます。
 発見側の情報は`discovery`に保存され、配信対象の`reference`やtarget metadataと区別されます。
 形式不明や問い合わせが必要な対象は`access_plan=None`です。`open()`はReferenceを
-loadしてから実行し、計画を作れない場合は`ExecutionAdapterUnavailableError`になります。
+loadしてから実行し、計画を作れない場合は`RuntimeAdapterUnavailableError`になります。
 URIの拡張子から形式を推測しません。
 
 Provider障害、未対応条件、認証不足などは`SearchResults.diagnostics`で確認できます。
@@ -227,7 +228,7 @@ ZIP、entry point、encodingもoptionsに含まれます。secretやRuntimeは�
 論理credential参照を自身のfactoryから解決します。
 
 `library`は必須です。外部Runtimeは`runtime=`へ実体を渡します。非互換・不足の場合は
-`ExecutionAdapterUnavailableError`になり、自動で別Runtimeへ切り替えません。
+`RuntimeAdapterUnavailableError`になり、自動で別Runtimeへ切り替えません。
 `json-service`はCoreのRuntimeを使うため`runtime=`を省略します。
 
 ## `Format` / `FormatPreset`（検索形式）
@@ -280,17 +281,17 @@ except ProviderMetadataError:
 主な分類は次のとおりです。
 
 - `ConfigValidationError`: Reference、検索条件、Catalog、Adapter定義の入力不正
-- `UnsupportedSourceError`: 未構成のSource ID
+- `UnsupportedProviderError`: 未構成のProvider ID
 - `ProviderMetadataError` / `ProviderResponseError`: 通信・Provider応答の失敗
 - `ResourceNotFoundError` / `AmbiguousResourceError`: Resource選択の失敗
 - `UnsupportedAccessError`: formatまたはAccessPlanが未対応・不明
-- `ExecutionAdapterUnavailableError` / `DependencyUnavailableError`: Runtime不足または非互換
+- `RuntimeAdapterUnavailableError` / `DependencyUnavailableError`: Runtime不足または非互換
 - `ResourceAccessError` / `DestinationNotAllowedError`: 実データアクセスまたは宛先制限の失敗
 - `CredentialUnavailableError` / `CredentialLoadError`: 論理Credentialの設定・factory失敗
 
-例外メッセージには、原因を調べるためのフィールド名、Source ID、Adapter名、候補数などが
+例外メッセージには、原因を調べるためのフィールド名、Provider ID、Adapter名、候補数などが
 含まれます。Credentialのsecret、raw payload、過長なレスポンスは含まれません。Providerの
-検索障害はSource単位で`SearchResults.diagnostics`へ隔離されますが、予期しないプログラム
+検索障害はProvider単位で`SearchResults.diagnostics`へ隔離されますが、予期しないプログラム
 エラーは握りつぶされません。
 
 ## 拡張・Adapter向けAPI
@@ -310,7 +311,7 @@ except ProviderMetadataError:
 
 ## 形式名の共通定義
 
-Source Adapter 間で共有する format 名と media type 対応は
+Provider Adapter 間で共有する format 名と media type 対応は
 `rhinestone.representations` から利用できます。
 
 ```python
@@ -322,7 +323,7 @@ assert format_from_media_type("image/tiff") == "geotiff"
 
 format の alias と既知の media type だけを正規化し、URL の拡張子から format は推測しません。
 `FORMAT_ALIASES`、`MEDIA_TYPE_FORMATS`、`FORMAT_CATEGORIES` は共有定義です。
-Execution Adapter がどの format を実行できるかは、各 Adapter の capability として管理されます。
+Runtime Adapter がどの format を実行できるかは、各 Adapter の capability として管理されます。
 
 ## `Rhinestone.open()`（データを開く）
 
@@ -333,10 +334,10 @@ Resource/Referenceは必要に応じてloadしてから開き、AccessPlanはPro
 data = app.open(result, "rasterio", runtime=rasterio)
 ```
 
-`library`には空でないExecution Adapter名の文字列を明示します。`None`、文字列以外、
+`library`には空でないRuntime Adapter名の文字列を明示します。`None`、文字列以外、
 空文字、空白のみの値は、load・認可・Runtime実行の前に`ConfigValidationError`になります。
 `None`によるAdapterの自動選択は行いません。この入力契約は`Resource.open()`でも共通です。
-非空の未登録名・非互換名は`ExecutionAdapterUnavailableError`になり、別のAdapterへ
+非空の未登録名・非互換名は`RuntimeAdapterUnavailableError`になり、別のAdapterへ
 自動で切り替えません。
 
 ## `Runtime`（外部ライブラリ）

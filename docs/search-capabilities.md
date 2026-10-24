@@ -1,6 +1,6 @@
 # 検索能力の対照表
 
-この表は現行の `SearchQuery(text, area, bbox, time, format, limit)` が各 Source Adapter でどこまで
+この表は現行の `SearchQuery(text, area, bbox, time, format, limit)` が各 Provider Adapter でどこまで
 適用されるかを示します。検索結果は `Resource` として返り、そのまま `open()` へ渡せます。
 discovery provenanceとProviderごとの順序を保持します。
 
@@ -57,8 +57,8 @@ URIの拡張子やraw metadataを調べて形式を補完したり、検索中�
 変更しません。たとえばsearch.ckan.jpが省略する形式未宣言のResourceは取得できません。
 `FormatPreset.PYOGRIO`も検索候補の形式集合であり、Runtimeのdriver対応を保証しません。
 
-検索しない Direct、基盤地図情報、ODPT などの Adapter はこの表の対象外です。Source が条件を
+検索しない Direct、基盤地図情報、ODPT などの Adapter はこの表の対象外です。Provider が条件を
 受け取れないときは、`SearchResults.diagnostics`に条件名と理由を残し、対応する条件だけで
-検索します。対応する条件が一つもないSourceや、必須条件が不足するSourceはスキップします。
+検索します。対応する条件が一つもないProviderや、必須条件が不足するProviderはスキップします。
 `format`はCoordinator側でも適用できるため、形式条件だけでも検索できますが、
 search.ckan.jpの必須`text`条件は省略できません。

@@ -9,8 +9,8 @@ from rhinestone import (
     configure,
 )
 from rhinestone.adapters.contracts import (
-    ExecutionAdapterDefinition,
-    SourceAdapterDefinition,
+    ProviderAdapterDefinition,
+    RuntimeAdapterDefinition,
 )
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import AdapterRegistrationError
@@ -64,8 +64,8 @@ def test_custom_source_and_execution_share_the_public_pipeline() -> None:
     app = configure(
         catalog=Catalog((Provider("custom", "custom-source"),)),
         adapters=(
-            SourceAdapterDefinition("custom-source", custom_source),
-            ExecutionAdapterDefinition(
+            ProviderAdapterDefinition("custom-source", custom_source),
+            RuntimeAdapterDefinition(
                 "custom-runtime", lambda context: CustomExecution()
             ),
         ),
@@ -93,7 +93,7 @@ def test_source_definition_can_declare_a_lazy_source_dependency() -> None:
         loaded.append(True)
         return object()
 
-    definition = SourceAdapterDefinition(
+    definition = ProviderAdapterDefinition(
         "custom-source",
         lambda provider, context: custom_source(provider, context),
         dependencies=frozenset({"custom-source-runtime"}),
@@ -123,10 +123,10 @@ def test_source_dependencies_are_scoped_to_each_definition() -> None:
             )
         ),
         adapters=(
-            SourceAdapterDefinition(
+            ProviderAdapterDefinition(
                 "first-source", factory, dependencies=frozenset({"first-runtime"})
             ),
-            SourceAdapterDefinition(
+            ProviderAdapterDefinition(
                 "second-source", factory, dependencies=frozenset({"second-runtime"})
             ),
         ),
@@ -160,7 +160,7 @@ def test_source_dependency_instances_are_cached_across_provider_contexts() -> No
             )
         ),
         adapters=(
-            SourceAdapterDefinition(
+            ProviderAdapterDefinition(
                 "shared-source", factory, dependencies=frozenset({"shared-runtime"})
             ),
         ),
@@ -196,41 +196,39 @@ def test_unregistered_source_type_fails_during_context_composition() -> None:
 
 def test_builtin_and_custom_duplicate_types_are_rejected() -> None:
     with pytest.raises(AdapterRegistrationError, match="ckan"):
-        configure(adapters=(SourceAdapterDefinition("ckan", custom_source),))
+        configure(adapters=(ProviderAdapterDefinition("ckan", custom_source),))
 
     with pytest.raises(AdapterRegistrationError, match="gdal"):
         configure(
             adapters=(
-                ExecutionAdapterDefinition("gdal", lambda context: CustomExecution()),
+                RuntimeAdapterDefinition("gdal", lambda context: CustomExecution()),
             )
         )
 
     with pytest.raises(AdapterRegistrationError, match="custom-source"):
         configure(
             adapters=(
-                SourceAdapterDefinition("custom-source", custom_source),
-                SourceAdapterDefinition("custom-source", custom_source),
+                ProviderAdapterDefinition("custom-source", custom_source),
+                ProviderAdapterDefinition("custom-source", custom_source),
             )
         )
 
     with pytest.raises(AdapterRegistrationError, match="expected 'declared'"):
         configure(
             adapters=(
-                ExecutionAdapterDefinition(
-                    "declared", lambda context: CustomExecution()
-                ),
+                RuntimeAdapterDefinition("declared", lambda context: CustomExecution()),
             )
         )
 
 
 def test_adapter_definition_rejects_invalid_values() -> None:
     with pytest.raises(ValueError):
-        SourceAdapterDefinition("", custom_source)
+        ProviderAdapterDefinition("", custom_source)
     with pytest.raises(ValueError):
-        SourceAdapterDefinition("custom", object())  # type: ignore[arg-type]
+        ProviderAdapterDefinition("custom", object())  # type: ignore[arg-type]
     with pytest.raises(ValueError):
-        ExecutionAdapterDefinition("", lambda context: CustomExecution())
+        RuntimeAdapterDefinition("", lambda context: CustomExecution())
     with pytest.raises(ValueError):
-        ExecutionAdapterDefinition("custom", object())  # type: ignore[arg-type]
+        RuntimeAdapterDefinition("custom", object())  # type: ignore[arg-type]
     with pytest.raises(AdapterRegistrationError, match="Unknown adapter"):
         configure(adapters=(object(),))  # type: ignore[arg-type]

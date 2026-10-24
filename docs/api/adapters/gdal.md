@@ -2,7 +2,7 @@
 
 `GdalAdapter` は選択済み AccessPlan を利用者提供の GDAL runtime へ渡します。
 
-[Execution Adapter 一覧](../execution-adapters.md) · 選択名: `gdal` · priority: `20`
+[Runtime Adapter 一覧](../runtime-adapters.md) · 選択名: `gdal` · priority: `20`
 
 ## 対応形式とRuntime
 

@@ -2,7 +2,7 @@
 
 `DcatAdapter` は明示した DCAT RDF catalog の Dataset を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `dcat`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `dcat`
 
 ## 設定
 

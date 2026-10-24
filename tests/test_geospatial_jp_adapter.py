@@ -7,7 +7,7 @@ import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import Format, configure
-from rhinestone.adapters.source import CkanAdapter, GeospatialJpAdapter
+from rhinestone.adapters.provider import CkanAdapter, GeospatialJpAdapter
 from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import ConfigValidationError, ProviderResponseError
 from rhinestone.models import Provider, ProviderSearchResults, SearchQuery

@@ -2,7 +2,7 @@
 
 `OgcFeaturesAdapter` は OGC API Features 1.0 の collection または feature を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `ogc-features`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `ogc-features`
 
 ## 設定と検索
 

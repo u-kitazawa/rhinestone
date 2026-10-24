@@ -1,16 +1,16 @@
 # MlitDpfAdapter（国交DPF検索アダプター）
 
 `MlitDpfAdapter` は国土交通データプラットフォーム（DPF）のGraphQL APIを検索・発見元として
-利用するDiscovery専用Sourceです。
+利用するDiscovery専用Providerです。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `mlit-dpf`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `mlit-dpf`
 
 ## 構成
 
 組み込み定義 `BUILTIN`内の`mlit-dpf` Provider はendpointと論理Credential名だけを持ちます。APIキーは
 `credentials` から遅延取得され、`Provider`、`Reference`、`Resource`、例外には保存されません。
 `MLIT_DPF` は組み込みCatalogに含まれますが、APIキーを登録せず横断検索した場合はDPFだけが
-`failure_type="credential"` のdiagnosticとして隔離され、他のSourceの検索は継続します。
+`failure_type="credential"` のdiagnosticとして隔離され、他のProviderの検索は継続します。
 
 ```python
 from rhinestone.catalogs import Catalog
@@ -112,6 +112,6 @@ data = resource.open("pyogrio", runtime=pyogrio)
 DPFは発見元であり、実行Runtimeを選びません。ネイティブ委譲でもDirect fallbackでも、利用者が
 `app.open(result, "gdal", runtime=gdal)`、`resource.open("pyogrio", runtime=pyogrio)` などでRuntimeを明示します。指定した
 RuntimeがResource形式と非互換なら、別のRuntimeへ暗黙に切り替えず
-`ExecutionAdapterUnavailableError` になります。
+`RuntimeAdapterUnavailableError` になります。
 
 署名付き `fileDownloadURLs`、半径・属性検索、互換Runtime一覧APIは対象外です。

@@ -1,6 +1,6 @@
 # Rhinestoneへの貢献
 
-Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Source Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
+Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Provider Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
 
 Rhinestoneは、日本の公的・地理空間データを使える形へ解決するPythonライブラリです。変更を始める前に、[README](README.md)と本ガイドを確認してください。
 
@@ -9,12 +9,12 @@ Rhinestoneは、日本の公的・地理空間データを使える形へ解決�
 - 設計仕様と既存の不変条件を優先する。
 - 変更の責務を適切な層に置く。
 - CoreにGDAL、Rasterio、pyogrioなどのGIS処理系を実行時依存として追加しない。
-- Provider固有の知識はSource AdapterまたはCatalogに閉じ込める。
+- Provider固有の知識はProvider AdapterまたはCatalogに閉じ込める。
 - URLの推測、暗黙のフォーマット変換、HTML scrapingを追加しない。
 - 振る舞いを変更した場合は、テスト、仕様、またはドキュメントも更新する。
 - 公開APIを変更する場合は旧APIを削除し、影響と移行先をPRに明記する。後方互換のための別名、wrapper、旧引数は追加しない。
 
-Source Adapterを追加・変更する場合は、代表的なFixture、期待されるReference・Resource・AccessPlan、仕様適合テストを一緒に追加してください。
+Provider Adapterを追加・変更する場合は、代表的なFixture、期待されるReference・Resource・AccessPlan、仕様適合テストを一緒に追加してください。
 `load(reference)`は配信単位のResourceを返し、検索能力を持つAdapterの`search(query)`も
 配信単位のResourceを返します。Providerは接続先・サービス設定、Catalogは構成するProviderの一覧です。
 組み込みProviderの接続先や静的な仕様は、可能な限りCatalogで管理します。
@@ -31,6 +31,23 @@ uv sync --dev --locked
 ```
 
 ロックファイルを更新する必要がある場合は、変更理由をPRに記載してください。
+
+### 依存関係の脆弱性監査
+
+Python 3.12とuvがある環境で `python scripts/audit_dependencies.py` を実行します。
+`uv.lock` の直接・間接・dev依存と、Python/OS別の全解決バージョンを
+PyPIの既知脆弱性情報と照合します。未公開のローカルプロジェクト自身は対象外です。
+監査ツールは固定版pip-auditを隔離環境で実行し、Core依存には追加しません。
+終了コード0は完全な監査の成功、1は既知脆弱性の検出、2は通信・ツール・lock不整合などによる
+監査未完了です。未完了を「脆弱性なし」として扱わず、診断を確認して再実行してください。
+通常の `scripts/check.sh` とは分け、Dependency audit CIでPR・pushと毎日実行します。
+定期workflowはGitHubの既定ブランチ上で動くため、既定ブランチへの反映後に有効になります。
+
+Dependabot version updatesはuvの更新PRをdevelop向けに週次作成する設定です。
+設定ファイルを既定ブランチにも反映する必要があります。Dependabot alerts/security updatesの
+有効化はリポジトリ設定・権限に依存し、この設定だけで有効化したとはみなしません。
+alertsは既定ブランチの依存グラフを対象とし、developの監査CIを代替しません。
+urllib3のセキュリティ下限値はuvのconstraintに置き、Coreの直接依存を増やさず維持します。
 
 ## リポジトリ構成
 

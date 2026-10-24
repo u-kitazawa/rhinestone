@@ -1,8 +1,8 @@
 import pytest
 
 from rhinestone import Catalog, Provider, Reference, Resource, configure
-from rhinestone.adapters.contracts import SourceAdapterDefinition
-from rhinestone.errors import ExecutionAdapterUnavailableError
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
+from rhinestone.errors import RuntimeAdapterUnavailableError
 from rhinestone.models import Metadata, Provenance, SearchQuery
 from rhinestone.resolution import resource_from_delivery
 
@@ -49,7 +49,7 @@ def test_bound_search_resource_loads_lazily_before_open(
     source = DeferredSource(resolved_format)
     app = configure(
         catalog=Catalog((Provider("catalog", "deferred-source"),)),
-        adapters=(SourceAdapterDefinition("deferred-source", lambda p, c: source),),
+        adapters=(ProviderAdapterDefinition("deferred-source", lambda p, c: source),),
         network_policy="none",
     )
     resource = app.search(text="data")[0]
@@ -58,7 +58,7 @@ def test_bound_search_resource_loads_lazily_before_open(
     assert source.loads == []
 
     if resolved_format is None:
-        with pytest.raises(ExecutionAdapterUnavailableError, match="no AccessPlan"):
+        with pytest.raises(RuntimeAdapterUnavailableError, match="no AccessPlan"):
             resource.open("rasterio", runtime=runtime)
         assert runtime.calls == []
     else:
@@ -74,14 +74,14 @@ def test_detached_deferred_resource_requires_rebinding_before_lazy_open() -> Non
     source = DeferredSource("geotiff")
     app = configure(
         catalog=Catalog((Provider("catalog", "deferred-source"),)),
-        adapters=(SourceAdapterDefinition("deferred-source", lambda p, c: source),),
+        adapters=(ProviderAdapterDefinition("deferred-source", lambda p, c: source),),
         network_policy="none",
     )
     original = app.search(text="data")[0]
     detached = Resource.from_dict(original.to_dict())
     runtime = RecordingRasterio()
 
-    with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="not bound"):
         detached.open("rasterio", runtime=runtime)
     assert source.loads == []
     assert runtime.calls == []

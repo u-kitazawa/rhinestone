@@ -10,7 +10,7 @@ from rhinestone import (
     Reference,
     configure,
 )
-from rhinestone.adapters.contracts import SourceAdapterDefinition
+from rhinestone.adapters.contracts import ProviderAdapterDefinition
 from rhinestone.adapters.knowledge import (
     KnowledgeAdapterContext,
     KnowledgeAdapterDefinition,
@@ -19,8 +19,8 @@ from rhinestone.adapters.knowledge import (
     StandardTimeAdapter,
     TimeSemantic,
 )
-from rhinestone.adapters.source.gsi_fundamental import GsiFundamentalAdapter
-from rhinestone.adapters.source.plateau import PlateauAdapter
+from rhinestone.adapters.provider.gsi_fundamental import GsiFundamentalAdapter
+from rhinestone.adapters.provider.plateau import PlateauAdapter
 from rhinestone.catalogs import Catalog
 from rhinestone.errors import (
     AdapterRegistrationError,
@@ -422,7 +422,7 @@ def test_knowledge_registry_rejects_invalid_definition_values() -> None:
         KnowledgeAdapterDefinition("adapter", cast(Any, None), "time")
 
 
-def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
+def test_two_provider_adapters_consume_the_same_knowledge_registry() -> None:
     registry = knowledge_registry()
     plateau = PlateauAdapter(
         plateau_client,
@@ -452,7 +452,7 @@ def test_two_source_adapters_consume_the_same_knowledge_registry() -> None:
     assert gsi_knowledge["time"]["year"] == 2020
 
 
-def test_source_adapters_preserve_explicit_time_kind() -> None:
+def test_provider_adapters_preserve_explicit_time_kind() -> None:
     registry = knowledge_registry()
     plateau_source = PlateauAdapter(
         plateau_client,
@@ -479,7 +479,7 @@ def test_source_adapters_preserve_explicit_time_kind() -> None:
 
 
 def test_source_knowledge_rejects_unknown_time_kind() -> None:
-    from rhinestone.adapters.source._knowledge import resolve_knowledge
+    from rhinestone.adapters.provider._knowledge import resolve_knowledge
 
     with pytest.raises(ConfigValidationError, match="time_kind"):
         resolve_knowledge(
@@ -500,6 +500,7 @@ def test_knowledge_factory_is_not_loaded_until_source_uses_it() -> None:
         adapters=(
             KnowledgeAdapterDefinition("official", identity_factory, "identity"),
         ),
+        knowledge={"identity": "official"},
     )
     app.load(
         Reference(
@@ -509,7 +510,7 @@ def test_knowledge_factory_is_not_loaded_until_source_uses_it() -> None:
     assert calls == []
 
 
-def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
+def test_public_provider_context_receives_the_shared_knowledge_registry() -> None:
     seen: list[KnowledgeAdapterRegistry] = []
 
     def source_factory(provider: Provider, context: Any) -> Any:
@@ -534,9 +535,10 @@ def test_public_source_context_receives_the_shared_knowledge_registry() -> None:
     app = configure(
         catalog=Catalog((Provider("custom", "custom-knowledge"),)),
         adapters=(
-            SourceAdapterDefinition("custom-knowledge", source_factory),
+            ProviderAdapterDefinition("custom-knowledge", source_factory),
             registry_definition,
         ),
+        knowledge={"time": "standard"},
     )
     app.load(Reference("custom", parameters={}))
     assert len(seen) == 1
@@ -554,6 +556,7 @@ def test_public_builtin_source_receives_knowledge_adapters() -> None:
             ),
             KnowledgeAdapterDefinition("standard", standard_time_factory, "time"),
         ),
+        knowledge={"identity": "official", "time": "standard"},
     )
 
     resource = app.load(Reference("fundamental", parameters=settings))
@@ -579,7 +582,7 @@ def test_public_application_auto_registers_standard_time_adapter() -> None:
     }
 
 
-def test_custom_time_definition_replaces_the_preinstalled_adapter() -> None:
+def test_explicitly_selected_custom_time_replaces_the_preinstalled_adapter() -> None:
     class CustomTimeAdapter:
         def resolve_time(self, value: str, *, kind: Any = None) -> TimeSemantic:
             return TimeSemantic("calendar_year", year=2099, raw=value)
@@ -591,6 +594,7 @@ def test_custom_time_definition_replaces_the_preinstalled_adapter() -> None:
                 "custom-time", lambda _context: CustomTimeAdapter(), "time"
             ),
         ),
+        knowledge={"time": "custom-time"},
     )
     settings = fundamental_settings()
     settings["time"] = "任意の時点"

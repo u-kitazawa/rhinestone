@@ -2,7 +2,7 @@
 
 `CkanAdapter` は CKAN Action API の resource を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `ckan`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `ckan`
 
 ## 設定と検索
 
@@ -13,7 +13,7 @@ Providerに`spatial_search=True`を設定した場合だけ`bbox`も利用でき
 [データを検索する](../../search.md)を参照してください。
 
 配布 URL は API response から取得し、推測しません。
-CKANが広告する `format` はExecution Adapterと共有するcanonical名へ小文字で正規化し、
+CKANが広告する `format` はRuntime Adapterと共有するcanonical名へ小文字で正規化し、
 `GeoPackage`と`gpkg`はどちらも `Resource.format="gpkg"` として扱います。Providerの
 元表記は`resource.provenance.raw["resource"]["format"]`から確認できます。
 

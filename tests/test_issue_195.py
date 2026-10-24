@@ -8,7 +8,7 @@ import pytest
 from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
 from rhinestone.errors import (
     DestinationNotAllowedError,
-    ExecutionAdapterUnavailableError,
+    RuntimeAdapterUnavailableError,
 )
 from rhinestone.models import DiscoveryRecord, Metadata, Provenance
 
@@ -105,7 +105,7 @@ def test_plan_rejects_a_provider_that_cannot_declare_an_access_plan() -> None:
         )
     )
     resource = app.load(Reference("fixture", "data"))
-    with pytest.raises(ExecutionAdapterUnavailableError, match="no AccessPlan"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="no AccessPlan"):
         app.plan(resource)
 
 

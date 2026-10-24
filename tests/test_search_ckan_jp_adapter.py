@@ -4,13 +4,13 @@ from typing import Any
 import pytest
 
 from rhinestone import Format
-from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
-from rhinestone.adapters.source.direct import DirectAdapter
-from rhinestone.adapters.source.search_ckan_jp import SearchCkanJpAdapter
+from rhinestone.adapters.provider.direct import DirectAdapter
+from rhinestone.adapters.provider.search_ckan_jp import SearchCkanJpAdapter
+from rhinestone.adapters.runtime.pyogrio import PyogrioAdapter
 from rhinestone.errors import (
     ConfigValidationError,
     ProviderResponseError,
-    UnsupportedSourceError,
+    UnsupportedProviderError,
 )
 from rhinestone.models import ProviderSearchResults, Reference, SearchQuery
 
@@ -243,7 +243,7 @@ def test_search_ckan_jp_rejects_an_empty_page_before_its_declared_count() -> Non
 def test_search_ckan_jp_is_discovery_only() -> None:
     adapter = SearchCkanJpAdapter(get_json=lambda url, params: {})
 
-    with pytest.raises(UnsupportedSourceError, match="discovery-only"):
+    with pytest.raises(UnsupportedProviderError, match="discovery-only"):
         adapter.load(Reference("search-ckan-jp", parameters={}))
 
 
