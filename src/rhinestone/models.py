@@ -35,6 +35,7 @@ class ProviderId(str, Enum):
     ODPT = "odpt"
     MLIT_DPF = "mlit-dpf"
     SEARCH_CKAN_JP = "search-ckan-jp"
+    JAXA_GSMAP_PREVIEW = "jaxa-gsmap-preview"
 
 
 @dataclass(frozen=True)

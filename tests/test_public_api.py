@@ -209,6 +209,7 @@ def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
         BUILTIN[3],
         BUILTIN[4],
         BUILTIN[5],
+        BUILTIN[6],
     )
     assert all(isinstance(source, Provider) for source in BUILTIN.providers)
     assert all(source.id != "direct" for source in BUILTIN.providers)
