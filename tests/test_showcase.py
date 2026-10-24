@@ -89,7 +89,12 @@ def test_all_showcase_cells_compile_and_use_current_pins() -> None:
                 compile(source, str(path), "exec")
                 assert not any(o.get("output_type") == "error" for o in cell["outputs"])
         text = "".join(sources)
-        assert "@9bae025b08357d23e5f5339c25a777a1445da176" in text
+        expected_pin = (
+            "@114a7a10c30880dfb1655d0ce94fb2bf0f917145"
+            if path.name == "05_open_raster.ipynb"
+            else "@9bae025b08357d23e5f5339c25a777a1445da176"
+        )
+        assert expected_pin in text
         assert "@develop" not in text
 
 
@@ -100,6 +105,7 @@ def test_main_entry_points_and_advanced_examples_are_separate() -> None:
         "02_open_vector.ipynb",
         "03_portable_vector.ipynb",
         "04_explore.ipynb",
+        "05_open_raster.ipynb",
     }
     assert {p.name for p in SHOWCASE.glob("*.ipynb")} == expected
     for name in expected:

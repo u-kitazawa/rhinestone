@@ -11,7 +11,7 @@ frame = resource.open("pyogrio", runtime=pyogrio)
 
 実行例では那須塩原市の公園10地点を読み込めます。
 [Showcase](showcase/README.md)で、依存の準備・候補一覧・URIの明示選択から試せます。
-JSONだけを別Notebookへ渡して、同じデータを開く例もあります。
+JSONだけを別Notebookへ渡す例と、組み込みJAXA Providerから月降水量を縮小表示する例もあります。
 
 ![那須塩原市の公園10地点の実行結果](showcase/assets/parks.svg)
 

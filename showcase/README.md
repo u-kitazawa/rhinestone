@@ -22,12 +22,14 @@ Notebookでは候補を一覧表示してURIを明示選択し、0件・診断�
 | [02 Open](02_open_vector.ipynb) | 候補を明示選択し、pyogrioで開いて地図を描き、Plan JSONを書き出す | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_open_vector.ipynb) |
 | [03 Portable](03_portable_vector.ipynb) | 02のJSONをアップロードし、検索元Providerのない環境で同じデータを開く | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_portable_vector.ipynb) |
 | [04 Explore](04_explore.ipynb) | 名前の条件を「八汐」「黒磯」等へ変え、公園を絞って強調表示する | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_explore.ipynb) |
+| [05 Raster](05_open_raster.ipynb) | 組み込みJAXA Providerで月降水量を検索し、日本周辺だけを縮小読取して表示する | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/05_open_raster.ipynb) |
 
 各Notebookはsetupを1セル実行してから上から順に使えます。認証キーは不要です。
 01はCSVなども含めて形式を限定せずに探します。02はpyogrio対応形式で検索し直すため、
 候補が異なります。SELECTED_URIは02で表示した一覧から選んでください。
 01はRhinestoneだけ、02〜04は固定バージョンのpyogrio・GeoPandas・Matplotlibを導入します。
-固定コミットは `9bae025b08357d23e5f5339c25a777a1445da176` です。
+01〜04の固定コミットは `9bae025b08357d23e5f5339c25a777a1445da176` です。
+05は組み込みJAXA Providerを含む `114a7a10c30880dfb1655d0ce94fb2bf0f917145` を使います。
 
 02と03は別Notebook・新しいkernelで実行します。02の`vector-plan.json`をダウンロードし、
 03の作業ディレクトリへアップロードしてください。既存ファイルは上書きしません。
@@ -64,16 +66,23 @@ Colab/Jupyterのkernelによる通し実行は検証環境の通信権限制約�
 保守者のlocal smokeでは`RHINESTONE_SHOWCASE_LOCAL=1`でsetupの再installを省略できます。
 その場合は上記commitと依存を別途用意して検証対象を記録します。TLSが環境依存の場合は管理済みCAをGDALへ設定してください。
 
-## 発展編とラスター
+## ラスターと発展編
+
+05は追加設定・APIキーなしで、JAXA Earth GSMaP月降水量の検証済みプレビューを検索します。
+対象は2021年2月・level 0・東経0〜180度に固定された組み込みProviderです。JAXA全製品・全期間を
+検索する例ではありません。検索はCatalogとItemの最大2文書に制限され、OpenではCOG全体を
+メモリ展開せず、日本周辺を64×64へ縮小読取します。RasterioとMatplotlibは利用者側のRuntimeです。
+
+JAXA Earth APIは静的COG/STACを配信し、現時点で登録・APIキー・回数制限を設けていません。
+データごとのライセンスはSTACの情報を確認し、公開成果にはJAXA Earth APIを利用した旨を明記してください。
+[公式サイトと利用条件](https://data.earth.jaxa.jp/ja/)を参照してください。
 
 必要な場面で詳細を調べられるよう、内部の来歴と手入力STACは別の入口へ移しました。
 
 - [発見側と解決側の来歴](advanced/discovery_lineage.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/advanced/discovery_lineage.ipynb)
 - [既知のSTAC Item / assetを指定する](advanced/stac_explicit.ipynb) · [Colab](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/advanced/stac_explicit.ipynb)
 
-国内STACを初期設定なしで検索して開くラスター体験は[#211](https://github.com/u-kitazawa/rhinestone/issues/211)に依存します。
-解像度・期間・階層選択の方針が確定した提供元を使い、Openへ組み込みます。
-発展編の4項目手入力を、この完成条件の達成とは扱いません。
+発展編の4項目手入力は、05の設定不要な入口とは別の高度な利用例です。
 
 短いAPI例は[examples](../examples/README.md)、手順や内部契約は[利用者ガイド](../docs/getting-started.md)を参照してください。
 NotebookのコードはMIT License、公開データには上記の配布元条件が適用されます。
