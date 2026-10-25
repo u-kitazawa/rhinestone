@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "jsonschema>=4.18,<5",
+    "pystac-core>=1.15.2,<2",
 ]
 
 [project.urls]

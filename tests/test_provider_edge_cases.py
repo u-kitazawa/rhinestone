@@ -75,9 +75,12 @@ def test_stac_serializes_interval_and_skips_ambiguous_data_assets() -> None:
     response = {
         "features": [
             {
+                "type": "Feature",
+                "stac_version": "1.0.0",
+                "geometry": None,
                 "id": "item",
                 "collection": "collection",
-                "properties": {},
+                "properties": {"datetime": "2024-01-01T00:00:00Z"},
                 "assets": {
                     "thumbnail": {"href": "https://thumb", "roles": ["thumbnail"]},
                     "a": {"href": "https://a", "roles": ["data"]},
@@ -109,8 +112,11 @@ def test_stac_asset_without_media_type_remains_explicitly_unknown() -> None:
     client = RecordingJsonClient(
         {
             item_url: {
+                "type": "Feature",
+                "stac_version": "1.0.0",
+                "geometry": None,
                 "id": "i",
-                "properties": {},
+                "properties": {"datetime": "2024-01-01T00:00:00Z"},
                 "assets": {"data": {"href": "https://f.tif"}},
             }
         }
@@ -138,8 +144,11 @@ def test_stac_plain_tiff_media_type_maps_to_geotiff() -> None:
     client = RecordingJsonClient(
         {
             item_url: {
+                "type": "Feature",
+                "stac_version": "1.0.0",
+                "geometry": None,
                 "id": "i",
-                "properties": {},
+                "properties": {"datetime": "2024-01-01T00:00:00Z"},
                 "assets": {"data": {"href": "https://f.tif", "type": "image/tiff"}},
             }
         }
