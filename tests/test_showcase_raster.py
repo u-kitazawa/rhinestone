@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -168,3 +169,29 @@ def test_open_reads_only_a_small_bbox_preview(monkeypatch: pytest.MonkeyPatch) -
     run("open", namespace)
     assert selected.calls == [("rasterio", rasterio)]
     assert namespace["preview"] is data
+
+
+@pytest.mark.parametrize(
+    ("bounds", "extent"),
+    [
+        ((135.0, 30.0, 145.0, 40.0), (135.0, 145.0, 30.0, 40.0)),
+        ((130.0, 31.0, 139.0, 37.0), (130.0, 139.0, 31.0, 37.0)),
+    ],
+)
+def test_plot_preserves_longitude_and_latitude_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+    bounds: tuple[float, float, float, float],
+    extent: tuple[float, float, float, float],
+) -> None:
+    pyplot = MagicMock()
+    figure, axis = MagicMock(), MagicMock()
+    pyplot.subplots.return_value = (figure, axis)
+    monkeypatch.setitem(sys.modules, "matplotlib", SimpleNamespace(pyplot=pyplot))
+    monkeypatch.setitem(sys.modules, "matplotlib.pyplot", pyplot)
+    preview = object()
+
+    run("plot", {"BBOX": bounds, "preview": preview})
+
+    axis.imshow.assert_called_once_with(
+        preview, origin="upper", extent=extent, cmap="Blues"
+    )
