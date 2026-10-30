@@ -6,7 +6,7 @@ Rhinestoneは、配信元・プロトコル固有の解釈を必要な範囲で�
 
 | 層 | Rhinestoneの方針 | 例 |
 | --- | --- | --- |
-| Core | 軽量な必須依存だけを持つ | `jsonschema` |
+| Core | 軽量な必須依存だけを持つ | `jsonschema`、`pystac-core`（標準STAC文書・リンク解釈） |
 | HTTP通信 | 組み込みで提供する | 提供元メタデータ、JSONサービス |
 | Provider Adapter | 提供元／通信仕様の解釈を担当する。専用ライブラリは意味の委譲が必要な場合だけ採用する | STAC、DCAT |
 | Runtime Adapter | 選択済みAccessPlanを専門ライブラリの呼び出しへ翻訳する | GDAL、Rasterio、pyogrio |
