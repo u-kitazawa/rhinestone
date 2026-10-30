@@ -8,6 +8,22 @@ API型は`endpoint`から`/search`を呼びます。静的型は`catalog_uri`か
 明示的に失敗します。相対リンクとasset hrefは、それぞれを含むレスポンスURIを基準に
 解決されます。
 
+標準文書（Catalog / Collection / Item）の解釈とLink / Assetの相対href解決は
+PySTACへ委譲します。配布依存は拡張パッケージ群を含まない`pystac-core>=1.15.2,<2`
+（import名は`pystac`）です。GIS Runtimeや`pystac-client`はCore依存へ追加しません。
+HTTP取得・認証・destination policy、幅優先の探索・上限・訪問管理、検索条件、
+assetの明示選択とResource/AccessPlan変換はRhinestoneが担当します。
+PySTACの自動再帰探索・既定I/O・ネットワークschema検証・暗黙の旧版migrationは使いません。
+未選択の親・root・collection・extension schemaへの追加通信は行いません。
+
+取得時の文書はraw metadataにそのまま保持し、PySTACによる再シリアライズ結果で置換しません。
+Itemの`stac_version`・`type`・日時等をPySTACが解釈できない場合、検索では
+`item_skipped` / `invalid_item`、直接loadでは`ProviderResponseError`となります。
+Catalog / Collectionの解釈失敗は応答全体の`ProviderResponseError`です。
+これは全STAC schemaへの適合検証を保証するものではありません。
+redirect後のURIも訪問済みとして管理し、同じ文書への別名リンクから重複候補を作りません。
+文書内の`self`リンクより実際のレスポンスURIを相対解決の基準として優先します。
+
 [Provider Adapter 一覧](../provider-adapters.md) · adapter type: `stac`
 
 ## 設定と検索
@@ -16,6 +32,31 @@ Provider の `settings` へAPI型は `endpoint`、静的型は `catalog_uri` を
 直接loadのReferenceには `collection_id`、`item_id`、`asset_key` が必要です。
 静的型ではItemの配信URIを `item_href` に指定します（検索結果のReferenceには保持済み）。
 検索には `bbox`、`time`、`limit` を使えます。
+
+組み込みCatalogの`jaxa-gsmap-preview`は、追加設定やAPIキーなしで試せる
+JAXA Earth GSMaP月降水量の低解像度プレビューです。大規模なJAXAルートCatalogを
+走査せず、検証済みの2021年2月・level 0・東経0〜180度の階層をProvider設定で
+直接指定し、取得上限を2文書に固定しています。これはJAXA全製品・全期間を検索する
+Providerではありません。
+
+```python
+from datetime import datetime, timezone
+
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN, Catalog
+
+jaxa = Catalog(provider for provider in BUILTIN if provider.id == "jaxa-gsmap-preview")
+app = configure(catalog=jaxa)
+results = app.search(
+    bbox=(139.0, 35.0, 140.0, 36.0),
+    time=(
+        datetime(2021, 2, 1, tzinfo=timezone.utc),
+        datetime(2021, 2, 28, tzinfo=timezone.utc),
+    ),
+    limit=1,
+)
+resource = results[0]
+```
 
 API型の`features`配列に混在する非object値や不正Itemは、
 `item_skipped` / `invalid_item`の診断付きで除外し、正常なItemの結果順とmetadataを保持します。

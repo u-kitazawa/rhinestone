@@ -2,11 +2,19 @@
 
 `StacAdapter` は STAC APIと静的STACのItem assetを配信単位の `Resource` に変換します。
 
+標準文書の解釈・相対Link/Asset解決はPySTAC（`pystac-core`）へ委譲します。
+取得・認可・巡回上限と訪問管理・選択・Resource/Plan変換はRhinestoneが担当し、
+PySTACの自動I/Oや再帰巡回は利用しません。raw metadataは取得文書を保持します。
+
 - Adapter 種別（`adapter_type`）: `stac`
 - Provider設定: API型は `endpoint`、静的型は `catalog_uri`（排他的）。
 - 直接loadのReference: `collection_id`, `item_id`, `asset_key`。静的型では `item_href` も必要。
 - 検索: `bbox`, `time`, `limit`
 - 注入: `get_json(url, params)`。`credential` に論理名を指定し、`credentials` のRegistryから認証情報を取得します。
+
+組み込みの`jaxa-gsmap-preview`は、JAXA Earth GSMaP月降水量の検証済み
+2021年2月・level 0・東経0〜180度階層を`catalog_uri`に設定し、
+`max_documents=2`で低解像度プレビューだけを有界探索します。
 
 API型・静的型のどちらも各data assetを独立Resourceとして返し、
 複数assetのItemでも先頭assetを暗黙選択しません。

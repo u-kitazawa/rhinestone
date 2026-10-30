@@ -245,9 +245,12 @@ def test_stac_rasterio_tutorial_selects_an_explicit_asset(
     def get_json(url: str, params: object, headers: object = None) -> dict[str, object]:
         requested.append((url, params))
         return {
+            "type": "Feature",
+            "stac_version": "1.0.0",
+            "geometry": None,
             "id": "scene-1",
             "collection": "imagery",
-            "properties": {"title": "Scene 1"},
+            "properties": {"title": "Scene 1", "datetime": "2024-01-01T00:00:00Z"},
             "assets": {
                 "analytic": {
                     "href": "https://assets.example/analytic.tif",

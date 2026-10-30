@@ -25,6 +25,7 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "odpt",
         "mlit-dpf",
         "search-ckan-jp",
+        "jaxa-gsmap-preview",
     )
     catalog_entries = load_source_catalog()
     assert tuple(entry.provider for entry in catalog_entries) == definitions
@@ -35,6 +36,7 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "ODPT",
         "MLIT_DPF",
         "SEARCH_CKAN_JP",
+        "JAXA_GSMAP_PREVIEW",
     )
     assert definitions == BUILTIN.providers
     assert all(isinstance(definition, Provider) for definition in BUILTIN.providers)
@@ -63,6 +65,21 @@ def test_gsi_tiles_are_defined_in_sources_catalog() -> None:
     assert metadata["title"] == "標準地図"
     candidates = cast(Sequence[Mapping[str, Any]], standard["candidates"])
     assert candidates[0]["uri"].endswith("/std/{z}/{x}/{y}.png")
+
+
+def test_jaxa_low_resolution_preview_is_bounded_in_sources_catalog() -> None:
+    preview = BUILTIN[6]
+
+    assert preview.id == "jaxa-gsmap-preview"
+    assert preview.adapter_type == "stac"
+    assert preview.settings == {
+        "catalog_uri": (
+            "https://s3.ap-northeast-1.wasabisys.com/je-pds/cog/v1/"
+            "JAXA.EORC_GSMaP_standard.Gauge.00Z-23Z.v6_monthly/"
+            "2021-02/0/E000.00-E180.00/catalog.json"
+        ),
+        "max_documents": 2,
+    }
 
 
 @pytest.mark.parametrize("name", (None, "", "../sources.json", "a\\b", ".", ".."))
