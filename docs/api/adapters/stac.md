@@ -33,6 +33,31 @@ Provider の `settings` へAPI型は `endpoint`、静的型は `catalog_uri` を
 静的型ではItemの配信URIを `item_href` に指定します（検索結果のReferenceには保持済み）。
 検索には `bbox`、`time`、`limit` を使えます。
 
+組み込みCatalogの`jaxa-gsmap-preview`は、追加設定やAPIキーなしで試せる
+JAXA Earth GSMaP月降水量の低解像度プレビューです。大規模なJAXAルートCatalogを
+走査せず、検証済みの2021年2月・level 0・東経0〜180度の階層をProvider設定で
+直接指定し、取得上限を2文書に固定しています。これはJAXA全製品・全期間を検索する
+Providerではありません。
+
+```python
+from datetime import datetime, timezone
+
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN, Catalog
+
+jaxa = Catalog(provider for provider in BUILTIN if provider.id == "jaxa-gsmap-preview")
+app = configure(catalog=jaxa)
+results = app.search(
+    bbox=(139.0, 35.0, 140.0, 36.0),
+    time=(
+        datetime(2021, 2, 1, tzinfo=timezone.utc),
+        datetime(2021, 2, 28, tzinfo=timezone.utc),
+    ),
+    limit=1,
+)
+resource = results[0]
+```
+
 API型の`features`配列に混在する非object値や不正Itemは、
 `item_skipped` / `invalid_item`の診断付きで除外し、正常なItemの結果順とmetadataを保持します。
 `features`自体の欠落、またはobject・nullなどの配列以外の値は、

@@ -193,6 +193,14 @@
         "endpoint": "https://search.ckan.jp/backend/api"
       },
       "name": "SEARCH_CKAN_JP"
+    },
+    "jaxa-gsmap-preview": {
+      "adapter_type": "stac",
+      "settings": {
+        "catalog_uri": "https://s3.ap-northeast-1.wasabisys.com/je-pds/cog/v1/JAXA.EORC_GSMaP_standard.Gauge.00Z-23Z.v6_monthly/2021-02/0/E000.00-E180.00/catalog.json",
+        "max_documents": 2
+      },
+      "name": "JAXA_GSMAP_PREVIEW"
     }
   }
 }

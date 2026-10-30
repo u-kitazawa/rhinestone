@@ -12,6 +12,10 @@ PySTACの自動I/Oや再帰巡回は利用しません。raw metadataは取得�
 - 検索: `bbox`, `time`, `limit`
 - 注入: `get_json(url, params)`。`credential` に論理名を指定し、`credentials` のRegistryから認証情報を取得します。
 
+組み込みの`jaxa-gsmap-preview`は、JAXA Earth GSMaP月降水量の検証済み
+2021年2月・level 0・東経0〜180度階層を`catalog_uri`に設定し、
+`max_documents=2`で低解像度プレビューだけを有界探索します。
+
 API型・静的型のどちらも各data assetを独立Resourceとして返し、
 複数assetのItemでも先頭assetを暗黙選択しません。
 data assetがないItemや不正Itemはスキップし、diagnosticsで理由を確認できます。
