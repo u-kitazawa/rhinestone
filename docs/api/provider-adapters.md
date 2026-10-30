@@ -25,7 +25,7 @@ Provider Adapter は provider 固有の `Reference` と公式 API、またはリ
 | [PLATEAU](adapters/plateau.md) | `plateau` | G 空間情報センター CKAN |
 | [国交DPF](adapters/mlit-dpf.md) | `mlit-dpf` | 国土交通データプラットフォーム GraphQL API |
 | [横断CKAN検索](adapters/search-ckan-jp.md) | `search-ckan-jp` | search.ckan.jp Backend API |
-| [STAC](adapters/stac.md) | `stac` | STAC API 1.0 |
+| [STAC](adapters/stac.md) | `stac` | STAC API 1.0、静的STAC Catalog、組み込みJAXA GSMaPプレビュー |
 
 Provider Adapter は `ProviderAdapterDefinition` として明示登録できます。Definition は
 `adapter_type` と `(provider, context) -> adapter` factory から構成され、同じ Definition を
