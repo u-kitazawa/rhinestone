@@ -7,7 +7,7 @@ import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import AccessPlan, Provider, configure
-from rhinestone.catalogs import Catalog
+from rhinestone.catalogs import BUILTIN, Catalog
 from tests.provider_support import RecordingJsonClient, fixture_json
 
 
@@ -18,6 +18,49 @@ class RecordingRasterio:
     def open(self, uri: str) -> str:
         self.calls.append(uri)
         return "opened:" + uri
+
+
+def test_builtin_jaxa_preview_searches_the_bounded_level_zero_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = next(
+        candidate for candidate in BUILTIN if candidate.id == "jaxa-gsmap-preview"
+    )
+    catalog_uri = provider.settings["catalog_uri"]
+    assert isinstance(catalog_uri, str)
+    item = dict(fixture_json("stac/jaxa_items.json")["gsmap"])
+    item.pop("period")
+    item_uri = urljoin(catalog_uri, "./S90.00-N90.00.json")
+    client = RecordingJsonClient(
+        {
+            catalog_uri: {
+                "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "jaxa-gsmap-preview",
+                "description": "Fixture catalog",
+                "links": [{"rel": "item", "href": "./S90.00-N90.00.json"}],
+            },
+            item_uri: item,
+        }
+    )
+    monkeypatch.setattr(_http, "get_json", client)
+    app = configure(catalog=Catalog((provider,)))
+
+    results = app.search(
+        bbox=(139.0, 35.0, 140.0, 36.0),
+        time=(
+            datetime(2021, 2, 1, tzinfo=timezone.utc),
+            datetime(2021, 2, 28, tzinfo=timezone.utc),
+        ),
+        limit=1,
+    )
+
+    assert len(results) == 1
+    resource = results[0]
+    assert resource.reference.provider_id == "jaxa-gsmap-preview"
+    assert resource.reference.parameters["asset_key"] == "PRECIP"
+    assert app.load(resource.reference).uri == resource.uri
+    assert client.calls == [(catalog_uri, {}), (item_uri, {}), (item_uri, {})]
 
 
 @pytest.mark.parametrize(
@@ -46,6 +89,9 @@ def test_jaxa_sample_search_open_and_independent_plan(
         {
             catalog_uri: {
                 "type": "Catalog",
+                "stac_version": "1.0.0",
+                "id": "fixture",
+                "description": "Fixture catalog",
                 "links": [{"rel": "item", "href": "./S90.00-N90.00.json"}],
             },
             item_uri: item,
