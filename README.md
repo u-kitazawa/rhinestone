@@ -2,6 +2,22 @@
 
 Rhinestoneは、日本の公的・地理空間データを探し、使えるデータの場所と形式を確定し、GDALやRasterioなどの既存ライブラリへ渡すPythonライブラリです。
 
+```python
+results = search(text="公園", providers=[ProviderId.SEARCH_CKAN_JP],
+                 format=(FormatPreset.PYOGRIO,), limit=3)
+resource = next(r for r in results if r.uri == SELECTED_URI)
+frame = resource.open("pyogrio", runtime=pyogrio)
+```
+
+実行例では那須塩原市の公園10地点を読み込めます。
+[Showcase](showcase/README.md)で、依存の準備・候補一覧・URIの明示選択から試せます。
+JSONだけを別Notebookへ渡す例と、組み込みJAXA Providerから月降水量を縮小表示する例もあります。
+
+![那須塩原市の公園10地点の実行結果](showcase/assets/parks.svg)
+
+出典：那須塩原市「公園 都市整備施設」、CC BY 2.1 JP。名称・位置の抽出と表示用座標変換をしています。
+2016年更新の参考データです。[配布元・利用条件・検証範囲](showcase/README.md#データと再現性)を参照してください。
+
 まずは次の流れだけ覚えれば使い始められます。
 
 ```text
@@ -9,6 +25,8 @@ search -> Resource -> open
 ```
 
 検索結果を選び、開くまでの最小例は[はじめに](docs/getting-started.md)にあります。
+実際の公園データの地図と、JSONだけを別Notebookへ渡す体験は
+[Showcase](showcase/README.md)のDiscover → Open → Portableから試せます。
 
 ## できること
 
