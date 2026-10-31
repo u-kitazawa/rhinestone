@@ -24,7 +24,9 @@ Notebookでは候補を一覧表示してURIを明示選択し、0件・診断�
 | [04 Explore](04_explore.ipynb) | 名前の条件を「八汐」「黒磯」等へ変え、公園を絞って強調表示する | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_explore.ipynb) |
 | [05 Raster](05_open_raster.ipynb) | 組み込みJAXA Providerで月降水量を検索し、日本周辺だけを縮小読取して表示する | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/05_open_raster.ipynb) |
 
-各Notebookはsetupを1セル実行してから上から順に使えます。認証キーは不要です。
+Colabでは **「ランタイム → すべてのセルを実行」** で先頭から実行してください。
+個別に実行する場合は、setupセルに続いてimport・入力設定セルを実行し、その後に検索・読込セルへ進みます。
+ランタイムを再起動した場合も先頭から実行します。認証キーは不要です。
 01はCSVなども含めて形式を限定せずに探します。02はpyogrio対応形式で検索し直すため、
 候補が異なります。SELECTED_URIは02で表示した一覧から選んでください。
 01はRhinestoneだけ、02〜04は固定バージョンのpyogrio・GeoPandas・Matplotlibを導入します。
@@ -61,7 +63,9 @@ Planにデータ本体・Runtime・Credentialは入りません。外部デー�
 0件、提供元の障害、読込失敗はNotebookの案内とdiagnosticsを確認できます。
 
 保存出力は実Pythonセルを独立したプロセスで実行して得た観測です。
-Colab/Jupyterのkernelによる通し実行は検証環境の通信権限制約により未確認です。
+Colabでの実行は、01〜04が2026-10-24、05が2026-10-31にユーザーから成功報告を受けています。
+05では準備セル未実行による`search`未定義を解消した後の成功報告です。
+この記録はユーザー報告に基づき、保存出力の追加や他のJupyter環境での検証を意味しません。
 ライブ Provider への疎通は通常 CI の必須条件にしません。fixtureで検証できる契約は通常CIで確認します。
 保守者のlocal smokeでは`RHINESTONE_SHOWCASE_LOCAL=1`でsetupの再installを省略できます。
 その場合は上記commitと依存を別途用意して検証対象を記録します。TLSが環境依存の場合は管理済みCAをGDALへ設定してください。
