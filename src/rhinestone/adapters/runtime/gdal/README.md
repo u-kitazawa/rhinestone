@@ -8,3 +8,7 @@
 - Runtimeの呼び出し: `OpenEx(uri, open_options=...)`
 
 Resource の再選択、データ解析、形式・CRS 変換は行いません。
+
+通常のHTTPS URIはそのまま`OpenEx`へ渡すため、部分転送を保証しません。
+Range対応を確認した静的HTTPSラスタで`/vsicurl/`を使う例と、Resource/Planの
+元URIを保持する境界は[GDALガイド](../../../../../docs/api/adapters/gdal.md)を参照してください。
