@@ -36,6 +36,8 @@ class ProviderId(str, Enum):
     MLIT_DPF = "mlit-dpf"
     SEARCH_CKAN_JP = "search-ckan-jp"
     JAXA_GSMAP_PREVIEW = "jaxa-gsmap-preview"
+    JAXA_AW3D_PREVIEW = "jaxa-aw3d-preview"
+    JAXA_HRLULC_PREVIEW = "jaxa-hrlulc-preview"
 
 
 @dataclass(frozen=True)

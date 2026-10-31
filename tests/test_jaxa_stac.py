@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
-from rhinestone import AccessPlan, Provider, configure
+from rhinestone import AccessPlan, Provider, ProviderId, configure
 from rhinestone.catalogs import BUILTIN, Catalog
 from tests.provider_support import RecordingJsonClient, fixture_json
 
@@ -20,15 +20,25 @@ class RecordingRasterio:
         return "opened:" + uri
 
 
+@pytest.mark.parametrize(
+    "provider_id,fixture_name,asset_key,year",
+    [
+        (ProviderId.JAXA_GSMAP_PREVIEW, "gsmap", "PRECIP", 2021),
+        (ProviderId.JAXA_AW3D_PREVIEW, "aw3d", "DSM", 2021),
+        (ProviderId.JAXA_HRLULC_PREVIEW, "hrlulc", "HRLULC", 2024),
+    ],
+)
 def test_builtin_jaxa_preview_searches_the_bounded_level_zero_catalog(
     monkeypatch: pytest.MonkeyPatch,
+    provider_id: ProviderId,
+    fixture_name: str,
+    asset_key: str,
+    year: int,
 ) -> None:
-    provider = next(
-        candidate for candidate in BUILTIN if candidate.id == "jaxa-gsmap-preview"
-    )
+    provider = next(candidate for candidate in BUILTIN if candidate.id == provider_id)
     catalog_uri = provider.settings["catalog_uri"]
     assert isinstance(catalog_uri, str)
-    item = dict(fixture_json("stac/jaxa_items.json")["gsmap"])
+    item = dict(fixture_json("stac/jaxa_items.json")[fixture_name])
     item.pop("period")
     item_uri = urljoin(catalog_uri, "./S90.00-N90.00.json")
     client = RecordingJsonClient(
@@ -36,7 +46,7 @@ def test_builtin_jaxa_preview_searches_the_bounded_level_zero_catalog(
             catalog_uri: {
                 "type": "Catalog",
                 "stac_version": "1.0.0",
-                "id": "jaxa-gsmap-preview",
+                "id": provider_id.value,
                 "description": "Fixture catalog",
                 "links": [{"rel": "item", "href": "./S90.00-N90.00.json"}],
             },
@@ -47,18 +57,19 @@ def test_builtin_jaxa_preview_searches_the_bounded_level_zero_catalog(
     app = configure(catalog=Catalog((provider,)))
 
     results = app.search(
+        providers=[provider_id],
         bbox=(139.0, 35.0, 140.0, 36.0),
         time=(
-            datetime(2021, 2, 1, tzinfo=timezone.utc),
-            datetime(2021, 2, 28, tzinfo=timezone.utc),
+            datetime(year, 2, 1, tzinfo=timezone.utc),
+            datetime(year, 2, 28, tzinfo=timezone.utc),
         ),
         limit=1,
     )
 
     assert len(results) == 1
     resource = results[0]
-    assert resource.reference.provider_id == "jaxa-gsmap-preview"
-    assert resource.reference.parameters["asset_key"] == "PRECIP"
+    assert resource.reference.provider_id == provider_id
+    assert resource.reference.parameters["asset_key"] == asset_key
     assert app.load(resource.reference).uri == resource.uri
     assert client.calls == [(catalog_uri, {}), (item_uri, {}), (item_uri, {})]
 
@@ -78,7 +89,7 @@ def test_jaxa_sample_search_open_and_independent_plan(
     format_name: str,
     year: int,
 ) -> None:
-    # Reduced snapshots of the official level-0 Items, not a built-in Provider.
+    # Reduced snapshots of the official level-0 Items with a custom Provider.
     item: dict[str, Any] = dict(fixture_json("stac/jaxa_items.json")[name])
     period = item.pop("period")
     base = "https://s3.ap-northeast-1.wasabisys.com/je-pds/cog/v1/"

@@ -26,6 +26,8 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "mlit-dpf",
         "search-ckan-jp",
         "jaxa-gsmap-preview",
+        "jaxa-aw3d-preview",
+        "jaxa-hrlulc-preview",
     )
     catalog_entries = load_source_catalog()
     assert tuple(entry.provider for entry in catalog_entries) == definitions
@@ -37,6 +39,8 @@ def test_builtin_sources_are_loaded_from_the_repository_catalog() -> None:
         "MLIT_DPF",
         "SEARCH_CKAN_JP",
         "JAXA_GSMAP_PREVIEW",
+        "JAXA_AW3D_PREVIEW",
+        "JAXA_HRLULC_PREVIEW",
     )
     assert definitions == BUILTIN.providers
     assert all(isinstance(definition, Provider) for definition in BUILTIN.providers)
@@ -67,16 +71,27 @@ def test_gsi_tiles_are_defined_in_sources_catalog() -> None:
     assert candidates[0]["uri"].endswith("/std/{z}/{x}/{y}.png")
 
 
-def test_jaxa_low_resolution_preview_is_bounded_in_sources_catalog() -> None:
-    preview = BUILTIN[6]
-
-    assert preview.id == "jaxa-gsmap-preview"
+@pytest.mark.parametrize(
+    "provider_id,collection,period",
+    [
+        (
+            "jaxa-gsmap-preview",
+            "JAXA.EORC_GSMaP_standard.Gauge.00Z-23Z.v6_monthly",
+            "2021-02",
+        ),
+        ("jaxa-aw3d-preview", "JAXA.EORC_ALOS.PRISM_AW3D30.v3.2_global", "2021-02"),
+        ("jaxa-hrlulc-preview", "JAXA.EORC_ALOS_HRLULC.v25.04_japan", "2024"),
+    ],
+)
+def test_jaxa_low_resolution_preview_is_bounded_in_sources_catalog(
+    provider_id: str, collection: str, period: str
+) -> None:
+    preview = next(provider for provider in BUILTIN if provider.id == provider_id)
     assert preview.adapter_type == "stac"
     assert preview.settings == {
         "catalog_uri": (
             "https://s3.ap-northeast-1.wasabisys.com/je-pds/cog/v1/"
-            "JAXA.EORC_GSMaP_standard.Gauge.00Z-23Z.v6_monthly/"
-            "2021-02/0/E000.00-E180.00/catalog.json"
+            f"{collection}/{period}/0/E000.00-E180.00/catalog.json"
         ),
         "max_documents": 2,
     }
