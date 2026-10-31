@@ -22,16 +22,16 @@ Notebookでは候補を一覧表示してURIを明示選択し、0件・診断�
 | [02 Open](02_open_vector.ipynb) | 候補を明示選択し、pyogrioで開いて地図を描き、Plan JSONを書き出す | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/02_open_vector.ipynb) |
 | [03 Portable](03_portable_vector.ipynb) | 02のJSONをアップロードし、検索元Providerのない環境で同じデータを開く | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/03_portable_vector.ipynb) |
 | [04 Explore](04_explore.ipynb) | 名前の条件を「八汐」「黒磯」等へ変え、公園を絞って強調表示する | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/04_explore.ipynb) |
-| [05 Raster](05_open_raster.ipynb) | 組み込みJAXA Providerで月降水量を検索し、日本周辺だけを縮小読取して表示する | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/05_open_raster.ipynb) |
+| [05 Raster](05_open_raster.ipynb) | 降水量・標高・土地被覆を選び、縮小表示と独立Planの読込を試す | [開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/05_open_raster.ipynb) |
 
 Colabでは **「ランタイム → すべてのセルを実行」** で先頭から実行してください。
-個別に実行する場合は、setupセルに続いてimport・入力設定セルを実行し、その後に検索・読込セルへ進みます。
+個別に実行する場合は、setupセルに続いてimport・入力設定セル（05はプリセット選択セルも）を実行し、検索・読込セルへ進みます。
 ランタイムを再起動した場合も先頭から実行します。認証キーは不要です。
 01はCSVなども含めて形式を限定せずに探します。02はpyogrio対応形式で検索し直すため、
 候補が異なります。SELECTED_URIは02で表示した一覧から選んでください。
 01はRhinestoneだけ、02〜04は固定バージョンのpyogrio・GeoPandas・Matplotlibを導入します。
 01〜04の固定コミットは `9bae025b08357d23e5f5339c25a777a1445da176` です。
-05は組み込みJAXA Providerを含む `114a7a10c30880dfb1655d0ce94fb2bf0f917145` を使います。
+05は組み込みJAXA Providerを含む `bf4b7d98a73f6871b1301c184386abf83cff29a9` を使います。
 
 02と03は別Notebook・新しいkernelで実行します。02の`vector-plan.json`をダウンロードし、
 03の作業ディレクトリへアップロードしてください。既存ファイルは上書きしません。
@@ -65,21 +65,26 @@ Planにデータ本体・Runtime・Credentialは入りません。外部デー�
 保存出力は実Pythonセルを独立したプロセスで実行して得た観測です。
 Colabでの実行は、01〜04が2026-10-24、05が2026-10-31にユーザーから成功報告を受けています。
 05では準備セル未実行による`search`未定義を解消した後の成功報告です。
-この記録はユーザー報告に基づき、保存出力の追加や他のJupyter環境での検証を意味しません。
+この記録はユーザー報告に基づき、今回の3分野切替・独立Plan追加後のColab成功を意味しません。
+改訂後の検証範囲はPR/Issueへ記録し、保存出力は残していません。
 ライブ Provider への疎通は通常 CI の必須条件にしません。fixtureで検証できる契約は通常CIで確認します。
 保守者のlocal smokeでは`RHINESTONE_SHOWCASE_LOCAL=1`でsetupの再installを省略できます。
 その場合は上記commitと依存を別途用意して検証対象を記録します。TLSが環境依存の場合は管理済みCAをGDALへ設定してください。
 
 ## ラスターと発展編
 
-05は追加設定・APIキーなしで、JAXA Earth GSMaP月降水量の検証済みプレビューを検索します。
-対象は2021年2月・level 0・東経0〜180度に固定された組み込みProviderです。JAXA全製品・全期間を
-検索する例ではありません。検索はCatalogとItemの最大2文書に制限され、OpenではCOG全体を
-メモリ展開せず、日本周辺を64×64へ縮小読取します。RasterioとMatplotlibは利用者側のRuntimeです。
+05はDATASETをgsmap（月降水量）・aw3d（標高）・hrlulc（土地被覆）から選びます。
+追加設定・APIキーなしで各組み込みProviderを検索し、日本周辺を64×64へ縮小読取します。
+GSMaP/AW3Dは2021年2月、HRLULCは2024年の固定配信階層です。いずれもlevel 0・
+東経0〜180度だけを対象とし、検索のmetadata取得は各最大2文書です。
+土地被覆の分類IDは平均せず最近傍で読み、分類IDの範囲1〜15を表示します。
+全製品・全期間や原解像度解析の例ではありません。RasterioとMatplotlibは利用者側Runtimeです。
+最後のセルではJSON化したPlanを、元STAC Providerを持たない別コンテキストで開きます。
+配信URIの許可とRuntimeは必要で、Planだけでデータ本体への通信が不要になるわけではありません。
 
-JAXA Earth APIは静的COG/STACを配信し、現時点で登録・APIキー・回数制限を設けていません。
-データごとのライセンスはSTACの情報を確認し、公開成果にはJAXA Earth APIを利用した旨を明記してください。
-[公式サイトと利用条件](https://data.earth.jaxa.jp/ja/)を参照してください。
+[JAXA Earth APIの利用条件](https://data.earth.jaxa.jp/ja/)と各製品の条件を確認し、
+出典表示・Earth API利用の明記・商用利用前の通知等に従ってください。
+詳細は[STAC設定](../docs/api/adapters/stac.md)を参照してください。
 
 必要な場面で詳細を調べられるよう、内部の来歴と手入力STACは別の入口へ移しました。
 

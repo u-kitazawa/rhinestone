@@ -13,7 +13,7 @@ frame = resource.open("pyogrio", runtime=pyogrio)
 [Showcase](showcase/README.md)で、依存の準備・候補一覧・URIの明示選択から試せます。
 [01 DiscoverをColabで開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/01_discover.ipynb) ·
 [05 RasterをColabで開く](https://colab.research.google.com/github/u-kitazawa/rhinestone/blob/develop/showcase/05_open_raster.ipynb)
-JSONだけを別Notebookへ渡す例と、組み込みJAXA Providerから月降水量を縮小表示する例もあります。
+JSONだけを別Notebookへ渡す例と、組み込みJAXA Providerから降水量・標高・土地被覆を選んで縮小表示する例もあります。
 
 ![那須塩原市の公園10地点の実行結果](showcase/assets/parks.svg)
 
