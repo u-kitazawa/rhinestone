@@ -28,8 +28,9 @@ resource = results[0]
 
 `ProviderId`は文字列enumです。IDEの補完で組み込みProviderを選べます。
 `GEOSPATIAL_JP`、`PLATEAU`、`GSI`、`ODPT`、`MLIT_DPF`、`SEARCH_CKAN_JP`、
-`JAXA_GSMAP_PREVIEW`を提供します。`JAXA_GSMAP_PREVIEW`は検証済みの低解像度・
-固定期間階層だけを有界探索するプレビューです。
+`JAXA_GSMAP_PREVIEW`、`JAXA_AW3D_PREVIEW`、`JAXA_HRLULC_PREVIEW`を提供します。
+JAXAの3件は検証済みの低解像度・固定期間階層だけを有界探索するプレビューです。
+対象期間とassetは[STAC設定](api/adapters/stac.md)を参照してください。
 独自Providerは`Provider.id`の文字列で指定します。
 
 `providers=[ProviderId.GEOSPATIAL_JP]`は検索前に対象を限定します。未選択Providerの

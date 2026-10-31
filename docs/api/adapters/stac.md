@@ -33,21 +33,28 @@ Provider の `settings` へAPI型は `endpoint`、静的型は `catalog_uri` を
 静的型ではItemの配信URIを `item_href` に指定します（検索結果のReferenceには保持済み）。
 検索には `bbox`、`time`、`limit` を使えます。
 
-組み込みCatalogの`jaxa-gsmap-preview`は、追加設定やAPIキーなしで試せる
-JAXA Earth GSMaP月降水量の低解像度プレビューです。大規模なJAXAルートCatalogを
-走査せず、検証済みの2021年2月・level 0・東経0〜180度の階層をProvider設定で
-直接指定し、取得上限を2文書に固定しています。これはJAXA全製品・全期間を検索する
-Providerではありません。
+組み込みCatalogには、追加設定やAPIキーなしで試せるJAXA Earthの
+低解像度プレビューを用意しています。
+
+| ProviderId / ID | データ | 固定期間 | data asset |
+| --- | --- | --- | --- |
+| `JAXA_GSMAP_PREVIEW` / `jaxa-gsmap-preview` | GSMaP月降水量 | 2021年2月 | `PRECIP` |
+| `JAXA_AW3D_PREVIEW` / `jaxa-aw3d-preview` | AW3D30 v3.2の標高 | 2021年2月 | `DSM` |
+| `JAXA_HRLULC_PREVIEW` / `jaxa-hrlulc-preview` | HRLULC v25.04の土地被覆 | 2024年 | `HRLULC` |
+
+大規模なJAXAルートCatalogを走査せず、各製品のlevel 0・東経0〜180度の階層を
+Provider設定で直接指定し、それぞれ取得上限を2文書に固定しています。
+固定期間は配信階層の期間であり、標高等の観測日時を意味しません。
+これはJAXA全製品・全期間を検索するProviderではありません。
+検索の`bbox`はItemを選ぶ条件であり、開いたラスタの切り出しではありません。
 
 ```python
 from datetime import datetime, timezone
 
-from rhinestone import configure
-from rhinestone.catalogs import BUILTIN, Catalog
+from rhinestone import ProviderId, search
 
-jaxa = Catalog(provider for provider in BUILTIN if provider.id == "jaxa-gsmap-preview")
-app = configure(catalog=jaxa)
-results = app.search(
+results = search(
+    providers=[ProviderId.JAXA_GSMAP_PREVIEW],
     bbox=(139.0, 35.0, 140.0, 36.0),
     time=(
         datetime(2021, 2, 1, tzinfo=timezone.utc),
@@ -57,6 +64,23 @@ results = app.search(
 )
 resource = results[0]
 ```
+
+上の例を`ProviderId.JAXA_AW3D_PREVIEW`へ変更すると同期間の標高を検索できます。
+土地被覆は`ProviderId.JAXA_HRLULC_PREVIEW`を選び、`time`も2024年内に変更してください。
+対象Providerだけを明示選択でき、結果のReferenceは表の`asset_key`を保持し、
+そのassetのURIをResourceとAccessPlanへ引き継ぎます。
+
+AW3Dの`DSM`は標高（m）、HRLULCは分類IDです。HRLULCの分類IDを
+連続値として平均せず、縮小表示時は最近傍など分類を保つ方法を使ってください。
+NoData値・単位・分類の意味は配信metadataと製品仕様を確認します。
+低解像度プレビューは原解像度の解析用データと同等ではありません。
+
+利用前に[JAXA Earthの利用条件](https://earth.jaxa.jp/en/data/policy/)と
+各製品の条件（[AW3D30](https://www.eorc.jaxa.jp/ALOS/aw3d30/terms)、
+[HRLULC](https://www.eorc.jaxa.jp/ALOS/lulc/terms.htm)）を確認してください。
+キーなしで取得できることは無条件利用を意味しません。
+出典表示や商用利用時の事前連絡など、適用される条件に従ってください。
+公開成果では[Earth APIの案内](https://data.earth.jaxa.jp/ja/)に従い、その利用も明記します。
 
 API型の`features`配列に混在する非object値や不正Itemは、
 `item_skipped` / `invalid_item`の診断付きで除外し、正常なItemの結果順とmetadataを保持します。
