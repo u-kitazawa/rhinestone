@@ -90,7 +90,7 @@ def test_all_showcase_cells_compile_and_use_current_pins() -> None:
                 assert not any(o.get("output_type") == "error" for o in cell["outputs"])
         text = "".join(sources)
         expected_pin = (
-            "@114a7a10c30880dfb1655d0ce94fb2bf0f917145"
+            "@bf4b7d98a73f6871b1301c184386abf83cff29a9"
             if path.name == "05_open_raster.ipynb"
             else "@9bae025b08357d23e5f5339c25a777a1445da176"
         )
