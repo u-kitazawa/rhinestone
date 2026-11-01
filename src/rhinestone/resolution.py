@@ -1,102 +1,108 @@
-"""Deterministic conversion from Source candidates to Resource access plans."""
+"""Provider-side construction of unique Resources and portable AccessPlans."""
 
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple, cast
+from collections.abc import Mapping
+from pathlib import PurePosixPath
+from typing import Any
 
-from .errors import (
-    AmbiguousResourceError,
-    ResourceNotFoundError,
-    UnsupportedAccessError,
-)
+from .errors import UnsupportedAccessError
 from .models import (
     AccessPlan,
-    FileAccessPlan,
-    RemoteDatasetPlan,
+    DiscoveryRecord,
+    Metadata,
+    Provenance,
+    Reference,
     Resource,
-    ResourceCandidate,
-    ServiceQueryPlan,
-    Source,
 )
+from .representations import canonical_format
 
-ResolutionRule = Callable[[ResourceCandidate], Optional[Tuple[int, str]]]
 
+def resource_from_delivery(
+    *,
+    reference: Reference,
+    uri: str,
+    format: str | None,
+    media_type: str | None,
+    metadata: Metadata,
+    provenance: Provenance,
+    kind: str | None = None,
+    options: Mapping[str, Any] | None = None,
+    encoding: str | None = None,
+    archive: str | None = None,
+    service: str | None = None,
+    credential: str | None = None,
+    discovery: DiscoveryRecord | None = None,
+) -> Resource:
+    """Build one Resource after a Provider selected one delivery target.
 
-class Resolver:
-    def __init__(self, rules: Iterable[ResolutionRule] = ()) -> None:
-        self._rules = tuple(rules)
-
-    def resolve(self, source: Source) -> Resource:
-        candidates: List[ResourceCandidate] = []
-        for item in source.candidates:
-            matches = item.attributes.get("matches_config", True)
-            if not isinstance(matches, bool):
-                raise UnsupportedAccessError("matches_config must be a boolean")
-            if matches:
-                candidates.append(item)
-        if not candidates:
-            raise ResourceNotFoundError("No resource matches the requested selection")
-        if len(candidates) != 1:
-            raise AmbiguousResourceError(
-                f"Expected exactly one resource candidate; got {len(candidates)}"
-            )
-        candidate = candidates[0]
-        if candidate.format is None and candidate.media_type is None:
-            raise UnsupportedAccessError(
-                "Resource format and media type are unknown; URI suffix is not guessed"
-            )
-        plan = self._select_plan(candidate)
+    This validates and normalizes a selected delivery; it performs no candidate
+    selection. Providers call it once per distribution/resource.
+    """
+    normalized = canonical_format(format)
+    if normalized is None and kind is None:
         return Resource(
-            uri=candidate.uri,
-            format=candidate.format,
-            media_type=candidate.media_type,
-            metadata=source.metadata,
-            provenance=source.provenance,
-            access_plan=plan,
-            source=source,
+            uri=uri,
+            format=None,
+            media_type=media_type,
+            metadata=metadata,
+            provenance=provenance,
+            access_plan=None,
+            reference=reference,
+            discovery=discovery,
         )
+    if kind is None:
+        if normalized == "cog":
+            kind = "remote-dataset"
+        elif normalized in {"wms", "wfs", "api", "ogc-api-features"}:
+            kind = "service-query"
+        else:
+            kind = "file"
+    plan_options = dict(options or {})
+    if encoding is not None:
+        plan_options.setdefault("encoding", encoding)
+    if kind == "file":
+        if archive is None and normalized in {"shapefile-zip", "zip"}:
+            archive = "zip"
+        if archive not in (None, "zip"):
+            raise UnsupportedAccessError("Only archive='zip' is supported")
+        entry_point = plan_options.get("entry_point")
+        if entry_point is not None:
+            if archive != "zip" or not isinstance(entry_point, str):
+                raise UnsupportedAccessError(
+                    "entry_point requires archive='zip' and a string path"
+                )
+            path = PurePosixPath(entry_point)
+            if (
+                not entry_point.strip()
+                or not path.parts
+                or path.is_absolute()
+                or ".." in path.parts
+                or "\\" in entry_point
+            ):
+                raise UnsupportedAccessError(
+                    "entry_point must be a safe relative archive path"
+                )
+        if archive is not None:
+            plan_options["archive"] = archive
+    plan = AccessPlan(
+        kind=kind,
+        uri=uri,
+        format=normalized,
+        media_type=media_type,
+        options=plan_options,
+        provider=provenance.provider,
+        service=service,
+        credential=credential,
+    )
+    return Resource(
+        uri=uri,
+        format=normalized,
+        media_type=media_type,
+        metadata=metadata,
+        provenance=provenance,
+        access_plan=plan,
+        reference=reference,
+        discovery=discovery,
+    )
 
-    def _select_plan(self, candidate: ResourceCandidate) -> AccessPlan:
-        explicit = candidate.attributes.get("access_kind")
-        if explicit is not None:
-            if not isinstance(explicit, str):
-                raise UnsupportedAccessError("access_kind must be a string")
-            return self._make_plan(explicit, candidate)
-        matches: List[Tuple[int, str]] = []
-        for rule in self._rules:
-            result = rule(candidate)
-            if result is not None:
-                matches.append(result)
-        if matches:
-            _, kind = max(matches, key=lambda match: (match[0], match[1]))
-            return self._make_plan(kind, candidate)
 
-        normalized = (candidate.format or "").lower()
-        if normalized in {"cog"}:
-            return RemoteDatasetPlan(uri=candidate.uri)
-        if normalized in {"wms", "wfs", "api", "ogc-api-features"}:
-            return ServiceQueryPlan(uri=candidate.uri)
-        if normalized:
-            archive = candidate.attributes.get("archive")
-            if archive is None and normalized in {"shapefile-zip", "zip"}:
-                archive = "zip"
-            return FileAccessPlan(uri=candidate.uri, archive=archive)
-        raise UnsupportedAccessError(
-            f"No access plan supports media type {candidate.media_type!r}"
-        )
-
-    @staticmethod
-    def _make_plan(kind: str, candidate: ResourceCandidate) -> AccessPlan:
-        options = candidate.attributes.get("access_options", {})
-        if not isinstance(options, Mapping):
-            raise UnsupportedAccessError("access_options must be an object")
-        options = cast(Mapping[str, Any], options)
-        if kind == "file":
-            return FileAccessPlan(
-                uri=candidate.uri,
-                archive=candidate.attributes.get("archive"),
-                options=options,
-            )
-        if kind == "remote-dataset":
-            return RemoteDatasetPlan(uri=candidate.uri, options=options)
-        if kind == "service-query":
-            return ServiceQueryPlan(uri=candidate.uri, options=options)
-        raise UnsupportedAccessError(f"Unknown access plan kind {kind!r}")
+__all__ = ["resource_from_delivery"]

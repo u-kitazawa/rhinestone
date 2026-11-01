@@ -1,6 +1,13 @@
-# API安定性とリリース運用
+# APIの安定性とリリース運用
 
 Rhinestoneは現在`0.1.x`のAlphaです。この文書は、利用者がアップグレードの影響を判断できるように、公開APIの範囲、変更の知らせ方、リリースの正本を定めます。
+
+## 文書の対象バージョン
+
+文書は同じブランチの実装とテストを対象とします。`develop`は次回リリース候補、
+`main`とGitHub Pagesは公開済みの境界です。`pip install rhinestone`で入るPyPI版の契約は、
+対応するリリースタグの文書で確認してください。developのインストール方法は
+[はじめに](getting-started.md)に記載しています。
 
 ## 0.1.xのAPI安定性
 
@@ -14,30 +21,40 @@ Rhinestoneは現在`0.1.x`のAlphaです。この文書は、利用者がアッ�
 - 利用者向けガイドと[APIリファレンス](api.md)に記載された関数、クラス、引数、戻り値、データ項目
 - [対応状況](compatibility.md)および各Adapterリファレンスに記載された利用方法
 
-`src/rhinestone/`に存在することだけでは、公開APIであることを意味しません。`_`で始まるmoduleや名前、`Source`、`Config`、`AccessPlan`、Resolver、Registry、Adapterの内部実装は、公開ドキュメントで明示されない限り内部APIです。内部APIを直接利用したコードの互換性は保証しません。
+`src/rhinestone/`に存在することだけでは、公開APIであることを意味しません。`_`で始まるmoduleや名前、
+Registry、Adapterの内部実装は、公開ドキュメントで明示されない限り内部APIです。`Reference`などの
+トップレベル中核APIと、各サブモジュールの`__all__`に含まれる拡張APIは、それぞれのsurfaceの契約に従います。
+内部実装を直接利用したコードの互換性は保証しません。
 
 公開APIの追加・変更・削除では、実装、テスト、該当する利用者向けドキュメントを同じ変更で更新します。
 
 ### 変更の扱い
 
 - 破壊的変更は`0.1.x`でも許容しますが、GitHub Release notesの`Removed / Breaking changes`または`Changed`に利用者への影響と移行方法を記載します。
-- deprecation periodは`0.1.x`の必須条件にしません。deprecated APIを導入する場合は`Deprecated`に対象、代替手段、削除予定または判断条件を記載します。
+- 過去のAPIを維持するための別名・wrapper・旧引数は残しません。変更時に旧APIを削除し、現行APIへ統一します。廃止猶予期間は設けません。
 - セキュリティ修正や設計上の緊急対応で段階的な廃止ができない場合も、変更の影響と必要な対応をRelease notesに記載します。
 - 内部実装の変更は、公開APIの挙動や利用者の設定・依存関係に影響しない限り、Release notesへの個別記載を必須にしません。
 
-`0.2.0`以降は、公開surfaceの整理と移行案内を進めます。`1.0.0`では、公開APIと互換性の基準を別途見直し、安定版としての契約を定めます。具体的なリリース時期はこの文書では決めません。
+トップレベルsurfaceとサブモジュールの拡張surfaceは別の契約として扱います。トップレベルの
+`__all__`は通常利用・設定導線のための小さな語彙を示し、低レベル型やAdapter契約は
+`rhinestone.models`、`rhinestone.adapters.contracts`、`rhinestone.adapters.knowledge`、
+`rhinestone.security`、`rhinestone.representations`の各`__all__`で公開します。サブモジュール
+経由の拡張APIは低レベルですが、これらの文書化されたsurfaceでは互換性を追跡します。
+
+`0.2.0`以降は、必要に応じて各surfaceの安定性を個別に見直します。`1.0.0`では、公開APIと
+互換性の基準を別途見直し、安定版としての契約を定めます。具体的なリリース時期はこの文書では決めません。
 
 ## 変更履歴の正本
 
 GitHub Releaseを、各versionの利用者向け変更履歴の正本とします。独立した`CHANGELOG.md`は作成せず、Release notesと別の履歴を二重に管理しません。
 
-各GitHub Releaseでは、次の見出しを使用します。該当する変更がない見出しは省略できます。
+各GitHub Releaseでは、次の見出し（英語の固定ラベル）を使用します。該当する変更がない見出しは省略できます。
 
-- `Added`
-- `Changed`
-- `Fixed`
-- `Deprecated`
-- `Removed / Breaking changes`
+- `Added`（追加）
+- `Changed`（変更）
+- `Fixed`（修正）
+- `Deprecated`（非推奨）
+- `Removed / Breaking changes`（削除／互換性を壊す変更）
 
 Release notesには、少なくとも次を記載します。
 
@@ -62,14 +79,13 @@ Publish workflowは、Release tagの`v`を除いたversionが`pyproject.toml`の
 
 GitHub ReleaseをPublishした後にnotesを編集しても、すでにPyPIへ公開された配布物は変更されません。公開後の訂正は、必要に応じてnotesの修正と次versionのFixedで行います。
 
-## v0.1.0の変更履歴
+## 現行APIの確認
 
-v0.1.0は初回Releaseです。初回Release notesでは、少なくとも次の主要変更を利用者が追跡できるようにします。
+通常フローは`search → Resource → open`です。直接指定には`Reference`と`load()`、
+別コンテキストへの転送には`AccessPlan`と`plan()`を使います。
+`AccessPlan`は`rhinestone`のトップレベル公開APIに含まれます。
+正確な引数・戻り値・portable schemaは[APIリファレンス](api.md)を正本とします。
 
-- `Catalog`、`Provider`、`Result`、`Resource`を中心とした公開語彙と、検索からResource解決までの利用導線
-- CKAN、DCAT、Direct、ODPT、OGC API Features、PLATEAU、STAC、静的SourceなどのSource対応範囲
-- 組み込みHTTP、外部Runtimeの注入、Credentialの分離、およびResourceのExecution Adapter連携
-- package metadata、wheel検証、GitHub Actionsによるテスト・ドキュメント・PyPI公開workflow
-- Catalog由来の宛先制限を含む、認証付きSourceとネットワークポリシーの利用契約
-
-これらはv0.1.0のRelease notesの`Added`または`Changed`に整理します。以降のversionでは、初回Releaseから変わった公開surfaceを同じ形式で追跡します。
+過去のversion固有の変更・削除・移行方法は
+[GitHub Releases](https://github.com/u-kitazawa/rhinestone/releases)を参照してください。
+このページでは現行の安定性・リリース運用のみを管理し、旧APIの移行表は保持しません。

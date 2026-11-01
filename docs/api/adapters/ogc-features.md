@@ -1,16 +1,28 @@
-# OgcFeaturesAdapter
+# OgcFeaturesAdapter（OGC API Featuresアダプター）
 
 `OgcFeaturesAdapter` は OGC API Features 1.0 の collection または feature を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `ogc-features`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `ogc-features`
 
 ## 設定と検索
 
-`collection_id` が必須です。SourceDefinitionの`settings`へ`endpoint`と検索対象の`collection_id`を指定し、Configの`feature_id`は任意です。検索には `bbox`、`time`、`limit` を使えます。
+検索用Providerの`settings`へ`endpoint`と検索対象の`collection_id`を指定します。
+検索には`bbox`、`time`、`limit`を使えます。
+
+`features`配列に混在する非object値や、ID・propertiesが不正なFeatureは、
+`item_skipped` / `invalid_feature`の診断付きで除外し、正常なFeatureの順序とmetadataを保持します。
+`features`自体の欠落、またはobject・nullなどの配列以外の値は、
+応答全体の`ProviderResponseError`として扱います。
+
+直接loadでは、Reference側にも`parameters={"collection_id": "rivers"}`、または
+`dataset_identifier="rivers"`の指定が必須です。Providerの検索用`collection_id`は
+直接loadの既定値にはなりません。任意の`feature_id`は`Reference.parameters`で指定できます。
+返却Referenceの`resource_identifier`はFeatureを指定した場合のみ設定されます。
+Collection全体の場合は未設定のまま保持し、返却Referenceを再loadしても同じitems配信を指します。
 
 `collection_id` と `feature_id` は未エンコードの論理IDとして指定します。RhinestoneはHTTP requestまたはfeature resource URIを組み立てる際に各IDを1つのpath segmentとしてpercent-encodeします。既にエンコードされたように見える値も推測で復号しないため、例えば論理IDの`%2F`はpathでは`%252F`になります。`.`と`..`だけのIDもpath traversalとして正規化されないようエンコードします。Metadataとprovenanceには元の論理IDを保持します。
 
-## Endpoint と認証
+## 接続先と認証
 
 collection が返す公式 `items` link を使用し、HTTP通信はRhinestoneの組み込みtransportで行います。`items`の`href`がrelative URI referenceの場合はCollection responseの最終URI（HTTP redirect後を含む）を基準にRFC 3986の規則でabsolute URIへ解決し、その後に明示されたfeature IDを付加します。元の`href`はraw metadataに保持し、解決済みURIをResourceとprovenanceの`original_url`に使用します。認証付きリクエストでは、認証情報が別originへ転送されないようredirectを許可しません。
 

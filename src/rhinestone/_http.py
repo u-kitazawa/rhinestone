@@ -1,7 +1,8 @@
 """Built-in standard-library HTTP transport."""
 
 import json
-from typing import Any, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
@@ -37,7 +38,7 @@ class JsonDocument(dict[str, Any]):
 def get_json(
     url: str,
     params: Mapping[str, Any],
-    headers: Optional[Mapping[str, str]] = None,
+    headers: Mapping[str, str] | None = None,
 ) -> Any:
     """Fetch and decode JSON over HTTP using the standard library."""
     request = _request(url, params, headers)
@@ -48,25 +49,36 @@ def get_json(
     )
     open_request = opener.open if opener is not None else urlopen
     with open_request(request, timeout=_TIMEOUT_SECONDS) as response:
-        try:
-            decoded = json.load(response, parse_int=_parse_json_int)
-        except (
-            UnicodeDecodeError,
-            json.JSONDecodeError,
-            _JsonIntegerDecodeError,
-        ):
-            raise ProviderResponseError("Provider response is not valid JSON") from None
-        if isinstance(decoded, Mapping):
-            response_uri = getattr(response, "geturl", lambda: request.full_url)()
-            return JsonDocument(
-                cast(Mapping[str, Any], decoded), response_uri or request.full_url
-            )
-        return decoded
+        return _decode_json(response, request.full_url)
 
 
-def get_text(url: str) -> str:
+def post_json(
+    url: str,
+    body: Mapping[str, Any],
+    headers: Mapping[str, str] | None = None,
+) -> Any:
+    """POST a JSON object and decode JSON without following redirects."""
+    request = Request(
+        url,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            **_DEFAULT_HEADERS,
+            "Content-Type": "application/json",
+            **dict(headers or {}),
+        },
+        method="POST",
+    )
+    opener = build_opener(_NoRedirectHandler())
+    with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
+        return _decode_json(response, request.full_url)
+
+
+def get_text(url: str, headers: Mapping[str, str] | None = None) -> str:
     """Fetch a text document without following HTTP redirects."""
-    request = Request(url, headers={"User-Agent": "rhinestone"})
+    request = Request(
+        url,
+        headers={"User-Agent": "rhinestone", **dict(headers or {})},
+    )
     opener = build_opener(_NoRedirectHandler())
     with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
         charset = response.headers.get_content_charset() or "utf-8"
@@ -122,14 +134,33 @@ class _NoRedirectHandler(HTTPRedirectHandler):
         msg: str,
         headers: Any,
         newurl: str,
-    ) -> Optional[Request]:
+    ) -> Request | None:
         return None
+
+
+def _decode_json(response: Any, request_url: str) -> Any:
+    try:
+        decoded = json.load(response, parse_int=_parse_json_int)
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        _JsonIntegerDecodeError,
+    ):
+        raise ProviderResponseError(
+            "Provider response is not valid JSON; expected a JSON document"
+        ) from None
+    if isinstance(decoded, Mapping):
+        response_uri = getattr(response, "geturl", lambda: request_url)()
+        return JsonDocument(
+            cast(Mapping[str, Any], decoded), response_uri or request_url
+        )
+    return decoded
 
 
 def _request(
     url: str,
     params: Mapping[str, Any],
-    headers: Optional[Mapping[str, str]] = None,
+    headers: Mapping[str, str] | None = None,
 ) -> Request:
     request_url = _append_query(url, params)
     return Request(

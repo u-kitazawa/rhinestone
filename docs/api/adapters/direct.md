@@ -1,8 +1,8 @@
-# DirectAdapter
+# DirectAdapter（直接指定アダプター）
 
 `DirectAdapter` は、完全に記述された単一 Resource を解決します。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `direct`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `direct`
 
 ## 設定
 
@@ -18,12 +18,16 @@ URL、形式、runtime は推測しません。
 ## 最小例
 
 ```python
-from rhinestone import Config, configure
+from rhinestone import Reference, configure
+
 app = configure()
-resource = app.resolve(
-    Config("direct", {"uri": "https://example.invalid/data.geojson", "format": "geojson"})
+resource = app.load(
+    Reference(
+        "direct",
+        parameters={"uri": "https://example.invalid/data.geojson", "format": "geojson"},
+    )
 )
 ```
 
-実在するデータを開くには、対応するruntime dependencyも登録します。手順は
+実在するデータを開くには、対応するRuntimeを`open(..., runtime=...)`で渡します。手順は
 [Resource を解決して開く](../../resolve-and-open.md)を参照してください。

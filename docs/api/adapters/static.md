@@ -1,20 +1,20 @@
-# StaticAdapter
+# StaticAdapter（静的定義アダプター）
 
 `StaticAdapter` は、リポジトリまたは利用者が管理する静的なサービス定義を
-`Source` として解決します。
+`Resource` として読み込みます。
 
-[Source Adapter 一覧](../source-adapters.md) · source type: `static`
+[Provider Adapter 一覧](../provider-adapters.md) · adapter type: `static`
 
 ## 設定
 
-`Config.settings` には定義済みitemの `id` を指定します。
+`Reference.parameters` には定義済みitemの `id` を指定します。
 
 ```python
-Config("gsi", {"id": "std"})
+Reference("gsi", parameters={"id": "std"})
 ```
 
 定義はHTTP通信、runtime dependency、credentialを使わず、同じ設定から常に同じ
-`Source` と `AccessPlan` を生成します。検索条件は `text` と `limit` です。
+`Resource` と `AccessPlan` を生成します。検索条件は `text` と `limit` です。
 
-標準の国土地理院タイル定義は `sources.GSI` に含まれます。定義にはURL、形式、
+標準の国土地理院タイル定義は `BUILTIN`内の`gsi` Provider に含まれます。定義にはURL、形式、
 ズーム範囲、帰属表示、利用条件URL、仕様確認日を含みます。

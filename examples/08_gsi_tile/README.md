@@ -1,9 +1,9 @@
-# GSI Tile
+# 国土地理院タイル
 
-## Setup
+## 準備と実行
 
-Install Rhinestone and the Python bindings for GDAL. Confirm that GDAL includes
-the WMS driver, then run `python examples/08_gsi_tile/example.py`.
+RhinestoneとGDALのPython bindingsを用意し、GDALに必要なドライバーが含まれることを確認してから、
+`python examples/08_gsi_tile/example.py`を実行します。
 
-The example opens the catalog-defined `std` XYZ tile set through `StaticAdapter`. Check the usage
-metadata on the returned Resource before publishing a derived map.
+Catalogに定義された`std`（標準地図）のXYZタイルを開きます。作成した地図を公開する前に、
+返されたResourceの利用条件メタデータを確認してください。

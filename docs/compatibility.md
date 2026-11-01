@@ -1,48 +1,78 @@
 # 対応状況と既知の非対応
 
-この文書は Rhinestone 0.1.0 の実装済み互換性を示す。表にない provider、protocol、format は対応していると見なしてはならない。Rhinestone は URL suffix や応答内容から format を推測しない。
+この文書は、このドキュメントと同じブランチの実装済み範囲を示します。`develop`では
+次回リリース候補を扱うため、PyPIの公開済み版と一致するとは限りません。
+公開済み版を確認する場合は、そのリリースタグの文書を参照してください。
+表にない提供元、通信仕様、形式は、
+対応しているとは限りません。RhinestoneはURLの拡張子や応答内容だけから形式を推測しません。
+
+「Provider Adapter」は提供元のAPIやメタデータを読み取る部分、「Runtime Adapter」は確定した
+ResourceをGDALなどへ渡す部分です。外部ライブラリの準備は[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
 ## 実行環境
 
-| 対象 | 対応範囲 | 注記 |
+| 対象 | 対応範囲 | 補足 |
 | --- | --- | --- |
 | Python | 3.10 以上 | CI は 3.10〜3.13 を対象にする。 |
-| HTTP | Python standard library | Source metadata、DCAT文書、ODPT JSON serviceのHTTP通信はRhinestoneに組み込む。 |
+| HTTP | Python標準ライブラリ | Providerメタデータ、DCAT文書、ODPT JSONサービスのHTTP通信はRhinestoneに組み込まれています。 |
 | GDAL / Rasterio / pyogrio | 利用者が供給する版 | Rhinestone は version を固定・管理しない。各 adapter が呼ぶ API と対象 format の互換性は利用者側で確認する。検証済み範囲は[Runtimeの導入ガイド](runtimes.md)に記載する。 |
 
-この表は、Rhinestoneが対応するProvider、format、APIの範囲を示します。Runtime packageのインストール可能性やnative libraryの組み合わせを保証するものではありません。Runtimeごとの installation recipe、lifecycle、tested versionは[Runtimeの導入ガイド](runtimes.md)を参照してください。
+この表は、Rhinestoneが対応する提供元、形式、APIの範囲を示します。外部ライブラリのインストール可能性や
+ネイティブライブラリの組み合わせを保証するものではありません。ライブラリごとの導入方法、管理方法、
+検証済みバージョンは[Runtimeの導入ガイド](runtimes.md)を参照してください。
 
-## Source Adapter
+## Provider Adapter（提供元アダプター）
 
 | source type | 対応する提供仕様・版 | 解決できる対象 | 明示的な制限 |
 | --- | --- | --- | --- |
-| `ckan` | CKAN Action API (`/api/3/action`) | 指定 resource の公式 download URL | HTML catalog、URL 推測、resource 検索以外の Action API は非対応。 |
+| `ckan` | CKAN Action API (`/api/3/action`) | 指定 resource の公式 download URL、package検索からのResource展開 | 対象は`resource_show`、`package_show`、`package_search`。HTML catalog、URL推測、その他のAction APIは非対応。 |
+| `geospatial-jp` | G空間情報センター CKAN Action API | 地域metadata・タグを使う検索、Resource単位の検索と解決 | 取得範囲内での優先順。bbox・timeは非対応。実APIの検索品質は未検証。[詳細](api/adapters/geospatial-jp.md) |
 | `dcat` | DCAT RDF: JSON-LD、Turtle、RDF/XML | `dcat:downloadURL` を持つ Distribution | 他の RDF serialization、`accessURL` だけの Distribution は非対応。 |
 | `direct` | provider 非依存 | 利用者が明示する URI / format | format、media type、実行方法の推測はしない。 |
+| `estat-gis` | e-Stat Statistics GIS の利用者管理 distribution index | 明示された GML / KML / Shapefile 配布物 | HTML scraping、安定 API とみなした URL 発見、selector の推測は非対応。 |
 | `gsi-fundamental` | 基盤地図情報の取得済み basic vector | ローカル GML、ZIP 内の明示 entry point | DEM、ログイン、ダウンロード自動化、ZIP 以外の archive は非対応。 |
 | `static` | Catalog または利用者が管理する静的定義（組み込み GSI は `sources.json` の `gsi`） | HTTPS / XYZ / EPSG:3857 / 256 px の PNG・JPEG tile など、定義済み Resource | 定義外 item、未定義のアクセス方式、仕様の推測は非対応。 |
-| `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Config 内の secret、他 resource type は非対応。 |
+| `odpt` | ODPT v4 | `station`、`railway`、`train` の JSON service query | 公式 filter 以外、Reference 内の secret、他 resource type は非対応。 |
 | `ogc-features` | OGC API Features 1.0 | collection または feature の service query | WFS、他 OGC API、built-in data reader は非対応。 |
 | `plateau` | G 空間情報センター CKAN Action API | 指定 dataset / resource の配布物 | 市区町村・年度からの配布物推測、ZIP 以外の archive は非対応。 |
-| `stac` | STAC API 1.0 | collection item の明示 asset、検索 | 検索はItemごとに `data` roleのassetがちょうど1件必要。解決には対応media typeも必要。asset の URL / format 推測、STAC 以外の catalog は非対応。 |
+| `mlit-dpf` | 国土交通DPF GraphQL API v1 | 明示規則で解決可能な既存Providerへ委譲できる検索結果、または形式宣言済みの恒久download URL | Discovery専用。Direct・別DPFへの規則委譲、`time`、署名付きfile download、半径・属性検索、landing page利用、ID・形式推測は非対応。 |
+| `search-ckan-jp` | search.ckan.jp Backend API | 元CKAN catalogの明示された配布物を指す検索結果 | Discovery専用。`text`が必須で、HTML解析、配布URLの推測、Provider自体の直接解決は非対応。 |
+| `stac` | STAC API 1.0、リンク準拠の静的STAC Catalog | collection item の明示 asset、検索 | API検索は`/search`、静的検索は有界・循環安全な`child` / `item`探索を使用。media typeが未知・未指定でもResourceは生成するが、形式が未確定ならAccessPlanは生成しない。asset の URL / format 推測は非対応。 |
 
-## Execution Adapter と format
+## Runtime Adapter と format
 
-| Execution Adapter | 対応 format / access | 非対応・注意点 |
+| Runtime Adapter | 対応 format / access | 非対応・注意点 |
 | --- | --- | --- |
-| `gdal` | `shapefile`、`geotiff`、`cog`、`netcdf`、`wms`、`gml`、`citygml`、GSI XYZ tile | ZIP URI の `/vsizip/` 変換はこれだけが行う。上記以外の format は選択しない。 |
-| `rasterio` | `cog`、`geotiff` | URI と option をそのまま `rasterio.open()` へ渡す。archive 展開や format 変換はしない。 |
-| `pyogrio` | `shapefile`、`geojson`、`gpkg`、`flatgeobuf` | URI と encoding だけを `read_dataframe()` へ渡す。archive URI の組み立てはしない。 |
+| `gdal` | `shapefile`、`geotiff`、`cog`、`netcdf`、`wms`、`gml`、`kml`、`citygml`、GSI XYZ tile | 明示されたZIP AccessPlanを`/vsizip/` URIへ変換する。pyogrioもZIP変換に対応する。上記以外のformatは選択しない。 |
+| `rasterio` | `cog`、`geotiff` | URI のみを `rasterio.open()` へ渡す。`AccessPlan.options`は引数として転送せず、archive 展開や format 変換はしない。 |
+| `pyogrio` | representation registry で `vector` と明示された `shapefile`、`geojson`、`gpkg`、`flatgeobuf`、`gml`、`kml`、`citygml` | URI と encoding を `read_dataframe()` へ渡す。明示された ZIP AccessPlan は GDAL VSI URI に変換する。URI suffix や archive内容から形式・memberを推測せず、環境に対応 driver がない場合は `ResourceAccessError`。 |
 | `json-service` | `application/json` の ODPT service query | 組み込みHTTP runtimeとODPT用request preparerを使用する。他providerのJSON APIを汎用的に実行しない。 |
 
-STAC は Cloud-Optimized GeoTIFF media type を `cog` として扱う。その他 asset は format が明示できないため、Resolver が失敗する場合がある。DCAT、CKAN、PLATEAU、Direct の配布物も、format が上表の Execution Adapter に一致した場合だけ `open()` できる。
+STACはcloud-optimizedを示すmedia typeを`cog`として扱い、それ以外も共通のmedia type対応から
+形式を判定します。例えば`image/tiff`は`geotiff`、`application/geo+json`は`geojson`です。
+media typeが未指定・未知なら、URIが`.tif`で終わっていても形式を推測せず、Resourceの
+`format`と`access_plan`は`None`になります。詳細は[STACガイド](api/adapters/stac.md)を参照してください。
+
+形式の判定と実行可否は別です。例えばSTAC assetの`text/csv`は`csv`、`application/json`は
+`json`と判定されても、上表の組み込みRuntime Adapterでは開けません（`json-service`はODPT専用）。
+DCAT、CKAN、PLATEAU、Directの配布物も、AccessPlanが選んだRuntime Adapterに適合し、
+必要なRuntime・認証・ドライバーが利用できることが必要です。対応表は実データの取得成功を保証しません。
+
+共通の representation 定義は `rhinestone.representations` にあり、format の alias と既知の
+media type 対応を Provider Adapter 間で共有する。format が明示されている場合は media type
+より優先し、URL suffix からの推測は行わない。
 
 ## 共通の非対応
 
 - GDAL、Rasterio、pyogrio、PyArrow 等を使った format 変換や GIS 処理
-- HTML scraping、redirect の追跡、曖昧な Resource・format・URL の推測
+- HTML scraping、曖昧な Resource・format・URL の推測
 - GeoDataFrame、GeoJSON、Arrow、xarray 等への強制変換
 - provider API や外部runtime dependency の version 管理
 - 表にない provider、認証方式、protocol、archive 形式
 
-新たな対応は、Source Adapter、Resource / AccessPlan、Execution Adapter の変換、fixture による適合テストを一つの垂直スライスとして追加する。
+redirectの扱いは通信経路によって異なります。組み込みtransportの公開JSON GETは
+Python標準urllibのredirect処理を使用します。Credential付きJSON GET、text GET、
+JSON POST、CoreのJSON serviceはredirectを追跡しません。GDAL、Rasterio、pyogrioへ
+委譲した実データ通信のredirect処理は、各Runtimeの責務です。
+
+新たな対応は、Provider Adapter、Resource / AccessPlan、Runtime Adapter の変換、fixture による適合テストを一つの垂直スライスとして追加する。

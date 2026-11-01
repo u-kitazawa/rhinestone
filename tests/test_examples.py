@@ -1,13 +1,17 @@
 import os
+import runpy
 import subprocess
 import sys
 from pathlib import Path
-from typing import Tuple
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
+import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
+
 EXAMPLES_ROOT = Path(__file__).parents[1] / "examples"
-EXAMPLE_NAMES: Tuple[str, ...] = (
+EXAMPLE_NAMES: tuple[str, ...] = (
     "01_direct_resource",
     "02_ckan_shapefile",
     "04_inspect_resource",
@@ -22,6 +26,98 @@ EXAMPLE_NAMES: Tuple[str, ...] = (
 )
 
 
+def test_example_readmes_describe_current_reference_and_search_contracts() -> None:
+    for name in EXAMPLE_NAMES:
+        instructions = (EXAMPLES_ROOT / name / "README.md").read_text(encoding="utf-8")
+        assert "Config" not in instructions, name
+
+    gdal = (EXAMPLES_ROOT / "05_gdal_dependency" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "`Reference.parameters`" in gdal
+    search = (EXAMPLES_ROOT / "07_search_and_fetch" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "通常の解決フローへ渡す" not in search
+    assert "検索結果が1件以上" in search
+    assert "データ本体を開いたりはしません" in search
+
+
+def test_search_example_only_inspects_search_results(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import rhinestone
+    from rhinestone import Reference, Resource, configure
+
+    resource = configure().load(
+        Reference(
+            "direct",
+            parameters={
+                "uri": "https://example.invalid/data.geojson",
+                "format": "geojson",
+            },
+        )
+    )
+    queries: list[object] = []
+
+    def search(query: object) -> dict[str, list[Resource]]:
+        queries.append(query)
+        return {"geospatial-jp": [resource]}
+
+    # No load/open methods: either extra resolution or execution must fail.
+    def configure_fixture(**_: Any) -> SimpleNamespace:
+        return SimpleNamespace(search=search)
+
+    monkeypatch.setattr(rhinestone, "configure", configure_fixture)
+    monkeypatch.setenv("RHINESTONE_QUERY", "fixture")
+    runpy.run_path(str(EXAMPLES_ROOT / "07_search_and_fetch" / "example.py"))
+
+    assert len(queries) == 1
+    output = capsys.readouterr().out
+    assert f"selected resource: {resource.uri}" in output
+    assert "metadata:" in output
+    assert "provenance:" in output
+
+
+@pytest.mark.parametrize("records", [[], [{"owl:sameAs": "odpt.Station:Fixture"}]])
+def test_odpt_example_runs_with_core_json_service_without_live_network(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    records: list[dict[str, str]],
+) -> None:
+    """Run the real example through configure/load/open with a fixture transport."""
+    monkeypatch.setenv("ODPT_CONSUMER_KEY", "fixture-secret")
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def get(uri: str, **kwargs: Any) -> object:
+        calls.append((uri, kwargs))
+        return SimpleNamespace(
+            status_code=200,
+            raise_for_status=lambda: None,
+            json=lambda: records,
+        )
+
+    monkeypatch.setattr(_http, "JsonServiceRuntime", lambda: SimpleNamespace(get=get))
+    runpy.run_path(str(EXAMPLES_ROOT / "12_odpt_station" / "example.py"))
+
+    assert calls == [
+        (
+            "https://api.odpt.org/api/v4/odpt:Station",
+            {
+                "params": {"dc:title": "東京", "acl:consumerKey": "fixture-secret"},
+                "headers": {},
+                "timeout": 30,
+                "allow_redirects": False,
+            },
+        )
+    ]
+    output = capsys.readouterr().out
+    assert f"records: {len(records)}" in output
+    identifier = records[0]["owl:sameAs"] if records else "none"
+    assert f"first identifier: {identifier}" in output
+    assert "fixture-secret" not in output
+
+
 @pytest.mark.parametrize("name", EXAMPLE_NAMES)
 def test_each_example_has_runnable_code_and_setup_readme(name: str) -> None:
     """利用者が各Exampleを単独で見ても環境構築と実行方法を再現できるようにするために必要である。"""
@@ -32,7 +128,7 @@ def test_each_example_has_runnable_code_and_setup_readme(name: str) -> None:
     assert script.is_file()
     assert readme.is_file()
     instructions = readme.read_text(encoding="utf-8").lower()
-    assert "setup" in instructions
+    assert "setup" in instructions or "準備" in instructions
     assert "python" in instructions
 
 
@@ -64,20 +160,21 @@ def test_deterministic_examples_run_without_network_or_optional_runtime(
 
 
 def test_service_examples_use_formats_known_to_create_service_plans() -> None:
-    """OGC Exampleが誤ってFileAccessPlanへ解決される退行を防ぐために必要である。"""
-    from rhinestone.models import Metadata, Provenance, ResourceCandidate, Source
-    from rhinestone.resolution import Resolver
+    """OGC Exampleが誤ってAccessPlanへ解決される退行を防ぐために必要である。"""
+    from rhinestone.models import Metadata, Provenance, Reference
+    from rhinestone.resolution import resource_from_delivery
 
     for format_name in ("ogc-api-features",):
-        candidate = ResourceCandidate("https://api.example/data", format_name, None)
-        source = Source(
+        resource = resource_from_delivery(
+            reference=Reference("fixture", resource_identifier="data"),
+            uri="https://api.example/data",
+            format=format_name,
+            media_type=None,
             metadata=Metadata(raw={}),
-            candidates=(candidate,),
-            capabilities=frozenset({"service-query"}),
             provenance=Provenance(provider="fixture", raw={}),
-            raw_metadata={},
         )
-        assert Resolver().resolve(source).access_plan.kind == "service-query"
+        assert resource.access_plan is not None
+        assert resource.access_plan.kind == "service-query"
 
 
 @pytest.mark.parametrize(

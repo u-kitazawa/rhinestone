@@ -1,0 +1,129 @@
+{
+  "success": true,
+  "result": {
+    "count": 5,
+    "results": [
+      {
+        "id": "incidental",
+        "title": "河川の調査紹介",
+        "area": "東京都",
+        "tags": [],
+        "notes": "神奈川県の利用例を紹介",
+        "resources": [
+          {
+            "id": "incidental-0",
+            "package_id": "incidental",
+            "format": "GeoJSON",
+            "url": "https://files.example/incidental-0"
+          },
+          {
+            "id": "incidental-1",
+            "package_id": "incidental",
+            "format": "CSV",
+            "url": "https://files.example/incidental-1"
+          }
+        ]
+      },
+      {
+        "id": "national",
+        "title": "全国河川",
+        "area": "日本全国",
+        "tags": [
+          {
+            "name": "河川"
+          },
+          {
+            "name": "全国"
+          }
+        ],
+        "notes": "",
+        "resources": [
+          {
+            "id": "national-0",
+            "package_id": "national",
+            "format": "GeoJSON",
+            "url": "https://files.example/national-0"
+          },
+          {
+            "id": "national-1",
+            "package_id": "national",
+            "format": "CSV",
+            "url": "https://files.example/national-1"
+          }
+        ]
+      },
+      {
+        "id": "regional",
+        "title": "関東河川",
+        "area": "関東",
+        "tags": [
+          {
+            "name": "河川"
+          }
+        ],
+        "notes": "",
+        "resources": [
+          {
+            "id": "regional-0",
+            "package_id": "regional",
+            "format": "GeoJSON",
+            "url": "https://files.example/regional-0"
+          }
+        ]
+      },
+      {
+        "id": "local",
+        "title": "神奈川県河川",
+        "area": "神奈川県",
+        "tags": [
+          {
+            "name": "神奈川県"
+          },
+          {
+            "name": "河川"
+          }
+        ],
+        "notes": "",
+        "resources": [
+          {
+            "id": "local-0",
+            "package_id": "local",
+            "format": "GeoJSON",
+            "url": "https://files.example/local-0"
+          },
+          {
+            "id": "local-1",
+            "package_id": "local",
+            "format": "CSV",
+            "url": "https://files.example/local-1"
+          },
+          {
+            "id": "local-2",
+            "package_id": "local",
+            "format": "GeoJSON",
+            "url": "https://files.example/local-2"
+          }
+        ]
+      },
+      {
+        "id": "municipal",
+        "title": "横浜市河川",
+        "area": "神奈川県_横浜市",
+        "tags": [
+          {
+            "name": "河川"
+          }
+        ],
+        "notes": "",
+        "resources": [
+          {
+            "id": "municipal-0",
+            "package_id": "municipal",
+            "format": "GeoJSON",
+            "url": "https://files.example/municipal-0"
+          }
+        ]
+      }
+    ]
+  }
+}

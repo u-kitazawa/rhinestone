@@ -1,0 +1,183 @@
+"""Registry for injectable shared knowledge adapters."""
+
+from collections.abc import Iterable, Mapping
+from dataclasses import replace
+from threading import RLock
+from typing import cast
+
+from ...errors import (
+    AdapterContractError,
+    AdapterFactoryError,
+    AdapterRegistrationError,
+    DependencyUnavailableError,
+    KnowledgeAdapterUnavailableError,
+    KnowledgeResolutionError,
+)
+from ..ports import DependencyPort
+from .base import (
+    AreaKnowledgeAdapter,
+    IdentityKnowledgeAdapter,
+    KnowledgeAdapter,
+    KnowledgeAdapterContext,
+    KnowledgeAdapterDefinition,
+    KnowledgeKind,
+    TimeKnowledgeAdapter,
+)
+from .models import AdministrativeArea, MunicipalityIdentity, TimeKind, TimeSemantic
+
+
+class _ScopedDependencyPort:
+    """Restrict a public dependency port without requiring registry methods."""
+
+    def __init__(self, dependencies: DependencyPort, names: Iterable[str]) -> None:
+        self._dependencies = dependencies
+        self._names = frozenset(names)
+
+    @property
+    def available(self) -> frozenset[str]:
+        return frozenset(self._names.intersection(self._dependencies.available))
+
+    def get(self, name: str) -> object:
+        if name not in self._names:
+            raise DependencyUnavailableError(
+                f"Runtime dependency {name!r} is not declared for this adapter"
+            )
+        return self._dependencies.get(name)
+
+
+class KnowledgeAdapterRegistry:
+    """Select and lazily instantiate one registered adapter for each kind."""
+
+    def __init__(
+        self,
+        definitions: Iterable[KnowledgeAdapterDefinition] = (),
+        context: KnowledgeAdapterContext | None = None,
+        *,
+        origins: Mapping[KnowledgeKind, str] | None = None,
+    ) -> None:
+        self._lock = RLock()
+        self._definitions: dict[KnowledgeKind, KnowledgeAdapterDefinition] = {}
+        self._instances: dict[KnowledgeKind, KnowledgeAdapter] = {}
+        self._context = context
+        self._origins = dict(origins or {})
+        for definition in definitions:
+            if definition.kind in self._definitions:
+                raise AdapterRegistrationError(
+                    f"Knowledge adapter kind {definition.kind!r} is registered more "
+                    "than once; register one definition per knowledge kind"
+                )
+            self._definitions[definition.kind] = definition
+
+    @property
+    def available(self) -> tuple[KnowledgeKind, ...]:
+        """Return configured knowledge kinds in registration order."""
+        return tuple(self._definitions)
+
+    def adapter_type(self, kind: KnowledgeKind) -> str:
+        """Return the configured adapter type for one knowledge kind."""
+        return self._definition(kind).adapter_type
+
+    def area(self) -> AreaKnowledgeAdapter:
+        """Return the configured administrative-area adapter."""
+        adapter = self._get("area")
+        self._require_method(adapter, "area", "resolve_area")
+        return cast(AreaKnowledgeAdapter, adapter)
+
+    def identity(self) -> IdentityKnowledgeAdapter:
+        """Return the configured adapter for municipality identity resolution."""
+        adapter = self._get("identity")
+        self._require_method(adapter, "identity", "resolve_municipality")
+        return cast(IdentityKnowledgeAdapter, adapter)
+
+    def time(self) -> TimeKnowledgeAdapter:
+        """Return the configured adapter for time-semantic resolution."""
+        adapter = self._get("time")
+        self._require_method(adapter, "time", "resolve_time")
+        return cast(TimeKnowledgeAdapter, adapter)
+
+    def _require_method(
+        self, adapter: KnowledgeAdapter, kind: KnowledgeKind, method: str
+    ) -> None:
+        if not callable(getattr(adapter, method, None)):
+            origin = self._origins.get(kind)
+            error = (
+                AdapterContractError if origin is not None else KnowledgeResolutionError
+            )
+            raise error(
+                f"{kind} knowledge adapter does not implement {method}; "
+                f"implement its public contract ({origin or kind})"
+            )
+
+    def resolve_area(self, value: str) -> AdministrativeArea:
+        """Resolve and validate one administrative-area expression."""
+        area = self.area().resolve_area(value)
+        if not isinstance(cast(object, area), AdministrativeArea):
+            raise KnowledgeResolutionError(
+                "area knowledge adapter returned an invalid value; expected "
+                "AdministrativeArea"
+            )
+        return area
+
+    def resolve_municipality(self, value: str) -> MunicipalityIdentity:
+        """Resolve and validate one municipality identity value."""
+        identity = self.identity().resolve_municipality(value)
+        if not isinstance(cast(object, identity), MunicipalityIdentity):
+            raise KnowledgeResolutionError(
+                "identity knowledge adapter returned an invalid value; expected "
+                "MunicipalityIdentity"
+            )
+        return identity
+
+    def resolve_time(self, value: str, *, kind: TimeKind | None = None) -> TimeSemantic:
+        """Resolve and validate one time expression and optional semantic kind."""
+        semantic = self.time().resolve_time(value, kind=kind)
+        if not isinstance(cast(object, semantic), TimeSemantic):
+            raise KnowledgeResolutionError(
+                "time knowledge adapter returned an invalid value; expected "
+                "TimeSemantic"
+            )
+        return semantic
+
+    def _definition(self, kind: KnowledgeKind) -> KnowledgeAdapterDefinition:
+        try:
+            return self._definitions[kind]
+        except KeyError:
+            raise KnowledgeAdapterUnavailableError(
+                f"Knowledge adapter for {kind!r} is not configured; register a "
+                "KnowledgeAdapterDefinition for this kind"
+            ) from None
+
+    def _get(self, kind: KnowledgeKind) -> KnowledgeAdapter:
+        with self._lock:
+            if kind in self._instances:
+                return self._instances[kind]
+            definition = self._definition(kind)
+            if self._context is None:
+                raise KnowledgeResolutionError(
+                    "Knowledge adapter registry has no factory context; construct it "
+                    "through configure() or provide KnowledgeAdapterContext"
+                )
+            context = replace(
+                self._context,
+                dependencies=_ScopedDependencyPort(
+                    self._context.dependencies, definition.dependencies
+                ),
+            )
+            try:
+                adapter = definition.factory(context)
+            except Exception as error:
+                origin = self._origins.get(kind)
+                if origin is not None:
+                    raise AdapterFactoryError(
+                        f"Installed adapter factory failed: {origin}; inspect its factory "
+                        "and declared dependencies"
+                    ) from None
+                raise KnowledgeResolutionError(
+                    f"Knowledge adapter {definition.adapter_type!r} could not be "
+                    "loaded; inspect its factory and declared dependencies"
+                ) from error
+            self._instances[kind] = adapter
+            return adapter
+
+
+__all__ = ["KnowledgeAdapterRegistry"]

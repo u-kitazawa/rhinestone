@@ -1,6 +1,8 @@
 # アプリケーションを構成する
 
-アプリケーションはCatalog、Runtime、Credentialを組み合わせて作ります。
+Rhinestoneのアプリケーションは、使うデータ提供元、検索・解決用のProvider依存ライブラリ、認証情報を組み合わせて作ります。
+データを開くRuntimeは、構成時ではなく`open()`の呼び出しごとに渡します。
+組み込みCatalogを検索するだけなら、[トップレベルのsearch()](api.md)も利用できます。
 
 ## Catalogを指定する
 
@@ -17,42 +19,122 @@ app = configure(catalog=BUILTIN)
 from rhinestone import Catalog, configure
 from rhinestone.catalogs import BUILTIN
 
-app = configure(catalog=Catalog((
-    BUILTIN.providers[0],
-    BUILTIN.providers[2],
-)))
+app = configure(
+    catalog=Catalog(
+        (
+            BUILTIN.providers[0],
+            BUILTIN.providers[2],
+        )
+    )
+)
 ```
 
-## 独自Providerを追加する
+## 独自の提供元を追加する
 
 ```python
 from rhinestone import Catalog, Provider, configure
 
-catalog = Catalog((
-    Provider(
-        id="my-stac",
-        adapter_type="stac",
-        settings={"endpoint": "https://stac.example/api"},
-    ),
-))
+catalog = Catalog(
+    (
+        Provider(
+            id="my-stac",
+            adapter_type="stac",
+            settings={"endpoint": "https://stac.example/api"},
+        ),
+    )
+)
 app = configure(catalog=catalog)
 ```
 
-`Provider`の`adapter_type`や`settings`は拡張向けの構成情報です。通常は組み込みCatalogのProviderを使います。
+`Provider`の`adapter_type`や`settings`は接続方法を指定する構成情報です。通常は組み込みCatalogのProviderを使います。
 
-## Runtime
+## 独自 Adapter を追加する
 
-外部Runtimeは利用者が所有し、実体または明示的な `RuntimeFactory` として渡します。
-公開APIではどちらも単一の`dependencies`引数へ渡しますが、内部では利用段階に応じて
-Source RuntimeとExecution Runtimeへ分離されます。
+詳しい実装手順、Context、検索、エラー処理は[Custom Adapter を作る](custom-adapters.md)を参照してください。
+
+Provider と Runtime は、組み込みと同じパイプラインへ明示的に登録できます。
+次は登録構造の例です。`...`のメソッド本体は独自の処理に置き換えてください。
 
 ```python
+from rhinestone import AccessPlan, Catalog, Provider, Reference, Resource, configure
+from rhinestone.adapters.contracts import (
+    RuntimeAdapterDefinition,
+    ProviderAdapterDefinition,
+)
+
+catalog = Catalog((Provider("example", "example-source"),))
+
+
+class ExampleProvider:
+    def load(self, reference: Reference) -> Resource: ...
+
+
+class ExampleRuntime:
+    name = "example-runtime"
+    priority = 100
+
+    def supports(self, plan: AccessPlan) -> bool: ...
+    def open(self, plan: AccessPlan, runtime, *, destination_policy=None): ...
+
+
+app = configure(
+    catalog=catalog,
+    adapters=(
+        ProviderAdapterDefinition(
+            "example-source",
+            lambda provider, context: ExampleProvider(),
+        ),
+        RuntimeAdapterDefinition(
+            "example-runtime",
+            lambda context: ExampleRuntime(),
+        ),
+    ),
+)
+```
+
+Provider factoryには、組み込みHTTP transport、Credential、依存Runtime、DestinationPolicyを
+`ProviderAdapterContext`として渡します。Runtime factoryの`RuntimeAdapterContext`には
+Credential PortとDestinationPolicyを渡します。Runtimeは`open(..., runtime=...)`へ渡します。
+
+共有知識をProvider Adapterへ疎結合に注入できます。標準のTime Adapterは自動登録されるため、
+追加設定なしで西暦・年度・元号を利用できます。自治体辞書など独自の公式データを使う場合は、
+`adapters`へ`KnowledgeAdapterDefinition`を候補として渡し、`knowledge`で種類ごとに明示選択します。
+インストールや登録だけでは標準実装を置き換えません。
+
+```python
+from rhinestone import configure
+from rhinestone.adapters.knowledge import (
+    KnowledgeAdapterDefinition,
+    StandardTimeAdapter,
+)
+
+app = configure(
+    adapters=(
+        KnowledgeAdapterDefinition(
+            "official-municipality", make_municipality_adapter, "identity"
+        ),
+    ),
+    knowledge={"identity": "official-municipality"},
+)
+```
+
+Knowledge Adapter factoryにはProvider/Runtime Adapterと同じくContextが渡されます。Provider Adapter Contextの`knowledge`から必要なadapterだけを取得します。Knowledge Adapterは
+Metadata/Provenanceやcanonical valueを扱いますが、Credential、Runtime、データ処理は保持しません。
+同じ`adapter_type`またはRuntime名を複数登録することはできません。
+
+## 外部ライブラリ（Runtime）
+
+外部Runtimeは利用者が所有します。Provider依存ライブラリは`dependencies`へ実体または`RuntimeFactory`として渡し、Runtime実体は`open(..., runtime=...)`へ渡します。
+
+```python
+import rdflib
+
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN
+
 app = configure(
     catalog=BUILTIN,
     dependencies={
-        "gdal": gdal,
-        "rasterio": rasterio,
-        "pyogrio": pyogrio,
         "rdflib": rdflib,
     },
 )
@@ -66,28 +148,35 @@ Runtime実体として扱われるため、callable façadeやMockがfactoryと�
 ```python
 import importlib
 
-from rhinestone import RuntimeFactory, configure
+from rhinestone import configure
+from rhinestone.models import RuntimeFactory
 
 app = configure(
     dependencies={
-        "rasterio": RuntimeFactory(lambda: importlib.import_module("rasterio")),
+        "rdflib": RuntimeFactory(lambda: importlib.import_module("rdflib")),
     },
 )
 ```
 
-| 種類 | 用途 | factoryの評価時点 | 例 |
+| 種類 | 用途 | 供給・評価時点 | 例 |
 | --- | --- | --- | --- |
-| Source Runtime | provider / protocol metadataの解釈 | 対象Sourceの`search()`または`resolve()`で初めて必要になった時 | `rdflib` |
-| Execution Runtime | 解決済みResourceを開く | `Resource.open()`で初めて必要になった時 | `gdal`、`rasterio`、`pyogrio` |
+| Provider依存ライブラリ | provider / protocol metadataの解釈 | `dependencies`へ実体または`RuntimeFactory`を登録。factoryは初めて必要になった時に評価 | `rdflib` |
+| Runtime | 解決済みResourceを開く | `open(..., runtime=...)`へ実体を渡す。`RuntimeFactory`は受け付けない | `gdal`、`rasterio`、`pyogrio` |
 
-`configure()`は `RuntimeFactory` を評価しません。Source Runtimeは解決済みResourceや
-AccessPlanへ保持されず、Execution RuntimeだけがResourceのopen経路から参照されます。
+`configure()`は Provider依存ライブラリの`RuntimeFactory`を評価しません。Resourceは実行コンテキストを引き継ぎますが、Runtime実体は保持しません。
+`dependencies`に`gdal`、`rasterio`、`pyogrio`、`json-service`などのRuntime名を
+登録すると`ConfigValidationError`になります。
 
-## Credential
+## 認証情報（Credential）
 
 secretはCatalogやProviderに保存せず、Credential factoryとして渡します。
 
 ```python
+import os
+
+from rhinestone import configure
+from rhinestone.catalogs import BUILTIN
+
 app = configure(
     catalog=BUILTIN,
     credentials={
@@ -96,18 +185,26 @@ app = configure(
 )
 ```
 
-認証付き CKAN、STAC、OGC Source は、Provider に secret ではなく Credential の論理名を
+認証付き CKAN、STAC、OGC Provider は、Provider に secret ではなく Credential の論理名を
 指定します。
 
 ```python
-catalog = Catalog((Provider(
-    id="private-stac",
-    adapter_type="stac",
-    settings={
-        "endpoint": "https://stac.example/api",
-        "credential": "stac-token",
-    },
-),))
+import os
+
+from rhinestone import Catalog, Provider, configure
+
+catalog = Catalog(
+    (
+        Provider(
+            id="private-stac",
+            adapter_type="stac",
+            settings={
+                "endpoint": "https://stac.example/api",
+                "credential": "stac-token",
+            },
+        ),
+    )
+)
 app = configure(
     catalog=catalog,
     credentials={"stac-token": lambda: os.environ["STAC_TOKEN"]},
@@ -121,9 +218,9 @@ ODPTでは`endpoint + resource_types`だけが対象です。`none`では宛先�
 
 Adapterを直接構築する既存コードでは、明示的に作成した`DestinationPolicy(rules=...)`の
 ruleをCredential付き通信にも引き続き利用できます。`from_catalog()`で生成したpolicyは、
-Providerの実行endpointからCredential専用ruleを生成します。Catalogに論理Credential名を
-持たないProviderでも、直接指定した`api_token`／`api_key`はその実行endpointだけへ送信できます。
+Providerの実行endpointからCredential専用ruleを生成します。認証情報は論理名を指定し、
+CredentialRegistryへ登録したfactoryから取得します。`api_token`／`api_key`は受け付けません。
 
 ## 高度なAPI
 
-`Config`、Source Adapter、Resolver、AccessPlanは内部パイプラインを直接扱う高度なAPIです。通常の検索・解決では`Result`を`app.resolve()`へ渡してください。
+通常は検索したResourceを`app.open()`へ渡します。既知の対象は`app.load(Reference(...))`、実行契約の転送は`app.plan(resource)`を使います。

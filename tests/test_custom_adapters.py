@@ -1,0 +1,234 @@
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
+from rhinestone import (
+    Provider,
+    Reference,
+    configure,
+)
+from rhinestone.adapters.contracts import (
+    ProviderAdapterDefinition,
+    RuntimeAdapterDefinition,
+)
+from rhinestone.catalogs import Catalog
+from rhinestone.errors import AdapterRegistrationError
+from rhinestone.models import AccessPlan, Metadata, Provenance, Resource, RuntimeFactory
+from rhinestone.resolution import resource_from_delivery
+from rhinestone.security import DestinationPolicy
+
+
+def custom_source(provider: Provider, context: Any) -> Any:
+    assert context.provider_id == provider.id
+
+    class Adapter:
+        def load(self, reference: Reference) -> Resource:
+            return resource_from_delivery(
+                reference=reference,
+                uri="https://data.example/item.bin",
+                format="custom",
+                media_type="application/octet-stream",
+                metadata=Metadata(
+                    title=reference.parameters["title"],
+                    raw={"provider": provider.id},
+                ),
+                provenance=Provenance(provider=provider.id, adapter="custom"),
+            )
+
+    return Adapter()
+
+
+class CustomExecution:
+    name = "custom-runtime"
+    priority = 100
+
+    def supports(self, plan: AccessPlan) -> bool:
+        return plan.format == "custom"
+
+    def open(
+        self,
+        plan: AccessPlan,
+        runtime: Any,
+        *,
+        destination_policy: Any = None,
+    ) -> Any:
+        return runtime.open(plan.uri)
+
+
+def test_custom_source_and_execution_share_the_public_pipeline() -> None:
+    def open_runtime(uri: str) -> tuple[str, str]:
+        return ("opened", uri)
+
+    runtime = SimpleNamespace(open=open_runtime)
+    app = configure(
+        catalog=Catalog((Provider("custom", "custom-source"),)),
+        adapters=(
+            ProviderAdapterDefinition("custom-source", custom_source),
+            RuntimeAdapterDefinition(
+                "custom-runtime", lambda context: CustomExecution()
+            ),
+        ),
+    )
+
+    resource = app.load(Reference("custom", parameters={"title": "Example"}))
+
+    assert resource.metadata.title == "Example"
+    assert resource.provenance.provider == "custom"
+    assert resource.metadata.raw["provider"] == "custom"
+    assert app.open(
+        Reference("custom", parameters={"title": "Example"}),
+        "custom-runtime",
+        runtime=runtime,
+    ) == (
+        "opened",
+        "https://data.example/item.bin",
+    )
+
+
+def test_source_definition_can_declare_a_lazy_source_dependency() -> None:
+    loaded: list[bool] = []
+
+    def factory() -> object:
+        loaded.append(True)
+        return object()
+
+    definition = ProviderAdapterDefinition(
+        "custom-source",
+        lambda provider, context: custom_source(provider, context),
+        dependencies=frozenset({"custom-source-runtime"}),
+    )
+    app = configure(
+        catalog=Catalog((Provider("custom", "custom-source"),)),
+        adapters=(definition,),
+        dependencies={"custom-source-runtime": RuntimeFactory(factory)},
+    )
+    assert loaded == []
+    app.load(Reference("custom", parameters={"title": "Example"}))
+    assert loaded == []
+
+
+def test_source_dependencies_are_scoped_to_each_definition() -> None:
+    seen: dict[str, frozenset[str]] = {}
+
+    def factory(provider: Provider, context: Any) -> Any:
+        seen[provider.id] = context.dependencies.available
+        return custom_source(provider, context)
+
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider("first", "first-source"),
+                Provider("second", "second-source"),
+            )
+        ),
+        adapters=(
+            ProviderAdapterDefinition(
+                "first-source", factory, dependencies=frozenset({"first-runtime"})
+            ),
+            ProviderAdapterDefinition(
+                "second-source", factory, dependencies=frozenset({"second-runtime"})
+            ),
+        ),
+        dependencies={"first-runtime": object(), "second-runtime": object()},
+    )
+
+    app.load(Reference("first", parameters={"title": "First"}))
+    assert seen == {
+        "first": frozenset({"first-runtime"}),
+        "second": frozenset({"second-runtime"}),
+    }
+
+
+def test_source_dependency_instances_are_cached_across_provider_contexts() -> None:
+    calls: list[bool] = []
+    runtime = object()
+
+    def load_runtime() -> object:
+        calls.append(True)
+        return runtime
+
+    def factory(provider: Provider, context: Any) -> Any:
+        assert context.dependencies.get("shared-runtime") is runtime
+        return custom_source(provider, context)
+
+    app = configure(
+        catalog=Catalog(
+            (
+                Provider("first", "shared-source"),
+                Provider("second", "shared-source"),
+            )
+        ),
+        adapters=(
+            ProviderAdapterDefinition(
+                "shared-source", factory, dependencies=frozenset({"shared-runtime"})
+            ),
+        ),
+        dependencies={"shared-runtime": RuntimeFactory(load_runtime)},
+    )
+
+    app.load(Reference("first", parameters={"title": "First"}))
+    app.load(Reference("second", parameters={"title": "Second"}))
+    assert len(calls) == 1
+
+
+def test_custom_provider_credentials_are_authorized_by_default_policy() -> None:
+    provider = Provider(
+        "custom",
+        "custom-source",
+        {"endpoint": "https://custom.example/api", "credential": "custom-key"},
+    )
+    policy = DestinationPolicy.from_catalog((provider,))
+
+    policy.authorize(
+        "https://custom.example/api/items",
+        credentialed=True,
+        provider="custom",
+        service="custom-source",
+        credential="custom-key",
+    )
+
+
+def test_unregistered_source_type_fails_during_context_composition() -> None:
+    with pytest.raises(AdapterRegistrationError, match="unknown-source"):
+        configure(catalog=Catalog((Provider("unknown", "unknown-source"),)))
+
+
+def test_builtin_and_custom_duplicate_types_are_rejected() -> None:
+    with pytest.raises(AdapterRegistrationError, match="ckan"):
+        configure(adapters=(ProviderAdapterDefinition("ckan", custom_source),))
+
+    with pytest.raises(AdapterRegistrationError, match="gdal"):
+        configure(
+            adapters=(
+                RuntimeAdapterDefinition("gdal", lambda context: CustomExecution()),
+            )
+        )
+
+    with pytest.raises(AdapterRegistrationError, match="custom-source"):
+        configure(
+            adapters=(
+                ProviderAdapterDefinition("custom-source", custom_source),
+                ProviderAdapterDefinition("custom-source", custom_source),
+            )
+        )
+
+    with pytest.raises(AdapterRegistrationError, match="expected 'declared'"):
+        configure(
+            adapters=(
+                RuntimeAdapterDefinition("declared", lambda context: CustomExecution()),
+            )
+        )
+
+
+def test_adapter_definition_rejects_invalid_values() -> None:
+    with pytest.raises(ValueError):
+        ProviderAdapterDefinition("", custom_source)
+    with pytest.raises(ValueError):
+        ProviderAdapterDefinition("custom", object())  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        RuntimeAdapterDefinition("", lambda context: CustomExecution())
+    with pytest.raises(ValueError):
+        RuntimeAdapterDefinition("custom", object())  # type: ignore[arg-type]
+    with pytest.raises(AdapterRegistrationError, match="Unknown adapter"):
+        configure(adapters=(object(),))  # type: ignore[arg-type]

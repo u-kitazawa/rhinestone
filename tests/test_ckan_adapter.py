@@ -1,10 +1,12 @@
+from collections.abc import Mapping
+from typing import Any
+
 import pytest
 
-from rhinestone.adapters.execution.pyogrio import PyogrioAdapter
-from rhinestone.adapters.source.ckan import CkanAdapter
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.runtime.pyogrio import PyogrioAdapter
 from rhinestone.errors import ProviderResponseError
-from rhinestone.models import Config, SearchQuery
-from rhinestone.resolution import Resolver
+from rhinestone.models import AccessPlan, ProviderSearchResults, Reference, SearchQuery
 from tests.provider_support import RecordingJsonClient, fixture_json
 
 
@@ -20,7 +22,9 @@ def test_ckan_resource_and_package_responses_become_a_complete_source() -> None:
     )
     adapter = CkanAdapter(get_json=client)
     source = adapter.load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
+        )
     )
     assert client.calls == [
         (resource_url, {"id": "resource-1"}),
@@ -29,12 +33,12 @@ def test_ckan_resource_and_package_responses_become_a_complete_source() -> None:
     assert source.metadata.title == "River Dataset"
     assert source.metadata.publisher == "River Agency"
     assert source.metadata.license == "CC BY 4.0"
-    assert source.candidates[0].uri == "https://files.example/river.csv"
-    assert source.candidates[0].format == "csv"
+    assert source.uri == "https://files.example/river.csv"
+    assert source.format == "csv"
     assert source.provenance.dataset_identifier == "dataset-1"
     assert source.provenance.resource_identifier == "resource-1"
-    assert source.raw_metadata["resource"]["encoding"] == "utf-8"
-    assert source.raw_metadata["package"]["extras"][0]["key"] == "frequency"
+    assert source.provenance.raw["resource"]["encoding"] == "utf-8"
+    assert source.provenance.raw["package"]["extras"][0]["key"] == "frequency"
 
 
 @pytest.mark.parametrize(
@@ -71,16 +75,77 @@ def test_ckan_canonicalizes_formats_without_losing_provider_metadata(
     )
 
     source = CkanAdapter(get_json=client).load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
+        )
     )
 
-    assert source.candidates[0].format == expected
-    assert source.candidates[0].attributes["format"] == advertised
-    assert source.raw_metadata["resource"]["format"] == advertised
+    assert source.format == expected
+    assert source.provenance.raw["resource"]["format"] == advertised
     if expected is not None:
-        resource = Resolver().resolve(source)
+        resource = source
         assert resource.format == expected
-        assert PyogrioAdapter().supports(resource, frozenset({"pyogrio"}))
+        assert resource.access_plan is not None
+        assert PyogrioAdapter().supports(resource.access_plan)
+
+
+def test_ckan_uses_media_type_when_format_is_missing() -> None:
+    endpoint = "https://catalog.example"
+    resource_url = endpoint + "/api/3/action/resource_show"
+    package_url = endpoint + "/api/3/action/package_show"
+    client = RecordingJsonClient(
+        {
+            resource_url: {
+                "success": True,
+                "result": {
+                    "id": "resource-1",
+                    "package_id": "dataset-1",
+                    "mimetype": "application/geo+json",
+                    "url": "https://files.example/vector",
+                },
+            },
+            package_url: {"success": True, "result": {"id": "dataset-1"}},
+        }
+    )
+
+    source = CkanAdapter(get_json=client).load(
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
+        )
+    )
+
+    assert source.format == "geojson"
+
+
+def test_ckan_records_zip_media_type_as_explicit_archive_evidence() -> None:
+    endpoint = "https://catalog.example"
+    resource_url = endpoint + "/api/3/action/resource_show"
+    package_url = endpoint + "/api/3/action/package_show"
+    client = RecordingJsonClient(
+        {
+            resource_url: {
+                "success": True,
+                "result": {
+                    "id": "resource-1",
+                    "package_id": "dataset-1",
+                    "format": "Shapefile",
+                    "mimetype": "application/zip; charset=binary",
+                    "url": "https://files.example/rivers.zip",
+                },
+            },
+            package_url: {"success": True, "result": {"id": "dataset-1"}},
+        }
+    )
+
+    source = CkanAdapter(get_json=client).load(
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
+        )
+    )
+    resource = source
+
+    assert isinstance(resource.access_plan, AccessPlan)
+    assert resource.access_plan.options["archive"] == "zip"
 
 
 def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None:
@@ -91,9 +156,289 @@ def test_ckan_search_uses_package_search_and_returns_resolvable_config() -> None
     results = adapter.search(SearchQuery(text="river", limit=5))
     assert client.calls == [(search_url, {"q": "river", "rows": 5})]
     assert len(results) == 1
-    assert results[0].to_config() == Config("ckan", {"resource_id": "resource-1"})
-    assert "endpoint" not in results[0].target.settings
+    assert results[0].reference == Reference(
+        "ckan", "dataset-1", "resource-1", {"resource_id": "resource-1"}
+    )
+    assert "endpoint" not in results[0].reference.parameters
     assert results[0].metadata.raw["id"] == "dataset-1"
+
+
+def test_ckan_search_skips_resources_without_a_valid_id() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    client = RecordingJsonClient(
+        {
+            search_url: {
+                "success": True,
+                "result": {
+                    "results": [
+                        {
+                            "id": "dataset-1",
+                            "resources": [
+                                {},
+                                {"id": None},
+                                {"id": 1},
+                                {"id": "   "},
+                                {"id": "resource-1"},
+                            ],
+                        }
+                    ]
+                },
+            }
+        }
+    )
+
+    results = CkanAdapter(endpoint=endpoint, get_json=client).search(SearchQuery())
+
+    assert isinstance(results, ProviderSearchResults)
+    assert [item.reference.resource_identifier for item in results] == ["resource-1"]
+    assert [item.reason for item in results.diagnostics] == [
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+        "item_skipped",
+    ]
+    assert [item.resource_identifier for item in results.diagnostics] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+    assert [item.detail for item in results.diagnostics] == [
+        "missing_resource_id",
+        "missing_resource_id",
+        "missing_resource_id",
+        "missing_resource_id",
+    ]
+
+
+def test_ckan_search_isolates_invalid_resource_urls_and_redacts_raw_metadata() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    client = RecordingJsonClient(
+        {
+            search_url: {
+                "success": True,
+                "result": {
+                    "results": [
+                        {
+                            "id": "dataset-1",
+                            "resources": [
+                                {
+                                    "id": "secret-1",
+                                    "url": "https://user:password@example/data.csv",
+                                },
+                                {
+                                    "id": "typed-1",
+                                    "url": 1,
+                                },
+                                {
+                                    "id": "ftp-secret-1",
+                                    "url": "ftp://user:password@example/data.csv",
+                                },
+                                {
+                                    "id": "malformed-1",
+                                    "url": "https://[invalid",
+                                },
+                                {
+                                    "id": "public-1",
+                                    "url": "https://files.example/data.csv",
+                                    "format": "CSV",
+                                },
+                            ],
+                        }
+                    ]
+                },
+            }
+        }
+    )
+
+    results = CkanAdapter(endpoint=endpoint, get_json=client).search(SearchQuery())
+
+    assert isinstance(results, ProviderSearchResults)
+    assert [item.reference.resource_identifier for item in results] == ["public-1"]
+    assert [item.resource_identifier for item in results.diagnostics] == [
+        "secret-1",
+        "typed-1",
+        "ftp-secret-1",
+        "malformed-1",
+    ]
+    assert [item.detail for item in results.diagnostics] == [
+        "invalid_resource_url",
+        "invalid_resource_url",
+        "invalid_resource_url",
+        "invalid_resource_url",
+    ]
+    raw_resources = results[0].metadata.raw["resources"]
+    assert [resource["url"] for resource in raw_resources] == [
+        "[redacted]",
+        "[redacted]",
+        "[redacted]",
+        "[redacted]",
+        "https://files.example/data.csv",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("resource", "message"),
+    (
+        ({"id": "resource-1", "url": "https://files.example/data.csv"}, "package_id"),
+        (
+            {
+                "id": "resource-1",
+                "package_id": "dataset-1",
+                "url": "https://user:password@example/data.csv",
+            },
+            "invalid HTTP",
+        ),
+        (
+            {
+                "id": "resource-1",
+                "package_id": "dataset-1",
+                "url": "ftp://user:password@example/data.csv",
+            },
+            "invalid HTTP",
+        ),
+    ),
+)
+def test_ckan_load_classifies_invalid_provider_resource_fields(
+    resource: Mapping[str, Any], message: str
+) -> None:
+    endpoint = "https://catalog.example"
+    resource_url = endpoint + "/api/3/action/resource_show"
+    package_url = endpoint + "/api/3/action/package_show"
+    client = RecordingJsonClient(
+        {
+            resource_url: {"success": True, "result": resource},
+            package_url: {
+                "success": True,
+                "result": {"id": "dataset-1"},
+            },
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match=message):
+        CkanAdapter(endpoint=endpoint, get_json=client).load(
+            Reference("ckan", resource_identifier="resource-1")
+        )
+
+
+def test_ckan_search_pages_packages_until_the_resource_limit_is_met() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url == search_url
+        calls.append(dict(params))
+        packages: list[dict[str, Any]]
+        if params.get("start") is None:
+            packages = [{"id": "empty", "resources": []}]
+        else:
+            packages = [
+                {
+                    "id": "next",
+                    "title": "Next page",
+                    "resources": [{"id": "resource-1"}],
+                }
+            ]
+        return {"success": True, "result": {"count": 2, "results": packages}}
+
+    results = CkanAdapter(endpoint=endpoint, get_json=get_json).search(
+        SearchQuery(text="river", limit=1)
+    )
+
+    assert [result.provenance.resource_identifier for result in results] == [
+        "resource-1"
+    ]
+    assert calls == [
+        {"q": "river", "rows": 1},
+        {"q": "river", "rows": 1, "start": 1},
+    ]
+
+
+def test_ckan_search_continues_after_a_server_capped_partial_package_page() -> None:
+    endpoint = "https://catalog.example"
+    search_url = endpoint + "/api/3/action/package_search"
+    calls: list[dict[str, Any]] = []
+
+    def get_json(url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        assert url == search_url
+        calls.append(dict(params))
+        start = params.get("start", 0)
+        package: dict[str, Any] = {"id": f"package-{start}", "resources": []}
+        if start:
+            package["resources"] = [{"id": f"resource-{start}"}]
+        return {"success": True, "result": {"count": 3, "results": [package]}}
+
+    results = CkanAdapter(endpoint=endpoint, get_json=get_json).search(
+        SearchQuery(text="river", limit=2)
+    )
+
+    assert [result.provenance.resource_identifier for result in results] == [
+        "resource-1",
+        "resource-2",
+    ]
+    assert [call.get("start", 0) for call in calls] == [0, 1, 2]
+
+
+def test_ckan_search_zero_limit_skips_requests_and_stops_at_known_last_page() -> None:
+    adapter = CkanAdapter(
+        endpoint="https://catalog.example",
+        get_json=lambda url, params: pytest.fail("zero limit must not request"),
+    )
+    assert adapter.search(SearchQuery(limit=0)) == ()
+
+    client = RecordingJsonClient(
+        {
+            "https://catalog.example/api/3/action/package_search": {
+                "success": True,
+                "result": {"count": 1, "results": [{"id": "empty", "resources": []}]},
+            }
+        }
+    )
+    assert (
+        CkanAdapter(endpoint="https://catalog.example", get_json=client).search(
+            SearchQuery(limit=1)
+        )
+        == ()
+    )
+    assert len(client.calls) == 1
+
+
+def test_ckan_search_rejects_an_invalid_count_before_paging() -> None:
+    client = RecordingJsonClient(
+        {
+            "https://catalog.example/api/3/action/package_search": {
+                "success": True,
+                "result": {
+                    "count": "unknown",
+                    "results": [{"id": "empty", "resources": []}],
+                },
+            }
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match="count"):
+        CkanAdapter(endpoint="https://catalog.example", get_json=client).search(
+            SearchQuery(limit=1)
+        )
+
+
+def test_ckan_search_rejects_an_empty_page_before_its_declared_count() -> None:
+    client = RecordingJsonClient(
+        {
+            "https://catalog.example/api/3/action/package_search": {
+                "success": True,
+                "result": {"count": 1, "results": []},
+            }
+        }
+    )
+
+    with pytest.raises(ProviderResponseError, match="empty"):
+        CkanAdapter(endpoint="https://catalog.example", get_json=client).search(
+            SearchQuery(limit=1)
+        )
 
 
 def test_ckan_unsuccessful_action_response_is_rejected() -> None:
@@ -109,5 +454,7 @@ def test_ckan_unsuccessful_action_response_is_rejected() -> None:
     )
     with pytest.raises(ProviderResponseError, match="Not found"):
         CkanAdapter(get_json=client).load(
-            Config("ckan", {"endpoint": endpoint, "resource_id": "missing"})
+            Reference(
+                "ckan", parameters={"endpoint": endpoint, "resource_id": "missing"}
+            )
         )

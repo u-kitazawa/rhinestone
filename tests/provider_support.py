@@ -1,6 +1,7 @@
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Tuple, cast
+from typing import Any, cast
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -10,13 +11,13 @@ def fixture_json(relative_path: str) -> Mapping[str, Any]:
         loaded = json.load(fixture)
     if not isinstance(loaded, dict):
         raise AssertionError("Provider fixture root must be an object")
-    return cast(Dict[str, Any], loaded)
+    return cast(dict[str, Any], loaded)
 
 
 class RecordingJsonClient:
     def __init__(self, responses: Mapping[str, Mapping[str, Any]]) -> None:
         self.responses = responses
-        self.calls: List[Tuple[str, Mapping[str, Any]]] = []
+        self.calls: list[tuple[str, Mapping[str, Any]]] = []
 
     def __call__(self, url: str, params: Mapping[str, Any]) -> Mapping[str, Any]:
         self.calls.append((url, dict(params)))

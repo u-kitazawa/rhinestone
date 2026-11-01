@@ -1,0 +1,113 @@
+"""Contracts for shared knowledge adapters."""
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal, Protocol
+
+from ...security import DestinationPolicy
+from ..ports import CredentialPort, DependencyPort
+from .models import AdministrativeArea, MunicipalityIdentity, TimeKind, TimeSemantic
+
+KnowledgeKind = Literal["area", "identity", "time"]
+
+
+class AreaKnowledgeAdapter(Protocol):
+    """Resolve an explicit administrative-area expression."""
+
+    def resolve_area(self, value: str) -> AdministrativeArea:
+        """Resolve an area name, alias, or code to canonical spatial data."""
+        ...
+
+
+class IdentityKnowledgeAdapter(Protocol):
+    """Resolve an explicit municipality name or code to canonical identity."""
+
+    def resolve_municipality(self, value: str) -> MunicipalityIdentity:
+        """Resolve a provider expression into a canonical municipality identity."""
+        ...
+
+
+class TimeKnowledgeAdapter(Protocol):
+    """Resolve an explicit Japanese public-data time expression."""
+
+    def resolve_time(self, value: str, *, kind: TimeKind | None = None) -> TimeSemantic:
+        """Resolve a provider time expression into canonical time semantics."""
+        ...
+
+
+KnowledgeAdapter = (
+    AreaKnowledgeAdapter | IdentityKnowledgeAdapter | TimeKnowledgeAdapter
+)
+
+
+class KnowledgePort(Protocol):
+    """Read-only shared knowledge service exposed to provider adapters."""
+
+    @property
+    def available(self) -> tuple[KnowledgeKind, ...]:
+        """Return configured knowledge kinds."""
+        ...
+
+    def adapter_type(self, kind: KnowledgeKind) -> str:
+        """Return the configured adapter type for one knowledge kind."""
+        ...
+
+    def resolve_area(self, value: str) -> AdministrativeArea:
+        """Resolve one explicit administrative-area expression."""
+        ...
+
+    def resolve_municipality(self, value: str) -> MunicipalityIdentity:
+        """Resolve one explicit municipality expression."""
+        ...
+
+    def resolve_time(self, value: str, *, kind: TimeKind | None = None) -> TimeSemantic:
+        """Resolve one explicit time expression."""
+        ...
+
+
+@dataclass(frozen=True)
+class KnowledgeAdapterContext:
+    """Framework services available to a Knowledge Adapter factory."""
+
+    get_json: Callable[..., Any]
+    get_text: Callable[[str], str]
+    credentials: CredentialPort
+    dependencies: DependencyPort
+    destination_policy: DestinationPolicy
+
+
+KnowledgeAdapterFactory = Callable[[KnowledgeAdapterContext], KnowledgeAdapter]
+
+
+@dataclass(frozen=True)
+class KnowledgeAdapterDefinition:
+    """Register one reusable shared knowledge adapter factory."""
+
+    adapter_type: str
+    factory: KnowledgeAdapterFactory
+    kind: KnowledgeKind
+    dependencies: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"area", "identity", "time"}:
+            raise ValueError(
+                "knowledge adapter kind must be 'area', 'identity', or 'time'"
+            )
+        if not self.adapter_type.strip():
+            raise ValueError("knowledge adapter type must be a non-empty string")
+        if not callable(self.factory):
+            raise ValueError("knowledge adapter factory must be callable")
+        object.__setattr__(self, "dependencies", frozenset(self.dependencies))
+
+
+__all__ = [
+    "AreaKnowledgeAdapter",
+    "IdentityKnowledgeAdapter",
+    "KnowledgeAdapter",
+    "KnowledgeAdapterContext",
+    "KnowledgeAdapterDefinition",
+    "KnowledgeAdapterFactory",
+    "KnowledgeKind",
+    "KnowledgePort",
+    "TimeKnowledgeAdapter",
+]

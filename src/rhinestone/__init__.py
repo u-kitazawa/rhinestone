@@ -1,60 +1,25 @@
 """Rhinestone public package."""
 
-from . import sources
+from . import api as _api
 from .api import Rhinestone, configure
 from .catalogs import Catalog
-from .models import (
-    AccessPlan,
-    Config,
-    Dependencies,
-    FileAccessPlan,
-    LibraryName,
-    Metadata,
-    Provenance,
-    Provider,
-    RemoteDatasetPlan,
-    Resource,
-    ResourceCandidate,
-    Result,
-    Runtime,
-    RuntimeFactory,
-    SearchDiagnostic,
-    SearchQuery,
-    SearchResult,
-    ServiceQueryPlan,
-    Source,
-    SourceDefinition,
-)
+from .models import AccessPlan, Provider, ProviderId, Reference, Resource
+from .representations import Format, FormatPreset
 from .search import SearchResults
-from .security import DestinationPolicy, DestinationRule, NetworkPolicyLevel
+
+search = _api.search
 
 __all__ = [
-    "AccessPlan",
-    "Catalog",
-    "Config",
-    "DestinationPolicy",
-    "DestinationRule",
-    "Dependencies",
-    "FileAccessPlan",
-    "LibraryName",
-    "Metadata",
-    "NetworkPolicyLevel",
-    "Provenance",
-    "Provider",
-    "RemoteDatasetPlan",
-    "Rhinestone",
-    "Resource",
-    "ResourceCandidate",
-    "Result",
-    "Runtime",
-    "RuntimeFactory",
-    "SearchDiagnostic",
-    "SearchQuery",
-    "SearchResult",
-    "SearchResults",
-    "ServiceQueryPlan",
-    "Source",
-    "SourceDefinition",
     "configure",
-    "sources",
+    "search",
+    "Rhinestone",
+    "Catalog",
+    "Provider",
+    "ProviderId",
+    "AccessPlan",
+    "Reference",
+    "SearchResults",
+    "Resource",
+    "Format",
+    "FormatPreset",
 ]

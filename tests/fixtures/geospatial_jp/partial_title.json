@@ -1,0 +1,37 @@
+{
+  "success": true,
+  "result": {
+    "count": 1,
+    "results": [
+      {
+        "id": "b020614d-8223-4fa8-9c71-10edb7bbefa0",
+        "name": "shimane-kasen-dem",
+        "title": "島根県_河川_数値標高モデル（DEM）1.0ｍ",
+        "area": "島根県",
+        "license_id": "cc-by",
+        "tags": [
+          {
+            "name": "DEM"
+          },
+          {
+            "name": "島根県"
+          },
+          {
+            "name": "数位標高モデル"
+          },
+          {
+            "name": "河川"
+          }
+        ],
+        "resources": [
+          {
+            "id": "c21a87b6-9cf7-4829-961b-e7cc02e8dcec",
+            "name": "島根県河川数値標高モデル（DEM）1.0m",
+            "format": "PBF",
+            "url": "https://gic-shimane.s3.ap-northeast-1.amazonaws.com/2015/river/Vectortile/LP/grid/{z}/{x}/{y}.pbf"
+          }
+        ]
+      }
+    ]
+  }
+}

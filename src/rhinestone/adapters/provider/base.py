@@ -1,0 +1,252 @@
+"""Public base class for provider provider adapters."""
+
+import json
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Mapping
+from importlib import resources
+from typing import Any, cast
+from urllib.parse import quote
+
+from jsonschema import Draft202012Validator, ValidationError
+
+from ..._uri import is_valid_http_authority
+from ...errors import (
+    ConfigValidationError,
+    ProviderMetadataError,
+    ProviderResponseError,
+)
+from ...models import Reference, Resource
+from ...registry import CredentialRegistry
+from ...security import DestinationPolicy
+
+JsonObject = Mapping[str, Any]
+JsonGetter = Callable[[str, Mapping[str, Any]], Any]
+AuthenticatedJsonGetter = Callable[[str, Mapping[str, Any], Mapping[str, str]], Any]
+JsonTransport = JsonGetter | AuthenticatedJsonGetter
+
+
+class _CredentialHeaders(dict[str, str]):
+    """Mark provider headers so the built-in transport rejects redirects."""
+
+    _rhinestone_no_redirects = True
+
+
+__all__ = [
+    "AuthenticatedJsonGetter",
+    "JsonGetter",
+    "JsonObject",
+    "ProviderAdapter",
+]
+
+
+class ProviderAdapter(ABC):
+    """Base for adapters that translate provider metadata into a ``Resource``.
+
+    Subclasses own provider-specific configuration and response interpretation.
+    The base class only standardizes validation and the injected JSON transport.
+    Search is deliberately optional and is therefore not part of this abstract
+    contract.
+    """
+
+    adapter_type = ""
+
+    def __init__(
+        self,
+        get_json: JsonTransport,
+        endpoint: str | None = None,
+        credential: str | None = None,
+        credential_header: str | None = None,
+        credential_scheme: str | None = None,
+        credentials: CredentialRegistry | None = None,
+        destination_policy: DestinationPolicy | None = None,
+        provider_id: str | None = None,
+    ) -> None:
+        self._get_json = get_json
+        self._endpoint = self._normalize_endpoint(endpoint) if endpoint else None
+        if credential is not None and not credential:
+            raise ConfigValidationError("credential must be a non-empty string")
+        self._credential_name = credential
+        self._provider_id = provider_id
+        self._credentials = credentials or CredentialRegistry({})
+        self._destination_policy = (
+            destination_policy or DestinationPolicy.unrestricted()
+        )
+        self._credential_header = (
+            "Authorization" if credential_header is None else credential_header
+        )
+        self._credential_prefix = ""
+        if not cast(object, self._credential_header) or not isinstance(
+            cast(object, self._credential_header), str
+        ):
+            raise ConfigValidationError("credential_header must be non-empty")
+        if credential is not None:
+            scheme = "Bearer" if credential_scheme is None else credential_scheme
+            if not isinstance(cast(object, scheme), str):
+                raise ConfigValidationError("credential_scheme must be a string")
+            self._credential_prefix = f"{scheme} " if scheme else ""
+
+    @abstractmethod
+    def load(self, reference: Reference) -> Resource:
+        """Load the unique delivery identified by ``reference``."""
+
+    def _reference_parameters(
+        self,
+        reference: Reference,
+        *,
+        dataset_key: str | None = None,
+        resource_key: str | None = None,
+    ) -> Mapping[str, Any]:
+        expected_provider = self._provider_id or self.adapter_type
+        if reference.provider_id not in {expected_provider, self.adapter_type}:
+            raise ConfigValidationError(
+                f"Expected Provider {expected_provider!r}; got "
+                f"{reference.provider_id!r}; construct Reference with the "
+                "configured Provider ID"
+            )
+        parameters = dict(reference.parameters)
+        if dataset_key is not None and reference.dataset_identifier is not None:
+            parameters.setdefault(dataset_key, reference.dataset_identifier)
+        if resource_key is not None and reference.resource_identifier is not None:
+            parameters.setdefault(resource_key, reference.resource_identifier)
+        schema = self.config_schema()
+        if schema is not None:
+            try:
+                validator: Any = Draft202012Validator(schema)
+                validator.validate(_json_value(parameters))
+            except ValidationError as error:
+                location = ".".join(str(item) for item in error.absolute_path)
+                detail = f"{location}: " if location else ""
+                raise ConfigValidationError(
+                    f"Invalid {self.adapter_type} configuration: {detail}"
+                    f"{error.message}"
+                ) from None
+        return parameters
+
+    def config_schema(self) -> Mapping[str, Any] | None:
+        """Return this built-in adapter's JSON Schema, if it provides one."""
+        module_name = type(self).__module__
+        try:
+            package_name = module_name.rpartition(".")[0] or module_name
+            text = resources.files(package_name).joinpath("schema.json").read_text()
+        except (FileNotFoundError, ModuleNotFoundError, TypeError):
+            return None
+        return cast(Mapping[str, Any], json.loads(text))
+
+    def _endpoint_from(
+        self, settings: Mapping[str, Any], default: str | None = None
+    ) -> str:
+        if self._endpoint is not None:
+            configured = settings.get("endpoint")
+            if configured is not None:
+                if not isinstance(configured, str) or not configured.strip():
+                    raise ConfigValidationError(
+                        "endpoint must be a non-empty string; provide the "
+                        "provider API endpoint"
+                    )
+                if self._normalize_endpoint(configured) != self._endpoint:
+                    raise ConfigValidationError("endpoint is managed by the Provider")
+            return self._endpoint
+        value = settings.get("endpoint", self._endpoint or default)
+        if not isinstance(value, str) or not value.strip():
+            raise ConfigValidationError(
+                "endpoint must be a non-empty string; provide the provider API endpoint"
+            )
+        return self._normalize_endpoint(value)
+
+    @staticmethod
+    def _normalize_endpoint(endpoint: str) -> str:
+        if not is_valid_http_authority(endpoint):
+            raise ConfigValidationError(
+                "endpoint must be a valid URI with a valid HTTP(S) authority and "
+                "without embedded credentials"
+            )
+        return endpoint.rstrip("/")
+
+    @staticmethod
+    def _encode_path_segment(value: str) -> str:
+        """Encode one decoded logical identifier for use as a URL path segment."""
+        if value in {".", ".."}:
+            return value.replace(".", "%2E")
+        return quote(value, safe="")
+
+    @staticmethod
+    def _required_string(settings: Mapping[str, Any], name: str) -> str:
+        value = settings.get(name)
+        if not isinstance(value, str) or not value:
+            raise ConfigValidationError(
+                f"{name} must be a non-empty string; provide this required "
+                "configuration value"
+            )
+        return value
+
+    def _request(self, url: str, params: Mapping[str, Any]) -> JsonObject:
+        response, _ = self._request_with_uri(url, params)
+        return response
+
+    def _request_with_uri(
+        self, url: str, params: Mapping[str, Any]
+    ) -> tuple[JsonObject, str]:
+        credentialed = self._credential_name is not None
+        self._destination_policy.authorize(
+            url,
+            credentialed=credentialed,
+            provider=self._provider_id,
+            service=self.adapter_type,
+            credential=self._credential_name,
+        )
+        headers: dict[str, str] = {}
+        if self._credential_name is not None:
+            headers[self._credential_header] = (
+                self._credential_prefix + self._credentials.get(self._credential_name)
+            )
+        if headers:
+            headers = _CredentialHeaders(headers)
+        try:
+            getter = cast(Any, self._get_json)
+            if headers:
+                response = getter(url, params, headers)
+            else:
+                response = getter(url, params)
+        except OSError as error:
+            raise ProviderMetadataError(
+                f"Provider metadata request failed for {url!r}"
+            ) from error
+        if not isinstance(response, Mapping):
+            raise ProviderResponseError(
+                "Provider response root must be an object; the decoded response "
+                "did not match the provider contract"
+            )
+        response_uri = getattr(cast(Any, response), "response_uri", url)
+        if not isinstance(response_uri, str) or not response_uri:
+            response_uri = url
+        return cast(JsonObject, response), response_uri
+
+    @staticmethod
+    def _object(value: Any, context: str) -> JsonObject:
+        if not isinstance(value, Mapping):
+            raise ProviderResponseError(
+                f"{context} must be an object; provider response shape is invalid"
+            )
+        return cast(JsonObject, value)
+
+    @staticmethod
+    def _objects(value: Any, context: str) -> tuple[JsonObject, ...]:
+        if isinstance(value, Mapping):
+            return (cast(JsonObject, value),)
+        if not isinstance(value, list):
+            raise ProviderResponseError(
+                f"{context} must be an object or array; provider response shape "
+                "is invalid"
+            )
+        values = cast(list[Any], value)
+        return tuple(ProviderAdapter._object(item, context) for item in values)
+
+
+def _json_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        mapping = cast(Mapping[Any, Any], value)
+        return {key: _json_value(item) for key, item in mapping.items()}
+    if isinstance(value, tuple):
+        items = cast(tuple[Any, ...], value)
+        return [_json_value(item) for item in items]
+    return value

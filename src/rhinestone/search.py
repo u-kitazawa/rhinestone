@@ -1,25 +1,58 @@
-"""Federated search over capable source adapters."""
+"""Federated search over capable provider adapters."""
 
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Mapping,
-    Tuple,
-    Union,
-    cast,
-    overload,
+from time import perf_counter
+from typing import overload
+
+from ._adapter_contracts import (
+    SearchableRegisteredProviderAdapter,
+    SearchParticipant,
+    is_searchable_provider,
 )
+from .adapters.knowledge import AreaKnowledgeAdapter
+from .adapters.knowledge.models import AdministrativeArea
+from .errors import (
+    ConfigValidationError,
+    CredentialUnavailableError,
+    KnowledgeResolutionError,
+    KnowledgeValidationError,
+    ProviderMetadataError,
+    ProviderResponseError,
+)
+from .models import (
+    ProviderSearchResults,
+    Resource,
+    SearchDiagnostic,
+    SearchExecution,
+    SearchQuery,
+)
+from .representations import Format, canonical_format
 
-from .errors import ProviderMetadataError, ProviderResponseError
-from .models import Resource, Result, SearchDiagnostic, SearchQuery
+
+def _result_formats(result: Resource) -> frozenset[Format]:
+    """Return formats declared for the selected resource only."""
+    found: set[Format] = set()
+    for value in result.formats:
+        normalized = canonical_format(value)
+        try:
+            found.add(Format(normalized))
+        except ValueError:
+            pass
+    return frozenset(found)
 
 
-class SearchResults(Sequence[Result]):
+def _matches_format(result: Resource, query: SearchQuery) -> bool:
+    requested = query.expanded_formats
+    available = _result_formats(result)
+    if available & requested:
+        return True
+    return not available and Format.UNKNOWN in requested
+
+
+class SearchResults(Sequence[Resource]):
     """Provider-grouped results with deterministic sequence traversal.
 
     Integer indexing and iteration concatenate groups in their supplied order and
@@ -30,143 +63,281 @@ class SearchResults(Sequence[Result]):
 
     def __init__(
         self,
-        grouped: Mapping[str, Tuple[Result, ...]],
+        grouped: Mapping[str, tuple[Resource, ...]],
         diagnostics: Iterable[SearchDiagnostic] = (),
+        executions: Iterable[SearchExecution] = (),
     ) -> None:
-        self._grouped = OrderedDict(
+        self._results_by_source = OrderedDict(
             (source_id, tuple(results)) for source_id, results in grouped.items()
         )
-        self._items = tuple(
-            result for results in self._grouped.values() for result in results
+        self._flattened_results = tuple(
+            result for results in self._results_by_source.values() for result in results
         )
         self._diagnostics = tuple(diagnostics)
+        self._executions = tuple(executions)
 
     @classmethod
     def from_grouped(
         cls,
-        grouped: Mapping[str, Tuple[Result, ...]],
+        grouped: Mapping[str, tuple[Resource, ...]],
         diagnostics: Iterable[SearchDiagnostic] = (),
+        executions: Iterable[SearchExecution] = (),
     ) -> "SearchResults":
-        return cls(grouped, diagnostics)
+        """Build immutable results from source-grouped Resource tuples."""
+        return cls(grouped, diagnostics, executions)
 
     @property
-    def diagnostics(self) -> Tuple[SearchDiagnostic, ...]:
+    def diagnostics(self) -> tuple[SearchDiagnostic, ...]:
         """Return source-scoped diagnostics for the executed search."""
         return self._diagnostics
 
-    @overload
-    def __getitem__(self, index: int) -> Result: ...
+    @property
+    def executions(self) -> tuple[SearchExecution, ...]:
+        """Return provider search timings in configured execution order."""
+
+        return self._executions
 
     @overload
-    def __getitem__(self, index: slice) -> Tuple[Result, ...]: ...
+    def __getitem__(self, index: int) -> Resource: ...
 
     @overload
-    def __getitem__(self, index: str) -> Tuple[Result, ...]: ...
+    def __getitem__(self, index: slice) -> tuple[Resource, ...]: ...
 
-    def __getitem__(
-        self, index: Union[int, slice, str]
-    ) -> Union[Result, Tuple[Result, ...]]:
+    @overload
+    def __getitem__(self, index: str) -> tuple[Resource, ...]: ...
+
+    def __getitem__(self, index: int | slice | str) -> Resource | tuple[Resource, ...]:
+        """Return a result, sequence slice, or source-specific result group."""
         if isinstance(index, str):
-            return self._grouped[index]
-        return self._items[index]
+            return self._results_by_source[index]
+        return self._flattened_results[index]
 
     def __len__(self) -> int:
-        return len(self._items)
+        """Return the total number of results across all source groups."""
+        return len(self._flattened_results)
 
-    def keys(self) -> Tuple[str, ...]:
+    def keys(self) -> tuple[str, ...]:
         """Return source IDs in sequence traversal order."""
-        return tuple(self._grouped)
+        return tuple(self._results_by_source)
 
-    def values(self) -> Tuple[Tuple[Result, ...], ...]:
+    def values(self) -> tuple[tuple[Resource, ...], ...]:
         """Return result groups in sequence traversal order."""
-        return tuple(self._grouped.values())
+        return tuple(self._results_by_source.values())
 
-    def items(self) -> Tuple[Tuple[str, Tuple[Result, ...]], ...]:
+    def items(self) -> tuple[tuple[str, tuple[Resource, ...]], ...]:
         """Return source IDs and result groups in sequence traversal order."""
-        return tuple(self._grouped.items())
+        return tuple(self._results_by_source.items())
 
     def get(
-        self, source_id: str, default: Tuple[Result, ...] = ()
-    ) -> Tuple[Result, ...]:
+        self, source_id: str, default: tuple[Resource, ...] = ()
+    ) -> tuple[Resource, ...]:
         """Get one source group without requiring the source to exist."""
-        return self._grouped.get(source_id, default)
+        return self._results_by_source.get(source_id, default)
 
-    def bind_resolver(self, resolver: Callable[[Result], Resource]) -> "SearchResults":
-        """Bind direct Result resolution to an application context."""
+    def bind(self, binder: Callable[[Resource], Resource]) -> "SearchResults":
+        """Bind searched Resources to an application execution context."""
         grouped = OrderedDict(
             (
                 source_id,
-                tuple(
-                    replace(
-                        result,
-                        _resolver=lambda result=result: resolver(result),
-                    )
-                    for result in results
-                ),
+                tuple(binder(result) for result in results),
             )
-            for source_id, results in self._grouped.items()
+            for source_id, results in self._results_by_source.items()
         )
-        return SearchResults(grouped, self._diagnostics)
+        return SearchResults(grouped, self._diagnostics, self._executions)
 
 
 class SearchCoordinator:
     """Search capable adapters in configuration order without cross-source ranking."""
 
-    def __init__(self, adapters: Iterable[Any]) -> None:
+    def __init__(
+        self,
+        adapters: Iterable[SearchParticipant],
+        knowledge: AreaKnowledgeAdapter | None = None,
+    ) -> None:
         self._adapters = tuple(adapters)
+        self._knowledge = knowledge
 
     def search(self, query: SearchQuery) -> SearchResults:
-        searchable = [
+        """Search capable adapters and isolate expected provider failures.
+
+        Each source receives only the conditions it declares. Unsupported or
+        missing required conditions become diagnostics; metadata and response
+        failures affect only the failing source. Unexpected programming errors
+        continue to propagate.
+        """
+        selected = None if query.providers is None else set(query.providers)
+        if selected is not None:
+            unknown = selected - {adapter.source_id for adapter in self._adapters}
+            if unknown:
+                raise ConfigValidationError(
+                    f"Unknown or unconfigured Provider IDs: {sorted(unknown)!r}"
+                )
+        searchable_adapters = [
             adapter
             for adapter in self._adapters
-            if getattr(adapter, "searchable", True)
-            and callable(getattr(adapter, "search", None))
-            and hasattr(adapter, "search_conditions")
+            if is_searchable_provider(adapter)
+            and (selected is None or adapter.source_id in selected)
         ]
-        grouped: OrderedDict[str, Tuple[Any, ...]] = OrderedDict()
-        diagnostics: List[SearchDiagnostic] = []
-        for adapter in searchable:
-            supported = frozenset(adapter.search_conditions)
-            unsupported = query.supplied_conditions - supported
-            required = frozenset(
-                cast(Iterable[str], getattr(adapter, "required_search_conditions", ()))
-            )
-            missing_required = required - query.supplied_conditions
-            if unsupported or missing_required:
-                diagnostics.append(
-                    SearchDiagnostic(
-                        source_id=adapter.source_id,
-                        skipped_conditions=unsupported,
-                        reason=(
-                            "missing_required" if missing_required else "unsupported"
-                        ),
-                        missing_conditions=missing_required,
-                    )
-                )
-            if missing_required:
-                continue
-            if query.supplied_conditions and not query.supplied_conditions & supported:
-                continue
+        if not searchable_adapters:
+            return SearchResults.from_grouped({})
+        grouped_results: OrderedDict[str, tuple[Resource, ...]] = OrderedDict()
+        diagnostics: list[SearchDiagnostic] = []
+        executions: list[SearchExecution] = []
+        resolved_area: AdministrativeArea | None = None
+        if query.area is not None:
             try:
-                grouped[adapter.source_id] = tuple(
-                    adapter.search(query.project(supported))
-                )
-            except ProviderMetadataError:
-                diagnostics.append(
-                    SearchDiagnostic(
-                        source_id=adapter.source_id,
-                        skipped_conditions=frozenset(),
-                        reason="provider_failure",
-                        failure_type="metadata",
+                if self._knowledge is None:
+                    raise KnowledgeResolutionError(
+                        "area knowledge adapter is not configured"
                     )
+                resolved_area = self._knowledge.resolve_area(query.area)
+            except (KnowledgeResolutionError, KnowledgeValidationError):
+                return SearchResults.from_grouped(
+                    grouped_results,
+                    (
+                        SearchDiagnostic(
+                            source_id=adapter.source_id,
+                            skipped_conditions=frozenset({"area"}),
+                            reason="area_resolution_failed",
+                        )
+                        for adapter in searchable_adapters
+                    ),
                 )
-            except ProviderResponseError:
-                diagnostics.append(
-                    SearchDiagnostic(
-                        source_id=adapter.source_id,
-                        skipped_conditions=frozenset(),
-                        reason="provider_failure",
-                        failure_type="response",
-                    )
+
+        def search_provider(
+            adapter: SearchableRegisteredProviderAdapter,
+        ) -> SearchResults:
+            return self._search_provider(adapter, query, resolved_area)
+
+        # Workers own their provider state; aggregation follows configuration order.
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            provider_searches = executor.map(
+                search_provider,
+                searchable_adapters,
+            )
+            for results in provider_searches:
+                grouped_results.update(results.items())
+                diagnostics.extend(results.diagnostics)
+                executions.extend(results.executions)
+        return SearchResults.from_grouped(grouped_results, diagnostics, executions)
+
+    @staticmethod
+    def _search_provider(
+        adapter: SearchableRegisteredProviderAdapter,
+        query: SearchQuery,
+        resolved_area: AdministrativeArea | None,
+    ) -> SearchResults:
+        """Execute one provider with local diagnostics and timing state."""
+        grouped_results: OrderedDict[str, tuple[Resource, ...]] = OrderedDict()
+        diagnostics: list[SearchDiagnostic] = []
+        executions: list[SearchExecution] = []
+        supported_conditions = adapter.search_conditions
+        native_format_search = "format" in supported_conditions
+        format_conditions: frozenset[str] = (
+            frozenset({"format"}) if query.format is not None else frozenset()
+        )
+        effective_conditions = supported_conditions | format_conditions
+        projected_query = query
+        area_handled = False
+        if resolved_area is not None:
+            if "area" in supported_conditions:
+                projected_query = replace(query, area=resolved_area.canonical_name)
+                area_handled = True
+            elif "bbox" in supported_conditions:
+                projected_query = replace(
+                    query,
+                    area=None,
+                    bbox=resolved_area.bbox.as_tuple(),
                 )
-        return SearchResults.from_grouped(grouped, diagnostics)
+                area_handled = True
+            elif "text" in supported_conditions and adapter.area_text_fallback:
+                text = resolved_area.canonical_name
+                if query.text:
+                    text = f"{query.text} {text}"
+                projected_query = replace(query, area=None, text=text)
+                area_handled = True
+            else:
+                projected_query = replace(query, area=None)
+
+        unsupported_conditions = query.supplied_conditions - effective_conditions
+        if area_handled:
+            unsupported_conditions -= {"area"}
+        required_conditions = adapter.required_search_conditions
+        missing_required_conditions = (
+            required_conditions - projected_query.supplied_conditions
+        )
+        if unsupported_conditions or missing_required_conditions:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=unsupported_conditions,
+                    reason=(
+                        "missing_required"
+                        if missing_required_conditions
+                        else "unsupported"
+                    ),
+                    missing_conditions=missing_required_conditions,
+                )
+            )
+        if missing_required_conditions:
+            return SearchResults.from_grouped(grouped_results, diagnostics)
+        if (
+            query.supplied_conditions
+            and not projected_query.supplied_conditions & effective_conditions
+        ):
+            return SearchResults.from_grouped(grouped_results, diagnostics)
+        started = perf_counter()
+        provider_results: tuple[Resource, ...] = ()
+        try:
+            adapter_query = projected_query.project(supported_conditions)
+            if query.format is not None and not native_format_search:
+                adapter_query = replace(adapter_query, limit=None)
+            adapter_results = adapter.search(adapter_query)
+            provider_results = tuple(adapter_results)
+            if isinstance(adapter_results, ProviderSearchResults):
+                diagnostics.extend(adapter_results.diagnostics)
+            if query.format is not None and not native_format_search:
+                provider_results = tuple(
+                    result
+                    for result in provider_results
+                    if _matches_format(result, query)
+                )
+                if query.limit is not None:
+                    provider_results = provider_results[: query.limit]
+            grouped_results[adapter.source_id] = provider_results
+        except ProviderMetadataError:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="provider_failure",
+                    failure_type="metadata",
+                )
+            )
+        except ProviderResponseError:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="provider_failure",
+                    failure_type="response",
+                )
+            )
+        except CredentialUnavailableError:
+            diagnostics.append(
+                SearchDiagnostic(
+                    source_id=adapter.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="provider_failure",
+                    failure_type="credential",
+                )
+            )
+        finally:
+            executions.append(
+                SearchExecution(
+                    source_id=adapter.source_id,
+                    elapsed_ms=(perf_counter() - started) * 1000,
+                    result_count=len(provider_results),
+                )
+            )
+        return SearchResults.from_grouped(grouped_results, diagnostics, executions)

@@ -21,4 +21,5 @@ def test_normal_ci_runs_full_checks_for_pushes_and_pull_requests() -> None:
 
     assert "  push:" in workflow
     assert "  pull_request:" in workflow
+    assert "      UV_PYTHON: ${{ matrix.python-version }}" in workflow
     assert "run: bash scripts/check.sh" in workflow

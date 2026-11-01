@@ -1,9 +1,8 @@
-# 06 — STAC COG with Rasterio
+# 06 — STACのCOGをRasterioで開く
 
-This live example resolves one explicitly selected STAC asset and delegates the
-COG URI to a user-owned Rasterio installation.
+明示したSTAC assetを解決し、利用者が用意したRasterioへ渡すlive exampleです。
 
-## Setup
+## 準備と実行
 
 ```console
 cd rhinestone
@@ -16,8 +15,6 @@ export RHINESTONE_STAC_ASSET_KEY="data-asset-key"
 uv run python examples/06_stac_cog/example.py
 ```
 
-The selected asset must advertise a COG media type containing
-`profile=cloud-optimized`; Rhinestone intentionally does not infer COG from a
-`.tif` suffix. HTTP metadata retrieval uses Rhinestone's built-in transport, so
-the STAC endpoint used by this public example must be reachable without custom
-transport injection.
+選択したassetは、`profile=cloud-optimized`を含むCOGのメディアタイプを広告している必要があります。
+`.tif`という拡張子だけからCOGとは判断しません。メタデータ取得には組み込みHTTP通信を使うため、
+指定するSTAC endpointへ追加のtransport設定なしで接続できる必要があります。

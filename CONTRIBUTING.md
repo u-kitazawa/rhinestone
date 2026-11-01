@@ -1,20 +1,24 @@
-# Contributing to Rhinestone
+# Rhinestoneへの貢献
 
-Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Source Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
+Rhinestoneへのコントリビューションを歓迎します。バグ修正、機能追加、Provider Adapterの追加、ドキュメント改善、テストの改善などを提案できます。
 
-Rhinestoneは、日本の公的・地理空間データへアクセスするためのKnowledge / Specification Layerです。変更を始める前に、[README](README.md)と[ドキュメントの位置付け](docs/documentation-status.md)を確認してください。
+Rhinestoneは、日本の公的・地理空間データを使える形へ解決するPythonライブラリです。変更を始める前に、[README](README.md)と本ガイドを確認してください。
 
 ## 基本方針
 
 - 設計仕様と既存の不変条件を優先する。
 - 変更の責務を適切な層に置く。
 - CoreにGDAL、Rasterio、pyogrioなどのGIS処理系を実行時依存として追加しない。
-- Source固有の知識はSource AdapterまたはCatalogに閉じ込める。
+- Provider固有の知識はProvider AdapterまたはCatalogに閉じ込める。
 - URLの推測、暗黙のフォーマット変換、HTML scrapingを追加しない。
 - 振る舞いを変更した場合は、テスト、仕様、またはドキュメントも更新する。
-- 公開APIを変更する場合は、後方互換性の要否と影響をPRに明記する。
+- 公開APIを変更する場合は旧APIを削除し、影響と移行先をPRに明記する。後方互換のための別名、wrapper、旧引数は追加しない。
 
-Source Adapterを追加・変更する場合は、代表的なFixture、期待されるSource・Resource・AccessPlan、仕様適合テストを一緒に追加してください。組み込みSourceの接続先や静的な仕様は、可能な限りCatalogで管理します。
+Provider Adapterを追加・変更する場合は、代表的なFixture、期待されるReference・Resource・AccessPlan、仕様適合テストを一緒に追加してください。
+`load(reference)`は配信単位のResourceを返し、検索能力を持つAdapterの`search(query)`も
+配信単位のResourceを返します。Providerは接続先・サービス設定、Catalogは構成するProviderの一覧です。
+組み込みProviderの接続先や静的な仕様は、可能な限りCatalogで管理します。
+拡張時の契約は[Custom Adapterを作る](docs/custom-adapters.md)を参照してください。
 
 ## 開発環境
 
@@ -28,18 +32,48 @@ uv sync --dev --locked
 
 ロックファイルを更新する必要がある場合は、変更理由をPRに記載してください。
 
+### 依存関係の脆弱性監査
+
+Python 3.12とuvがある環境で `python scripts/audit_dependencies.py` を実行します。
+`uv.lock` の直接・間接・dev依存と、Python/OS別の全解決バージョンを
+PyPIの既知脆弱性情報と照合します。未公開のローカルプロジェクト自身は対象外です。
+監査ツールは固定版pip-auditを隔離環境で実行し、Core依存には追加しません。
+終了コード0は完全な監査の成功、1は既知脆弱性の検出、2は通信・ツール・lock不整合などによる
+監査未完了です。未完了を「脆弱性なし」として扱わず、診断を確認して再実行してください。
+通常の `scripts/check.sh` とは分け、Dependency audit CIでPR・pushと毎日実行します。
+定期workflowはGitHubの既定ブランチ上で動くため、既定ブランチへの反映後に有効になります。
+
+Dependabot version updatesはuvの更新PRをdevelop向けに週次作成する設定です。
+設定ファイルを既定ブランチにも反映する必要があります。Dependabot alerts/security updatesの
+有効化はリポジトリ設定・権限に依存し、この設定だけで有効化したとはみなしません。
+alertsは既定ブランチの依存グラフを対象とし、developの監査CIを代替しません。
+urllib3のセキュリティ下限値はuvのconstraintに置き、Coreの直接依存を増やさず維持します。
+
 ## リポジトリ構成
 
 主なディレクトリとファイルは次のとおりです。
 
 - `src/rhinestone/`: パッケージ本体
 - `tests/`: テスト
-- `docs/`: 利用者向けドキュメントと設計仕様
-- `src/rhinestone/catalogs/`: 組み込みSourceのCatalog
+- `docs/`: 現行の利用者向けガイド、APIリファレンス、開発・リリース運用
+- `src/rhinestone/catalogs/`: 組み込みProviderのCatalog
 - `pyproject.toml`: パッケージ、開発ツール、型チェックの設定
 - `.github/workflows/`: CIとドキュメント公開の設定
 
-`docs/`には現行の公開契約に加えて、v0.5への移行先を示す設計草案と履歴資料が含まれます。ナビゲーションに掲載されたガイドとAPIリファレンスを現行の利用者向け契約とし、公開APIの正確な振る舞いは実装とテストで固定します。`docs/spec_v5.md`は段階移行中の設計草案、`docs/spec_v4.md`、`docs/adapter_expansion.md`、`docs/architecture/`、`docs/specs/`は履歴資料です。詳しい更新規則は[ドキュメントの位置付け](docs/documentation-status.md)を参照してください。
+## ドキュメントの更新
+
+ナビゲーションに掲載されたガイドとAPIリファレンスは、同じブランチの実装とテストに
+一致する公開契約を説明します。文書と実装が矛盾する場合は実装・テストを確認し、
+公開APIや振る舞いの変更と同時に該当するガイド・APIリファレンスを更新してください。
+文書のブランチと公開版の関係は[API安定性とリリース運用](docs/release-policy.md)の「文書の対象バージョン」を参照します。
+
+設計課題・未完了事項・調査結果はGitHub Issuesで追跡します。調査には対象Issue、調査日、
+確認済み事項、残る検証を記録し、未確認の提案を現行の公開契約として扱いません。
+新しい設計判断を実装した場合はIssueの記録だけで完了とせず、現行文書にも反映します。
+過去の仕様本文はGit履歴、versionごとの変更履歴はGitHub Releasesを参照し、
+旧API例・移行マトリクス・履歴分類ページを現行文書ツリーに保持しません。
+
+Pythonサポート範囲は`pyproject.toml`を正本とし、CIの検証範囲は[対応状況](docs/compatibility.md)に記載します。
 
 ## ローカル検証
 
@@ -63,7 +97,7 @@ CIはContributorのブランチを自動修正・commit・pushしません。Ruf
 1. 既存Issueに同じ目的の議論がないか確認する。
 2. 新しい変更の場合はIssueを作成し、目的、背景、対象範囲、想定するAPIや挙動を記載する。
 3. 小さな修正でIssueが不要な場合でも、変更理由がPR本文から分かるようにする。
-4. 仕様変更を伴う場合は、[ドキュメントの位置付け](docs/documentation-status.md)を確認し、実装、テスト、公開ガイド、APIリファレンスを同じ変更で更新する。
+4. 仕様変更を伴う場合は、実装、テスト、公開ガイド、APIリファレンスを同じ変更で更新する。
 
 大きな設計変更や公開APIの変更は、実装を始める前にIssueで方向性を確認してください。
 
@@ -93,13 +127,13 @@ git switch -c <type>/<short-description>
 
 ```text
 feat/add-new-source
-fix/resolve-invalid-config
+fix/reject-invalid-reference
 docs/update-contributing-guide
 ```
 
 ## 実装とコミット
 
-変更はレビューしやすい単位に分けてください。
+コミットは変更の意図を追える単位に分け、PRは次の基準でまとめてください。
 
 - 実装、テスト、ドキュメントを変更内容に合わせて更新する。
 - 無関係なリファクタリングや大規模な整形を同じPRに混在させない。
@@ -115,6 +149,27 @@ fix: reject incomplete access plan
 docs: explain static source configuration
 refactor: simplify source composition
 ```
+
+## PRの粒度と継続作業
+
+PRは、利用者にとって一つの目的が完了し、レビューと取り込みを一度に判断できる単位にまとめます。
+ファイル数、個々の検証項目、作業時間の区切りをPRの分割基準にはしません。
+
+- 着手前に関連Issueと未マージPRを確認する。同じ目的・原因・公開契約に属する修正、回帰テスト、文書更新は、既存PRの範囲に収まる限り同じブランチへ集約する。
+- 文書監査は対象範囲を先に定め、関連ページを横断して確認し、見つかった修正をまとめる。同じ入力・例外契約に関する複数Adapterの修正も、責務と検証を整理して一つのPRにできるか検討する。
+- 同じIssueでも独立した目的の変更は無理にまとめず、異なるIssueでも同じ目的の変更なら関連IssueをPR本文に列挙する。Issue番号だけで分割・集約を決めない。
+- 新しいPRは、独立して取り込む必要がある変更、先行して提供する必要がある修正、依存関係やリスクが異なる変更、または一度にレビューするには大きすぎる変更に分ける。分割した場合は、各PRの完了条件・依存順序・分割理由を説明する。
+
+一つの目的の中でも、無関係な整理を追加して範囲を広げないでください。
+修正に必要な実装・テスト・文書を揃え、合意した範囲の完了を目指します。
+
+エージェントや定期実行でも、実行回数やセッション終了を理由にPRを分割しません。
+一度の実行で完了できない場合は、同じ作業ブランチを継続し、必要ならDraft PRを使います。
+IssueまたはPRへ、確認済み範囲、検証結果、残件、次のアクションを記録して引き継ぎます。
+「原則1件対応」は取り組むIssue・目的の選択であり、毎回新しいPRを作る意味ではありません。
+
+進捗報告は、実装の進展、阻害要因、ユーザー判断が必要な点、取り込み準備完了などを中心にまとめます。
+同じ結果の反復や、CI確認だけの細切れの通知は避け、報告頻度の明示指示がある場合はその指示に従います。
 
 ## Pull Requestを作成する
 

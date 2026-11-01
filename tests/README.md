@@ -1,49 +1,45 @@
-# Spec contract tests
+# 契約テスト
 
-These tests translate the provider-independent requirements in
-`docs/spec_v4.md` into executable contracts before implementation.
+テストは、同じブランチの[公開API](../docs/api.md)と[責務境界](../docs/concepts.md)を
+実行可能な契約として固定します。過去の設計案を現在のAPIや追加の製品要件として扱いません。
+公開契約を変更する場合は、実装・テスト・利用者向け文書を同じ変更で更新します。
 
-## API assumptions
+## 公開APIと拡張境界
 
-The specification defines model and component names, but intentionally does not
-fix Python module paths or complete constructor signatures.  The tests use the
-following minimal layout so implementation can start from an explicit design:
+- 通常の経路は`search → Resource → open`、既知の対象は`Reference → app.load()`です。
+  検索は配信単位のResourceを返し、metadata、raw metadata、provenance、discoveryを保持します。
+- `configure()`は分離されたアプリケーションを作ります。Provider依存ライブラリは`dependencies=`へ、
+  遅延factoryは明示的な`RuntimeFactory`で渡します。Runtimeは
+  `app.open(resource, name, runtime=...)`または`resource.open(name, runtime=...)`へ実体を渡します。
+  Core所有の`json-service` Runtimeは省略できます。Runtimeを暗黙に選びません。
+- 公開する名前とシグネチャは[公開APIテスト](test_public_api.py)で確認します。
+  詳細なモデルは`rhinestone.models`、原因別エラーは`rhinestone.errors`に置きます。
+- Provider/Runtime Adapterの拡張境界は`rhinestone.adapters.contracts`のDefinition/Contextと
+  `rhinestone.adapters.ports`です。[Custom Adapterテスト](test_custom_adapters.py)では、
+  公開構成経路で登録・依存・認証の境界を検証します。内部Registryの配置を外部契約にしません。
+- Knowledge Adapterの`KnowledgeAdapterDefinition`と`KnowledgeAdapterContext`は
+  `rhinestone.adapters.knowledge`からimportします。[Knowledgeガイド](../docs/knowledge.md)と
+  [Knowledgeテスト](test_knowledge.py)で、`configure(adapters=...)`による登録と共有知識の契約を確認します。
 
-- domain values live in `rhinestone.models`;
-- stable, cause-specific failures live in `rhinestone.errors`;
-- registries, resolution, search, and execution selection are separate modules;
-- adapters are accepted by behaviour (duck typing), so Core does not need to
-  expose a premature third-party adapter API.
+## Providerと実行の検証
 
-These are test-design assumptions rather than additional product requirements.
-If implementation reveals a better public layout, update this note and the
-imports without weakening the behavioural assertions.
+同じAdapter型を異なる`Provider.id`で構成でき、Provider Adapterは`Reference`を配信単位の
+`Resource`へ読み込みます。Provider Adapterの直接テストでは、小さなfixtureとfake transportで
+要求、選択、情報保持、曖昧性、異常応答を確認し、公開search/load経路も別途検証します。
+e-Stat統計GISは明示distribution indexを扱い、統計表APIの実装を前提にしません。
 
-Provider-specific tests use small, deterministic fixtures derived from the
-official CKAN Action API, e-Stat API 3.0, STAC API 1.0.0, and OGC API Features
-1.0 contracts. They specify only behaviour supported by those standards and
-their fixtures; deployment-specific extensions remain out of scope.
+Runtime Adapterは選択済み`AccessPlan`を受け取り、Resourceを再選択せず、既存Runtimeの
+呼び出しへ翻訳します。形式・ZIP entry point等を推測せず、失敗原因と宛先認可を検証します。
+[AccessPlan実行テスト](test_plan_execution.py)では、JSONから復元した計画を、元のResourceや
+Providerへの再問い合わせなしで開くことを確認します。[直列化テスト](test_portable.py)では、
+Resourceのmetadata/discovery保持、runtime状態の非転送、復元・bindの契約を確認します。
 
-Source Adapter classes are internal contracts. The public composition API maps
-named `SourceDefinition` values to built-in adapters, allowing multiple source
-ids to share one adapter type. Repository-managed Catalog values are loaded into
-SourceDefinition objects before composition. Tests may instantiate adapters
-directly to verify their request, preservation, explicit-selection, and failure
-behaviour.
+## 決定的なCIと実地確認
 
-The first execution vertical slice temporarily places execution adapters in
-`rhinestone.adapters.execution` and connects them through `AccessPipeline.open`.
-Those package and constructor shapes may evolve; the stable contracts are that
-the selected Resource is translated without being re-selected, runtime
-dependencies stay lazy and user-owned, and runtime failures retain their cause.
+通常CIはネットワークに依存しないfixture/fake Runtimeを使います。観測応答の抜粋と合成データは
+区別し、fixtureが検証する範囲を超えて外部Providerやnative driverへの適合を保証しません。
+live通信や実Runtimeの手動検証は、実行環境・日時・条件・結果を別途記録し、通常CIの成功と区別します。
 
-Execution Adapter classes are also composed internally. Their stable name,
-priority, support predicate, and runtime-opening operation remain internal
-contracts; users provide only runtime dependency factories.
-
-The following public-composition slice treats `rhinestone.configure()` as a
-factory for an isolated application context rather than mutable process-global
-configuration. A Resource resolved by that context is bound to its executor so
-`resource.open(library)` can follow the documented interface. The binding
-mechanism is not itself a permanent API; context isolation, lazy dependencies,
-normal resolution, and explicit adapter selection are the guarantees.
+全品質チェックは[開発ガイド](../CONTRIBUTING.md)に従い`bash scripts/check.sh`で実行します。
+対象を絞ったテストが通るだけで、全体のcoverage・lint・型チェック・文書・配布物ビルドを
+検証済みとは扱いません。

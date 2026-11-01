@@ -4,10 +4,12 @@
 Runtimeへ渡すまでを、目的別に説明します。基本的な流れは次のとおりです。
 
 ```text
-configure -> search -> Resultを選ぶ -> resolve -> Resourceを開く
+search -> Resourceを選ぶ -> open -> Data
 ```
 
-各チュートリアルは、異なる解決パターンを一つずつ扱います。
+独自Providerを使う場合は先に`configure()`でアプリケーションを構成します。
+既知の配信対象を直接指定する場合は、`Reference`を`app.load()`へ渡します。
+各チュートリアルは、異なる取得パターンを一つずつ扱います。
 
 | 目的 | 解決パターン | 最後に得るもの |
 | --- | --- | --- |

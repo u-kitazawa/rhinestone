@@ -1,0 +1,20 @@
+[project]
+name = "rhinestone-entrypoint-fixture"
+version = "0.0.1"
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13"]
+build-backend = "uv_build"
+
+[project.entry-points."rhinestone.provider_adapters"]
+installed-provider = "rhinestone_entrypoint_fixture.provider:definition"
+unused-broken = "rhinestone_entrypoint_fixture.broken:definition"
+
+[project.entry-points."rhinestone.runtime_adapters"]
+installed-runtime = "rhinestone_entrypoint_fixture.runtime:definition"
+unused-runtime = "rhinestone_entrypoint_fixture.broken:definition"
+
+[project.entry-points."rhinestone.knowledge_adapters"]
+installed-time = "rhinestone_entrypoint_fixture.knowledge:definition"
+unused-knowledge = "rhinestone_entrypoint_fixture.broken:definition"

@@ -1,0 +1,29 @@
+# STACの提供元アダプター
+
+`StacAdapter` は STAC APIと静的STACのItem assetを配信単位の `Resource` に変換します。
+
+標準文書の解釈・相対Link/Asset解決はPySTAC（`pystac-core`）へ委譲します。
+取得・認可・巡回上限と訪問管理・選択・Resource/Plan変換はRhinestoneが担当し、
+PySTACの自動I/Oや再帰巡回は利用しません。raw metadataは取得文書を保持します。
+
+- Adapter 種別（`adapter_type`）: `stac`
+- Provider設定: API型は `endpoint`、静的型は `catalog_uri`（排他的）。
+- 直接loadのReference: `collection_id`, `item_id`, `asset_key`。静的型では `item_href` も必要。
+- 検索: `bbox`, `time`, `limit`
+- 注入: `get_json(url, params)`。`credential` に論理名を指定し、`credentials` のRegistryから認証情報を取得します。
+
+組み込みJAXAプレビューは`jaxa-gsmap-preview`（GSMaP月降水量・2021年2月）、
+`jaxa-aw3d-preview`（AW3D標高・2021年2月）、
+`jaxa-hrlulc-preview`（HRLULC土地被覆・2024年）です。
+検証済みのlevel 0・東経0〜180度階層を`catalog_uri`に設定し、
+それぞれ`max_documents=2`で低解像度プレビューだけを有界探索します。
+全製品・全期間の検索ではありません。
+
+API型・静的型のどちらも各data assetを独立Resourceとして返し、
+複数assetのItemでも先頭assetを暗黙選択しません。
+data assetがないItemや不正Itemはスキップし、diagnosticsで理由を確認できます。
+静的型は公式のchild/itemリンクを有界に巡回します（`max_documents`、既定100）。
+条件はItem取得後に適用し、Collection extentによる枝刈りは現在行いません。
+asset URLやフォーマットは推測しません。詳細は
+[APIリファレンス](../../../../../docs/api/adapters/stac.md)を参照してください。
+設定は [schema.json](schema.json) で補完・構造検証できます。

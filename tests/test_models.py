@@ -1,45 +1,139 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, cast
+from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import pytest
 
-from rhinestone.errors import ConfigValidationError, ExecutionAdapterUnavailableError
+from rhinestone.errors import ConfigValidationError, RuntimeAdapterUnavailableError
 from rhinestone.models import (
-    Config,
-    FileAccessPlan,
+    AccessPlan,
     Metadata,
     Provenance,
+    Provider,
+    Reference,
     Resource,
-    ResourceCandidate,
     SearchDiagnostic,
+    SearchExecution,
     SearchQuery,
-    SearchResult,
-    Source,
-    SourceDefinition,
 )
 
 
+def unresolved_resource(
+    uri: object, format_name: object = "csv", media_type: object = None
+) -> Resource:
+    return Resource(
+        uri=cast(Any, uri),
+        format=cast(Any, format_name),
+        media_type=cast(Any, media_type),
+        metadata=Metadata(),
+        provenance=Provenance(provider="fixture"),
+        access_plan=None,
+        reference=Reference("fixture"),
+    )
+
+
+@pytest.mark.parametrize(
+    "execution",
+    [
+        SearchExecution("provider", 0.0, 0),
+        SearchExecution("provider", 1.5, 2),
+    ],
+)
+def test_search_execution_accepts_non_negative_provider_measurements(
+    execution: SearchExecution,
+) -> None:
+    assert execution.source_id == "provider"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ("", 0.0, 0),
+        ("provider", -0.1, 0),
+        ("provider", 0.0, -1),
+        ("provider", float("nan"), 0),
+        ("provider", float("inf"), 0),
+        ("provider", True, 0),
+        ("provider", 0.0, 1.5),
+        ("provider", 0.0, True),
+    ],
+)
+def test_search_execution_rejects_invalid_measurements(
+    arguments: tuple[Any, Any, Any],
+) -> None:
+    with pytest.raises(ConfigValidationError):
+        SearchExecution(*arguments)
+
+
 def test_config_is_immutable_and_copies_nested_settings() -> None:
-    settings: Dict[str, Any] = {
+    settings: dict[str, Any] = {
         "resource_id": "resource-1",
         "filters": {"year": 2024},
     }
-    config = Config(source_id="ckan", settings=settings)
+    config = Reference(provider_id="ckan", parameters=settings)
 
-    cast(Dict[str, int], settings["filters"])["year"] = 2025
+    cast(dict[str, int], settings["filters"])["year"] = 2025
 
-    assert config.settings["filters"]["year"] == 2024
+    assert config.parameters["filters"]["year"] == 2024
     with pytest.raises(TypeError):
-        cast(Dict[str, Any], config.settings)["resource_id"] = "changed"
+        cast(dict[str, Any], config.parameters)["resource_id"] = "changed"
 
 
 def test_source_definition_and_config_ids_must_be_non_empty() -> None:
     with pytest.raises(ConfigValidationError, match="source id"):
-        SourceDefinition("", "ckan")
+        Provider("", "ckan")
     with pytest.raises(ConfigValidationError, match="adapter_type"):
-        SourceDefinition("catalog", "")
-    with pytest.raises(ConfigValidationError, match="source_id"):
-        Config("", {})
+        Provider("catalog", "")
+    with pytest.raises(ConfigValidationError, match="provider_id"):
+        Reference("", parameters={})
+
+
+def test_resource_rejects_embedded_http_credentials() -> None:
+    with pytest.raises(ConfigValidationError, match="credentials"):
+        unresolved_resource("https://user:password@example.jp/data.csv")
+
+
+@pytest.mark.parametrize(
+    "uri",
+    (
+        "https://exa mple/data.csv",
+        "https://%ZZ/data.csv",
+        "https://-bad.example/data.csv",
+        "https://bad_name.example/data.csv",
+        "https://[gggg::1]/data.csv",
+    ),
+)
+def test_resource_rejects_malformed_http_hostnames(uri: str) -> None:
+    with pytest.raises(ConfigValidationError, match="authority"):
+        unresolved_resource(uri)
+
+
+def test_resource_accepts_valid_ipv6_http_authority() -> None:
+    candidate = unresolved_resource("https://[2001:db8::1]/data.csv")
+
+    assert candidate.uri == "https://[2001:db8::1]/data.csv"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    (
+        ({"uri": "", "format": "csv", "media_type": None}, "non-empty"),
+        ({"uri": 1, "format": "csv", "media_type": None}, "non-empty"),
+        ({"uri": "https://[invalid", "format": "csv", "media_type": None}, "invalid"),
+        ({"uri": "https://example.jp/data", "format": 1, "media_type": None}, "format"),
+        (
+            {"uri": "https://example.jp/data", "format": "csv", "media_type": 1},
+            "media_type",
+        ),
+    ),
+)
+def test_resource_validates_public_field_shapes(
+    kwargs: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigValidationError, match=message):
+        unresolved_resource(
+            kwargs["uri"], kwargs.get("format"), kwargs.get("media_type")
+        )
 
 
 @pytest.mark.parametrize("limit", (-1, True, 1.5, "1"))
@@ -56,12 +150,51 @@ def test_search_query_rejects_invalid_limits(limit: object) -> None:
         (0, 1, 2, 3, 4),
         (0, 1, 2, "3"),
         (False, 1, 2, 3),
+        (float("nan"), 1, 2, 3),
+        (0, float("inf"), 2, 3),
+        (0, 1, float("-inf"), 3),
         [0, 1, 2, 3],
+        (-181, 0, 1, 1),
+        (181, 0, 1, 1),
+        (0, 0, -181, 1),
+        (0, 0, 181, 1),
+        (0, -91, 1, 1),
+        (0, 91, 1, 1),
+        (0, 0, 1, -91),
+        (0, 0, 1, 91),
+        (0, 2, 1, 1),
+        (10**400, 0, 1, 1),
     ),
 )
 def test_search_query_rejects_invalid_bboxes(bbox: object) -> None:
     with pytest.raises(ConfigValidationError, match="bbox"):
         SearchQuery(bbox=cast(Any, bbox))
+
+
+def test_search_query_bbox_error_does_not_call_element_repr() -> None:
+    class Unrepresentable:
+        def __repr__(self) -> str:
+            raise AssertionError("repr must not be called")
+
+    with pytest.raises(ConfigValidationError, match="invalid length or element type"):
+        SearchQuery(bbox=cast(Any, (0, 1, 2, Unrepresentable())))
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    (
+        (-180, -90, 180, 90),
+        (180, -90, -180, 90),
+        (170.5, -10.5, -170.5, 10.5),
+        (139, 35, 139, 35),
+    ),
+)
+def test_search_query_preserves_boundary_and_antimeridian_bboxes(
+    bbox: tuple[float, float, float, float],
+) -> None:
+    query = SearchQuery(bbox=bbox)
+    assert query.bbox == bbox
+    assert query.project(frozenset({"bbox"})).bbox == bbox
 
 
 @pytest.mark.parametrize(
@@ -79,41 +212,88 @@ def test_search_query_rejects_invalid_time_ranges(time: object) -> None:
         SearchQuery(time=cast(Any, time))
 
 
+def test_search_query_time_error_does_not_call_element_repr() -> None:
+    class Unrepresentable:
+        def __repr__(self) -> str:
+            raise AssertionError("repr must not be called")
+
+    with pytest.raises(ConfigValidationError, match="invalid length or element type"):
+        SearchQuery(time=cast(Any, (Unrepresentable(), None)))
+
+
+@pytest.mark.parametrize(
+    "time",
+    (
+        (datetime(2024, 1, 2), datetime(2024, 1, 1)),
+        (
+            datetime(2024, 1, 2, tzinfo=timezone.utc),
+            datetime(2024, 1, 1, tzinfo=timezone.utc),
+        ),
+        (datetime(2024, 1, 1), datetime(2024, 1, 2, tzinfo=timezone.utc)),
+    ),
+)
+def test_search_query_rejects_invalid_time_intervals(
+    time: tuple[datetime, datetime],
+) -> None:
+    with pytest.raises(ConfigValidationError, match="time"):
+        SearchQuery(time=time)
+
+
+def test_search_query_rejects_dst_fold_interval_reversed_in_absolute_time() -> None:
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2024, 11, 3, 1, 30, tzinfo=new_york, fold=1)
+    end = datetime(2024, 11, 3, 1, 45, tzinfo=new_york, fold=0)
+
+    with pytest.raises(ConfigValidationError, match="time start"):
+        SearchQuery(time=(start, end))
+
+
+def test_search_query_accepts_dst_fold_interval_in_absolute_time_order() -> None:
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2024, 11, 3, 1, 30, tzinfo=new_york, fold=0)
+    end = datetime(2024, 11, 3, 1, 15, tzinfo=new_york, fold=1)
+
+    assert SearchQuery(time=(start, end)).time == (start, end)
+
+
 def test_search_query_accepts_valid_boundary_values() -> None:
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
     query = SearchQuery(
         bbox=(0, 1.5, 2, 3.5),
-        time=(start, None),
+        time=(start, end),
         limit=0,
     )
 
     assert query.bbox == (0, 1.5, 2, 3.5)
-    assert query.time == (start, None)
+    assert query.time == (start, end)
     assert query.limit == 0
 
 
 def test_source_definition_is_deeply_immutable() -> None:
-    settings: Dict[str, Any] = {"endpoint": "https://example.jp", "nested": {"x": 1}}
-    source = SourceDefinition("catalog", "ckan", settings)
-    cast(Dict[str, int], settings["nested"])["x"] = 2
+    settings: dict[str, Any] = {"endpoint": "https://example.jp", "nested": {"x": 1}}
+    source = Provider("catalog", "ckan", settings)
+    cast(dict[str, int], settings["nested"])["x"] = 2
 
     assert source.settings["nested"]["x"] == 1
     with pytest.raises(TypeError):
-        cast(Dict[str, Any], source.settings)["endpoint"] = "changed"
+        cast(dict[str, Any], source.settings)["endpoint"] = "changed"
 
 
 def test_config_freezes_all_mutable_container_shapes() -> None:
-    config = Config(
-        source_id="fixture",
-        settings={"list": [1], "tuple": ({"nested": True},), "set": {1, 2}},
+    config = Reference(
+        provider_id="fixture",
+        parameters={"list": [1], "tuple": ({"nested": True},)},
     )
 
-    assert config.settings == {
+    assert config.parameters == {
         "list": (1,),
         "tuple": ({"nested": True},),
-        "set": frozenset({1, 2}),
     }
+
+    with pytest.raises(ConfigValidationError, match="non-JSON"):
+        Reference("fixture", parameters={"set": {1, 2}})
 
 
 def test_resource_preserves_source_metadata_and_provenance() -> None:
@@ -125,101 +305,67 @@ def test_resource_preserves_source_metadata_and_provenance() -> None:
         retrieved_at=datetime(2024, 1, 2, tzinfo=timezone.utc),
         raw={"request_id": "req-1"},
     )
-    candidate = ResourceCandidate(
+    resource = Resource(
         uri="https://example.jp/river.zip",
         format="shapefile",
         media_type="application/zip",
-    )
-    source = Source(
         metadata=metadata,
-        candidates=(candidate,),
-        capabilities=frozenset({"download"}),
         provenance=provenance,
-        raw_metadata=raw,
-    )
-
-    resource = Resource(
-        uri=candidate.uri,
-        format=candidate.format,
-        media_type=candidate.media_type,
-        metadata=source.metadata,
-        provenance=source.provenance,
-        access_plan=FileAccessPlan(uri=candidate.uri, archive="zip"),
-        source=source,
+        access_plan=AccessPlan(
+            kind="file",
+            uri="https://example.jp/river.zip",
+            format="shapefile",
+            media_type="application/zip",
+            options={"archive": "zip"},
+        ),
+        reference=Reference("example-ckan", "dataset-1", "resource-1"),
     )
 
     assert resource.metadata is metadata
     assert resource.provenance is provenance
-    assert resource.source is source
-    assert resource.source.raw_metadata == raw
+    assert resource.metadata.raw == raw
 
 
-def test_search_result_returns_config_without_losing_knowledge() -> None:
+def test_resource_reference_retains_delivery_identity_without_losing_knowledge() -> (
+    None
+):
     metadata = Metadata(title="Dataset", raw={"table": "raw-value"})
     provenance = Provenance(provider="catalog", raw={"query": "dataset"})
-    result = SearchResult(
-        title="Dataset",
-        description="Official dataset",
-        discovered_by="search-ckan-jp",
-        target=Config("catalog", {"resource_id": "resource-1"}),
+    resource = Resource(
+        uri="https://example.jp/data.csv",
+        format=None,
+        media_type=None,
         metadata=metadata,
         provenance=provenance,
+        access_plan=None,
+        reference=Reference("catalog", "dataset-1", "resource-1"),
     )
 
-    config = result.to_config()
-
-    assert config == Config(source_id="catalog", settings={"resource_id": "resource-1"})
-    assert result.metadata is metadata
-    assert result.provenance is provenance
+    assert resource.reference == Reference("catalog", "dataset-1", "resource-1")
+    assert resource.metadata is metadata
+    assert resource.provenance is provenance
 
 
 def test_unbound_resource_cannot_open_without_execution_context() -> None:
-    candidate = ResourceCandidate("/data/a.csv", "csv", "text/csv")
-    source = Source(
-        metadata=Metadata(title="A", raw={}),
-        candidates=(candidate,),
-        capabilities=frozenset(),
-        provenance=Provenance(provider="direct", raw={}),
-        raw_metadata={},
-    )
     resource = Resource(
-        uri=candidate.uri,
-        format=candidate.format,
-        media_type=candidate.media_type,
-        metadata=source.metadata,
-        provenance=source.provenance,
-        access_plan=FileAccessPlan(uri=candidate.uri),
-        source=source,
+        uri="/data/a.csv",
+        format="csv",
+        media_type="text/csv",
+        metadata=Metadata(title="A", raw={}),
+        provenance=Provenance(provider="direct", raw={}),
+        access_plan=AccessPlan(
+            kind="file", uri="/data/a.csv", format="csv", media_type="text/csv"
+        ),
+        reference=Reference("direct", resource_identifier="/data/a.csv"),
     )
 
-    with pytest.raises(ExecutionAdapterUnavailableError, match="not bound"):
+    with pytest.raises(RuntimeAdapterUnavailableError, match="not bound"):
         resource.open("gdal")
 
 
-def test_unbound_search_result_cannot_resolve() -> None:
-    result = SearchResult(
-        title="Dataset",
-        description=None,
-        discovered_by="catalog",
-        target=Config("direct", {}),
-        metadata=Metadata(raw={}),
-        provenance=Provenance(provider="direct", raw={}),
-    )
-
-    with pytest.raises(ConfigValidationError, match="not bound"):
-        result.resolve()
-
-
-def test_search_result_requires_a_discovery_source() -> None:
-    with pytest.raises(ConfigValidationError, match="discovered_by"):
-        SearchResult(
-            title="Dataset",
-            description=None,
-            discovered_by="",
-            target=Config("direct", {}),
-            metadata=Metadata(raw={}),
-            provenance=Provenance(provider="direct", raw={}),
-        )
+def test_reference_requires_a_provider_id() -> None:
+    with pytest.raises(ConfigValidationError, match="provider_id"):
+        Reference("")
 
 
 def test_search_diagnostic_requires_a_source_id() -> None:

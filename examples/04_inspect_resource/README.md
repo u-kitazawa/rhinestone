@@ -1,17 +1,15 @@
-# 04 — Inspect a Resource
+# 04 — Resourceの情報を確認する
 
-This deterministic example demonstrates why a Rhinestone Resource is more than
-a download URL. It displays format, media type, archive, encoding, layer,
-Metadata, Source, AccessPlan, and Provenance.
+`Resource`が単なるダウンロードURLではないことを確認する、通信不要の例です。形式、メディアタイプ、
+アーカイブ、文字コード、レイヤー、メタデータ、アクセス方法、出典情報を表示します。
 
-## Setup and run
+## 準備と実行
 
 ```console
 cd rhinestone
 uv sync --dev
-uv run python docs/examples/04_inspect_resource/example.py
+uv run python examples/04_inspect_resource/example.py
 ```
 
-No network or GIS runtime is required. The URI uses the reserved
-`example.invalid` domain and is never opened.
-
+ネットワーク接続やGIS用ライブラリは必要ありません。URIには予約ドメイン`example.invalid`を使い、
+データ本体は開きません。

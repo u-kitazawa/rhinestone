@@ -4,16 +4,16 @@ import os
 
 from osgeo import gdal
 
-from rhinestone import Config, RuntimeFactory, SourceDefinition, configure
+from rhinestone import Provider, Reference, configure
+from rhinestone.catalogs import Catalog
 
 app = configure(
-    sources=(SourceDefinition("gsi-fundamental", "gsi-fundamental"),),
-    dependencies={"gdal": RuntimeFactory(lambda: gdal)},
+    catalog=Catalog((Provider("gsi-fundamental", "gsi-fundamental"),)),
 )
-resource = app.resolve(
-    Config(
+resource = app.load(
+    Reference(
         "gsi-fundamental",
-        {
+        parameters={
             "dataset": "basic",
             "path": os.environ["RHINESTONE_GSI_FUNDAMENTAL_PATH"],
             "metadata": {
@@ -27,7 +27,7 @@ resource = app.resolve(
         },
     )
 )
-dataset = resource.open("gdal")
+dataset = resource.open("gdal", runtime=gdal)
 print("URI:", resource.uri)
 print("provenance:", resource.provenance)
 print("layer count:", dataset.GetLayerCount())

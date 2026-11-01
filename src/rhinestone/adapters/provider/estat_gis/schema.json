@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "distribution_id": {"type": "string", "minLength": 1},
+    "dataset_id": {"type": "string", "minLength": 1},
+    "boundary_kind": {"type": "string", "minLength": 1},
+    "survey_year": {"type": "integer", "minimum": 1, "maximum": 9999},
+    "time": {"type": "string", "minLength": 1},
+    "time_kind": {"enum": ["survey_year"]},
+    "level": {"type": "string", "minLength": 1},
+    "region_code": {"type": "string", "minLength": 1},
+    "format": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

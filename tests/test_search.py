@@ -1,20 +1,25 @@
-from typing import List, Tuple
-
 import pytest
 
-from rhinestone.errors import ProviderMetadataError, ProviderResponseError
-from rhinestone.models import SearchQuery
+from rhinestone.errors import (
+    CredentialUnavailableError,
+    ProviderMetadataError,
+    ProviderResponseError,
+)
+from rhinestone.models import ProviderSearchResults, SearchDiagnostic, SearchQuery
 from rhinestone.search import SearchCoordinator
 
 
 class SearchableAdapter:
     source_id = "searchable"
+    searchable = True
     search_conditions = frozenset({"text", "limit"})
+    required_search_conditions: frozenset[str] = frozenset()
+    area_text_fallback = False
 
     def __init__(self) -> None:
-        self.queries: List[SearchQuery] = []
+        self.queries: list[SearchQuery] = []
 
-    def search(self, query: SearchQuery) -> Tuple[object, ...]:
+    def search(self, query: SearchQuery) -> tuple[object, ...]:
         self.queries.append(query)
         return (object(),)
 
@@ -31,12 +36,12 @@ class ResolveOnlyAdapter:
 
 
 class OrderedSearchableAdapter(SearchableAdapter):
-    def __init__(self, source_id: str, results: Tuple[object, ...]) -> None:
+    def __init__(self, source_id: str, results: tuple[object, ...]) -> None:
         super().__init__()
         self.source_id = source_id
         self.results = results
 
-    def search(self, query: SearchQuery) -> Tuple[object, ...]:
+    def search(self, query: SearchQuery) -> tuple[object, ...]:
         self.queries.append(query)
         return self.results
 
@@ -51,13 +56,39 @@ class FailingSearchableAdapter(SearchableAdapter):
         self.source_id = source_id
         self.error = error
 
-    def search(self, query: SearchQuery) -> Tuple[object, ...]:
+    def search(self, query: SearchQuery) -> tuple[object, ...]:
         self.queries.append(query)
         raise self.error
 
 
+class DiagnosticSearchableAdapter:
+    source_id = "searchable"
+    searchable = True
+    search_conditions = frozenset({"text", "limit"})
+    required_search_conditions: frozenset[str] = frozenset()
+    area_text_fallback = False
+
+    def __init__(self) -> None:
+        self.queries: list[SearchQuery] = []
+
+    def search(self, query: SearchQuery) -> ProviderSearchResults:
+        self.queries.append(query)
+        return ProviderSearchResults(
+            (),
+            (
+                SearchDiagnostic(
+                    source_id=self.source_id,
+                    skipped_conditions=frozenset(),
+                    reason="item_skipped",
+                    resource_identifier="item-1",
+                    detail="missing_data_asset",
+                ),
+            ),
+        )
+
+
 def test_search_calls_only_adapters_declaring_search_capability() -> None:
-    """検索不能な Source Adapter を federated search が誤って呼ばないために必要である。"""
+    """検索不能な Provider Adapter を federated search が誤って呼ばないために必要である。"""
     searchable = SearchableAdapter()
     resolve_only = ResolveOnlyAdapter()
     coordinator = SearchCoordinator((resolve_only, searchable))
@@ -138,6 +169,18 @@ def test_single_provider_sequence_preserves_provider_order() -> None:
     assert results[0] is provider_results[0]
 
 
+def test_search_executions_report_provider_timing_and_result_count() -> None:
+    provider = OrderedSearchableAdapter("provider", (object(), object()))
+
+    results = SearchCoordinator((provider,)).search(SearchQuery(text="river"))
+
+    assert len(results.executions) == 1
+    execution = results.executions[0]
+    assert execution.source_id == "provider"
+    assert execution.result_count == 2
+    assert execution.elapsed_ms >= 0
+
+
 def test_expected_provider_failure_isolated_from_other_sources() -> None:
     failing = FailingSearchableAdapter("unavailable", ProviderMetadataError("secret"))
     healthy = OrderedSearchableAdapter("healthy", (object(),))
@@ -149,22 +192,33 @@ def test_expected_provider_failure_isolated_from_other_sources() -> None:
     assert results.diagnostics[0].source_id == "unavailable"
     assert results.diagnostics[0].reason == "provider_failure"
     assert results.diagnostics[0].failure_type == "metadata"
+    assert [(item.source_id, item.result_count) for item in results.executions] == [
+        ("unavailable", 0),
+        ("healthy", 1),
+    ]
 
 
 def test_all_expected_provider_failures_return_empty_results_and_diagnostics() -> None:
     metadata = FailingSearchableAdapter("metadata", ProviderMetadataError("hidden"))
     response = FailingSearchableAdapter("response", ProviderResponseError("hidden"))
+    credential = FailingSearchableAdapter(
+        "credential", CredentialUnavailableError("hidden")
+    )
 
-    results = SearchCoordinator((metadata, response)).search(SearchQuery(text="river"))
+    results = SearchCoordinator((metadata, response, credential)).search(
+        SearchQuery(text="river")
+    )
 
     assert len(results) == 0
     assert [diagnostic.source_id for diagnostic in results.diagnostics] == [
         "metadata",
         "response",
+        "credential",
     ]
     assert [diagnostic.failure_type for diagnostic in results.diagnostics] == [
         "metadata",
         "response",
+        "credential",
     ]
 
 
@@ -178,6 +232,14 @@ def test_provider_failure_is_distinct_from_a_successful_empty_provider() -> None
     assert results["empty"] == ()
     assert results.diagnostics[0].reason == "provider_failure"
     assert results.diagnostics[0].failure_type == "response"
+
+
+def test_provider_item_diagnostics_are_preserved() -> None:
+    results = SearchCoordinator((DiagnosticSearchableAdapter(),)).search(SearchQuery())
+
+    assert results.keys() == ("searchable",)
+    assert results.diagnostics[0].resource_identifier == "item-1"
+    assert results.diagnostics[0].detail == "missing_data_asset"
 
 
 def test_unexpected_provider_errors_are_not_swallowed() -> None:

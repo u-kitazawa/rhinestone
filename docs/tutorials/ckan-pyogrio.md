@@ -13,64 +13,42 @@ export RHINESTONE_CKAN_RESULT_INDEX="0"
 ```
 
 G空間情報センターの公開CKAN APIへ接続するため、ネットワーク接続が必要です。検索結果から、
-GeoJSON、GeoPackage、またはFlatGeobufとして提供されているdistributionを選べる検索語を
-指定してください。ZIP archiveしかないdistributionは、このpyogrioの例では選択しません。
+Rhinestone の representation registry で `vector` と明示された形式として提供されている
+distributionを選べる検索語を指定してください。ZIP Shapefile を選ぶ場合も、
+`archive="zip"`（必要なら ZIP 内の `entry_point`）が Provider で明示されていれば同じ例で開けます。
 
 ## 検索、distribution選択、pyogrioへの受け渡し
 
 ```python
+from rhinestone.catalogs import BUILTIN
+from rhinestone.catalogs import Catalog
 import os
-from collections.abc import Mapping
-from typing import Any, Optional
 
 import pyogrio
 
-from rhinestone import configure, sources
-
-
-def vector_format(result: Any) -> Optional[str]:
-    """Read the format advertised by the selected CKAN resource."""
-    resources = result.metadata.raw.get("resources", [])
-    resource_id = result.provenance.resource_identifier
-    if not isinstance(resources, (list, tuple)) or not isinstance(resource_id, str):
-        return None
-    for resource in resources:
-        if not isinstance(resource, Mapping) or resource.get("id") != resource_id:
-            continue
-        format_name = resource.get("format")
-        if not isinstance(format_name, str):
-            return None
-        normalized = format_name.lower()
-        return {"geopackage": "gpkg"}.get(normalized, normalized)
-    return None
-
+from rhinestone import FormatPreset, configure
 
 app = configure(
-    sources=(sources.GEOSPATIAL_JP,),
-    dependencies={"pyogrio": pyogrio},
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "geospatial-jp"),
 )
 results = app.search(
     text=os.environ.get("RHINESTONE_CKAN_QUERY", "河川"),
+    format=(FormatPreset.PYOGRIO,),
     limit=20,
 )
-supported = [
-    result
-    for result in results
-    if vector_format(result) in {"geojson", "gpkg", "flatgeobuf"}
-]
-if not supported:
+if not results:
+    for diagnostic in results.diagnostics:
+        print(diagnostic.source_id, diagnostic.reason, diagnostic.failure_type)
     raise RuntimeError("The CKAN search returned no direct vector distribution")
 
-for index, result in enumerate(supported):
+for index, result in enumerate(results):
     print(f"[{index}] {result.title}")
-    print("    resource id:", result.provenance.resource_identifier)
-    print("    format:", vector_format(result))
+    print("    reProvider.id:", result.provenance.resource_identifier)
+    print("    formats:", sorted(result.formats))
 
-selected = supported[
-    int(os.environ.get("RHINESTONE_CKAN_RESULT_INDEX", "0"))
-]
-resource = app.resolve(selected)
-frame = resource.open("pyogrio")
+selected = results[int(os.environ.get("RHINESTONE_CKAN_RESULT_INDEX", "0"))]
+resource = app.load(selected)
+frame = resource.open("pyogrio", runtime=pyogrio)
 
 print("resource:", resource.uri)
 print("format:", resource.format)
@@ -78,22 +56,30 @@ print("rows:", len(frame))
 print("columns:", list(frame.columns))
 ```
 
-CKANのpackage検索はdataset単位の結果をdistributionごとに展開します。`Result`の
-provenanceにあるresource IDと検索metadata内の `resources` を照合して、providerが広告した
-形式だけを選んでいます。その後の `app.resolve(selected)`で配布URLを取得し、
-`resource.open("pyogrio")`が選択済みURIをpyogrioへ渡します。
-`import pyogrio`だけではRuntimeは登録されないため、利用者が所有する実体を
-`configure(dependencies={"pyogrio": pyogrio})`へ明示的に渡しています。導入方法と
+CKANのpackage検索はdataset単位の結果をdistributionごとに展開します。
+`FormatPreset.PYOGRIO`で、対象Resourceが宣言するベクター形式だけを選びます。
+raw metadataを利用者側で解釈したり、別Resourceの形式を流用したりする必要はありません。
+CKAN Adapterは形式照合後の結果に`limit=20`を適用し、必要なら次のpackage pageを取得します。
+`Resource.formats`で検索時の形式を確認できます。選択した検索結果が配布URLとAccessPlanを
+既に持つ場合、`app.load(selected)`はProviderへ再問い合わせせず、現在のアプリケーションへbindします。
+検索応答にURLがなく`selected.access_plan is None`の場合は、`resource_show`と`package_show`で
+配布情報を追加取得します。形式による絞り込みだけでは、AccessPlanの存在を保証しません。
+明示的なloadは必須ではなく、`selected.open("pyogrio", runtime=pyogrio)`でも、必要ならloadして開けます。
+`resource.open("pyogrio", runtime=pyogrio)`が選択済みURIをpyogrioへ渡します。ZIP の場合は、選択済みの
+`archive` と任意の `entry_point` から GDAL VSI URI を組み立てます。
+利用者が所有する実体は`resource.open("pyogrio", runtime=pyogrio)`へ明示的に渡します。導入方法と
 責任境界は[pyogrio Runtime](../runtimes.md#pyogrio)を参照してください。
+選択できても、利用者のpyogrio/GDAL環境に対応 read driver がない場合や、geometry / field typeを
+読めない場合は `ResourceAccessError` になります。
 
 ## この例の境界
 
-- 必須: ネットワーク接続、G空間情報センターの公開CKAN API、`dependencies`へ登録したpyogrio / GeoPandas
+- 必須: ネットワーク接続、G空間情報センターの公開CKAN API、pyogrio / GeoPandasのインストールと`open()`へのpyogrio実体の指定
 - credential: この公開CKANの標準経路では不要
 - 変更される値: dataset、resource ID、配布URL、形式、公開状態
 - Rhinestoneの責務: CKAN検索、dataset内のdistribution選択、公式配布URLの解決、pyogrioへの委譲
 - pyogrio / GeoPandasの責務: ベクターデータの読み込みとDataFrame操作
-- 非対応: HTMLページの解析、URLや形式の推測、ZIP archive URIの自動構築、空間演算
+- 非対応: HTMLページの解析、URL・形式・ZIP memberの推測、空間演算
 
 ZIP内のCityGMLなど、archive memberの指定とGDALが必要なケースは[PLATEAU Adapter](../api/adapters/plateau.md)
 と[GDALのRuntime説明](../runtimes.md)を参照してください。CKANの対応範囲は

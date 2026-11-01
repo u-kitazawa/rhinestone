@@ -1,24 +1,22 @@
+from collections.abc import Mapping
 from types import SimpleNamespace
-from typing import Any, Dict, Mapping, Tuple, cast
+from typing import Any, cast
 from xml.etree.ElementTree import fromstring
 
 import pytest
 
 from rhinestone import (
-    Config,
-    RuntimeFactory,
-    SearchQuery,
-    SourceDefinition,
+    Reference,
     configure,
-    sources,
 )
 from rhinestone.adapters import StaticAdapter
+from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     ResourceNotFoundError,
     UnsupportedSearchConditionError,
 )
-from rhinestone.models import Source
+from rhinestone.models import Provider, Resource, SearchQuery
 
 
 def item(identifier: str = "one") -> Mapping[str, Any]:
@@ -51,12 +49,12 @@ def item(identifier: str = "one") -> Mapping[str, Any]:
 def test_static_adapter_restores_source_and_provenance() -> None:
     adapter = StaticAdapter({"one": item()})
 
-    source = adapter.load(Config("static", {"id": "one"}))
+    source = adapter.load(Reference("static", parameters={"id": "one"}))
 
-    assert isinstance(source, Source)
+    assert isinstance(source, Resource)
     assert source.metadata.title == "One"
     assert source.metadata.raw["checked"] is True
-    assert source.candidates[0].uri.endswith("/one")
+    assert source.uri.endswith("/one")
     assert source.provenance.dataset_identifier == "one"
     assert source.provenance.original_url == "https://example.test/one"
 
@@ -67,15 +65,34 @@ def test_static_adapter_search_is_deterministic_and_returns_configs() -> None:
     results = adapter.search(SearchQuery(text="a", limit=1))
 
     assert len(results) == 1
-    assert results[0].to_config() == Config("static", {"id": "a"})
+    assert results[0].reference == Reference("static", "a", "0", {"id": "a"})
     assert adapter.search(SearchQuery(text="absent")) == ()
+
+
+def test_static_adapter_matches_each_whitespace_delimited_text_term() -> None:
+    adapter = StaticAdapter(
+        {
+            "rivers": {
+                "metadata": {"title": "River observations", "description": "Tokyo"},
+                "candidates": [{"uri": "https://example.test/rivers.csv"}],
+            },
+            "roads": {
+                "metadata": {"title": "Road observations", "description": "Tokyo"},
+                "candidates": [{"uri": "https://example.test/roads.csv"}],
+            },
+        }
+    )
+
+    assert [
+        result.title for result in adapter.search(SearchQuery(text="river tokyo"))
+    ] == ["River observations"]
 
 
 def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
     adapter = StaticAdapter({"one": item()})
 
     with pytest.raises(ResourceNotFoundError):
-        adapter.load(Config("static", {"id": "missing"}))
+        adapter.load(Reference("static", parameters={"id": "missing"}))
     with pytest.raises(UnsupportedSearchConditionError):
         adapter.search(SearchQuery(bbox=(0, 0, 1, 1)))
     with pytest.raises(ConfigValidationError):
@@ -83,7 +100,7 @@ def test_static_adapter_rejects_unknown_and_unsupported_requests() -> None:
 
 
 def test_static_adapter_rejects_invalid_catalog() -> None:
-    invalid_items: Tuple[object, ...] = (
+    invalid_items: tuple[object, ...] = (
         {},
         [],
         {"": item()},
@@ -115,41 +132,45 @@ def test_static_adapter_rejects_invalid_metadata_and_query_parameters() -> None:
     metadata_item["metadata"] = dict(metadata_item["metadata"])
     metadata_item["metadata"]["raw"] = []
     with pytest.raises(ConfigValidationError):
-        StaticAdapter({"one": metadata_item}).load(Config("static", {"id": "one"}))
+        StaticAdapter({"one": metadata_item}).load(
+            Reference("static", parameters={"id": "one"})
+        )
 
     query_item = dict(item())
     query_item["provenance"] = {"query_parameters": []}
     with pytest.raises(ConfigValidationError):
-        StaticAdapter({"one": query_item}).load(Config("static", {"id": "one"}))
+        StaticAdapter({"one": query_item}).load(
+            Reference("static", parameters={"id": "one"})
+        )
 
 
 def test_builtin_gsi_tiles_are_static_catalog_items() -> None:
-    captured: Dict[str, Any] = {}
+    captured: dict[str, Any] = {}
 
     def open_ex(uri: str, **kwargs: Any) -> str:
         captured["uri"] = uri
         return "dataset"
 
     app = configure(
-        sources=(sources.GSI,),
-        dependencies={"gdal": RuntimeFactory(lambda: SimpleNamespace(OpenEx=open_ex))},
+        catalog=Catalog((BUILTIN[2],)),
     )
-    resource = app.resolve(Config("gsi", {"id": "std"}))
+    resource = app.load(Reference("gsi", parameters={"id": "std"}))
 
+    assert resource.access_plan is not None
     assert resource.access_plan.kind == "remote-dataset"
     assert resource.format == "png"
     assert resource.metadata.raw["attribution"] == "国土地理院"
-    assert resource.open("gdal") == "dataset"
+    assert resource.open("gdal", runtime=SimpleNamespace(OpenEx=open_ex)) == "dataset"
     xml = fromstring(captured["uri"])
     assert xml.findtext("DataWindow/YOrigin") == "top"
     assert "${z}/${x}/${y}.png" in cast(str, xml.findtext("Service/ServerUrl"))
 
 
 def test_static_source_composes_through_public_api() -> None:
-    source = SourceDefinition("catalog", "static", {"items": {"one": item()}})
-    app = configure(sources=(source,))
+    source = Provider("catalog", "static", {"items": {"one": item()}})
+    app = configure(catalog=Catalog((source,)))
 
-    resource = app.resolve(Config("catalog", {"id": "one"}))
+    resource = app.load(Reference("catalog", parameters={"id": "one"}))
 
     assert resource.provenance.provider == "catalog"
     assert resource.provenance.adapter == "static"
@@ -158,7 +179,7 @@ def test_static_source_composes_through_public_api() -> None:
 
 def test_static_source_requires_items_in_composition() -> None:
     with pytest.raises(ConfigValidationError, match="requires items"):
-        configure(sources=(SourceDefinition("catalog", "static"),))
+        configure(catalog=Catalog((Provider("catalog", "static"),)))
 
 
 def test_static_adapter_validates_capabilities_and_provenance_objects() -> None:

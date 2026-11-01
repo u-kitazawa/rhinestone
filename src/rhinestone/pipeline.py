@@ -1,57 +1,79 @@
-"""Application pipeline from Config through Source to user-owned runtime."""
+"""Application pipeline from Reference through Resource to user-owned runtime."""
 
 from dataclasses import replace
-from typing import Any, Optional
+from typing import Any
 
-from .errors import ProviderMetadataError, RhinestoneError
-from .execution import ExecutionAdapterSelector
-from .models import Config, LibraryName, Resource
-from .registry import AdapterRegistry, DependencyRegistry
-from .resolution import Resolver
+from . import _http
+from .errors import (
+    ProviderMetadataError,
+    RhinestoneError,
+    RuntimeAdapterUnavailableError,
+)
+from .models import (
+    AccessPlan,
+    LibraryName,
+    Reference,
+    Resource,
+    RuntimeFactory,
+)
+from .registry import AdapterRegistry
+from .runtime import AuthorizingRuntimeAdapter, RuntimeAdapterSelector
 from .security import DestinationPolicy
 
 
 class AccessPipeline:
+    """Load a Reference and execute its Resource's access plan."""
+
     def __init__(
         self,
         adapter_registry: AdapterRegistry,
-        resolver: Resolver,
-        execution_selector: Optional[ExecutionAdapterSelector] = None,
-        dependencies: Optional[DependencyRegistry] = None,
-        destination_policy: Optional[DestinationPolicy] = None,
+        runtime_selector: RuntimeAdapterSelector | None = None,
+        destination_policy: DestinationPolicy | None = None,
     ) -> None:
         self._adapter_registry = adapter_registry
-        self._resolver = resolver
-        self._execution_selector = execution_selector
-        self._dependencies = dependencies
+        self._execution_adapter_selector = runtime_selector
         self._destination_policy = (
             destination_policy or DestinationPolicy.unrestricted()
         )
 
-    def resolve(self, config: Config) -> Resource:
-        adapter = self._adapter_registry.source(config.source_id)
+    def load(self, reference: Reference) -> Resource:
+        """Load the unique Resource identified by a Reference."""
+        adapter = self._adapter_registry.provider(reference.provider_id)
         try:
-            source = adapter.load(config)
+            resource = adapter.load(reference)
         except RhinestoneError:
             raise
         except Exception as error:
             raise ProviderMetadataError(
-                f"Provider metadata for {config.source_id!r} could not be loaded"
+                f"Provider metadata for Provider {reference.provider_id!r} could not be "
+                "loaded; inspect the endpoint and provider availability"
             ) from error
-        resource = self._resolver.resolve(source)
-        if self._execution_selector is None or self._dependencies is None:
-            return resource
-        selector = self._execution_selector
-        dependencies = self._dependencies
-        destination_policy = self._destination_policy
+        return self.bind(resource)
 
-        def open_resource(library: LibraryName) -> object:
-            return AccessPipeline._open_resource(
-                resource,
+    def bind(self, resource: Resource) -> Resource:
+        """Bind a detached Resource to this execution context."""
+        if self._execution_adapter_selector is None:
+            return resource
+        selector = self._execution_adapter_selector
+        destination_policy = self._destination_policy
+        loader = self.load if resource.access_plan is None else None
+
+        def open_resource(
+            value: Resource, library: LibraryName, runtime: object | None
+        ) -> object:
+            if loader is not None:
+                value = loader(value.reference)
+            if value.access_plan is None:
+                raise RuntimeAdapterUnavailableError(
+                    "Resource has no AccessPlan; load its Reference through the "
+                    "target Provider before opening it"
+                )
+            return AccessPipeline._open_plan(
+                value.access_plan,
                 library,
                 selector,
-                dependencies,
                 destination_policy,
+                runtime,
             )
 
         return replace(
@@ -59,38 +81,79 @@ class AccessPipeline:
             _opener=open_resource,
         )
 
-    def open(self, config: Config, library: LibraryName) -> object:
-        return self.resolve(config).open(library)
+    def open(
+        self,
+        reference: Reference,
+        library: LibraryName,
+        *,
+        runtime: object | None = None,
+    ) -> object:
+        """Load ``reference`` and open its Resource through ``library``."""
+        return self.load(reference).open(library, runtime=runtime)
 
-    def open_resource(self, resource: Resource, library: LibraryName) -> object:
+    def open_resource(
+        self, resource: Resource, library: LibraryName, *, runtime: object | None = None
+    ) -> object:
         """Open an existing Resource using this pipeline's policy and runtimes."""
-        if self._execution_selector is None or self._dependencies is None:
-            raise ProviderMetadataError("Execution pipeline is not configured")
-        return self._open_resource(
-            resource,
+        if self._execution_adapter_selector is None:
+            raise ProviderMetadataError(
+                "Execution pipeline is not configured; construct the public "
+                "application with configure() before opening a Resource"
+            )
+        if resource.access_plan is None:
+            raise RuntimeAdapterUnavailableError(
+                "Resource has no AccessPlan; resolve its Reference first"
+            )
+        return self._open_plan(
+            resource.access_plan,
             library,
-            self._execution_selector,
-            self._dependencies,
+            self._execution_adapter_selector,
             self._destination_policy,
+            runtime,
+        )
+
+    def open_plan(
+        self, plan: AccessPlan, library: LibraryName, *, runtime: object | None = None
+    ) -> object:
+        """Execute a standalone plan without consulting a provider."""
+        if self._execution_adapter_selector is None:
+            raise ProviderMetadataError("Execution pipeline is not configured")
+        self._destination_policy.authorize_plan(plan)
+        return self._open_plan(
+            plan,
+            library,
+            self._execution_adapter_selector,
+            self._destination_policy,
+            runtime,
         )
 
     @staticmethod
-    def _open_resource(
-        resource: Resource,
+    def _open_plan(
+        plan: AccessPlan,
         library: LibraryName,
-        selector: ExecutionAdapterSelector,
-        dependencies: DependencyRegistry,
+        selector: RuntimeAdapterSelector,
         destination_policy: DestinationPolicy,
+        runtime: object | None,
     ) -> Any:
         selected = selector.select(
-            resource,
-            dependencies.available,
+            plan,
             requested=library,
         )
-        selected.authorize(resource, destination_policy=destination_policy)
-        runtime = dependencies.get(selected.name)
+        destination_policy.authorize(plan.uri)
+        if isinstance(selected, AuthorizingRuntimeAdapter):
+            selected.authorize(plan, destination_policy=destination_policy)
+        if selected.name == "json-service":
+            if runtime is not None:
+                raise RuntimeAdapterUnavailableError(
+                    "json-service uses the core-owned runtime; omit runtime"
+                )
+            runtime = _http.JsonServiceRuntime()
+        elif runtime is None or isinstance(runtime, RuntimeFactory):
+            raise RuntimeAdapterUnavailableError(
+                f"Runtime for {selected.name!r} must be supplied as an object"
+            )
         return selected.open(
-            resource,
+            plan,
             runtime,
             destination_policy=destination_policy,
         )

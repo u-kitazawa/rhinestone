@@ -1,8 +1,8 @@
-# Runtime の導入ガイド
+# 外部ライブラリ（Runtime）の導入ガイド
 
-Rhinestone Core は、外部 Runtime をインストール・選択・更新しません。利用者が用途に合う Runtime を用意し、`configure(dependencies=...)` へ実体または明示的な `RuntimeFactory` として渡します。
+Rhinestone Coreは、外部ライブラリをインストール・選択・更新しません。利用者が用途に合うライブラリを用意します。Provider依存ライブラリは`configure(dependencies=...)`へ、Runtimeは`open(..., runtime=...)`へ渡します。
 
-この責務分離により、Runtime の依存関係、native library、ライセンス、更新時期は利用者の環境で管理できます。Rhinestone が保証するのは、対応表に記載した Adapter が、供給された Runtime の公開 API を呼び出すことです。
+この責務分離により、Runtimeの依存関係、ネイティブライブラリ、ライセンス、更新時期は利用者の環境で管理できます。Rhinestoneが保証するのは、対応表に記載したAdapterが、供給されたRuntimeの公開APIを呼び出すことです。
 
 ## まず確認すること
 
@@ -10,23 +10,25 @@ Runtime が必要になる段階は二つあります。
 
 | 種類 | 必要になる段階 | 現在の Runtime |
 | --- | --- | --- |
-| Source Runtime | Source の `search()` または `resolve()` | `rdflib`（DCAT の RDF 解釈） |
-| Execution Runtime | 解決済み Resource の `open()` | `gdal`、`rasterio`、`pyogrio` |
+| Provider依存ライブラリ | Provider Adapter の `search()` または `load()` | `rdflib`（DCAT の RDF 解釈） |
+| Runtime | 解決済み Resource の `open()` | `gdal`、`rasterio`、`pyogrio` |
 
-`configure()` と `resolve()` は Execution Runtime の `RuntimeFactory` を評価しません。対象の段階までfactoryは呼び出されません。DCAT の `rdflib` は Source Runtime のため、DCAT の検索・解決時に必要です。
+Runtimeは構成時に登録しません。DCAT の `rdflib` は Provider依存ライブラリ のため、DCAT の検索・解決時に必要です。
+GDAL、Rasterio、pyogrioではRuntime実体を渡します。`RuntimeFactory`はProvider依存ライブラリ専用で、
+Runtimeとして渡すと`RuntimeAdapterUnavailableError`になります。
+`json-service`だけはCore所有のRuntimeを使い、`open("json-service")`に`runtime`を渡しません。
 
-bare valueはcallableでもRuntime実体として扱います。遅延factoryを使う場合だけ明示的に
+Provider依存ライブラリのbare valueはcallableでもRuntime実体として扱います。遅延factoryを使う場合だけ明示的に
 `RuntimeFactory` で包むため、callable façadeやMockを誤って呼び出しません。
 
 ```python
 import importlib
 
-from rhinestone import RuntimeFactory, configure
+from rhinestone import configure
+from rhinestone.models import RuntimeFactory
 
 app = configure(
-    dependencies={
-        "rasterio": RuntimeFactory(lambda: importlib.import_module("rasterio"))
-    }
+    dependencies={"rdflib": RuntimeFactory(lambda: importlib.import_module("rdflib"))}
 )
 ```
 
@@ -41,7 +43,7 @@ HTTP metadata の取得と JSON service の通信は Rhinestone に組み込ま�
 
 ### Rasterio
 
-Rasterio は COG と GeoTIFF を `Resource.open("rasterio")` で開くための Execution Runtime です。
+Rasterio は COG と GeoTIFF を `Resource.open("rasterio", runtime=rasterio)` で開くための Runtime です。
 
 ```console
 python -m pip install rasterio
@@ -50,17 +52,34 @@ python -m pip install rasterio
 ```python
 import rasterio
 
-from rhinestone import configure
+from rhinestone import Reference, configure
 
-app = configure(dependencies={"rasterio": rasterio})
-dataset = app.open(resource, "rasterio")
+app = configure()
+resource = app.load(
+    Reference(
+        "direct",
+        parameters={
+            "uri": "https://example.invalid/data.tif",
+            "format": "geotiff",
+            "media_type": "image/tiff",
+        },
+    )
+)
+dataset = app.open(resource, "rasterio", runtime=rasterio)
 ```
 
-`resource` は `app.resolve(result)` などで取得した、format が `cog` または `geotiff` の Resource です。Rhinestone は URI を `rasterio.open()` へそのまま渡し、archive の展開や形式変換を行いません。導入時の wheel、GDAL、PROJ などの組み合わせは [Rasterio の installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) を確認してください。
+上のURIは例示用なので、実在する配信URIに置き換えてください。既知の対象は
+`app.load(Reference(...))`で読み込みます。検索から使う場合は、`app.search()`が返した
+formatが`cog`または`geotiff`のResourceを選び、そのまま`open()`へ渡せます。
+AccessPlanがない検索結果はopen時にReferenceからloadされるため、事前の`app.load()`は必須ではありません。
+Rhinestone は URI を `rasterio.open()` へそのまま渡し、archive の展開や形式変換を行いません。
+導入時の wheel、GDAL、PROJ などの組み合わせは [Rasterio の installation guide](https://rasterio.readthedocs.io/en/latest/installation.html) を確認してください。
+対応形式であっても、Runtimeのdriver・配信先・認証によって開けない場合があります。
+実行段階の失敗は`ResourceAccessError`になります。詳細は[Resourceを開く](resolve-and-open.md)を参照してください。
 
 ### GDAL
 
-GDAL は Shapefile、GML、CityGML、GeoTIFF、COG、NetCDF、WMS、GSI XYZ tile などを `Resource.open("gdal")` で開くための Execution Runtime です。
+GDAL は Shapefile、GML、CityGML、GeoTIFF、COG、NetCDF、WMS、GSI XYZ tile などを `Resource.open("gdal", runtime=gdal)` で開くための Runtime です。
 
 ```console
 # 例。native library と Python bindings の組み合わせを環境に合わせる
@@ -72,15 +91,18 @@ from osgeo import gdal
 
 from rhinestone import configure
 
-app = configure(dependencies={"gdal": gdal})
-dataset = app.open(resource, "gdal")
+app = configure()
+dataset = app.open(resource, "gdal", runtime=gdal)
 ```
 
 GDAL の Python bindings は system GDAL のライブラリと開発ヘッダーを必要とする場合があります。`pip install GDAL` だけで導入できない環境では、[GDAL の Python bindings guide](https://gdal.org/en/stable/api/python_bindings.html) や OS / conda-forge の手順に従ってください。Rhinestone は GDAL の導入や `/vsicurl/` の利用可否を解決しません。
 
 ### pyogrio
 
-pyogrio は Shapefile、GeoJSON、GeoPackage、FlatGeobuf を `Resource.open("pyogrio")` で読み込むための Execution Runtime です。現在の Adapter は `pyogrio.read_dataframe()` を呼び出すため、GeoPandas も実行時に必要です。
+pyogrio は Rhinestone の representation registry で `vector` と明示された Shapefile、
+GeoJSON、GeoPackage、FlatGeobuf、GML、KML、CityGML を `Resource.open("pyogrio", runtime=pyogrio)` で
+読み込むための Runtime です。現在の Adapter は `pyogrio.read_dataframe()` を
+呼び出すため、GeoPandas も実行時に必要です。
 
 ```console
 python -m pip install pyogrio geopandas
@@ -91,54 +113,66 @@ import pyogrio
 
 from rhinestone import configure
 
-app = configure(dependencies={"pyogrio": pyogrio})
-frame = app.open(resource, "pyogrio")
+app = configure()
+frame = app.open(resource, "pyogrio", runtime=pyogrio)
 ```
 
-Rhinestone は URI と Source が確定した `encoding` だけを `read_dataframe()` へ渡します。archive URI の組み立て、GeoDataFrame 以外への変換、空間演算は行いません。GDAL の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。
+Rhinestone は URI と Provider が確定した `format` / `encoding` だけを使い、URI suffix や
+archive 内容から形式・memberを推測しません。明示された ZIP AccessPlan は GDAL VSI URIに
+変換するため、ZIP Shapefileも同じ `resource.open("pyogrio", runtime=pyogrio)` で読めます。GeoDataFrame
+以外への変換、空間演算は行いません。選択できても環境の pyogrio/GDAL が read driver を持たない場合や
+geometry / field type を読めない場合、`open()` は `ResourceAccessError` になります。GDAL
+の導入方法や wheel の対応範囲は [pyogrio の installation guide](https://pyogrio.readthedocs.io/en/latest/install.html) を確認してください。
 
 ### RDFLib
 
-RDFLib は DCAT の JSON-LD、Turtle、RDF/XML を解釈する Source Runtime です。`Resource.open()` のための Runtime ではありません。
+RDFLib は DCAT の JSON-LD、Turtle、RDF/XML を解釈する Provider依存ライブラリ です。`Resource.open()` のための Runtime ではありません。
 
 ```console
 python -m pip install rdflib
 ```
 
 ```python
+from rhinestone.catalogs import Catalog
 import rdflib
 
 from rhinestone import Provider, configure
 
 app = configure(
-    sources=(Provider(
-        id="my-dcat",
-        adapter_type="dcat",
-        settings={"catalog_uri": "https://example.test/catalog.ttl"},
-    ),),
+    catalog=Catalog(
+        (
+            Provider(
+                id="my-dcat",
+                adapter_type="dcat",
+                settings={"catalog_uri": "https://example.test/catalog.ttl"},
+            ),
+        )
+    ),
     dependencies={"rdflib": rdflib},
 )
 results = app.search(text="dataset")
 ```
 
-DCAT Source を直接構成する場合も、`dependencies={"rdflib": rdflib}` を同じように渡します。factory を使う場合は `dependencies={"rdflib": RuntimeFactory(lambda: rdflib)}` と書けます。DCAT を使わない構成では RDFLib は不要です。
+DCAT ProviderのRDF解釈には`dependencies={"rdflib": rdflib}`を使います。factory を使う場合は `dependencies={"rdflib": RuntimeFactory(lambda: rdflib)}` と書けます。DCAT を使わない構成では RDFLib は不要です。
 
 ## 現在の対象外 Runtime
 
 `pystac-client`、`pystac` は現行の built-in Adapter が要求する Runtime ではありません。STAC は組み込み HTTP Adapterで動作します。これらを Rhinestone の Runtime として追加インストールしても、現行 Adapter の機能は増えません。
 
-## Tested compatibility matrix
+## 検証済みバージョン
 
-`tested` は package の dependency constraint ではなく、Rhinestone の Adapter を実際に実行した範囲です。`tested (manual)` は CI ではなく、記載した環境で再現可能な smoke test を手動実行したことを示します。OS、Python、native library の組み合わせが変われば、同じ package version でも再確認が必要です。
+「検証済み」はパッケージの依存条件ではなく、RhinestoneのAdapterを実際に実行した範囲です。
+「手動検証済み」はCIではなく、記載した環境で再現可能な動作確認を手動実行したことを示します。
+OS、Python、ネイティブライブラリの組み合わせが変われば、同じパッケージバージョンでも再確認が必要です。
 
 基準日: 2026-09-08
 
-| Runtime | Version | Role / required phase | Tested environment | Status |
+| 外部ライブラリ | バージョン | 役割／必要な段階 | 検証環境 | 状態 |
 | --- | --- | --- | --- | --- |
-| RDFLib | 7.6.0 | Source / `search`, `resolve` | Linux x86_64, CPython 3.12.13 | tested (manual) |
-| Rasterio | 1.5.1 | Execution / `open` | Linux x86_64, CPython 3.12.13 | tested (manual) |
-| pyogrio + GeoPandas | 0.13.0 + 1.1.4 | Execution / `open` | Linux x86_64, CPython 3.12.13 | tested (manual) |
-| GDAL | 3.13.3 | Execution / `open` | — | not tested; native installation was unavailable in the verification environment |
+| RDFLib | 7.6.0 | Provider／`search`、`load` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
+| Rasterio | 1.5.1 | Runtime／`open` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
+| pyogrio + GeoPandas | 0.13.0 + 1.1.4 | Runtime／`open` | Linux x86_64、CPython 3.12.13 | 手動検証済み |
+| GDAL | 3.13.3 | Runtime／`open` | — | 未検証（検証環境で導入できなかった） |
 
 Rhinestone の通常 CI は `uv.lock` に固定された RDFLib 6.3.2 を Python 3.10〜3.13、`ubuntu-latest` で検証します。これは package metadata の制約や lockfile の再現性を確認するための範囲であり、上表の latest stable を意味しません。
 

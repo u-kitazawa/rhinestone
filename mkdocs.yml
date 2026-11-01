@@ -6,48 +6,45 @@ nav:
       - インストールと最初の一歩: getting-started.md
       - 用語と概念: concepts.md
       - アプリケーションを構成する: configuration.md
+      - Knowledge Adapter を構成する: knowledge.md
+      - Custom Adapter を作る: custom-adapters.md
   - ガイド:
       - 目的別チュートリアル:
           - 概要: tutorials/index.md
           - STAC画像をRasterioで開く: tutorials/stac-rasterio.md
           - CKANのベクター配布物をpyogrioで読む: tutorials/ckan-pyogrio.md
       - データを検索する: search.md
+      - 検索能力の対照表: search-capabilities.md
       - Resourceを解決して開く: resolve-and-open.md
-      - DiscoveryとResolution: discovery-resolution.md
   - リファレンス:
       - 対応状況: compatibility.md
       - Runtime の導入ガイド: runtimes.md
       - API安定性とリリース運用: release-policy.md
       - ブランチ運用方針: branch-policy.md
       - 外部ライブラリ依存方針: dependency-policy.md
-      - ドキュメントの位置付け: documentation-status.md
-      - v0.5 実装状態マトリクス: v05-status-matrix.md
       - APIリファレンス:
           - 概要: api.md
-          - Source Adapter:
-              - 概要: api/source-adapters.md
+          - 提供元アダプター:
+              - 概要: api/provider-adapters.md
               - CKAN: api/adapters/ckan.md
+              - G空間情報センター: api/adapters/geospatial-jp.md
               - DCAT: api/adapters/dcat.md
               - Direct: api/adapters/direct.md
+              - e-Stat Statistics GIS: api/adapters/estat-gis.md
               - 基盤地図情報: api/adapters/gsi-fundamental.md
               - ODPT: api/adapters/odpt.md
               - OGC API Features: api/adapters/ogc-features.md
               - PLATEAU: api/adapters/plateau.md
+              - 国交DPF: api/adapters/mlit-dpf.md
+              - 横断CKAN検索: api/adapters/search-ckan-jp.md
               - STAC: api/adapters/stac.md
               - Static: api/adapters/static.md
-          - Execution Adapter:
-              - 概要: api/execution-adapters.md
+          - 実行アダプター:
+              - 概要: api/runtime-adapters.md
               - GDAL: api/adapters/gdal.md
-              - JSON service: api/adapters/json-service.md
+              - JSONサービス: api/adapters/json-service.md
               - pyogrio: api/adapters/pyogrio.md
               - Rasterio: api/adapters/rasterio.md
-
-exclude_docs: |
-  adapter_expansion.md
-  architecture/*
-  spec_v4.md
-  spec_v5.md
-  specs/*
 
 theme:
   name: material

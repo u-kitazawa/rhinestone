@@ -1,13 +1,11 @@
-from typing import List, Tuple
-
-from rhinestone import Config, RuntimeFactory, configure
+from rhinestone import Reference, configure
 
 
 class FakeGdal:
     def __init__(self) -> None:
-        self.calls: List[Tuple[str, Tuple[str, ...]]] = []
+        self.calls: list[tuple[str, tuple[str, ...]]] = []
 
-    def OpenEx(self, uri: str, open_options: Tuple[str, ...] = ()) -> object:
+    def OpenEx(self, uri: str, open_options: tuple[str, ...] = ()) -> object:
         self.calls.append((uri, open_options))
         return object()
 
@@ -15,15 +13,10 @@ class FakeGdal:
 def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> None:
     """Specの全アクセス順序とruntime callbackの遅延評価を垂直スライスで保証するために必要である。"""
     runtime = FakeGdal()
-    dependency_calls: List[str] = []
-    app = configure(
-        dependencies={
-            "gdal": RuntimeFactory(lambda: dependency_calls.append("gdal") or runtime)
-        }
-    )
-    config = Config(
-        source_id="direct",
-        settings={
+    app = configure()
+    config = Reference(
+        provider_id="direct",
+        parameters={
             "uri": "https://files.example/rivers.zip",
             "format": "shapefile",
             "archive": "zip",
@@ -31,11 +24,9 @@ def test_direct_config_reaches_user_runtime_through_the_complete_pipeline() -> N
         },
     )
 
-    assert dependency_calls == []
-    data = app.open(config, library="gdal")
+    data = app.open(config, library="gdal", runtime=runtime)
 
     assert data is not None
-    assert dependency_calls == ["gdal"]
     assert runtime.calls[0][0].startswith("/vsizip//vsicurl/")
 
 
@@ -46,10 +37,10 @@ def test_complete_pipeline_honours_explicit_execution_adapter() -> None:
         def read_dataframe(self, uri: str, **options: object) -> str:
             return "pyogrio-data"
 
-    app = configure(dependencies={"pyogrio": RuntimeFactory(FakePyogrio)})
-    config = Config(
-        source_id="direct",
-        settings={"uri": "/data/rivers.shp", "format": "shapefile"},
+    app = configure()
+    config = Reference(
+        provider_id="direct",
+        parameters={"uri": "/data/boundaries.gml", "format": "gml"},
     )
 
-    assert app.open(config, library="pyogrio") == "pyogrio-data"
+    assert app.open(config, library="pyogrio", runtime=FakePyogrio()) == "pyogrio-data"

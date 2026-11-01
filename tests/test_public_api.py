@@ -1,28 +1,28 @@
 import io
-from typing import Any, Dict, List, Mapping, Optional, cast
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any, cast
 from urllib.request import Request
 
 import pytest
 
+import rhinestone
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
     Catalog,
-    Config,
-    Metadata,
-    Provenance,
     Provider,
-    Result,
-    RuntimeFactory,
-    SearchQuery,
-    SourceDefinition,
+    Reference,
+    Resource,
     configure,
-    sources,
 )
+from rhinestone.catalogs import BUILTIN
 from rhinestone.errors import (
     AdapterRegistrationError,
     ConfigValidationError,
-    UnsupportedSourceError,
+    RuntimeAdapterUnavailableError,
+    UnsupportedProviderError,
 )
+from rhinestone.models import RuntimeFactory, SearchQuery
 
 from .provider_support import fixture_json
 
@@ -30,17 +30,103 @@ from .provider_support import fixture_json
 class FakeRasterio:
     def __init__(self, label: str) -> None:
         self.label = label
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     def open(self, uri: str) -> str:
         self.calls.append(uri)
         return self.label + ":" + uri
 
 
-def direct_config() -> Config:
-    return Config(
+class InvalidResourceInput:
+    @property
+    def provider_id(self) -> str:
+        raise AssertionError("invalid input attributes must not be read")
+
+    def __str__(self) -> str:
+        raise AssertionError("invalid input must not be stringified")
+
+    def __repr__(self) -> str:
+        raise AssertionError("invalid input must not be represented")
+
+
+@pytest.mark.parametrize("operation", ["load", "open"])
+@pytest.mark.parametrize(
+    "value",
+    [None, 123, "secret-input", {}, [], object(), InvalidResourceInput()],
+    ids=["none", "integer", "string", "mapping", "list", "object", "hostile"],
+)
+def test_load_and_open_reject_invalid_value_types_before_side_effects(
+    operation: str, value: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    def unexpected_call(*args: object, **kwargs: object) -> Any:
+        calls.append("external")
+        raise AssertionError("invalid inputs must not trigger external calls")
+
+    monkeypatch.setattr(_http, "get_json", unexpected_call)
+    monkeypatch.setattr(_http, "get_text", unexpected_call)
+    app = configure(credentials={"unused": unexpected_call})
+    runtime = FakeRasterio("unused")
+
+    with pytest.raises(ConfigValidationError) as raised:
+        if operation == "load":
+            app.load(cast(Any, value))
+        else:
+            app.open(cast(Any, value), "rasterio", runtime=runtime)
+
+    allowed = (
+        "Reference or Resource"
+        if operation == "load"
+        else ("Reference, Resource, or AccessPlan")
+    )
+    assert str(raised.value) == f"{operation} value must be a {allowed}"
+    assert calls == []
+    assert runtime.calls == []
+
+
+def test_top_level_all_is_limited_to_the_core_public_surface() -> None:
+    assert rhinestone.__all__ == [
+        "configure",
+        "search",
+        "Rhinestone",
+        "Catalog",
+        "Provider",
+        "ProviderId",
+        "AccessPlan",
+        "Reference",
+        "SearchResults",
+        "Resource",
+        "Format",
+        "FormatPreset",
+    ]
+    removed = (
+        "Source",
+        "ResourceCandidate",
+        "Result",
+        "resolve",
+        "Config",
+        "Metadata",
+        "Provenance",
+        "SearchQuery",
+        "Runtime",
+        "RuntimeFactory",
+        "Dependencies",
+        "AdapterDefinition",
+        "KnowledgeAdapterDefinition",
+        "DestinationPolicy",
+        "canonical_format",
+        "SourceDefinition",
+        "SearchResult",
+        "sources",
+    )
+    assert all(not hasattr(rhinestone, name) for name in removed)
+
+
+def direct_config() -> Reference:
+    return Reference(
         "direct",
-        {
+        parameters={
             "uri": "https://example.test/dataset.tif",
             "format": "geotiff",
             "media_type": "image/tiff",
@@ -48,42 +134,26 @@ def direct_config() -> Config:
     )
 
 
-def test_direct_and_execution_adapters_are_built_in() -> None:
-    calls: List[str] = []
+def test_direct_and_runtime_adapters_are_built_in() -> None:
     runtime = FakeRasterio("opened")
-    app = configure(
-        dependencies={
-            "rasterio": RuntimeFactory(lambda: calls.append("load") or runtime)
-        }
+    app = configure()
+
+    resource = app.load(direct_config())
+
+    assert (
+        resource.open("rasterio", runtime=runtime)
+        == "opened:https://example.test/dataset.tif"
     )
-
-    resource = app.resolve(direct_config())
-
-    assert calls == []
-    assert resource.open("rasterio") == "opened:https://example.test/dataset.tif"
-    assert calls == ["load"]
 
 
 def test_resource_open_honours_explicit_built_in_adapter_name() -> None:
-    selected: List[str] = []
-
-    class FakeGdal:
-        def OpenEx(self, uri: str, **options: object) -> str:
-            selected.append("gdal")
-            return "gdal-data"
-
     rasterio = FakeRasterio("rasterio")
-    app = configure(
-        dependencies={
-            "gdal": RuntimeFactory(FakeGdal),
-            "rasterio": RuntimeFactory(lambda: rasterio),
-        }
-    )
+    app = configure()
 
-    resource = app.resolve(direct_config())
+    resource = app.load(direct_config())
 
-    assert resource.open("rasterio").startswith("rasterio:")
-    assert selected == []
+    assert resource.open("rasterio", runtime=rasterio).startswith("rasterio:")
+    assert rasterio.calls == ["https://example.test/dataset.tif"]
 
 
 def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
@@ -101,8 +171,8 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         assert url == item_url
         assert params == {}
         return item
@@ -110,13 +180,12 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
     monkeypatch.setattr(_http, "get_json", get_json)
     runtime = FakeRasterio("opened")
     app = configure(
-        sources=(SourceDefinition("imagery", "stac", {"endpoint": endpoint}),),
-        dependencies={"rasterio": runtime},
+        catalog=Catalog((Provider("imagery", "stac", {"endpoint": endpoint}),)),
     )
-    resource = app.resolve(
-        Config(
+    resource = app.load(
+        Reference(
             "imagery",
-            {
+            parameters={
                 "collection_id": "sentinel-2",
                 "item_id": "scene-1",
                 "asset_key": "visual",
@@ -127,25 +196,29 @@ def test_stac_relative_asset_reaches_runtime_as_resolved_uri(
 
     assert resource.uri == resolved_uri
     assert resource.provenance.original_url == resolved_uri
-    assert resource.open("rasterio") == "opened:" + resolved_uri
+    assert resource.open("rasterio", runtime=runtime) == "opened:" + resolved_uri
     assert runtime.calls == [resolved_uri]
 
 
 def test_all_is_an_immutable_tuple_of_all_builtin_external_sources() -> None:
-    assert isinstance(sources.ALL, tuple)
-    assert sources.ALL == (
-        sources.GEOSPATIAL_JP,
-        sources.PLATEAU,
-        sources.GSI,
-        sources.ODPT,
-        sources.SEARCH_CKAN_JP,
+    assert isinstance(BUILTIN.providers, tuple)
+    assert BUILTIN.providers == (
+        BUILTIN[0],
+        BUILTIN[1],
+        BUILTIN[2],
+        BUILTIN[3],
+        BUILTIN[4],
+        BUILTIN[5],
+        BUILTIN[6],
+        BUILTIN[7],
+        BUILTIN[8],
     )
-    assert all(isinstance(source, SourceDefinition) for source in sources.ALL)
-    assert all(source.id != "direct" for source in sources.ALL)
+    assert all(isinstance(source, Provider) for source in BUILTIN.providers)
+    assert all(source.id != "direct" for source in BUILTIN.providers)
 
 
-def test_source_definitions_do_not_store_runtime_or_secret_values() -> None:
-    for source in sources.ALL:
+def test_provider_definitions_do_not_store_runtime_or_secret_values() -> None:
+    for source in BUILTIN.providers:
         assert "credentials" not in source.settings
         assert "dependencies" not in source.settings
         assert "app_id" not in source.settings
@@ -154,14 +227,12 @@ def test_source_definitions_do_not_store_runtime_or_secret_values() -> None:
 
 
 def test_configure_all_composes_without_loading_dependencies_or_credentials() -> None:
-    dependency_calls: List[bool] = []
-    credential_calls: List[bool] = []
+    dependency_calls: list[bool] = []
+    credential_calls: list[bool] = []
 
     configure(
-        sources=sources.ALL,
-        dependencies={
-            "rasterio": RuntimeFactory(lambda: dependency_calls.append(True))
-        },
+        catalog=Catalog(BUILTIN.providers),
+        dependencies={"rdflib": RuntimeFactory(lambda: dependency_calls.append(True))},
         credentials={"odpt": lambda: credential_calls.append(True) or "secret"},
     )
 
@@ -170,24 +241,27 @@ def test_configure_all_composes_without_loading_dependencies_or_credentials() ->
 
 
 def test_configure_one_source_only_enables_that_source_and_direct() -> None:
-    app = configure(sources=(sources.GSI,))
+    app = configure(catalog=Catalog((BUILTIN[2],)))
 
-    assert app.resolve(Config("gsi", {"id": "std"})).provenance.provider == "gsi"
-    assert app.resolve(direct_config()).provenance.provider == "direct"
-    with pytest.raises(UnsupportedSourceError, match="geospatial-jp"):
-        app.resolve(Config("geospatial-jp", {"resource_id": "x"}))
+    assert (
+        app.load(Reference("gsi", parameters={"id": "std"})).provenance.provider
+        == "gsi"
+    )
+    assert app.load(direct_config()).provenance.provider == "direct"
+    with pytest.raises(UnsupportedProviderError, match="geospatial-jp"):
+        app.load(Reference("geospatial-jp", parameters={"resource_id": "x"}))
 
 
 def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    requests: List[str] = []
+    requests: list[str] = []
 
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         requests.append(url)
         catalog = "first" if url.startswith("https://first.test") else "second"
         resource_id = catalog + "-resource"
@@ -234,20 +308,23 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
         }
 
     monkeypatch.setattr(_http, "get_json", get_json)
-    first = SourceDefinition("catalog-a", "ckan", {"endpoint": "https://first.test"})
-    second = SourceDefinition("catalog-b", "ckan", {"endpoint": "https://second.test"})
-    app = configure(sources=(first, second))
+    first = Provider("catalog-a", "ckan", {"endpoint": "https://first.test"})
+    second = Provider("catalog-b", "ckan", {"endpoint": "https://second.test"})
+    app = configure(catalog=Catalog((first, second)))
 
     grouped = app.search(SearchQuery(text="dataset", limit=1))
 
     assert tuple(grouped.keys()) == ("catalog-a", "catalog-b")
     result = grouped["catalog-a"][0]
     assert result.discovered_by == "catalog-a"
-    assert result.target == Config("catalog-a", {"resource_id": "first-resource"})
-    assert "endpoint" not in result.target.settings
-    config = result.to_config()
-    assert config == Config("catalog-a", {"resource_id": "first-resource"})
-    resolved = app.resolve(config)
+    assert result.reference == Reference(
+        "catalog-a",
+        dataset_identifier="first-dataset",
+        resource_identifier="first-resource",
+        parameters={"resource_id": "first-resource"},
+    )
+    assert "endpoint" not in result.reference.parameters
+    resolved = app.load(result.reference)
     assert resolved.provenance.provider == "catalog-a"
     assert resolved.provenance.adapter == "ckan"
     assert any(url.startswith("https://first.test") for url in requests)
@@ -263,7 +340,7 @@ def test_two_sources_can_share_one_adapter_type_without_endpoint_in_config(
 
     simple = app.search("dataset")
     assert simple[0].title == "first"
-    assert simple[0].resolve().provenance.provider == "catalog-a"
+    assert simple[0].provenance.provider == "catalog-a"
 
 
 def test_discovery_result_resolves_through_a_different_target_source(
@@ -275,32 +352,42 @@ def test_discovery_result_resolves_through_a_different_target_source(
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         assert url == search_url
-        assert params == {"q": "river", "rows": 1}
-        return cast(Dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
+        assert params == {
+            "q": '(xckan_title:"river"^8 OR xckan_title:*river*^4 OR "river")',
+            "rows": 10,
+        }
+        return cast(dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
 
     monkeypatch.setattr(_http, "get_json", get_json)
-    app = configure(sources=(sources.SEARCH_CKAN_JP,))
+    app = configure(catalog=Catalog((BUILTIN[5],)))
 
     result = app.search(text="river", limit=1)[0]
-    resource = app.resolve(result)
-    bound_resource = result.resolve()
+    resource = app.load(result)
+    bound_resource = result
 
     assert result.discovered_by == "search-ckan-jp"
-    assert result.target.source_id == "direct"
+    assert result.reference.provider_id == "direct"
     assert resource.metadata.title == "Example Rivers"
-    assert resource.provenance.provider == "Example CKAN"
-    assert resource.provenance.resource_identifier == "resource-1"
+    assert resource.provenance.provider == "direct"
+    assert resource.discovery is not None
+    assert resource.discovery.source_id == "search-ckan-jp"
+    assert resource.discovery.provenance.provider == "Example CKAN"
+    assert resource.discovery.provenance.resource_identifier == "resource-1"
+    assert resource.discovery is not None
+    assert result.discovery is not None
+    assert resource.discovery.raw_metadata == result.discovery.raw_metadata
+    assert resource.discovery.raw_metadata["resource"]["id"] == "resource-1"
+    assert resource.uri.endswith("resource-1/download/rivers.geojson")
+    assert resource.metadata.raw["title"] == "Example Rivers"
     assert bound_resource == resource
-    assert bound_resource.source.metadata is bound_resource.metadata
-    assert bound_resource.source.provenance is bound_resource.provenance
 
 
 def test_public_search_reports_unsupported_conditions_per_source() -> None:
-    source = SourceDefinition("catalog", "ckan", {"endpoint": "https://example.test"})
-    app = configure(sources=(source,))
+    source = Provider("catalog", "ckan", {"endpoint": "https://example.test"})
+    app = configure(catalog=Catalog((source,)))
 
     results = app.search(SearchQuery(bbox=(139.0, 35.0, 140.0, 36.0)))
 
@@ -328,9 +415,11 @@ def test_public_search_isolates_builtin_malformed_json_response(
 
     monkeypatch.setattr(_http, "urlopen", open_url)
     app = configure(
-        sources=(
-            SourceDefinition("broken", "ckan", {"endpoint": "https://broken.test"}),
-            SourceDefinition("healthy", "ckan", {"endpoint": "https://healthy.test"}),
+        catalog=Catalog(
+            (
+                Provider("broken", "ckan", {"endpoint": "https://broken.test"}),
+                Provider("healthy", "ckan", {"endpoint": "https://healthy.test"}),
+            )
         )
     )
 
@@ -349,12 +438,12 @@ def test_public_search_skips_search_ckan_jp_without_required_text(
     def fail_if_called(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         raise AssertionError("search-ckan.jp must be skipped without text")
 
     monkeypatch.setattr(_http, "get_json", fail_if_called)
-    app = configure(sources=(sources.SEARCH_CKAN_JP,))
+    app = configure(catalog=Catalog((BUILTIN[5],)))
 
     results = app.search(bbox=(139.0, 35.0, 140.0, 36.0), limit=10)
 
@@ -370,43 +459,48 @@ def test_public_search_skips_search_ckan_jp_without_required_text(
     (
         {"limit": -1},
         {"bbox": (139.0, 35.0, 140.0)},
+        {"bbox": (181, 35, 140, 36)},
+        {"bbox": (139, -91, 140, 36)},
+        {"bbox": (139, 36, 140, 35)},
         {"time": ("2024-01-01", None)},
     ),
 )
 def test_invalid_public_search_parameters_fail_before_provider_requests(
-    monkeypatch: pytest.MonkeyPatch, search_parameters: Dict[str, Any]
+    monkeypatch: pytest.MonkeyPatch, search_parameters: dict[str, Any]
 ) -> None:
-    requests: List[str] = []
+    requests: list[str] = []
 
     def get_json(
         url: str,
         params: Mapping[str, Any],
-        headers: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         requests.append(url)
         return {}
 
     monkeypatch.setattr(_http, "get_json", get_json)
     app = configure(
-        sources=(
-            SourceDefinition("ckan", "ckan", {"endpoint": "https://ckan.test"}),
-            SourceDefinition("stac", "stac", {"endpoint": "https://stac.test"}),
-            SourceDefinition(
-                "static",
-                "static",
-                {
-                    "items": {
-                        "one": {
-                            "candidates": [
-                                {
-                                    "uri": "https://example.test/one.geojson",
-                                    "format": "geojson",
-                                }
-                            ]
+        catalog=Catalog(
+            (
+                Provider("ckan", "ckan", {"endpoint": "https://ckan.test"}),
+                Provider("stac", "stac", {"endpoint": "https://stac.test"}),
+                Provider(
+                    "static",
+                    "static",
+                    {
+                        "items": {
+                            "one": {
+                                "candidates": [
+                                    {
+                                        "uri": "https://example.test/one.geojson",
+                                        "format": "geojson",
+                                    }
+                                ]
+                            }
                         }
-                    }
-                },
-            ),
+                    },
+                ),
+            )
         )
     )
 
@@ -418,38 +512,61 @@ def test_invalid_public_search_parameters_fail_before_provider_requests(
 
 def test_duplicate_source_id_is_rejected_during_configuration() -> None:
     with pytest.raises(AdapterRegistrationError, match="registered more than once"):
-        configure(sources=(sources.GSI, sources.GSI))
+        configure(catalog=Catalog((BUILTIN[2], BUILTIN[2])))
 
 
 def test_direct_source_id_is_reserved() -> None:
     with pytest.raises(AdapterRegistrationError, match="direct"):
-        configure(sources=(SourceDefinition("direct", "static"),))
+        configure(catalog=Catalog((Provider("direct", "static"),)))
 
 
 def test_unknown_built_in_adapter_type_is_rejected() -> None:
     with pytest.raises(AdapterRegistrationError, match="unknown"):
-        configure(sources=(SourceDefinition("custom", "unknown"),))
+        configure(catalog=Catalog((Provider("custom", "unknown"),)))
 
 
-def test_configured_contexts_do_not_share_runtime_instances() -> None:
+def test_open_calls_use_the_supplied_runtime_instance() -> None:
     first_runtime = FakeRasterio("first")
     second_runtime = FakeRasterio("second")
-    first = configure(dependencies={"rasterio": RuntimeFactory(lambda: first_runtime)})
-    second = configure(
-        dependencies={"rasterio": RuntimeFactory(lambda: second_runtime)}
+    first = configure()
+    second = configure()
+
+    assert (
+        first.load(direct_config())
+        .open("rasterio", runtime=first_runtime)
+        .startswith("first:")
+    )
+    assert (
+        second.load(direct_config())
+        .open("rasterio", runtime=second_runtime)
+        .startswith("second:")
     )
 
-    assert first.resolve(direct_config()).open("rasterio").startswith("first:")
-    assert second.resolve(direct_config()).open("rasterio").startswith("second:")
 
-
-def test_concrete_dependency_object_is_accepted() -> None:
+def test_concrete_runtime_object_is_accepted_at_open() -> None:
     runtime = FakeRasterio("direct")
-    app = configure(dependencies={"rasterio": runtime})
+    app = configure()
 
-    resource = app.resolve(direct_config())
+    resource = app.load(direct_config())
 
-    assert resource.open("rasterio") == "direct:https://example.test/dataset.tif"
+    assert (
+        resource.open("rasterio", runtime=runtime)
+        == "direct:https://example.test/dataset.tif"
+    )
+
+
+@pytest.mark.parametrize("name", ("gdal", "rasterio", "pyogrio", "json-service"))
+def test_configure_rejects_execution_runtime_dependencies(name: str) -> None:
+    with pytest.raises(ConfigValidationError, match="Runtime names"):
+        configure(dependencies={name: object()})
+
+
+def test_open_requires_an_execution_runtime_object() -> None:
+    resource = configure().load(direct_config())
+    with pytest.raises(RuntimeAdapterUnavailableError, match="must be supplied"):
+        resource.open("rasterio")
+    with pytest.raises(RuntimeAdapterUnavailableError, match="must be supplied"):
+        resource.open("rasterio", runtime=RuntimeFactory(lambda: object()))
 
 
 def test_callable_dependency_object_is_accepted_without_invoking_it() -> None:
@@ -460,17 +577,17 @@ def test_callable_dependency_object_is_accepted_without_invoking_it() -> None:
             raise AssertionError("Runtime object must not be invoked")
 
     runtime = CallableRasterio("callable")
-    app = configure(dependencies={"rasterio": runtime})
+    app = configure()
 
     assert (
-        app.resolve(direct_config()).open("rasterio")
+        app.load(direct_config()).open("rasterio", runtime=runtime)
         == "callable:https://example.test/dataset.tif"
     )
 
 
 def test_resource_open_requires_a_library_name() -> None:
-    app = configure(dependencies={"rasterio": FakeRasterio("runtime")})
-    resource = app.resolve(direct_config())
+    app = configure()
+    resource = app.load(direct_config())
 
     with pytest.raises(TypeError):
         resource.open()  # type: ignore[call-arg]
@@ -482,42 +599,116 @@ def test_legacy_provider_composition_api_is_not_public() -> None:
 
 
 def test_catalog_provider_and_result_are_the_short_public_path() -> None:
-    catalog = Catalog((sources.GSI,))
+    catalog = Catalog((BUILTIN[2],))
     app = configure(catalog=catalog)
 
-    assert isinstance(sources.GSI, Provider)
-    assert tuple(catalog) == (sources.GSI,)
+    assert isinstance(BUILTIN[2], Provider)
+    assert tuple(catalog) == (BUILTIN[2],)
     result = app.search(text="標準", limit=1)[0]
-    resource = app.resolve(result)
+    resource = app.load(result)
 
     assert result.title == "標準地図"
     assert resource.provenance.provider == "gsi"
 
 
-def test_catalog_and_provider_selection_conflicts_are_rejected() -> None:
-    with pytest.raises(TypeError, match="either catalog or sources"):
-        configure(sources=(sources.GSI,), catalog=Catalog((sources.GSI,)))
+def test_removed_sources_argument_is_rejected() -> None:
+    with pytest.raises(TypeError, match="sources"):
+        kwargs: dict[str, Any] = {"sources": BUILTIN.providers}
+        configure(**kwargs)
 
 
 def test_search_parameters_and_open_shortcuts_are_supported() -> None:
-    app = configure(dependencies={"rasterio": FakeRasterio("runtime")})
+    runtime = FakeRasterio("runtime")
+    app = configure()
 
     with pytest.raises(TypeError, match="either query or search parameters"):
         app.search("dataset", text="dataset")
 
-    resource = app.resolve(direct_config())
-    assert app.open(resource, "rasterio") == "runtime:https://example.test/dataset.tif"
+    resource = app.load(direct_config())
     assert (
-        app.open(direct_config(), "rasterio")
+        app.open(resource, "rasterio", runtime=runtime)
+        == "runtime:https://example.test/dataset.tif"
+    )
+    assert (
+        app.open(direct_config(), "rasterio", runtime=runtime)
         == "runtime:https://example.test/dataset.tif"
     )
 
-    result = Result(
-        title="direct",
-        description=None,
-        discovered_by="direct",
-        target=direct_config(),
-        metadata=Metadata(),
-        provenance=Provenance(provider="direct"),
+    result: Resource = app.load(direct_config())
+    assert (
+        app.open(result, "rasterio", runtime=runtime)
+        == "runtime:https://example.test/dataset.tif"
     )
-    assert app.open(result, "rasterio") == "runtime:https://example.test/dataset.tif"
+
+
+def test_removed_compatibility_modules_and_model_aliases_are_unavailable() -> None:
+    import importlib
+
+    from rhinestone import models
+
+    for module in ("rhinestone.sources", "rhinestone.adapters.provider.ckan.format"):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(module)
+    assert not hasattr(models, "SourceDefinition")
+    assert not hasattr(models, "SearchResult")
+
+
+def test_cross_ckan_area_fallback_uses_a_verified_unique_municipality_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
+        assert url == "https://search.ckan.jp/backend/api/package_search"
+        calls.append(dict(params))
+        return cast(dict[str, Any], fixture_json("search_ckan_jp/package_search.json"))
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    provider = next(p for p in BUILTIN if p.id == "search-ckan-jp")
+    result = configure(catalog=Catalog((provider,))).search(
+        text="避難所", area="横浜市", limit=1
+    )[0]
+    assert calls == [
+        {
+            "q": '(xckan_title:"避難所"^8 OR xckan_title:*避難所*^4 OR "避難所") AND '
+            '(xckan_title:"横浜市"^8 OR xckan_title:*横浜市*^4 OR "横浜市")',
+            "rows": 10,
+        }
+    ]
+    resource = result
+    assert resource.discovery is not None
+    assert resource.discovery.provenance.query_parameters == calls[0]
+
+
+def test_cross_ckan_documented_search_example_executes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def get_json(
+        url: str,
+        params: Mapping[str, Any],
+        headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
+        assert url == "https://search.ckan.jp/backend/api/package_search"
+        calls.append(dict(params))
+        return dict(fixture_json("search_ckan_jp/package_search.json"))
+
+    monkeypatch.setattr(_http, "get_json", get_json)
+    provider = next(p for p in BUILTIN if p.id == "search-ckan-jp")
+    app = configure(catalog=Catalog((provider,)))
+    monkeypatch.setattr("rhinestone.api._default_application", lambda: app)
+    path = Path(__file__).parents[1] / "docs/api/adapters/search-ckan-jp.md"
+    source = path.read_text().split("```python\n", 1)[1].split("\n```", 1)[0]
+    namespace: dict[str, Any] = {}
+    exec(compile(source, str(path), "exec"), namespace)
+    results = namespace["results"]
+    assert len(results) == 1
+    assert results[0].formats == frozenset({"geojson"})
+    assert results[0].discovery is not None
+    assert len(calls) == 1
+    assert calls[0]["rows"] == 10

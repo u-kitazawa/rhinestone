@@ -15,8 +15,15 @@ def tutorial_python(name: str) -> str:
     return documentation_python(f"tutorials/{name}")
 
 
+@pytest.mark.parametrize("reverse_catalog", (False, True))
+@pytest.mark.parametrize(
+    "document", ("index.md", "resolve-and-open.md", "getting-started.md")
+)
 def test_documentation_index_example_opens_a_compatible_resource(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    reverse_catalog: bool,
+    document: str,
 ) -> None:
     """冒頭例が決定的な検索結果を明示Runtimeで開けることを保証する。"""
 
@@ -37,8 +44,22 @@ def test_documentation_index_example_opens_a_compatible_resource(
     monkeypatch.setitem(sys.modules, "osgeo", osgeo)
     monkeypatch.setitem(sys.modules, "osgeo.gdal", gdal)
 
-    source = documentation_python("index.md")
-    exec(compile(source, "docs/index.md", "exec"), {})
+    if reverse_catalog:
+        import rhinestone.catalogs as catalogs
+
+        monkeypatch.setattr(
+            catalogs, "BUILTIN", catalogs.Catalog(reversed(catalogs.BUILTIN))
+        )
+
+    if document == "getting-started.md":
+        guide = (Path(__file__).parents[1] / "docs" / document).read_text(
+            encoding="utf-8"
+        )
+        section = guide.split("## 5. Resourceを開く\n", 1)[1]
+        source = section.split("```python\n", 1)[1].split("\n```", 1)[0]
+    else:
+        source = documentation_python(document)
+    exec(compile(source, f"docs/{document}", "exec"), {})
 
     assert len(opened) == 1
     assert "cyberjapandata.gsi.go.jp" in opened[0]
@@ -47,7 +68,7 @@ def test_documentation_index_example_opens_a_compatible_resource(
     assert "raster size: 256 256\n" in output
 
 
-def test_ckan_pyogrio_tutorial_registers_runtime() -> None:
+def test_ckan_pyogrio_tutorial_passes_runtime_at_open() -> None:
     source = tutorial_python("ckan-pyogrio.md")
     tree = ast.parse(source)
     configure_calls = [
@@ -59,18 +80,132 @@ def test_ckan_pyogrio_tutorial_registers_runtime() -> None:
     ]
 
     assert len(configure_calls) == 1
-    dependencies = next(
-        keyword.value
-        for keyword in configure_calls[0].keywords
-        if keyword.arg == "dependencies"
+    assert not any(
+        keyword.arg == "dependencies" for keyword in configure_calls[0].keywords
     )
-    assert isinstance(dependencies, ast.Dict)
-    assert len(dependencies.keys) == 1
-    key = dependencies.keys[0]
-    assert isinstance(key, ast.Constant)
-    assert key.value == "pyogrio"
-    assert isinstance(dependencies.values[0], ast.Name)
-    assert dependencies.values[0].id == "pyogrio"
+    open_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "open"
+    ]
+    assert any(
+        any(
+            keyword.arg == "runtime"
+            and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "pyogrio"
+            for keyword in call.keywords
+        )
+        for call in open_calls
+    )
+
+
+@pytest.mark.parametrize("url_state", ("present", "missing", "null"))
+def test_ckan_pyogrio_tutorial_filters_formats_before_opening(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    url_state: str,
+) -> None:
+    """CSVのpageを飛ばし、後続のベクター配布物を解決して開ける。"""
+    from rhinestone import Resource, api
+
+    csv_resource = {
+        "id": "table",
+        "url": "https://assets.example/table.csv",
+        "format": "CSV",
+    }
+    vector_resource = {
+        "id": "vector",
+        "package_id": "vector-package",
+        "url": "https://assets.example/vector.gpkg",
+        "format": "GeoPackage",
+    }
+    search_resource: dict[str, object] = dict(vector_resource)
+    if url_state == "missing":
+        del search_resource["url"]
+    elif url_state == "null":
+        search_resource["url"] = None
+    package = {
+        "id": "vector-package",
+        "title": "河川",
+        "resources": [search_resource],
+    }
+    search_params: list[dict[str, object]] = []
+    load_actions: list[str] = []
+
+    def get_json(
+        url: str, params: dict[str, object], headers: object = None
+    ) -> dict[str, object]:
+        if url.endswith("/package_search"):
+            search_params.append(dict(params))
+            return {
+                "success": True,
+                "result": {
+                    "count": 2,
+                    "results": [
+                        package
+                        if params.get("start") == 1
+                        else {
+                            "id": "table-package",
+                            "title": "河川",
+                            "resources": [csv_resource],
+                        }
+                    ],
+                },
+            }
+        if url_state == "present":
+            pytest.fail("a planned search Resource must not request metadata again")
+        load_actions.append(url.rsplit("/", 1)[-1])
+        if url.endswith("/resource_show"):
+            assert params == {"id": "vector"}
+            return {"success": True, "result": vector_resource}
+        assert url.endswith("/package_show")
+        assert params == {"id": "vector-package"}
+        return {"success": True, "result": package}
+
+    class Frame:
+        columns = ("geometry", "name")
+
+        def __len__(self) -> int:
+            return 1
+
+    opened: list[str] = []
+    pyogrio = ModuleType("pyogrio")
+
+    def read_dataframe(uri: str, **kwargs: object) -> Frame:
+        opened.append(uri)
+        return Frame()
+
+    pyogrio.read_dataframe = read_dataframe  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "pyogrio", pyogrio)
+    monkeypatch.setattr(getattr(api, "_http"), "get_json", get_json)
+    monkeypatch.setenv("RHINESTONE_CKAN_QUERY", "河川")
+    monkeypatch.setenv("RHINESTONE_CKAN_RESULT_INDEX", "0")
+
+    source = tutorial_python("ckan-pyogrio.md")
+    namespace: dict[str, object] = {}
+    exec(compile(source, "docs/tutorials/ckan-pyogrio.md", "exec"), namespace)
+
+    selected = namespace["selected"]
+    resource = namespace["resource"]
+    assert isinstance(selected, Resource)
+    assert isinstance(resource, Resource)
+    assert (selected.access_plan is not None) == (url_state == "present")
+    assert resource.access_plan is not None
+    assert load_actions == (
+        [] if url_state == "present" else ["resource_show", "package_show"]
+    )
+
+    assert search_params == [
+        {"q": "(title_string:*河川* OR tags:*河川*)", "rows": 100, "start": 0},
+        {"q": "(title_string:*河川* OR tags:*河川*)", "rows": 100, "start": 1},
+    ]
+    assert opened == ["https://assets.example/vector.gpkg"]
+    output = capsys.readouterr().out
+    assert "formats: ['gpkg']" in output
+    assert "format: gpkg\n" in output
+    assert "rows: 1\n" in output
 
 
 def test_stac_rasterio_tutorial_selects_an_explicit_asset(
@@ -110,9 +245,12 @@ def test_stac_rasterio_tutorial_selects_an_explicit_asset(
     def get_json(url: str, params: object, headers: object = None) -> dict[str, object]:
         requested.append((url, params))
         return {
+            "type": "Feature",
+            "stac_version": "1.0.0",
+            "geometry": None,
             "id": "scene-1",
             "collection": "imagery",
-            "properties": {"title": "Scene 1"},
+            "properties": {"title": "Scene 1", "datetime": "2024-01-01T00:00:00Z"},
             "assets": {
                 "analytic": {
                     "href": "https://assets.example/analytic.tif",

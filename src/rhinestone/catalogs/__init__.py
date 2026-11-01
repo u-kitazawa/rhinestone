@@ -1,9 +1,10 @@
 """Repository-managed Source Catalog loading."""
 
 import json
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, Iterable, Iterator, List, Mapping, Tuple, cast
+from typing import Any, cast
 
 from ..errors import ConfigValidationError
 from ..models import Provider
@@ -20,7 +21,9 @@ def load_catalog_resource(name: object) -> Any:
         or "\\" in name
         or name in {".", ".."}
     ):
-        raise ConfigValidationError("Catalog resource name must be a file name")
+        raise ConfigValidationError(
+            "Catalog resource name must be a file name without path separators"
+        )
     try:
         text = (
             resources.files(_CATALOG_PACKAGE).joinpath(name).read_text(encoding="utf-8")
@@ -39,20 +42,27 @@ def load_catalog_resource(name: object) -> Any:
 
 @dataclass(frozen=True)
 class Catalog:
-    """An immutable collection of Providers known to an application."""
+    """An immutable, ordered collection of Providers enabled by an application.
 
-    providers: Tuple[Provider, ...]
+    Iteration and indexing preserve configuration order. Use :meth:`add` to
+    obtain a new Catalog; an existing Catalog is never modified.
+    """
+
+    providers: tuple[Provider, ...]
 
     def __init__(self, providers: Iterable[Provider] = ()) -> None:
         object.__setattr__(self, "providers", tuple(providers))
 
     def __iter__(self) -> Iterator[Provider]:
+        """Iterate over Providers in catalog order."""
         return iter(self.providers)
 
     def __len__(self) -> int:
+        """Return the number of Providers in the catalog."""
         return len(self.providers)
 
     def __getitem__(self, index: int) -> Provider:
+        """Return the Provider at an integer index."""
         return self.providers[index]
 
     def add(self, *providers: Provider) -> "Catalog":
@@ -62,30 +72,30 @@ class Catalog:
 
 @dataclass(frozen=True)
 class CatalogSource:
-    """A catalog entry with its public facade name."""
+    """A built-in catalog entry pairing a display name with its Provider."""
 
     name: str
-    definition: Provider
-
-    @property
-    def provider(self) -> Provider:
-        return self.definition
+    provider: Provider
 
 
 def load_source_catalog(
     name: str = "sources.json",
-) -> Tuple[CatalogSource, ...]:
+) -> tuple[CatalogSource, ...]:
     """Load and validate built-in Source catalog entries in catalog order."""
     document = load_catalog_resource(name)
     if not isinstance(document, Mapping):
-        raise ConfigValidationError("Source catalog must be an object")
+        raise ConfigValidationError(
+            "Source catalog must be an object containing a 'sources' mapping"
+        )
     document_mapping = cast(Mapping[str, Any], document)
     raw_sources = document_mapping.get("sources")
     if not isinstance(raw_sources, Mapping) or not raw_sources:
-        raise ConfigValidationError("Source catalog must define sources")
+        raise ConfigValidationError(
+            "Source catalog must define a non-empty 'sources' mapping"
+        )
 
     source_entries = cast(Mapping[Any, Any], raw_sources)
-    entries: List[CatalogSource] = []
+    entries: list[CatalogSource] = []
     for raw_id, raw_definition in source_entries.items():
         if not isinstance(raw_id, str) or not raw_id.strip():
             raise ConfigValidationError("Source catalog ids must be non-empty strings")
@@ -117,7 +127,7 @@ def load_source_catalog(
         entries.append(
             CatalogSource(
                 name=public_name,
-                definition=Provider(
+                provider=Provider(
                     id=raw_id,
                     adapter_type=adapter_type,
                     settings=settings,
@@ -129,9 +139,9 @@ def load_source_catalog(
 
 def load_source_definitions(
     name: str = "sources.json",
-) -> Tuple[Provider, ...]:
+) -> tuple[Provider, ...]:
     """Load built-in Source definitions in catalog order."""
-    return tuple(entry.definition for entry in load_source_catalog(name))
+    return tuple(entry.provider for entry in load_source_catalog(name))
 
 
 __all__ = [

@@ -1,19 +1,24 @@
-"""Destination authorization derived from trusted Source definitions."""
+"""Destination authorization derived from trusted Provider definitions."""
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from posixpath import normpath
-from typing import Any, Iterable, Literal, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 from urllib.parse import unquote, urlsplit
 
+from ._uri import is_valid_http_authority
 from .errors import ConfigValidationError, DestinationNotAllowedError
 from .models import Provider
+
+if TYPE_CHECKING:
+    from .models import AccessPlan
 
 NetworkPolicyLevel = Literal["none", "credentialed"]
 
 
 @dataclass(frozen=True)
 class DestinationRule:
-    """A URL origin and path boundary that may receive a request."""
+    """Describe an HTTP origin and path boundary allowed for requests."""
 
     scheme: str
     host: str
@@ -22,6 +27,7 @@ class DestinationRule:
 
     @classmethod
     def from_url(cls, url: str) -> Optional["DestinationRule"]:
+        """Parse an HTTP(S) URL into a boundary rule, or return ``None``."""
         try:
             parsed = urlsplit(url)
             port = parsed.port
@@ -32,7 +38,7 @@ class DestinationRule:
             return None
         if parsed.username is not None or parsed.password is not None:
             return None
-        if not hostname:
+        if not hostname or not is_valid_http_authority(url):
             return None
         default_port = 443 if parsed.scheme.lower() == "https" else 80
         return cls(
@@ -43,6 +49,7 @@ class DestinationRule:
         )
 
     def matches(self, url: str) -> bool:
+        """Return whether ``url`` stays within this rule's origin and path."""
         candidate = self.from_url(url)
         if candidate is None:
             return False
@@ -61,21 +68,22 @@ class DestinationRule:
 
 @dataclass(frozen=True)
 class CredentialDestinationRule:
-    """A provider-scoped destination that may receive one credential."""
+    """Describe a provider-scoped destination allowed to receive a credential."""
 
     provider: str
     service: str
-    credential: Optional[str]
+    credential: str | None
     destination: DestinationRule
 
     def matches(
         self,
         url: str,
         *,
-        provider: Optional[str],
-        service: Optional[str],
-        credential: Optional[str],
+        provider: str | None,
+        service: str | None,
+        credential: str | None,
     ) -> bool:
+        """Return whether URL and logical credential context match this rule."""
         if provider is not None and provider != self.provider:
             return False
         if service != self.service:
@@ -87,11 +95,15 @@ class CredentialDestinationRule:
 
 @dataclass(frozen=True)
 class DestinationPolicy:
-    """Authorize network destinations at the execution boundary."""
+    """Authorize network destinations at Provider and Runtime boundaries.
+
+    The default ``credentialed`` level permits ordinary public requests while
+    requiring catalog-derived authorization before credential release.
+    """
 
     level: NetworkPolicyLevel = "credentialed"
-    rules: Tuple[DestinationRule, ...] = ()
-    credential_rules: Optional[Tuple[CredentialDestinationRule, ...]] = None
+    rules: tuple[DestinationRule, ...] = ()
+    credential_rules: tuple[CredentialDestinationRule, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.level not in {"none", "credentialed"}:
@@ -103,7 +115,7 @@ class DestinationPolicy:
     def from_catalog(
         cls, catalog: Iterable[Provider], level: NetworkPolicyLevel = "credentialed"
     ) -> "DestinationPolicy":
-        """Derive rules from the URL-bearing values in a trusted catalog."""
+        """Derive immutable authorization rules from trusted catalog URLs."""
         rules: list[DestinationRule] = []
         seen: set[DestinationRule] = set()
         credential_rules: list[CredentialDestinationRule] = []
@@ -126,6 +138,7 @@ class DestinationPolicy:
 
     @classmethod
     def unrestricted(cls) -> "DestinationPolicy":
+        """Return a policy that permits all destinations."""
         return cls(level="none")
 
     def authorize(
@@ -133,11 +146,16 @@ class DestinationPolicy:
         url: str,
         *,
         credentialed: bool = False,
-        provider: Optional[str] = None,
-        service: Optional[str] = None,
-        credential: Optional[str] = None,
+        provider: str | None = None,
+        service: str | None = None,
+        credential: str | None = None,
     ) -> None:
-        """Raise when ``url`` is outside this policy's authorized URL space."""
+        """Raise when ``url`` is outside this policy's authorized URL space.
+
+        ``credential`` is a logical credential name, never the secret itself.
+        Invalid or ambiguous network destinations are rejected when policy
+        authorization is required.
+        """
         if self.level == "none" or (self.level == "credentialed" and not credentialed):
             return
         try:
@@ -159,7 +177,64 @@ class DestinationPolicy:
         else:
             authorized = any(rule.matches(url) for rule in self.rules)
         if not authorized:
-            raise DestinationNotAllowedError("Network destination is not authorized")
+            context = "credentialed " if credentialed else ""
+            raise DestinationNotAllowedError(
+                f"Network destination {context}is not authorized by the "
+                f"configured policy for provider {provider!r} and service "
+                f"{service!r}"
+            )
+
+    def authorize_plan(
+        self, plan: "AccessPlan", *, redirect_url: str | None = None
+    ) -> None:
+        """Revalidate a received plan and an optional redirect destination.
+
+        Unlike ordinary public requests, a transferred plan is untrusted input,
+        so every network destination must match catalog-derived rules. Logical
+        credential references additionally require an exact credential rule.
+        """
+        if self.level == "none":
+            return
+        urls = [plan.uri]
+        tile = plan.options.get("tile")
+        if tile is not None:
+            if not isinstance(tile, Mapping):
+                raise ConfigValidationError(
+                    "AccessPlan.options.tile must contain a string URL"
+                )
+            tile_url = cast(Mapping[str, Any], tile).get("url")
+            if not isinstance(tile_url, str):
+                raise ConfigValidationError(
+                    "AccessPlan.options.tile must contain a string URL"
+                )
+            urls.append(tile_url)
+        if redirect_url is not None:
+            urls.append(redirect_url)
+        for url in urls:
+            try:
+                scheme = urlsplit(url).scheme.lower()
+            except ValueError:
+                scheme = "__invalid__"
+            if scheme in {"", "file"}:
+                continue
+            if plan.credential is not None:
+                authorized = self.credential_rules is not None and any(
+                    rule.matches(
+                        url,
+                        provider=plan.provider,
+                        service=plan.service,
+                        credential=plan.credential,
+                    )
+                    for rule in self.credential_rules
+                )
+            else:
+                authorized = any(rule.matches(url) for rule in self.rules)
+            if not authorized:
+                raise DestinationNotAllowedError(
+                    "AccessPlan network destination is not authorized by the "
+                    f"configured policy for provider {plan.provider!r} and "
+                    f"service {plan.service!r}"
+                )
 
 
 def _normalize_path(path: str) -> str:
@@ -167,7 +242,7 @@ def _normalize_path(path: str) -> str:
     return normalized or "/"
 
 
-def _urls(value: Any) -> Tuple[str, ...]:
+def _urls(value: Any) -> tuple[str, ...]:
     found: list[str] = []
     if isinstance(value, str):
         if DestinationRule.from_url(value) is not None:
@@ -176,13 +251,13 @@ def _urls(value: Any) -> Tuple[str, ...]:
         mapping = cast(Mapping[Any, Any], value)
         for item in mapping.values():
             found.extend(_urls(item))
-    elif isinstance(value, (list, tuple, set, frozenset)):
+    elif isinstance(value, list | tuple | set | frozenset):
         for item in cast(Iterable[Any], value):
             found.extend(_urls(item))
     return tuple(found)
 
 
-def _credential_rules(provider: Provider) -> Tuple[CredentialDestinationRule, ...]:
+def _credential_rules(provider: Provider) -> tuple[CredentialDestinationRule, ...]:
     endpoint = provider.settings.get("endpoint")
     if not isinstance(endpoint, str):
         return ()
@@ -196,8 +271,14 @@ def _credential_rules(provider: Provider) -> Tuple[CredentialDestinationRule, ..
             for resource_type in cast(Mapping[Any, Any], resource_types).values()
             if isinstance(resource_type, str) and resource_type
         )
-        credential: Optional[str] = None
-    elif provider.adapter_type in {"ckan", "ogc-features", "plateau", "stac"}:
+        credential: str | None = None
+    elif provider.adapter_type not in {
+        "direct",
+        "static",
+        "search-ckan-jp",
+        "gsi-fundamental",
+        "dcat",
+    }:
         configured_credential = provider.settings.get("credential")
         if configured_credential is None:
             credential = None

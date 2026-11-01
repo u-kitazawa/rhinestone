@@ -1,34 +1,33 @@
+from collections.abc import Mapping
 from dataclasses import replace
 from types import SimpleNamespace
-from typing import Any, Dict, List, Mapping, cast
+from typing import Any, cast
 
 import pytest
 
 import rhinestone._http as _http  # pyright: ignore[reportPrivateUsage]
 from rhinestone import (
-    Config,
-    DestinationPolicy,
-    DestinationRule,
     Provider,
-    RuntimeFactory,
-    SearchQuery,
+    Reference,
     configure,
-    sources,
 )
-from rhinestone.adapters.execution.json_service import JsonServiceAdapter
-from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.adapters.source.odpt import OdptAdapter
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.runtime.json_service import JsonServiceAdapter
+from rhinestone.adapters.runtime.json_service.odpt import prepare_odpt_request
+from rhinestone.catalogs import BUILTIN, Catalog
 from rhinestone.errors import (
     ConfigValidationError,
     DestinationNotAllowedError,
 )
+from rhinestone.models import AccessPlan, SearchQuery
 from rhinestone.registry import CredentialRegistry
+from rhinestone.security import DestinationPolicy, DestinationRule
 from tests.provider_support import fixture_json
 
 
 class RecordingGdal:
     def __init__(self) -> None:
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     def OpenEx(self, uri: str, **kwargs: Any) -> str:
         self.calls.append(uri)
@@ -54,6 +53,8 @@ def test_destination_rule_uses_url_boundaries() -> None:
         "https:///missing-host",
         "https://catalog.example:not-a-port/data",
         "https://user:pass@catalog.example/data",
+        "https://exa mple/data",
+        "https://%ZZ/data",
     ),
 )
 def test_destination_rule_rejects_non_http_or_ambiguous_urls(url: str) -> None:
@@ -118,27 +119,121 @@ def test_policy_levels_control_when_authorization_is_applied() -> None:
         DestinationPolicy(level="invalid")  # type: ignore[arg-type]
 
 
+def test_received_access_plan_revalidates_destination_and_redirects() -> None:
+    policy = DestinationPolicy.from_catalog(
+        (Provider("source", "static", {"endpoint": "https://known.example/api"}),)
+    )
+    plan = AccessPlan(
+        kind="remote-dataset",
+        uri="https://known.example/api/data.tif",
+        provider="source",
+    )
+
+    policy.authorize_plan(plan)
+    policy.authorize_plan(AccessPlan(kind="file", uri="/tmp/data"))
+    DestinationPolicy.unrestricted().authorize_plan(
+        replace(plan, uri="https://evil.example/data")
+    )
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(replace(plan, uri="https://evil.example/data"))
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(plan, redirect_url="https://evil.example/data")
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(plan, redirect_url="https://[invalid")
+
+
+def test_received_access_plan_revalidates_tile_destination() -> None:
+    policy = DestinationPolicy.from_catalog(
+        (
+            Provider(
+                "tiles",
+                "static",
+                {
+                    "endpoint": "https://known.example/catalog",
+                    "tile": {"url": "https://tiles.example/{z}/{x}/{y}.png"},
+                },
+            ),
+        )
+    )
+    plan = AccessPlan(
+        kind="remote-dataset",
+        uri="https://known.example/catalog",
+        options={
+            "tile": {
+                "url": "https://tiles.example/{z}/{x}/{y}.png",
+                "min_zoom": 0,
+                "max_zoom": 18,
+            }
+        },
+    )
+
+    policy.authorize_plan(plan)
+    tampered = replace(
+        plan,
+        options={
+            "tile": {
+                "url": "https://evil.example/{z}/{x}/{y}.png",
+                "min_zoom": 0,
+                "max_zoom": 18,
+            }
+        },
+    )
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(tampered)
+    invalid_tiles: tuple[object, ...] = ([], {})
+    for invalid_tile in invalid_tiles:
+        with pytest.raises(ConfigValidationError, match="tile"):
+            policy.authorize_plan(replace(plan, options={"tile": invalid_tile}))
+
+
+def test_received_credential_plan_requires_exact_logical_destination() -> None:
+    provider = Provider(
+        "private",
+        "ckan",
+        {
+            "endpoint": "https://catalog.example/api",
+            "credential": "catalog-key",
+        },
+    )
+    policy = DestinationPolicy.from_catalog((provider,))
+    plan = AccessPlan(
+        kind="service-query",
+        uri="https://catalog.example/api/action",
+        provider="private",
+        service="ckan",
+        credential="catalog-key",
+    )
+
+    policy.authorize_plan(plan)
+    with pytest.raises(DestinationNotAllowedError):
+        policy.authorize_plan(replace(plan, credential="other-key"))
+    with pytest.raises(DestinationNotAllowedError):
+        DestinationPolicy(rules=policy.rules, credential_rules=None).authorize_plan(
+            plan
+        )
+
+
 def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
-    factory_calls: List[bool] = []
+    factory_calls: list[bool] = []
 
     def get_json(*args: Any, **kwargs: Any) -> Any:
         return SimpleNamespace(
             status_code=200,
             raise_for_status=lambda: None,
-            json=lambda: cast(List[Mapping[str, Any]], []),
+            json=lambda: cast(list[Mapping[str, Any]], []),
         )
 
     app = configure(
-        sources=(sources.ODPT,),
-        dependencies={
-            "json-service": RuntimeFactory(lambda: SimpleNamespace(get=get_json))
-        },
+        catalog=Catalog((BUILTIN[3],)),
         credentials={
             "odpt": lambda: factory_calls.append(True) or "secret",
         },
     )
-    resource = app.resolve(Config("odpt", {"dataset": "station", "credential": "odpt"}))
+    resource = app.load(
+        Reference("odpt", parameters={"dataset": "station", "credential": "odpt"})
+    )
     plan = resource.access_plan
+    assert plan is not None
     tampered_plan = replace(
         plan,
         uri="https://evil.example/service",
@@ -151,39 +246,45 @@ def test_configured_odpt_rejects_tampered_destination_before_factory() -> None:
     )
 
     with pytest.raises(DestinationNotAllowedError):
+        assert tampered.access_plan is not None
         JsonServiceAdapter(
-            OdptAdapter.prepare_request,
+            prepare_odpt_request,
             "odpt",
             CredentialRegistry(
                 {"odpt": lambda: factory_calls.append(True) or "secret"}
             ),
-            DestinationPolicy.from_catalog((sources.ODPT,)),
-        ).open(tampered, SimpleNamespace(get=get_json))
+            DestinationPolicy.from_catalog((BUILTIN[3],)),
+        ).open(tampered.access_plan, SimpleNamespace(get=get_json))
     assert factory_calls == []
 
 
-def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> None:
+def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     endpoint = "https://private-odpt.example/api/v4"
-    calls: List[str] = []
+    calls: list[str] = []
 
     def get(url: str, **kwargs: Any) -> Any:
         calls.append(url)
         return SimpleNamespace(
             status_code=200,
             raise_for_status=lambda: None,
-            json=lambda: cast(List[Mapping[str, Any]], []),
+            json=lambda: cast(list[Mapping[str, Any]], []),
         )
 
-    settings = dict(sources.ODPT.settings)
+    monkeypatch.setattr(_http, "JsonServiceRuntime", lambda: SimpleNamespace(get=get))
+
+    settings = dict(BUILTIN[3].settings)
     settings["endpoint"] = endpoint
     app = configure(
-        sources=(Provider("private-odpt", "odpt", settings),),
-        dependencies={"json-service": RuntimeFactory(lambda: SimpleNamespace(get=get))},
+        catalog=Catalog((Provider("private-odpt", "odpt", settings),)),
         credentials={"key": lambda: "secret"},
     )
 
-    resource = app.resolve(
-        Config("private-odpt", {"dataset": "station", "credential": "key"})
+    resource = app.load(
+        Reference(
+            "private-odpt", parameters={"dataset": "station", "credential": "key"}
+        )
     )
 
     assert resource.open("json-service") == []
@@ -193,7 +294,7 @@ def test_custom_odpt_provider_endpoint_is_authorized_by_its_catalog_entry() -> N
 def test_odpt_credential_rules_exclude_metadata_and_other_providers() -> None:
     policy = DestinationPolicy.from_catalog(
         (
-            sources.ODPT,
+            BUILTIN[3],
             Provider(
                 "other",
                 "ckan",
@@ -266,7 +367,7 @@ def test_explicit_rules_remain_usable_for_direct_adapter_credentials() -> None:
     url = endpoint + "/api/3/action/package_search"
     rule = DestinationRule.from_url(endpoint)
     assert rule is not None
-    calls: List[Mapping[str, str]] = []
+    calls: list[Mapping[str, str]] = []
 
     def get_json(
         request_url: str,
@@ -280,7 +381,8 @@ def test_explicit_rules_remain_usable_for_direct_adapter_credentials() -> None:
     CkanAdapter(
         get_json=get_json,
         endpoint=endpoint,
-        api_token="secret",
+        credential="secret",
+        credentials=CredentialRegistry({"secret": lambda: "secret"}),
         destination_policy=DestinationPolicy(rules=(rule,)),
     ).search(SearchQuery(text="river"))
 
@@ -329,7 +431,7 @@ def test_invalid_credential_endpoint_does_not_create_rule() -> None:
 
 def test_odpt_credential_rule_is_scoped_to_provider_and_resource_path() -> None:
     endpoint = "https://shared.example/api/v4"
-    settings = dict(sources.ODPT.settings)
+    settings = dict(BUILTIN[3].settings)
     settings["endpoint"] = endpoint
     policy = DestinationPolicy.from_catalog(
         (Provider("private-odpt", "odpt", settings),)
@@ -351,16 +453,19 @@ def test_odpt_credential_rule_is_scoped_to_provider_and_resource_path() -> None:
 
 
 def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> None:
-    credential_calls: List[bool] = []
-    runtime_calls: List[bool] = []
+    credential_calls: list[bool] = []
+    runtime_calls: list[bool] = []
     app = configure(
-        sources=(sources.ODPT, sources.GSI),
+        catalog=Catalog((BUILTIN[3], BUILTIN[2])),
         credentials={
             "odpt": lambda: credential_calls.append(True) or "secret",
         },
     )
-    resource = app.resolve(Config("odpt", {"dataset": "station", "credential": "odpt"}))
+    resource = app.load(
+        Reference("odpt", parameters={"dataset": "station", "credential": "odpt"})
+    )
     metadata_url = "https://maps.gsi.go.jp/development/ichiran.html"
+    assert resource.access_plan is not None
     tampered = replace(
         resource,
         uri=metadata_url,
@@ -377,14 +482,15 @@ def test_tampered_odpt_catalog_url_does_not_evaluate_credential_factory() -> Non
             raise AssertionError("runtime must not be called")
 
     with pytest.raises(DestinationNotAllowedError):
+        assert tampered.access_plan is not None
         JsonServiceAdapter(
-            OdptAdapter.prepare_request,
+            prepare_odpt_request,
             "odpt",
             CredentialRegistry(
                 {"odpt": lambda: credential_calls.append(True) or "secret"}
             ),
-            DestinationPolicy.from_catalog((sources.ODPT, sources.GSI)),
-        ).open(tampered, Runtime())
+            DestinationPolicy.from_catalog((BUILTIN[3], BUILTIN[2])),
+        ).open(tampered.access_plan, Runtime())
 
     assert credential_calls == []
     assert runtime_calls == []
@@ -424,8 +530,8 @@ def test_public_http_sources_bind_credentials_lazily(
     response: Mapping[str, Any],
     expected_header: str,
 ) -> None:
-    calls: List[Mapping[str, str]] = []
-    factory_calls: List[bool] = []
+    calls: list[Mapping[str, str]] = []
+    factory_calls: list[bool] = []
 
     def get_json(
         url: str,
@@ -437,11 +543,11 @@ def test_public_http_sources_bind_credentials_lazily(
         return response
 
     monkeypatch.setattr(_http, "get_json", get_json)
-    settings: Dict[str, Any] = {"endpoint": endpoint, "credential": "secret"}
+    settings: dict[str, Any] = {"endpoint": endpoint, "credential": "secret"}
     if adapter_type == "ogc-features":
         settings["collection_id"] = "rivers"
     app = configure(
-        sources=(Provider("protected", adapter_type, settings),),
+        catalog=Catalog((Provider("protected", adapter_type, settings),)),
         credentials={
             "secret": lambda: factory_calls.append(True) or "secret",
         },
@@ -458,7 +564,7 @@ def test_public_http_sources_bind_credentials_lazily(
 def test_configured_source_endpoint_cannot_be_overridden(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: List[bool] = []
+    calls: list[bool] = []
 
     def get_json(*args: Any, **kwargs: Any) -> Mapping[str, Any]:
         calls.append(True)
@@ -466,21 +572,26 @@ def test_configured_source_endpoint_cannot_be_overridden(
 
     monkeypatch.setattr(_http, "get_json", get_json)
     app = configure(
-        sources=(
-            Provider(
-                "protected",
-                "ckan",
-                {"endpoint": "https://known.example", "credential": "secret"},
-            ),
+        catalog=Catalog(
+            (
+                Provider(
+                    "protected",
+                    "ckan",
+                    {"endpoint": "https://known.example", "credential": "secret"},
+                ),
+            )
         ),
         credentials={"secret": lambda: "secret"},
     )
 
     with pytest.raises(ConfigValidationError, match="managed"):
-        app.resolve(
-            Config(
+        app.load(
+            Reference(
                 "protected",
-                {"endpoint": "https://evil.example", "resource_id": "resource-1"},
+                parameters={
+                    "endpoint": "https://evil.example",
+                    "resource_id": "resource-1",
+                },
             )
         )
     assert calls == []
@@ -504,8 +615,6 @@ def test_direct_source_adapter_can_use_a_destination_policy() -> None:
 def test_source_credential_configuration_is_validated() -> None:
     with pytest.raises(ConfigValidationError, match="non-empty string"):
         CkanAdapter(get_json=lambda url, params: {}, credential="")
-    with pytest.raises(ConfigValidationError, match="either credential"):
-        CkanAdapter(get_json=lambda url, params: {}, credential="name", api_token="x")
     with pytest.raises(ConfigValidationError, match="credential_header"):
         CkanAdapter(
             get_json=lambda url, params: {}, credential="name", credential_header=""
@@ -520,14 +629,14 @@ def test_source_credential_configuration_is_validated() -> None:
         get_json=lambda url, params: {}, endpoint="https://known.example"
     )
     with pytest.raises(ConfigValidationError, match="should be non-empty"):
-        adapter.load(Config("ckan", {"endpoint": "", "resource_id": "x"}))
+        adapter.load(Reference("ckan", parameters={"endpoint": "", "resource_id": "x"}))
     with pytest.raises(ConfigValidationError, match="non-empty string"):
         adapter._endpoint_from({"endpoint": 1})  # type: ignore[reportPrivateUsage]
     with pytest.raises(ConfigValidationError, match="managed"):
         adapter.load(
-            Config(
+            Reference(
                 "ckan",
-                {"endpoint": "https://evil.example", "resource_id": "x"},
+                parameters={"endpoint": "https://evil.example", "resource_id": "x"},
             )
         )
 
@@ -537,14 +646,15 @@ def test_configure_supports_none_network_policy() -> None:
         def open(self, uri: str, driver: str | None = None) -> str:
             return uri
 
-    config = Config(
+    config = Reference(
         "direct",
-        {"uri": "https://unlisted.example/data.tif", "format": "geotiff"},
+        parameters={"uri": "https://unlisted.example/data.tif", "format": "geotiff"},
     )
-    unrestricted = configure(
-        network_policy="none", dependencies={"rasterio": Rasterio()}
+    unrestricted = configure(network_policy="none")
+    assert (
+        unrestricted.open(config, "rasterio", runtime=Rasterio())
+        == "https://unlisted.example/data.tif"
     )
-    assert unrestricted.open(config, "rasterio") == "https://unlisted.example/data.tif"
 
 
 def test_configure_rejects_invalid_network_policy() -> None:

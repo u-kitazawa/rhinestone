@@ -1,19 +1,20 @@
-from typing import Any, Dict, List, Mapping, Tuple
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 
-from rhinestone.adapters.source.ckan import CkanAdapter
-from rhinestone.adapters.source.ogc import OgcFeaturesAdapter
-from rhinestone.adapters.source.stac import StacAdapter
-from rhinestone.errors import ConfigValidationError
-from rhinestone.models import Config, SearchQuery
+from rhinestone.adapters.provider.ckan import CkanAdapter
+from rhinestone.adapters.provider.ogc import OgcFeaturesAdapter
+from rhinestone.adapters.provider.stac import StacAdapter
+from rhinestone.models import Reference, SearchQuery
+from rhinestone.registry import CredentialRegistry
 from tests.provider_support import fixture_json
 
 
 class HeaderRecordingClient:
     def __init__(self, responses: Mapping[str, Mapping[str, Any]]) -> None:
-        self.responses: Dict[str, Mapping[str, Any]] = dict(responses)
-        self.calls: List[Tuple[str, Mapping[str, Any], Mapping[str, str]]] = []
+        self.responses: dict[str, Mapping[str, Any]] = dict(responses)
+        self.calls: list[tuple[str, Mapping[str, Any], Mapping[str, str]]] = []
 
     def __call__(
         self,
@@ -36,17 +37,23 @@ def test_ckan_api_token_uses_authorization_header_without_provenance_leak() -> N
             package_url: fixture_json("ckan/package_show.json"),
         }
     )
-    adapter = CkanAdapter(get_json=client, api_token="ckan-secret")
+    adapter = CkanAdapter(
+        get_json=client,
+        credential="ckan",
+        credentials=CredentialRegistry({"ckan": lambda: "ckan-secret"}),
+    )
 
     source = adapter.load(
-        Config("ckan", {"endpoint": endpoint, "resource_id": "resource-1"})
+        Reference(
+            "ckan", parameters={"endpoint": endpoint, "resource_id": "resource-1"}
+        )
     )
 
     assert client.calls[0][2] == {"Authorization": "ckan-secret"}
     assert "ckan-secret" not in repr(source)
 
 
-def test_ckan_legacy_api_key_can_use_configured_header() -> None:
+def test_ckan_credential_can_use_configured_header() -> None:
     """CKAN deploymentごとに異なるAPI-key header名を明示指定できるために必要である。"""
     endpoint = "https://catalog.example"
     url = endpoint + "/api/3/action/package_search"
@@ -54,27 +61,33 @@ def test_ckan_legacy_api_key_can_use_configured_header() -> None:
     adapter = CkanAdapter(
         endpoint=endpoint,
         get_json=client,
-        api_key="legacy-secret",
-        api_key_header="X-CKAN-API-Key",
+        credential="ckan",
+        credentials=CredentialRegistry({"ckan": lambda: "ckan-secret"}),
+        credential_header="X-CKAN-API-Key",
     )
 
     adapter.search(SearchQuery(text="river"))
 
-    assert client.calls[0][2] == {"X-CKAN-API-Key": "legacy-secret"}
+    assert client.calls[0][2] == {"X-CKAN-API-Key": "ckan-secret"}
 
 
 @pytest.mark.parametrize("adapter_factory", (StacAdapter, OgcFeaturesAdapter))
 def test_standard_adapters_send_bearer_token_as_header(adapter_factory: Any) -> None:
     """STAC/OGCの保護APIへBearer tokenをqueryへ露出せず送るために必要である。"""
     client = HeaderRecordingClient({})
-    adapter = adapter_factory(get_json=client, api_token="bearer-secret")
+    adapter = adapter_factory(
+        get_json=client,
+        credential="service",
+        credentials=CredentialRegistry({"service": lambda: "bearer-secret"}),
+    )
     query = SearchQuery()
     if adapter_factory is OgcFeaturesAdapter:
         adapter = adapter_factory(
             endpoint="https://features.example",
             collection_id="rivers",
             get_json=client,
-            api_token="bearer-secret",
+            credential="service",
+            credentials=CredentialRegistry({"service": lambda: "bearer-secret"}),
         )
         client.responses["https://features.example/collections/rivers/items"] = {
             "features": []
@@ -84,7 +97,8 @@ def test_standard_adapters_send_bearer_token_as_header(adapter_factory: Any) -> 
         adapter = adapter_factory(
             endpoint="https://stac.example",
             get_json=client,
-            api_token="bearer-secret",
+            credential="service",
+            credentials=CredentialRegistry({"service": lambda: "bearer-secret"}),
         )
 
     adapter.search(query)
@@ -93,30 +107,20 @@ def test_standard_adapters_send_bearer_token_as_header(adapter_factory: Any) -> 
     assert "bearer-secret" not in repr(client.calls[0][1])
 
 
-def test_token_and_key_are_mutually_exclusive() -> None:
-    """認証情報の優先順位を暗黙に決めず、誤送信を防ぐために必要である。"""
-    with pytest.raises(ConfigValidationError, match="both"):
-        CkanAdapter(
-            get_json=HeaderRecordingClient({}),
-            api_token="token",
-            api_key="key",
-        )
-
-
 @pytest.mark.parametrize(
-    "kwargs",
-    ({"api_token": ""}, {"api_key": ""}, {"api_key": "secret", "api_key_header": ""}),
+    "argument", ("api_token", "api_key", "api_key_header", "token_scheme")
 )
-def test_empty_credentials_are_rejected(kwargs: Mapping[str, Any]) -> None:
-    with pytest.raises(ConfigValidationError):
+def test_removed_direct_credentials_are_rejected(argument: str) -> None:
+    with pytest.raises(TypeError, match=argument):
+        kwargs: dict[str, Any] = {argument: "secret"}
         CkanAdapter(get_json=HeaderRecordingClient({}), **kwargs)
 
 
-def test_two_argument_json_callback_remains_supported_without_auth() -> None:
-    """既存利用者の2引数transport callbackを認証なしでは壊さないために必要である。"""
+def test_unauthenticated_json_transport() -> None:
+    """認証なしのmetadata取得には2引数transportを使用する。"""
     endpoint = "https://catalog.example"
     url = endpoint + "/api/3/action/package_search"
-    calls: List[Tuple[str, Mapping[str, Any]]] = []
+    calls: list[tuple[str, Mapping[str, Any]]] = []
 
     def get_json(url: str, params: Mapping[str, Any]) -> Mapping[str, Any]:
         calls.append((url, params))

@@ -1,6 +1,9 @@
+import ast
 import json
+from collections.abc import Mapping
 from importlib import resources
-from typing import Any, Mapping, cast
+from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -16,23 +19,41 @@ from rhinestone.adapters import (
     ProviderAdapter,
     StacAdapter,
 )
-from rhinestone.adapters.source._knowledge import string
+from rhinestone.adapters.provider._knowledge import string
+from rhinestone.adapters.provider._uri import has_embedded_credentials
 from rhinestone.errors import (
     ConfigValidationError,
     ProviderMetadataError,
     ProviderResponseError,
 )
-from rhinestone.models import Config, Source
+from rhinestone.models import Reference, Resource
+
+ADAPTER_PACKAGES = (
+    "provider/ckan",
+    "provider/dcat",
+    "provider/direct",
+    "provider/gsi_fundamental",
+    "provider/odpt",
+    "provider/ogc",
+    "provider/plateau",
+    "provider/search_ckan_jp",
+    "provider/stac",
+    "provider/static",
+    "runtime/gdal",
+    "runtime/json_service",
+    "runtime/pyogrio",
+    "runtime/rasterio",
+)
 
 
 class ProbeAdapter(ProviderAdapter):
     adapter_type = "probe"
 
-    def load(self, config: Config) -> Source:
+    def load(self, reference: Reference) -> Resource:
         raise NotImplementedError
 
-    def settings(self, config: Config) -> Mapping[str, Any]:
-        return self._config_settings(config)
+    def settings(self, config: Reference) -> Mapping[str, Any]:
+        return self._reference_parameters(config)
 
     def endpoint(self, settings: Mapping[str, Any]) -> str:
         return self._endpoint_from(settings)
@@ -59,13 +80,29 @@ def test_common_adapter_normalizes_endpoint_and_validates_config() -> None:
 
     assert adapter.endpoint({}) == "https://example.test"
     assert adapter.required({"id": "known"}, "id") == "known"
-    assert adapter.settings(Config("probe", {"id": "known"}))["id"] == "known"
-    with pytest.raises(ConfigValidationError, match="adapter type"):
-        adapter.settings(Config("other", {}))
+    assert (
+        adapter.settings(Reference("probe", parameters={"id": "known"}))["id"]
+        == "known"
+    )
+    with pytest.raises(ConfigValidationError, match="Provider"):
+        adapter.settings(Reference("other", parameters={}))
     with pytest.raises(ConfigValidationError, match="endpoint"):
         ProbeAdapter(lambda url, params: {}).endpoint({})
+    for endpoint in ("https://exa mple/api", "https://%ZZ/api"):
+        with pytest.raises(ConfigValidationError, match="endpoint"):
+            ProbeAdapter(lambda url, params: {}, endpoint=endpoint)
     with pytest.raises(ConfigValidationError, match="id"):
         adapter.required({"id": 1}, "id")
+    with pytest.raises(ConfigValidationError, match="credentials"):
+        ProbeAdapter(lambda url, params: {}, endpoint="https://user:pass@example.test")
+    with pytest.raises(ConfigValidationError, match="valid URI"):
+        ProbeAdapter(lambda url, params: {}, endpoint="https://[invalid")
+
+
+def test_uri_credential_detection_rejects_only_http_userinfo() -> None:
+    assert has_embedded_credentials("https://user:pass@example.test/data") is True
+    assert has_embedded_credentials("file:///data/file.gml") is False
+    assert has_embedded_credentials("https://[invalid") is False
 
 
 def test_common_adapter_wraps_transport_failure_and_validates_json_shapes() -> None:
@@ -147,7 +184,7 @@ def test_public_base_class_requires_load_implementation() -> None:
         StacAdapter,
     ),
 )
-def test_builtin_source_adapters_implement_the_public_base(adapter: Any) -> None:
+def test_builtin_provider_adapters_implement_the_public_base(adapter: Any) -> None:
     assert issubclass(adapter, ProviderAdapter)
 
 
@@ -165,7 +202,8 @@ def test_builtin_source_adapters_implement_the_public_base(adapter: Any) -> None
     ),
 )
 def test_builtin_adapter_schema_is_valid_json_schema(adapter: Any) -> None:
-    text = resources.files(adapter.__module__).joinpath("schema.json").read_text()
+    package_name = adapter.__module__.rpartition(".")[0]
+    text = resources.files(package_name).joinpath("schema.json").read_text()
 
     Draft202012Validator.check_schema(json.loads(text))
 
@@ -173,3 +211,16 @@ def test_builtin_adapter_schema_is_valid_json_schema(adapter: Any) -> None:
 def test_internal_string_validation_remains_available_to_custom_adapters() -> None:
     with pytest.raises(ConfigValidationError, match="name"):
         string({}, "name")
+
+
+@pytest.mark.parametrize("package", ADAPTER_PACKAGES)
+def test_adapter_package_initializers_only_reexport_public_symbols(
+    package: str,
+) -> None:
+    root = Path(__file__).parents[1] / "src" / "rhinestone" / "adapters"
+    tree = ast.parse((root / package / "__init__.py").read_text())
+
+    assert not any(
+        isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef)
+        for node in tree.body
+    )

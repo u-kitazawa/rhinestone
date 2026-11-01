@@ -2,17 +2,23 @@
 
 import os
 
-from rhinestone import Config, configure, sources
+from rhinestone import Reference, configure
+from rhinestone.catalogs import BUILTIN, Catalog
 
 app = configure(
-    sources=(sources.ODPT,),
+    catalog=Catalog(provider for provider in BUILTIN if provider.id == "odpt"),
     credentials={"odpt": lambda: os.environ["ODPT_CONSUMER_KEY"]},
 )
 records = app.open(
-    Config(
+    Reference(
         "odpt",
-        {"dataset": "station", "credential": "odpt", "filters": {"dc:title": "東京"}},
-    )
+        parameters={
+            "dataset": "station",
+            "credential": "odpt",
+            "filters": {"dc:title": "東京"},
+        },
+    ),
+    "json-service",
 )
 print("records:", len(records))
 print("first identifier:", records[0]["owl:sameAs"] if records else "none")
