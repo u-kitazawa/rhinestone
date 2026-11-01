@@ -78,9 +78,7 @@ class OgcFeaturesAdapter(ProviderAdapter):
             reference=Reference(
                 reference.provider_id,
                 dataset_identifier=collection_id,
-                resource_identifier=feature_id
-                if isinstance(feature_id, str)
-                else collection_id,
+                resource_identifier=feature_id if isinstance(feature_id, str) else None,
                 parameters=reference.parameters,
             ),
             uri=uri,
