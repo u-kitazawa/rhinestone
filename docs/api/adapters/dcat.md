@@ -21,6 +21,10 @@ RDFLibが文書内の参照先を追加取得しないよう、必要なコン�
 
 `dcat:downloadURL` を持つ Distribution のみを候補にし、`accessURL` だけの Distribution は解決しません。検索は `text` と `limit` を使えます。
 
+匿名のDistribution（RDFのblank node）には、利用者が供給したRDFLibの標準機能で
+グラフを正規化した識別子を使用します。同じカタログを再解析しても返却Referenceから
+同じ配信を選べます。識別子は不透明な値として扱い、カタログ内容の変更をまたいだ固定IDには使わないでください。
+
 Adapterを直接構築する内部テストや再利用用途では、document取得callbackとRDF runtime factoryをconstructorへ注入できます。このfactoryの任意例外も`DependencyUnavailableError`へ変換され、既存の`DependencyUnavailableError`はそのまま伝播します。
 
 Distribution URI を指定して pyogrio で開く例は、リポジトリ checkout の `examples/11_dcat_dataset/README.md` にあります。

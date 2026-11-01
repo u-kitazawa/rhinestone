@@ -53,3 +53,28 @@ def test_direct_load_requires_collection_on_reference_not_search_provider(
         assert client.calls == [(collection_url, {})]
         assert resource.uri == collection_url + "/items/river-1"
         assert resource.reference.dataset_identifier == "rivers"
+
+
+@pytest.mark.parametrize("feature_id", [None, "river-1"])
+def test_loaded_ogc_reference_preserves_collection_or_feature(
+    feature_id: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    endpoint = "https://features.example"
+    collection_url = endpoint + "/collections/rivers"
+    client = RecordingJsonClient({collection_url: fixture_json("ogc/collection.json")})
+    monkeypatch.setattr(_http, "get_json", client)
+    app = configure(
+        catalog=Catalog((Provider("features", "ogc-features", {"endpoint": endpoint}),))
+    )
+    resource = app.load(
+        Reference(
+            "features", dataset_identifier="rivers", resource_identifier=feature_id
+        )
+    )
+
+    reloaded = app.load(resource.reference)
+
+    assert resource.reference.resource_identifier == feature_id
+    assert reloaded.uri == resource.uri
+    assert reloaded.reference == resource.reference
+    assert reloaded.provenance == resource.provenance

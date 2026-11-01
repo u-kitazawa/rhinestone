@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Callable, Mapping
+from importlib import import_module
 from typing import Any, cast
 
 from ....errors import (
@@ -110,6 +111,8 @@ class DcatAdapter(ProviderAdapter):
         try:
             graph = rdf.Graph()
             graph.parse(data=document, format=serialization, publicID=uri)
+            # RDF parser-local blank-node labels cannot serve as reloadable selectors.
+            graph = import_module("rdflib.compare").to_canonical_graph(graph)
         except Exception as error:
             raise ProviderResponseError("Invalid RDF catalog") from error
         return rdf, graph, document, uri

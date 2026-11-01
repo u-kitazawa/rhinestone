@@ -17,6 +17,8 @@
 直接loadでは、Reference側にも`parameters={"collection_id": "rivers"}`、または
 `dataset_identifier="rivers"`の指定が必須です。Providerの検索用`collection_id`は
 直接loadの既定値にはなりません。任意の`feature_id`は`Reference.parameters`で指定できます。
+返却Referenceの`resource_identifier`はFeatureを指定した場合のみ設定されます。
+Collection全体の場合は未設定のまま保持し、返却Referenceを再loadしても同じitems配信を指します。
 
 `collection_id` と `feature_id` は未エンコードの論理IDとして指定します。RhinestoneはHTTP requestまたはfeature resource URIを組み立てる際に各IDを1つのpath segmentとしてpercent-encodeします。既にエンコードされたように見える値も推測で復号しないため、例えば論理IDの`%2F`はpathでは`%252F`になります。`.`と`..`だけのIDもpath traversalとして正規化されないようエンコードします。Metadataとprovenanceには元の論理IDを保持します。
 

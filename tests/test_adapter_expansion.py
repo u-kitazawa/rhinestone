@@ -297,6 +297,35 @@ def test_dcat_optional_labels_formats_and_blank_nodes() -> None:
     assert result.access_plan is None
 
 
+@pytest.mark.parametrize("serialization", ["turtle", "xml", "json-ld"])
+def test_dcat_blank_distribution_references_survive_reparsing(
+    serialization: str,
+) -> None:
+    rdf: Any = importlib.import_module("rdflib")
+    text = """@prefix dcat: <http://www.w3.org/ns/dcat#> .
+    <https://fixture.example/dataset> a dcat:Dataset ;
+        dcat:distribution [
+            dcat:mediaType "application/geo+json" ;
+            dcat:downloadURL <https://fixture.example/a.geojson>,
+                <https://fixture.example/b.geojson> ], [
+            dcat:downloadURL <https://fixture.example/c.geojson> ] ."""
+    document = (
+        rdf.Graph().parse(data=text, format="turtle").serialize(format=serialization)
+    )
+    adapter = dcat_adapter(document, serialization)
+    found = adapter.search(SearchQuery())
+
+    assert {resource.uri for resource in found} == {
+        "https://fixture.example/a.geojson",
+        "https://fixture.example/b.geojson",
+        "https://fixture.example/c.geojson",
+    }
+    assert len({resource.reference.resource_identifier for resource in found}) == 3
+    assert adapter.search(SearchQuery()) == found
+    for resource in found:
+        assert adapter.load(resource.reference) == resource
+
+
 def test_dcat_distinguishes_bad_config_fetch_parse_and_missing_dataset() -> None:
     with pytest.raises(ConfigValidationError):
         dcat_adapter().load(dcat_config(serialization="csv"))
