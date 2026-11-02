@@ -9,8 +9,8 @@ from pathlib import Path
 
 from qgis.core import QgsCoordinateTransform, QgsProject, QgsVectorLayer
 from qgis.PyQt.QtCore import QProcess, QStandardPaths, Qt, QTimer
+from qgis.PyQt.QtGui import QAction
 from qgis.PyQt.QtWidgets import (
-    QAction,
     QDockWidget,
     QLabel,
     QLineEdit,
@@ -57,7 +57,7 @@ class RhinestonePlugin:
             self.button = QPushButton("検索")
             self.status = QLabel("キーワードを入力して検索")
             self.status.setWordWrap(True)
-            self.status.setTextFormat(Qt.PlainText)
+            self.status.setTextFormat(Qt.TextFormat.PlainText)
             self.results = QListWidget()
             self.results.setWordWrap(True)
             self.results.setAccessibleName("検索結果：選択で地図へ追加")
@@ -68,7 +68,7 @@ class RhinestonePlugin:
             self.button.clicked.connect(self.search)
             self.results.itemClicked.connect(self.select)
             self.results.itemActivated.connect(self.select)
-            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
+            self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
         self.dock.show()
         self.query.setFocus()
 
@@ -177,14 +177,18 @@ class RhinestonePlugin:
             item = QListWidgetItem(
                 f"{index + 1}. {row['title']}\n{row['provider']} / {row['format']}{suffix}"
             )
-            item.setData(Qt.UserRole, row)
+            item.setData(Qt.ItemDataRole.UserRole, row)
             resource = row["resource"]
             item.setToolTip(
                 f"{row['title']}\n{resource['uri']}\n"
                 + json.dumps(resource.get("reference", {}), ensure_ascii=False)
             )
             if row["reason"]:
-                item.setFlags(item.flags() & ~Qt.ItemIsEnabled & ~Qt.ItemIsSelectable)
+                item.setFlags(
+                    item.flags()
+                    & ~Qt.ItemFlag.ItemIsEnabled
+                    & ~Qt.ItemFlag.ItemIsSelectable
+                )
             self.results.addItem(item)
         # Populating a list must never choose or add a Resource.
         self.results.setCurrentRow(-1)
@@ -193,11 +197,15 @@ class RhinestonePlugin:
     def select(self, item):
         if self.process is not None:
             return
-        row = item.data(Qt.UserRole)
+        row = item.data(Qt.ItemDataRole.UserRole)
         if not row or row["reason"]:
             return
         cache = (
-            Path(QStandardPaths.writableLocation(QStandardPaths.CacheLocation))
+            Path(
+                QStandardPaths.writableLocation(
+                    QStandardPaths.StandardLocation.CacheLocation
+                )
+            )
             / "rhinestone"
         )
         try:

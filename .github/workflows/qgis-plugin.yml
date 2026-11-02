@@ -32,3 +32,37 @@ jobs:
         with:
           name: rhinestone-qgis-linux-x86_64-py312
           path: ${{ runner.temp }}/rhinestone-qgis-linux-x86_64-py312.zip
+
+  qgis4:
+    name: QGIS 4 / Qt 6
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash -el {0}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      RHINESTONE_QGIS_MAJOR: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-name: qgis4
+          create-args: >-
+            --channel conda-forge
+            python=3.12
+            qgis=4.2.3
+          cache-environment: true
+      - name: Build dependency-complete ZIP
+        run: python scripts/build_qgis_plugin.py --output "$RUNNER_TEMP/rhinestone-qgis4-linux-x86_64-py312.zip"
+      - name: Exercise installed ZIP with QGIS 4 / Qt 6 and no system Core
+        run: |
+          python -m zipfile -e "$RUNNER_TEMP/rhinestone-qgis4-linux-x86_64-py312.zip" "$RUNNER_TEMP/plugin"
+          export PYTHONPATH="$CONDA_PREFIX/share/qgis/python"
+          export QGIS_PREFIX_PATH="$CONDA_PREFIX"
+          export RHINESTONE_PLUGIN_DIR="$RUNNER_TEMP/plugin/rhinestone_search"
+          python qgis_plugin/tests/check_qgis.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rhinestone-qgis4-linux-x86_64-py312
+          path: ${{ runner.temp }}/rhinestone-qgis4-linux-x86_64-py312.zip

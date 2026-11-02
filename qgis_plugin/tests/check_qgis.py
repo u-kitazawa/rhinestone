@@ -4,6 +4,7 @@ RHINESTONE_PLUGIN_DIR points to extracted rhinestone_search. Optional --live use
 search.ckan.jp and the selected publisher's real HTTP endpoint.
 """
 
+import configparser
 import json
 import os
 import sys
@@ -13,9 +14,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from qgis.core import QgsApplication, QgsCoordinateReferenceSystem, QgsProject
+from qgis.core import Qgis, QgsApplication, QgsCoordinateReferenceSystem, QgsProject
 from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas
-from qgis.PyQt.QtCore import Qt, QTimer
+from qgis.PyQt.QtCore import QT_VERSION_STR, Qt, QTimer
 from qgis.PyQt.QtTest import QTest
 from qgis.PyQt.QtWidgets import QMainWindow, QPushButton
 
@@ -31,6 +32,20 @@ APP = QgsApplication([], True)
 if os.environ.get("QGIS_PREFIX_PATH"):
     APP.setPrefixPath(os.environ["QGIS_PREFIX_PATH"], True)
 APP.initQgis()
+print(
+    json.dumps(
+        {
+            "qgis": Qgis.QGIS_VERSION,
+            "qt": QT_VERSION_STR,
+            "python": sys.version.split()[0],
+        }
+    ),
+    flush=True,
+)
+if os.environ.get("RHINESTONE_QGIS_MAJOR"):
+    assert Qgis.QGIS_VERSION_INT // 10000 == int(os.environ["RHINESTONE_QGIS_MAJOR"])
+if Qgis.QGIS_VERSION_INT >= 40000:
+    assert QT_VERSION_STR.startswith("6.")
 if os.environ.get("RHINESTONE_FONT"):
     from qgis.PyQt.QtGui import QFont, QFontDatabase
 
@@ -102,6 +117,12 @@ class PluginTests(unittest.TestCase):
         self.iface.window.close()
         APP.processEvents()
 
+    def test_metadata_allows_qgis3_and_qgis4(self):
+        metadata = configparser.ConfigParser()
+        metadata.read(ROOT / "metadata.txt", encoding="utf-8")
+        self.assertEqual(metadata["general"]["qgisMinimumVersion"], "3.34")
+        self.assertEqual(metadata["general"]["qgisMaximumVersion"], "4.99")
+
     def test_empty_failure_unknown_and_no_implicit_selection(self):
         self.plugin.searched({"rows": [], "diagnostics": []})
         self.assertEqual(self.plugin.status.text(), "結果0件")
@@ -118,7 +139,9 @@ class PluginTests(unittest.TestCase):
             {"rows": [row("a", reason="未対応")], "diagnostics": diagnostics}
         )
         self.assertIn("一部", self.plugin.status.text())
-        self.assertFalse(self.plugin.results.item(0).flags() & Qt.ItemIsSelectable)
+        self.assertFalse(
+            self.plugin.results.item(0).flags() & Qt.ItemFlag.ItemIsSelectable
+        )
         self.assertIsNone(self.plugin.results.currentItem())
         self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
         self.assertEqual(
@@ -136,7 +159,7 @@ class PluginTests(unittest.TestCase):
             item = self.plugin.results.item(1)
             QTest.mouseClick(
                 self.plugin.results.viewport(),
-                Qt.LeftButton,
+                Qt.MouseButton.LeftButton,
                 pos=self.plugin.results.visualItemRect(item).center(),
             )
         self.assertEqual(len(captured), 1)
@@ -194,7 +217,7 @@ class PluginTests(unittest.TestCase):
             module.Path, "read_text", side_effect=FileNotFoundError("bundle")
         ):
             self.plugin.query.setText("公園")
-            QTest.keyClick(self.plugin.query, Qt.Key_Return)
+            QTest.keyClick(self.plugin.query, Qt.Key.Key_Return)
         self.assertIn("起動できません", self.plugin.status.text())
         self.assertIsNone(self.plugin.process)
 
@@ -220,22 +243,22 @@ class PluginTests(unittest.TestCase):
         timer.timeout.connect(lambda: beats.append(time.monotonic()))
         timer.start(20)
         self.plugin.query.setText("那須塩原市 公園")
-        QTest.keyClick(self.plugin.query, Qt.Key_Return)
+        QTest.keyClick(self.plugin.query, Qt.Key.Key_Return)
         self.assertIn("検索中", self.plugin.status.text())
         wait_until(lambda: self.plugin.process is None)
         self.assertGreater(len(beats), 2)
         candidates = [
             self.plugin.results.item(i)
             for i in range(self.plugin.results.count())
-            if self.plugin.results.item(i).flags() & Qt.ItemIsSelectable
+            if self.plugin.results.item(i).flags() & Qt.ItemFlag.ItemIsSelectable
         ]
         self.assertGreaterEqual(len(candidates), 2, self.plugin.status.text())
         self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
         selected = candidates[1]
-        expected = selected.data(Qt.UserRole)["resource"]["uri"]
+        expected = selected.data(Qt.ItemDataRole.UserRole)["resource"]["uri"]
         QTest.mouseClick(
             self.plugin.results.viewport(),
-            Qt.LeftButton,
+            Qt.MouseButton.LeftButton,
             pos=self.plugin.results.visualItemRect(selected).center(),
         )
         wait_until(lambda: self.plugin.process is None)

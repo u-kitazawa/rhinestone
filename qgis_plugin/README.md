@@ -6,10 +6,17 @@ AI・MCP・アカウント・独自サーバーは不要です。
 
 ## インストール
 
-初期の配布対象はLinux x86_64、QGIS 3.x（3.34以上）、Python 3.12です。
+配布対象はLinux x86_64、QGIS 3.x（3.34以上）／4.x、Python 3.12です。
+4.xの実機・CI検証対象はQGIS 4.2.3／Qt 6です。
 GitHubの[QGIS plugin workflow](https://github.com/u-kitazawa/rhinestone/actions/workflows/qgis-plugin.yml)
-で成功した対象commitのArtifactsから `rhinestone-qgis-linux-x86_64-py312` をダウンロードし、
-**Artifactsの外側のZIPを展開**します。中の `rhinestone-qgis-linux-x86_64-py312.zip` がプラグインです。
+で成功した対象commitのArtifactsから、使用するQGIS系列に合わせてダウンロードし、
+**Artifactsの外側のZIPを展開**します。中にあるZIPがプラグインです。
+
+| QGIS | Artifact | 中のプラグインZIP |
+| --- | --- | --- |
+| 3.x | `rhinestone-qgis-linux-x86_64-py312` | `rhinestone-qgis-linux-x86_64-py312.zip` |
+| 4.x | `rhinestone-qgis4-linux-x86_64-py312` | `rhinestone-qgis4-linux-x86_64-py312.zip` |
+
 QGISの「プラグイン → プラグインの管理とインストール → ZIPからインストール」でそのZIPを選び、
 「Rhinestone Search」を有効にします。メニューの「Rhinestone → Rhinestone Search」でパネルを開きます。
 GitHubへのサインインがArtifactsの取得に必要になる場合があります。検索・利用にアカウントは不要です。
@@ -18,7 +25,9 @@ Coreとそのロック済み依存をZIPへ同梱します。利用者によるp
 QGIS付属の対応Python実行ファイルが必要です（`sys.prefix/bin/python3` または `python.exe` 等）。
 CoreはそのPythonの隔離プロセス（`-I -S`）で実行し、QGISや他プラグインのimport環境を変更しません。
 ZIPはOS・CPU・Python minor versionに対応します。不一致・付属Python不足は画面へ表示します。
-Windows/macOS・他のPython版・QGIS 4は未検証で、現時点の配布サポート対象には含めません。
+Windows/macOS・他のPython版は未検証で、現時点の配布サポート対象には含めません。
+Qtのimportと列挙値は `qgis.PyQt` のQt 5／6共通APIを使用します。
+互換性の指定は `qgisMinimumVersion=3.34`／`qgisMaximumVersion=4.99` です。
 公式QGISプラグインリポジトリへの登録は行っていません。
 
 ## 検索と対応範囲
@@ -50,7 +59,12 @@ Windows/macOS・他のPython版・QGIS 4は未検証で、現時点の配布サ�
 2026-11-02、隔離したconda-forge QGIS 3.44.14、Python 3.12.16、Qt 5.15.15、GDAL 3.13.3、Linux x86_64で、
 依存同梱ZIPを展開し、QGIS側へCoreをインストールせずに実QGIS/Qtの自動操作を検証しました。
 これはoffscreenでの自動受け入れテストであり、通常デスクトップのZIPインストール画面と手動操作は未確認です。
-Ubuntu標準QGISによるオフライン回帰テストは上記workflowで実行します。
+Ubuntu標準QGIS 3.34.4による回帰テストに加え、conda-forge QGIS 4.2.3／Qt 6の
+依存同梱ZIPを使う回帰テストも上記workflowで実行します。
+
+2026-11-03、QGIS 4.2.3／Python 3.12.16／Qt 6.11.2／GDAL 3.13.3で、
+同じ実データのEnter検索→1クリック追加・10 feature・選択URI一致・GUIイベントの継続を
+検証しました。Qt 6の実体を使い、QGIS 3.xが混入した環境を成功扱いにしないチェックも行います。
 
 実データの再現手順:
 
