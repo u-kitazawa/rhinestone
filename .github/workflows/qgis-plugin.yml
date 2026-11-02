@@ -1,0 +1,34 @@
+name: QGIS plugin
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+
+jobs:
+  qgis:
+    runs-on: ubuntu-24.04
+    env:
+      UV_PYTHON: /usr/bin/python3
+      QT_QPA_PLATFORM: offscreen
+      QGIS_PREFIX_PATH: /usr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install stock Ubuntu QGIS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-qgis qgis-providers
+      - name: Check Core worker boundary
+        run: uv run pytest qgis_plugin/tests/test_worker.py --no-cov
+      - name: Build dependency-complete ZIP
+        run: /usr/bin/python3 scripts/build_qgis_plugin.py --output "$RUNNER_TEMP/rhinestone-qgis-linux-x86_64-py312.zip"
+      - name: Exercise installed ZIP with real QGIS and no system Core
+        run: |
+          /usr/bin/python3 -m zipfile -e "$RUNNER_TEMP/rhinestone-qgis-linux-x86_64-py312.zip" "$RUNNER_TEMP/plugin"
+          export RHINESTONE_PLUGIN_DIR="$RUNNER_TEMP/plugin/rhinestone_search"
+          /usr/bin/python3 qgis_plugin/tests/check_qgis.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rhinestone-qgis-linux-x86_64-py312
+          path: ${{ runner.temp }}/rhinestone-qgis-linux-x86_64-py312.zip
