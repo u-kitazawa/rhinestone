@@ -211,6 +211,11 @@ class PluginTests(unittest.TestCase):
             self.assertEqual(len(self.iface.canvas.layers()), 1)
             self.assertLess(self.iface.canvas.extent().width(), 2_000_000)
             self.assertTrue(target.exists())
+            # Windows cannot delete an OGR source while its layer owns the file.
+            # Production caches outlive layers; release the test layer first.
+            self.iface.canvas.setLayers([])
+            QgsProject.instance().removeAllMapLayers()
+            APP.processEvents()
 
     def test_missing_bundle_is_visible(self):
         with patch.object(

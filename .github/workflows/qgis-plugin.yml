@@ -66,3 +66,52 @@ jobs:
         with:
           name: rhinestone-qgis4-linux-x86_64-py312
           path: ${{ runner.temp }}/rhinestone-qgis4-linux-x86_64-py312.zip
+
+  qgis4-windows:
+    name: QGIS 4 / Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      QT_QPA_PLATFORM: offscreen
+      RHINESTONE_QGIS_MAJOR: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: x64
+      - name: Build Windows dependency-complete ZIP
+        run: python scripts/build_qgis_plugin.py --output "$env:RUNNER_TEMP/rhinestone-qgis4-windows-x86_64-py312.zip"
+      - name: Install official OSGeo4W QGIS
+        shell: pwsh
+        run: |
+          $installer = "$env:RUNNER_TEMP/osgeo4w-setup.exe"
+          Invoke-WebRequest https://download.osgeo.org/osgeo4w/v2/osgeo4w-setup.exe -OutFile $installer
+          $setup = Start-Process -FilePath $installer -ArgumentList @(
+            '-q', '-k', '-A', '--root', 'C:\OSGeo4W',
+            '--local-package-dir', "$env:RUNNER_TEMP/osgeo-cache",
+            '--site', 'https://download.osgeo.org/osgeo4w/v2/', '--packages', 'qgis'
+          ) -Wait -PassThru
+          if ($setup.ExitCode -notin @(0, 3010)) { throw "OSGeo4W setup failed: $($setup.ExitCode)" }
+          if (!(Test-Path C:\OSGeo4W\bin\python-qgis.bat)) { throw 'QGIS Python launcher missing' }
+      - name: Exercise installed ZIP with real Windows QGIS and no system Core
+        shell: cmd
+        run: |
+          chcp 65001 >nul
+          set "RHINESTONE_PLUGIN_DIR=%RUNNER_TEMP%\plugin 日本語\rhinestone_search"
+          call C:\OSGeo4W\bin\python-qgis.bat -m zipfile -e "%RUNNER_TEMP%\rhinestone-qgis4-windows-x86_64-py312.zip" "%RUNNER_TEMP%\plugin 日本語"
+          if errorlevel 1 exit /b 1
+          call C:\OSGeo4W\bin\python-qgis.bat qgis_plugin\tests\check_qgis.py
+          if errorlevel 1 exit /b 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rhinestone-qgis4-windows-x86_64-py312
+          path: ${{ runner.temp }}/rhinestone-qgis4-windows-x86_64-py312.zip
+      - name: Upload OSGeo4W setup logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qgis4-windows-setup-logs
+          path: C:/OSGeo4W/var/log/setup.log*
+          if-no-files-found: ignore
