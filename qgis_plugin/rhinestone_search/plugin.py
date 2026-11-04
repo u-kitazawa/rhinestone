@@ -19,11 +19,12 @@ from qgis.core import (
     QgsProviderSublayerDetails,
     QgsProviderSublayerTask,
     QgsRasterLayer,
+    QgsVectorTileBasicRenderer,
     QgsVectorTileLayer,
 )
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QProcess, QStandardPaths, Qt, QTimer
-from qgis.PyQt.QtGui import QAction
+from qgis.PyQt.QtGui import QAction, QColor
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
     QLabel,
@@ -298,6 +299,20 @@ class RhinestonePlugin:
         encoded = bytes(uri.encodedUri()).decode("utf-8")
         if tile["format"] in {"pbf", "mvt"}:
             layer = QgsVectorTileLayer(encoded, self.selected_title)
+            renderer = QgsVectorTileBasicRenderer()
+            renderer.setStyles(
+                QgsVectorTileBasicRenderer.simpleStyle(
+                    QColor("#c5dfeb"),
+                    QColor("#38748f"),
+                    0.2,
+                    QColor("#38748f"),
+                    0.4,
+                    QColor("#12ab34"),
+                    QColor("#126b34"),
+                    4,
+                )
+            )
+            layer.setRenderer(renderer)
         else:
             layer = QgsRasterLayer(encoded, self.selected_title, "wms")
         if not layer.isValid():

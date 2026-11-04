@@ -100,6 +100,11 @@ def tile_problem(tile):
         return "HTTP(S)のXYZタイルURLが必要"
     if tile.get("crs") != "EPSG:3857" or tile.get("tile_size", 256) != 256:
         return "タイルはEPSG:3857・256ピクセルに対応"
+    if any(
+        key in tile and not isinstance(tile[key], str)
+        for key in ("attribution", "coverage", "usage_notes", "usage_url")
+    ):
+        return "タイルの帰属・利用条件が不正"
     low, high = tile.get("min_zoom"), tile.get("max_zoom")
     if (
         any(

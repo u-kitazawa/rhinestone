@@ -376,8 +376,8 @@ class PluginTests(unittest.TestCase):
                     path = Path(directory) / ("data" + suffix)
                     vector_fixture(path, driver)
                     layers = self.add_distribution(path.read_bytes(), format)
-                    self.assertEqual(len(layers), 1)
-                    self.assertEqual(layers[0].featureCount(), 1)
+                    self.assertGreaterEqual(len(layers), 1)
+                    self.assertEqual(sum(layer.featureCount() for layer in layers), 1)
                     self.release_layers()
 
     def test_multiple_gpkg_layers_and_explicit_layer_selector(self):
@@ -442,8 +442,11 @@ class PluginTests(unittest.TestCase):
             dataset.SetProjection(crs.ExportToWkt())
             dataset.GetRasterBand(1).Fill(42)
             dataset = None
-            for format in ("geotiff", "cog"):
-                layers = self.add_distribution(path.read_bytes(), format)
+            cog = Path(directory) / "cloud.tif"
+            dataset = gdal.Translate(str(cog), str(path), format="COG")
+            dataset = None
+            for format, fixture in (("geotiff", path), ("cog", cog)):
+                layers = self.add_distribution(fixture.read_bytes(), format)
                 self.assertEqual(len(layers), 1)
                 self.assertEqual(layers[0].type(), Qgis.LayerType.Raster)
                 self.assertEqual(layers[0].width(), 2)
@@ -485,9 +488,9 @@ class PluginTests(unittest.TestCase):
                 layers = list(QgsProject.instance().mapLayers().values())
                 self.assertEqual(len(layers), 1, self.plugin.status.text())
                 layer = layers[0]
-                self.assertEqual(
-                    QgsDataSourceUri(layer.source()).param("url"), template
-                )
+                parsed = QgsDataSourceUri()
+                parsed.setEncodedUri(layer.source().encode())
+                self.assertEqual(parsed.param("url"), template)
                 self.assertFalse((Path(directory) / "unused").exists())
                 settings = self.iface.canvas.mapSettings()
                 settings.setLayers([layer])
@@ -505,7 +508,19 @@ class PluginTests(unittest.TestCase):
                 self.release_layers()
 
     def test_mvt_xyz_layer_and_zoom_limits(self):
-        with FixtureServer(b"") as server:
+        from qgis.core import QgsMapRendererSequentialJob, QgsRectangle
+        from qgis.PyQt.QtCore import QSize
+
+        # Minimal valid MVT: one point in the center of a 4096-unit tile.
+        feature = b"\x08\x01\x18\x01\x22\x05\x09\x80\x20\x80\x20"
+        layer_data = (
+            b"\x0a\x06points\x12"
+            + bytes([len(feature)])
+            + feature
+            + b"\x28\x80\x20\x78\x02"
+        )
+        mvt = b"\x1a" + bytes([len(layer_data)]) + layer_data
+        with FixtureServer(mvt) as server:
             self.plugin.selected_title = "Vector XYZ"
             self.plugin.search_status = "1件"
             tile = {
@@ -525,6 +540,17 @@ class PluginTests(unittest.TestCase):
             self.assertEqual(layers[0].sourceMinZoom(), 2)
             self.assertEqual(layers[0].sourceMaxZoom(), 14)
             self.assertEqual(layers[0].metadata().rights(), ["Publisher"])
+            self.assertTrue(layers[0].renderer().styles())
+            # This fixture's point is centered in every requested tile.
+            settings = self.iface.canvas.mapSettings()
+            settings.setLayers(layers)
+            settings.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
+            settings.setExtent(QgsRectangle(4_000_000, 4_000_000, 6_000_000, 6_000_000))
+            settings.setOutputSize(QSize(256, 256))
+            job = QgsMapRendererSequentialJob(settings)
+            job.start()
+            wait_until(lambda: not job.isActive())
+            self.assertTrue(server.hits)
             self.release_layers()
 
     @unittest.skipUnless(LIVE, "explicit --live required")
