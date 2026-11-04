@@ -44,6 +44,12 @@ print(
 )
 if os.environ.get("RHINESTONE_QGIS_MAJOR"):
     assert Qgis.QGIS_VERSION_INT // 10000 == int(os.environ["RHINESTONE_QGIS_MAJOR"])
+if os.environ.get("RHINESTONE_QGIS_VERSION"):
+    expected = tuple(
+        int(part) for part in os.environ["RHINESTONE_QGIS_VERSION"].split(".")
+    )
+    actual = (Qgis.QGIS_VERSION_INT // 10000, Qgis.QGIS_VERSION_INT // 100 % 100)
+    assert actual[: len(expected)] == expected, (Qgis.QGIS_VERSION, expected)
 if Qgis.QGIS_VERSION_INT >= 40000:
     assert QT_VERSION_STR.startswith("6.")
 if os.environ.get("RHINESTONE_FONT"):
