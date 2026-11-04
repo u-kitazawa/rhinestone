@@ -25,7 +25,7 @@ from qgis.core import (
     QgsProject,
 )
 from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas
-from qgis.PyQt.QtCore import QT_VERSION_STR, Qt, QTimer
+from qgis.PyQt.QtCore import QT_VERSION_STR, QEvent, Qt, QTimer
 from qgis.PyQt.QtGui import QColor, QImage
 from qgis.PyQt.QtTest import QTest
 from qgis.PyQt.QtWidgets import QMainWindow, QPushButton
@@ -191,9 +191,14 @@ class PluginTests(unittest.TestCase):
 
     def tearDown(self):
         self.plugin.unload()
+        self.iface.canvas.stopRendering()
+        self.iface.canvas.setLayers([])
         QgsProject.instance().removeAllMapLayers()
         self.iface.window.close()
+        self.iface.window.deleteLater()
+        APP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         APP.processEvents()
+        del self.plugin, self.iface
 
     def test_metadata_allows_qgis3_and_qgis4(self):
         metadata = configparser.ConfigParser()
@@ -608,4 +613,8 @@ class PluginTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    program = unittest.main(exit=False)
+    APP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    APP.processEvents()
+    APP.exitQgis()
+    sys.exit(not program.result.wasSuccessful())
