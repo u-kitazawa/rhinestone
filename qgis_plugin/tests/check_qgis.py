@@ -148,6 +148,7 @@ def vector_fixture(path, driver, names=("points",)):
     data = ogr.GetDriverByName(driver).CreateDataSource(str(path))
     crs = osr.SpatialReference()
     crs.ImportFromEPSG(4326)
+    crs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
     for name in names:
         layer = data.CreateLayer(name, crs, ogr.wkbPoint)
         layer.CreateField(ogr.FieldDefn("name", ogr.OFTString))
@@ -324,6 +325,7 @@ class PluginTests(unittest.TestCase):
         with FixtureServer(data) as server:
             uri = server.url + "/selected"
             selected = portable(uri, format, options)
+            self.plugin.results.clear()
             self.plugin.searched(
                 {
                     "rows": [
