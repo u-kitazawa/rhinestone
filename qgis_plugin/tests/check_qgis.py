@@ -25,10 +25,11 @@ from qgis.core import (
     QgsProject,
 )
 from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QT_VERSION_STR, QEvent, Qt, QTimer
 from qgis.PyQt.QtGui import QColor, QImage
 from qgis.PyQt.QtTest import QTest
-from qgis.PyQt.QtWidgets import QMainWindow, QPushButton
+from qgis.PyQt.QtWidgets import QMainWindow
 
 ROOT = Path(os.environ["RHINESTONE_PLUGIN_DIR"])
 sys.path.insert(0, str(ROOT.parent))
@@ -188,10 +189,13 @@ class PluginTests(unittest.TestCase):
         self.plugin.show()
         self.iface.window.show()
         APP.processEvents()
+        wait_until(lambda: not self.plugin.busy())
+        self.assertTrue(self.plugin.catalog_loaded, self.plugin.status.text())
 
     def tearDown(self):
         self.plugin.unload()
         self.iface.canvas.stopRendering()
+        sip.delete(self.iface.bridge)
         self.iface.canvas.setLayers([])
         QgsProject.instance().removeAllMapLayers()
         self.iface.window.close()
@@ -222,16 +226,15 @@ class PluginTests(unittest.TestCase):
             {"rows": [row("a", reason="未対応")], "diagnostics": diagnostics}
         )
         self.assertIn("一部", self.plugin.status.text())
-        self.assertFalse(
+        self.assertTrue(
             self.plugin.results.item(0).flags() & Qt.ItemFlag.ItemIsSelectable
         )
         self.assertIsNone(self.plugin.results.currentItem())
         self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
-        self.assertEqual(
-            [b.text() for b in self.plugin.dock.findChildren(QPushButton)], ["検索"]
-        )
+        self.assertEqual(self.plugin.add_button.text(), "選択したデータを追加")
+        self.assertFalse(self.plugin.add_button.isEnabled())
 
-    def test_single_click_uses_exact_resource(self):
+    def test_click_shows_details_and_add_button_uses_exact_resource(self):
         self.plugin.searched({"rows": [row("first"), row("second")], "diagnostics": []})
         captured = []
         with patch.object(
@@ -245,8 +248,81 @@ class PluginTests(unittest.TestCase):
                 Qt.MouseButton.LeftButton,
                 pos=self.plugin.results.visualItemRect(item).center(),
             )
+            self.assertEqual(captured, [])
+            self.assertIn("second", self.plugin.details.toPlainText())
+            self.assertTrue(self.plugin.add_button.isEnabled())
+            QTest.keyClick(self.plugin.results, Qt.Key.Key_Return)
+            self.assertEqual(captured, [])
+            QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
         self.assertEqual(len(captured), 1)
         self.assertEqual(captured[0]["resource"]["uri"], "second")
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_search_controls_forward_parameters_and_provider_selection(self):
+        captured = []
+        for action in self.plugin.provider_actions:
+            action.setChecked(action.data() == "geospatial-jp")
+        for action in self.plugin.format_actions:
+            action.setChecked(action.data() in {"geojson", "gpkg"})
+        self.plugin.area.setText("横浜市")
+        self.plugin.start_time.setText("2026-01-01T00:00:00+09:00")
+        self.plugin.limit.setValue(7)
+        with patch.object(
+            self.plugin,
+            "start",
+            side_effect=lambda request, callback: captured.append(request),
+        ):
+            QTest.mouseClick(self.plugin.button, Qt.MouseButton.LeftButton)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(
+            captured[0]["conditions"],
+            {
+                "text": None,
+                "area": "横浜市",
+                "bbox": None,
+                "time": ["2026-01-01T00:00:00+09:00", None],
+                "format": ["geojson", "gpkg"],
+                "limit": 7,
+                "providers": ["geospatial-jp"],
+            },
+        )
+
+    def test_empty_providers_and_conflicting_spatial_conditions_are_visible(self):
+        with patch.object(self.plugin, "start") as start:
+            for action in self.plugin.provider_actions:
+                action.setChecked(False)
+            self.plugin.search()
+            self.assertIn("提供元", self.plugin.status.text())
+            self.plugin.provider_actions[0].setChecked(True)
+            self.plugin.area.setText("横浜市")
+            self.plugin.bbox.setText("138,35,140,37")
+            self.plugin.search()
+            self.assertIn("どちらか", self.plugin.status.text())
+            start.assert_not_called()
+
+    def test_unsupported_details_are_readable_and_result_filter_does_not_add(self):
+        selected = row("https://example.org/park", title="公園")
+        selected["resource"]["metadata"] = {
+            "description": "公園の位置と設備",
+            "publisher": "横浜市",
+            "license": "CC BY 4.0",
+            "updated_at": "2026-01-01",
+        }
+        unsupported = row(
+            "https://example.org/unknown", title="未対応データ", reason="形式が不明です"
+        )
+        self.plugin.searched({"rows": [selected, unsupported], "diagnostics": []})
+        self.plugin.results.setCurrentRow(0)
+        text = self.plugin.details.toPlainText()
+        for expected in ("公園の位置と設備", "横浜市", "CC BY 4.0", "2026-01-01"):
+            self.assertIn(expected, text)
+        self.plugin.results.setCurrentRow(1)
+        self.assertIn("形式が不明", self.plugin.details.toPlainText())
+        self.assertFalse(self.plugin.add_button.isEnabled())
+        self.plugin.result_filter.setText("設備")
+        self.assertFalse(self.plugin.results.item(0).isHidden())
+        self.assertTrue(self.plugin.results.item(1).isHidden())
+        self.assertIsNone(self.plugin.selected_row)
         self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
 
     def test_invalid_layer_is_not_added(self):
@@ -351,6 +427,9 @@ class PluginTests(unittest.TestCase):
                 Qt.MouseButton.LeftButton,
                 pos=self.plugin.results.visualItemRect(item).center(),
             )
+            self.assertFalse(self.plugin.busy())
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+            QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
             wait_until(lambda: not self.plugin.busy())
             self.assertIn("追加しました", self.plugin.status.text())
             self.assertEqual(server.hits, ["/selected"])
@@ -583,6 +662,8 @@ class PluginTests(unittest.TestCase):
             Qt.MouseButton.LeftButton,
             pos=self.plugin.results.visualItemRect(selected).center(),
         )
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+        QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
         wait_until(lambda: not self.plugin.busy())
         layers = list(QgsProject.instance().mapLayers().values())
         self.assertEqual(len(layers), 1, self.plugin.status.text())
@@ -613,7 +694,7 @@ class PluginTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    program = unittest.main(exit=False)
+    program = unittest.main(verbosity=2, exit=False)
     APP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     APP.processEvents()
     APP.exitQgis()

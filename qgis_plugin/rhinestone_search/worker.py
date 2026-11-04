@@ -7,6 +7,7 @@ import shutil
 import sys
 import zipfile
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 from urllib.request import urlopen
@@ -14,7 +15,10 @@ from urllib.request import urlopen
 # -I -S excludes user/system site packages. Never alter QGIS's import paths.
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 
-from rhinestone import AccessPlan, ProviderId, Resource, configure, search  # noqa: E402
+from rhinestone import AccessPlan, Format, ProviderId, Resource, configure, search
+from rhinestone.catalogs import BUILTIN
+from rhinestone.errors import ConfigValidationError
+from rhinestone.models import SearchQuery  # noqa: E402
 
 MAX_BYTES = 512 * 1024 * 1024
 MAX_UNPACKED_BYTES = 1024 * 1024 * 1024
@@ -189,17 +193,71 @@ def unpack(path, plan):
     return directory
 
 
-def execute(request):
-    if request["action"] == "search":
-        results = search(
-            providers=[
-                ProviderId.SEARCH_CKAN_JP,
-                ProviderId.GEOSPATIAL_JP,
-                ProviderId.GSI,
-            ],
-            text=request["text"],
-            limit=20,
+PROVIDER_LABELS = {
+    "search-ckan-jp": "search.ckan.jp",
+    "geospatial-jp": "G空間情報センター",
+    "gsi": "国土地理院",
+    "plateau": "PLATEAU",
+    "mlit-dpf": "国土交通DPF",
+    "odpt": "公共交通オープンデータ",
+    "jaxa-gsmap-preview": "JAXA GSMaP（プレビュー）",
+    "jaxa-aw3d-preview": "JAXA AW3D（プレビュー）",
+    "jaxa-hrlulc-preview": "JAXA 土地被覆（プレビュー）",
+}
+
+
+def search_conditions(values):
+    try:
+        dates = values.get("time")
+        query = SearchQuery(
+            text=values.get("text") or None,
+            area=values.get("area") or None,
+            bbox=tuple(values["bbox"]) if values.get("bbox") is not None else None,
+            time=tuple(
+                datetime.fromisoformat(v.replace("Z", "+00:00")) if v else None
+                for v in dates
+            )
+            if dates
+            else None,
+            format=tuple(Format(v) for v in values["format"])
+            if values.get("format")
+            else None,
+            limit=values.get("limit"),
+            providers=values["providers"],
         )
+    except (ValueError, TypeError, KeyError) as error:
+        raise DownloadError(
+            "検索条件を確認してください（日時はISO8601、bboxは西・南・東・北の4数値）"
+        ) from error
+    except ConfigValidationError as error:
+        raise DownloadError("検索条件が不正です: " + str(error)) from error
+    return query
+
+
+def execute(request):
+    if request["action"] == "catalog":
+        return {
+            "providers": [
+                {
+                    "id": p.id,
+                    "label": PROVIDER_LABELS.get(p.id, p.id),
+                    "default": p.id
+                    in {
+                        ProviderId.SEARCH_CKAN_JP,
+                        ProviderId.GEOSPATIAL_JP,
+                        ProviderId.GSI,
+                    },
+                }
+                for p in BUILTIN
+            ],
+            "formats": [{"id": f.value, "label": f.value} for f in Format],
+        }
+    if request["action"] == "search":
+        query = search_conditions(request["conditions"])
+        try:
+            results = search(query)
+        except ConfigValidationError as error:
+            raise DownloadError("検索条件が不正です: " + str(error)) from error
         rows = []
         app = configure()
         for resource in results:
@@ -214,6 +272,15 @@ def execute(request):
                     "resource": resource.to_dict(),
                     "title": resource.title,
                     "provider": resource.metadata.publisher or resource.discovered_by,
+                    "source_id": resource.discovered_by,
+                    "skipped_conditions": sorted(
+                        {
+                            condition
+                            for d in results.diagnostics
+                            if d.source_id == resource.discovered_by
+                            for condition in d.skipped_conditions
+                        }
+                    ),
                     "format": "XYZタイル"
                     if plan and "tile" in plan.options
                     else resource.format or "不明",
@@ -227,6 +294,9 @@ def execute(request):
                 "provider": d.source_id,
                 "reason": d.reason,
                 "failure_type": d.failure_type,
+                "skipped_conditions": sorted(d.skipped_conditions),
+                "missing_conditions": sorted(d.missing_conditions),
+                "detail": d.detail,
             }
             for d in results.diagnostics
         ]

@@ -1,7 +1,7 @@
 [general]
 name=Rhinestone Search
-description=国内公開データを検索し、選択だけで地図に追加
-about=Local keyword search using Rhinestone Core. OGR/GDAL vector, raster, table and ZIP deliveries.
+description=地域・提供元・形式で公開データを検索し、詳細を確認して地図に追加
+about=Filtered search and metadata inspection using Rhinestone Core. OGR/GDAL vector, raster, table and ZIP deliveries.
 version=0.1.0
 qgisMinimumVersion=3.34
 qgisMaximumVersion=4.99

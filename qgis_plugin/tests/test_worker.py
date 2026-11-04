@@ -11,7 +11,7 @@ import pytest
 
 from rhinestone import AccessPlan, Reference, configure
 from rhinestone.catalogs import BUILTIN
-from rhinestone.models import SearchDiagnostic
+from rhinestone.models import SearchDiagnostic, SearchQuery
 from rhinestone.search import SearchResults
 
 SPEC = importlib.util.spec_from_file_location(
@@ -19,6 +19,19 @@ SPEC = importlib.util.spec_from_file_location(
 )
 worker = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(worker)
+
+
+def conditions(text="公園", **values):
+    return {
+        "text": text,
+        "limit": 20,
+        "providers": [
+            worker.ProviderId.SEARCH_CKAN_JP,
+            worker.ProviderId.GEOSPATIAL_JP,
+            worker.ProviderId.GSI,
+        ],
+        **values,
+    }
 
 
 def resource(uri="https://example.org/data.json", format="geojson", **options):
@@ -39,22 +52,24 @@ def test_search_preserves_selected_identity_and_diagnostics(monkeypatch):
         ),
     )
 
-    def search(**kwargs):
-        assert kwargs == {
-            "providers": [
-                worker.ProviderId.SEARCH_CKAN_JP,
-                worker.ProviderId.GEOSPATIAL_JP,
-                worker.ProviderId.GSI,
-            ],
-            "text": "公園",
-            "limit": 20,
-        }
+    def search(query):
+        assert query == SearchQuery(
+            **{
+                "providers": [
+                    worker.ProviderId.SEARCH_CKAN_JP,
+                    worker.ProviderId.GEOSPATIAL_JP,
+                    worker.ProviderId.GSI,
+                ],
+                "text": "公園",
+                "limit": 20,
+            }
+        )
         return SearchResults.from_grouped(
             {"test": (unknown, first, second)}, diagnostics
         )
 
     monkeypatch.setattr(worker, "search", search)
-    result = worker.execute({"action": "search", "text": "公園"})
+    result = worker.execute({"action": "search", "conditions": conditions()})
     assert [r["resource"]["uri"] for r in result["rows"]] == [
         first.uri,
         second.uri,
@@ -226,10 +241,12 @@ def test_size_limit_cleans_partial_file(monkeypatch, tmp_path):
 
 def test_main_sanitizes_network_failure(monkeypatch, capsys):
     monkeypatch.setattr(
-        worker.sys, "stdin", io.StringIO('{"action":"search","text":"公園"}')
+        worker.sys,
+        "stdin",
+        io.StringIO(json.dumps({"action": "search", "conditions": conditions()})),
     )
 
-    def fail(**kwargs):
+    def fail(*args, **kwargs):
         raise OSError("https://secret@example.org/private")
 
     monkeypatch.setattr(worker, "search", fail)
@@ -239,7 +256,7 @@ def test_main_sanitizes_network_failure(monkeypatch, capsys):
 
 def test_planning_failure_is_disabled(monkeypatch):
     monkeypatch.setattr(
-        worker, "search", lambda **kw: SearchResults({"test": (resource(),)})
+        worker, "search", lambda *args, **kw: SearchResults({"test": (resource(),)})
     )
 
     def fail(value):
@@ -248,7 +265,9 @@ def test_planning_failure_is_disabled(monkeypatch):
     monkeypatch.setattr(worker, "configure", lambda: SimpleNamespace(plan=fail))
     assert (
         "ValueError"
-        in worker.execute({"action": "search", "text": "公園"})["rows"][0]["reason"]
+        in worker.execute({"action": "search", "conditions": conditions()})["rows"][0][
+            "reason"
+        ]
     )
 
 
@@ -315,3 +334,84 @@ def test_any_provider_xyz_template_is_recognized_without_filename_guess_for_file
     assert plan.options["tile"]["format"] == format
     assert "min_zoom" not in plan.options["tile"]
     assert plan.uri == selected.uri
+
+
+def test_catalog_exposes_all_builtin_providers_and_search_formats():
+    result = worker.execute({"action": "catalog"})
+    assert {p["id"] for p in result["providers"]} == {p.id for p in BUILTIN}
+    assert any(
+        p["id"] == worker.ProviderId.GSI and p["default"] for p in result["providers"]
+    )
+    assert "geojson" in {f["id"] for f in result["formats"]}
+
+
+def test_search_forwards_area_formats_time_limit_and_selected_providers(monkeypatch):
+    from datetime import datetime
+
+    from rhinestone import Format
+
+    captured = []
+
+    def search(query):
+        captured.append(query)
+        return SearchResults({})
+
+    monkeypatch.setattr(worker, "search", search)
+    worker.execute(
+        {
+            "action": "search",
+            "conditions": conditions(
+                None,
+                area="横浜市",
+                format=["geojson", "gpkg"],
+                time=["2026-01-01T00:00:00+09:00", None],
+                limit=7,
+                providers=[worker.ProviderId.GEOSPATIAL_JP],
+            ),
+        }
+    )
+    assert captured == [
+        SearchQuery(
+            text=None,
+            area="横浜市",
+            format=(Format.GEOJSON, Format.GPKG),
+            time=(datetime.fromisoformat("2026-01-01T00:00:00+09:00"), None),
+            limit=7,
+            providers=[worker.ProviderId.GEOSPATIAL_JP],
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"area": "横浜市", "bbox": [138, 35, 140, 37]},
+        {"bbox": [138, 35, 140]},
+        {"time": ["not-a-date", None]},
+        {"time": ["2026-01-02", "2026-01-01"]},
+        {"format": ["not-a-format"]},
+        {"bbox": [float("nan"), 35, 140, 37]},
+    ],
+)
+def test_invalid_search_conditions_fail_before_network(monkeypatch, values):
+    def fail(*args, **kwargs):
+        pytest.fail("Invalid conditions must not reach the provider search")
+
+    monkeypatch.setattr(worker, "search", fail)
+    with pytest.raises(worker.DownloadError, match="検索条件"):
+        worker.execute({"action": "search", "conditions": conditions(**values)})
+
+
+def test_bbox_and_open_ended_time_are_converted_without_guessing():
+    query = worker.search_conditions(
+        conditions(
+            None,
+            bbox=[138, 35, 140, 37],
+            time=[None, "2026-01-01T00:00:00Z"],
+            limit=None,
+        )
+    )
+    assert query.bbox == (138, 35, 140, 37)
+    assert query.time[0] is None
+    assert query.time[1].utcoffset().total_seconds() == 0
+    assert query.limit is None

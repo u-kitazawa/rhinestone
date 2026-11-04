@@ -27,11 +27,17 @@ from qgis.PyQt.QtCore import QProcess, QStandardPaths, Qt, QTimer
 from qgis.PyQt.QtGui import QAction, QColor
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
+    QFormLayout,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTextBrowser,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -84,6 +90,9 @@ class RhinestonePlugin:
         self.scan_task = None
         self.pending_directory = None
         self.closed = False
+        self.selected_row = None
+        self.catalog_loaded = False
+        self.diagnostic_text = ""
 
     def initGui(self):
         self.action = QAction("Rhinestone Search", self.iface.mainWindow())
@@ -94,41 +103,227 @@ class RhinestonePlugin:
         if self.dock is None:
             self.dock = QDockWidget("Rhinestone Search", self.iface.mainWindow())
             self.dock.setObjectName("RhinestoneSearch")
-            self.dock.setMinimumWidth(360)
+            self.dock.setMinimumWidth(440)
             panel = QWidget()
             layout = QVBoxLayout(panel)
+            self.search_controls = QWidget()
+            form = QFormLayout(self.search_controls)
             self.query = QLineEdit()
-            self.query.setPlaceholderText("河川、公園…")
+            self.query.setPlaceholderText("河川、公園…（省略可）")
             self.query.setAccessibleName("検索キーワード")
+            self.area = QLineEdit()
+            self.area.setPlaceholderText("神奈川県、横浜市、行政区域コードなど")
+            self.area.setAccessibleName("地域名")
+            self.providers_button = QToolButton()
+            self.providers_button.setMenu(QMenu(self.providers_button))
+            self.providers_button.setPopupMode(
+                QToolButton.ToolButtonPopupMode.InstantPopup
+            )
+            self.formats_button = QToolButton()
+            self.formats_button.setMenu(QMenu(self.formats_button))
+            self.formats_button.setPopupMode(
+                QToolButton.ToolButtonPopupMode.InstantPopup
+            )
+            self.provider_actions = []
+            self.format_actions = []
+            self.providers_button.setText("提供元を読み込み中…")
+            self.formats_button.setText("形式: すべて")
+            form.addRow("キーワード", self.query)
+            form.addRow("地域（area）", self.area)
+            form.addRow("提供元", self.providers_button)
+            form.addRow("形式（複数可）", self.formats_button)
+            advanced_button = QToolButton()
+            advanced_button.setText("期間・範囲・件数")
+            advanced_button.setCheckable(True)
+            form.addRow(advanced_button)
+            self.advanced = QWidget()
+            extra = QFormLayout(self.advanced)
+            extra.setContentsMargins(0, 0, 0, 0)
+            self.start_time = QLineEdit()
+            self.end_time = QLineEdit()
+            for control in (self.start_time, self.end_time):
+                control.setPlaceholderText("2026-01-01T00:00:00+09:00（省略可）")
+            self.bbox = QLineEdit()
+            self.bbox.setPlaceholderText("西,南,東,北（経度・緯度）。areaと併用不可")
+            self.extent_button = QPushButton("現在の表示範囲を使う")
+            self.extent_button.clicked.connect(self.use_extent)
+            self.limit = QSpinBox()
+            self.limit.setRange(0, 1000)
+            self.limit.setSpecialValueText("提供元の既定")
+            self.limit.setValue(20)
+            extra.addRow("開始日時", self.start_time)
+            extra.addRow("終了日時", self.end_time)
+            extra.addRow("範囲（bbox）", self.bbox)
+            extra.addRow(self.extent_button)
+            extra.addRow("件数（提供元ごと）", self.limit)
+            form.addRow(self.advanced)
+            self.advanced.hide()
+            advanced_button.toggled.connect(self.advanced.setVisible)
             self.button = QPushButton("検索")
-            self.status = QLabel("キーワードを入力して検索")
+            form.addRow(self.button)
+            layout.addWidget(self.search_controls)
+            self.status = QLabel("キーワードや地域を指定して検索")
             self.status.setWordWrap(True)
             self.status.setTextFormat(Qt.TextFormat.PlainText)
+            layout.addWidget(self.status)
+            self.result_filter = QLineEdit()
+            self.result_filter.setPlaceholderText(
+                "検索結果の名称・説明・提供者で絞り込み"
+            )
+            self.result_filter.textChanged.connect(self.filter_results)
+            layout.addWidget(self.result_filter)
+            splitter = QSplitter(Qt.Orientation.Vertical)
             self.results = QListWidget()
             self.results.setWordWrap(True)
-            self.results.setAccessibleName("検索結果：選択で地図へ追加")
-            for widget in (self.query, self.button, self.status, self.results):
-                layout.addWidget(widget)
+            self.results.setAccessibleName("検索結果：選択で詳細を表示")
+            self.details = QTextBrowser()
+            self.details.setPlaceholderText(
+                "結果を選ぶと、説明・更新日・ライセンス・配布URIを表示します"
+            )
+            splitter.addWidget(self.results)
+            splitter.addWidget(self.details)
+            layout.addWidget(splitter)
+            self.add_button = QPushButton("選択したデータを追加")
+            self.add_button.setEnabled(False)
+            self.add_button.clicked.connect(self.add_selected)
+            layout.addWidget(self.add_button)
             self.dock.setWidget(panel)
-            self.query.returnPressed.connect(self.search)
+            for edit in (
+                self.query,
+                self.area,
+                self.bbox,
+                self.start_time,
+                self.end_time,
+            ):
+                edit.returnPressed.connect(self.search)
             self.button.clicked.connect(self.search)
-            self.results.itemClicked.connect(self.select)
-            self.results.itemActivated.connect(self.select)
+            self.results.currentItemChanged.connect(self.select)
             self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
         self.dock.show()
         self.query.setFocus()
+        if not self.catalog_loaded and not self.busy():
+            self.start({"action": "catalog"}, self.catalog_ready)
+
+    def catalog_ready(self, catalog):
+        for button, storage, values in (
+            (self.providers_button, self.provider_actions, catalog["providers"]),
+            (self.formats_button, self.format_actions, catalog["formats"]),
+        ):
+            button.menu().clear()
+            storage.clear()
+            for value in values:
+                action = QAction(value["label"], button.menu())
+                action.setCheckable(True)
+                action.setChecked(value.get("default", False))
+                action.setData(value["id"])
+                action.toggled.connect(self.update_filter_labels)
+                button.menu().addAction(action)
+                storage.append(action)
+        self.catalog_loaded = True
+        self.update_filter_labels()
+        self.status.setText("キーワードや地域を指定して検索")
+
+    def update_filter_labels(self, *_args):
+        providers = [a.text() for a in self.provider_actions if a.isChecked()]
+        formats = [a.text() for a in self.format_actions if a.isChecked()]
+        self.providers_button.setText(
+            "、".join(providers)
+            if 0 < len(providers) <= 2
+            else f"{len(providers)}件の提供元を選択"
+            if providers
+            else "提供元を選んでください"
+        )
+        self.providers_button.setToolTip("\n".join(providers))
+        self.formats_button.setText(
+            "、".join(formats)
+            if 0 < len(formats) <= 2
+            else f"{len(formats)}形式を選択"
+            if formats
+            else "すべて"
+        )
+        self.formats_button.setToolTip("\n".join(formats))
+
+    def use_extent(self):
+        canvas = self.iface.mapCanvas()
+        from qgis.core import QgsCoordinateReferenceSystem
+
+        transform = QgsCoordinateTransform(
+            canvas.mapSettings().destinationCrs(),
+            QgsCoordinateReferenceSystem("EPSG:4326"),
+            QgsProject.instance(),
+        )
+        extent = transform.transformBoundingBox(canvas.extent())
+        self.bbox.setText(
+            ", ".join(
+                str(v)
+                for v in (
+                    extent.xMinimum(),
+                    extent.yMinimum(),
+                    extent.xMaximum(),
+                    extent.yMaximum(),
+                )
+            )
+        )
+        self.area.clear()
+
+    def update_controls(self):
+        available = not self.busy()
+        self.search_controls.setEnabled(available)
+        self.results.setEnabled(available)
+        self.result_filter.setEnabled(available)
+        self.add_button.setEnabled(
+            available
+            and self.selected_row is not None
+            and not self.selected_row.get("reason")
+        )
 
     def busy(self):
         return self.process is not None or self.scan_task is not None
 
     def search(self):
-        text = self.query.text().strip()
-        if not text or self.busy():
+        if self.busy():
             return
+        providers = [a.data() for a in self.provider_actions if a.isChecked()]
+        if not providers:
+            self.status.setText("提供元を1件以上選択してください")
+            return
+        if self.area.text().strip() and self.bbox.text().strip():
+            self.status.setText(
+                "地域名（area）と範囲（bbox）はどちらか一方を指定してください"
+            )
+            return
+        try:
+            bbox = (
+                [float(v.strip()) for v in self.bbox.text().split(",")]
+                if self.bbox.text().strip()
+                else None
+            )
+            if bbox is not None and len(bbox) != 4:
+                raise ValueError()
+        except ValueError:
+            self.status.setText("bboxは西・南・東・北の4数値をカンマで区切ってください")
+            return
+        conditions = {
+            "text": self.query.text().strip() or None,
+            "area": self.area.text().strip() or None,
+            "bbox": bbox,
+            "time": [
+                self.start_time.text().strip() or None,
+                self.end_time.text().strip() or None,
+            ],
+            "format": [a.data() for a in self.format_actions if a.isChecked()],
+            "limit": self.limit.value() or None,
+            "providers": providers,
+        }
+        if not any(conditions["time"]):
+            conditions["time"] = None
         self.results.clear()
+        self.selected_row = None
+        self.details.clear()
+        self.result_filter.clear()
         self.search_status = ""
         self.status.setText("検索中…")
-        self.start({"action": "search", "text": text}, self.searched)
+        self.start({"action": "search", "conditions": conditions}, self.searched)
 
     def start(self, request, completed):
         try:
@@ -146,8 +341,7 @@ class RhinestonePlugin:
             self.operation = request["action"]
             process = QProcess(self.dock)
             self.process = process
-            self.button.setEnabled(False)
-            self.results.setEnabled(False)
+            self.update_controls()
             process.setProgram(executable)
             process.setArguments(["-I", "-S", str(root / "worker.py")])
             process.finished.connect(
@@ -182,7 +376,9 @@ class RhinestonePlugin:
                 raise ValueError("worker failed")
             message = json.loads(bytes(process.readAllStandardOutput()).decode("utf-8"))
             if not message["ok"]:
-                phase = "検索失敗" if self.operation == "search" else "追加失敗"
+                phase = {"search": "検索失敗", "catalog": "初期化失敗"}.get(
+                    self.operation, "追加失敗"
+                )
                 self.status.setText(f"{phase}: 通信・データ処理 ({message['error']})")
                 self.cleanup_pending()
             else:
@@ -195,8 +391,7 @@ class RhinestonePlugin:
 
     def reset(self, process):
         self.process = None
-        self.button.setEnabled(self.scan_task is None)
-        self.results.setEnabled(self.scan_task is None)
+        self.update_controls()
         process.deleteLater()
 
     def searched(self, result):
@@ -215,16 +410,47 @@ class RhinestonePlugin:
             prefix += f" / 診断{len(diagnostics)}件"
         self.search_status = prefix
         self.status.setText(prefix)
-        self.status.setToolTip(
-            "\n".join(
-                f"{d['provider']}: {d['reason']} ({d['failure_type'] or '-'})"
-                for d in diagnostics
+        labels = {
+            "unsupported": "指定条件に未対応",
+            "missing_required": "必須条件が不足",
+            "area_resolution_failed": "地域を特定できません",
+            "provider_failure": "提供元の検索失敗",
+            "item_skipped": "一部の配布を除外",
+        }
+        self.diagnostic_text = "\n".join(
+            f"{d['provider']}: {labels.get(d['reason'], d['reason'])} "
+            + (
+                "（条件: "
+                + ", ".join(
+                    d.get("skipped_conditions", []) + d.get("missing_conditions", [])
+                )
+                + "）"
+                if d.get("skipped_conditions") or d.get("missing_conditions")
+                else ""
             )
+            + (f" / {d['failure_type']}" if d.get("failure_type") else "")
+            for d in diagnostics
+        )
+        self.status.setToolTip(self.diagnostic_text)
+        self.details.setPlainText(
+            self.diagnostic_text or "結果を選ぶと詳細を表示します"
         )
         for index, row in enumerate(rows):
             suffix = f" — {row['reason']}" if row["reason"] else ""
+            if row.get("skipped_conditions"):
+                names = {
+                    "area": "地域",
+                    "bbox": "範囲",
+                    "time": "日時",
+                    "format": "形式",
+                    "text": "キーワード",
+                    "limit": "件数",
+                }
+                suffix += " / 条件未適用: " + "、".join(
+                    names.get(k, k) for k in row["skipped_conditions"]
+                )
             item = QListWidgetItem(
-                f"{index + 1}. {row['title']}\n{row['provider']} / {row['format']}{suffix}"
+                f"{index + 1}. {row['title']}\n{row['provider']} / {row.get('source_id', '')} / {row['format']}{suffix}"
             )
             item.setData(Qt.ItemDataRole.UserRole, row)
             resource = row["resource"]
@@ -232,22 +458,83 @@ class RhinestonePlugin:
                 f"{row['title']}\n{resource['uri']}\n"
                 + json.dumps(resource.get("reference", {}), ensure_ascii=False)
             )
-            if row["reason"]:
-                item.setFlags(
-                    item.flags()
-                    & ~Qt.ItemFlag.ItemIsEnabled
-                    & ~Qt.ItemFlag.ItemIsSelectable
-                )
             self.results.addItem(item)
         # Populating a list must never choose or add a Resource.
         self.results.setCurrentRow(-1)
         self.results.clearSelection()
+        self.filter_results()
+        self.update_controls()
 
-    def select(self, item):
+    def filter_results(self, *_args):
+        needle = self.result_filter.text().casefold().strip()
+        for index in range(self.results.count()):
+            item = self.results.item(index)
+            row = item.data(Qt.ItemDataRole.UserRole)
+            metadata = row["resource"].get("metadata", {})
+            text = " ".join(
+                str(v or "")
+                for v in (
+                    row["title"],
+                    row["provider"],
+                    row["format"],
+                    metadata.get("description"),
+                    metadata.get("license"),
+                )
+            )
+            item.setHidden(needle not in text.casefold())
+        current = self.results.currentItem()
+        if current is not None and current.isHidden():
+            self.results.setCurrentRow(-1)
+
+    def select(self, item, previous=None):
+        self.selected_row = (
+            item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        )
+        if self.selected_row is None:
+            self.details.setPlainText(
+                self.diagnostic_text or "結果を選ぶと詳細を表示します"
+            )
+            self.update_controls()
+            return
+        row = self.selected_row
+        resource = row["resource"]
+        metadata = resource.get("metadata", {})
+        discovery = resource.get("discovery") or {}
+        description = (
+            metadata.get("description")
+            or (discovery.get("metadata") or {}).get("description")
+            or "説明はありません"
+        )
+        reference = resource.get("reference", {})
+        plan = resource.get("access_plan") or {}
+        note = row.get("reason") or (
+            "配布物内の対応レイヤーをまとめて追加します"
+            if plan.get("options", {}).get("archive")
+            else "追加時にOGR/GDALまたはタイルレイヤーで読み込みます"
+        )
+        text = f"{row['title']}\n\n{description}\n\n" + "\n".join(
+            [
+                f"提供者: {metadata.get('publisher') or row['provider']}",
+                f"検索元: {row.get('source_id') or row['provider']}",
+                f"形式: {row['format']}",
+                f"更新日: {metadata.get('updated_at') or '記載なし'}",
+                f"ライセンス: {metadata.get('license') or '記載なし（配布元を確認してください）'}",
+                f"配布URI: {resource['uri']}",
+                f"データセットID: {reference.get('dataset_identifier') or '記載なし'}",
+                f"配布ID: {reference.get('resource_identifier') or '記載なし'}",
+                f"追加について: {note}",
+            ]
+        )
+        if self.diagnostic_text:
+            text += "\n\n検索条件・提供元の診断\n" + self.diagnostic_text
+        self.details.setPlainText(text)
+        self.update_controls()
+
+    def add_selected(self):
         if self.busy():
             return
-        row = item.data(Qt.ItemDataRole.UserRole)
-        if not row or row["reason"]:
+        row = self.selected_row
+        if not row or row.get("reason"):
             return
         cache = (
             Path(
@@ -281,8 +568,7 @@ class RhinestonePlugin:
         self.scan_paths = dataset_paths(result["path"])
         self.sublayers = []
         self.status.setText("OGR/GDALでデータを確認中…")
-        self.button.setEnabled(False)
-        self.results.setEnabled(False)
+        self.update_controls()
         self.scan_next(result)
 
     def add_tile(self, result):
@@ -345,6 +631,7 @@ class RhinestonePlugin:
             return
         task = QgsProviderSublayerTask(self.scan_paths.pop(0))
         self.scan_task = task
+        self.update_controls()
         task.taskCompleted.connect(lambda: self.scanned(task, result, True))
         task.taskTerminated.connect(lambda: self.scanned(task, result, False))
         QgsApplication.taskManager().addTask(task)
@@ -357,8 +644,7 @@ class RhinestonePlugin:
         if not success:
             self.status.setText("レイヤー追加失敗: データ確認を中止しました")
             self.cleanup_pending()
-            self.button.setEnabled(True)
-            self.results.setEnabled(True)
+            self.update_controls()
             return
         self.sublayers.extend(
             d for d in task.results() if d.providerKey() in {"ogr", "gdal"}
@@ -388,8 +674,7 @@ class RhinestonePlugin:
                 for prepared in layers:
                     sip.delete(prepared)
                 self.status.setText("レイヤー追加失敗: QGIS/OGR/GDALで開けません")
-                self.button.setEnabled(True)
-                self.results.setEnabled(True)
+                self.update_controls()
                 self.cleanup_pending()
                 return
             layer.setName(
@@ -408,8 +693,7 @@ class RhinestonePlugin:
                 "rhinestone/plan", json.dumps(result["plan"], ensure_ascii=False)
             )
             layers.append(layer)
-        self.button.setEnabled(True)
-        self.results.setEnabled(True)
+        self.update_controls()
         if not layers:
             self.status.setText(
                 "レイヤー追加失敗: 対応するOGR/GDALドライバー・レイヤーがありません"
