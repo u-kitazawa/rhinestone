@@ -34,6 +34,7 @@ from qgis.PyQt.QtWidgets import (
     QListWidgetItem,
     QMenu,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QSplitter,
     QTextBrowser,
@@ -161,7 +162,12 @@ class RhinestonePlugin:
             advanced_button.toggled.connect(self.advanced.setVisible)
             self.button = QPushButton("検索")
             form.addRow(self.button)
-            layout.addWidget(self.search_controls)
+            self.search_scroll = QScrollArea()
+            self.search_scroll.setWidgetResizable(True)
+            self.search_scroll.setWidget(self.search_controls)
+            self.search_scroll.setMaximumHeight(360)
+            self.search_scroll.setMinimumHeight(230)
+            layout.addWidget(self.search_scroll)
             self.status = QLabel("キーワードや地域を指定して検索")
             self.status.setWordWrap(True)
             self.status.setTextFormat(Qt.TextFormat.PlainText)
@@ -182,7 +188,7 @@ class RhinestonePlugin:
             )
             splitter.addWidget(self.results)
             splitter.addWidget(self.details)
-            layout.addWidget(splitter)
+            layout.addWidget(splitter, 1)
             self.add_button = QPushButton("選択したデータを追加")
             self.add_button.setEnabled(False)
             self.add_button.clicked.connect(self.add_selected)
@@ -215,6 +221,9 @@ class RhinestonePlugin:
                 action = QAction(value["label"], button.menu())
                 action.setCheckable(True)
                 action.setChecked(value.get("default", False))
+                if not value.get("searchable", True):
+                    action.setEnabled(False)
+                    action.setToolTip("検索には未対応です（直接参照専用）")
                 action.setData(value["id"])
                 action.toggled.connect(self.update_filter_labels)
                 button.menu().addAction(action)

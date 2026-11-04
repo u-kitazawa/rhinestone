@@ -343,6 +343,9 @@ def test_catalog_exposes_all_builtin_providers_and_search_formats():
         p["id"] == worker.ProviderId.GSI and p["default"] for p in result["providers"]
     )
     assert "geojson" in {f["id"] for f in result["formats"]}
+    assert not next(
+        p for p in result["providers"] if p["id"] == worker.ProviderId.ODPT
+    )["searchable"]
 
 
 def test_search_forwards_area_formats_time_limit_and_selected_providers(monkeypatch):

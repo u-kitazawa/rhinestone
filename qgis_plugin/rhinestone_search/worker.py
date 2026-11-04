@@ -16,6 +16,15 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 
 from rhinestone import AccessPlan, Format, ProviderId, Resource, configure, search
+from rhinestone.adapters.provider import (
+    GeospatialJpAdapter,
+    MlitDpfAdapter,
+    OdptAdapter,
+    PlateauAdapter,
+    SearchCkanJpAdapter,
+    StacAdapter,
+    StaticAdapter,
+)
 from rhinestone.catalogs import BUILTIN
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery  # noqa: E402
@@ -193,6 +202,16 @@ def unpack(path, plan):
     return directory
 
 
+PROVIDER_ADAPTERS = {
+    "geospatial-jp": GeospatialJpAdapter,
+    "plateau": PlateauAdapter,
+    "static": StaticAdapter,
+    "odpt": OdptAdapter,
+    "mlit-dpf": MlitDpfAdapter,
+    "search-ckan-jp": SearchCkanJpAdapter,
+    "stac": StacAdapter,
+}
+
 PROVIDER_LABELS = {
     "search-ckan-jp": "search.ckan.jp",
     "geospatial-jp": "G空間情報センター",
@@ -241,6 +260,9 @@ def execute(request):
                 {
                     "id": p.id,
                     "label": PROVIDER_LABELS.get(p.id, p.id),
+                    "searchable": callable(
+                        getattr(PROVIDER_ADAPTERS.get(p.adapter_type), "search", None)
+                    ),
                     "default": p.id
                     in {
                         ProviderId.SEARCH_CKAN_JP,
