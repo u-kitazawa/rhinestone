@@ -489,7 +489,7 @@ class PluginTests(unittest.TestCase):
                 self.assertEqual(len(layers), 1, self.plugin.status.text())
                 layer = layers[0]
                 parsed = QgsDataSourceUri()
-                parsed.setEncodedUri(layer.source().encode())
+                parsed.setEncodedUri(layer.source())
                 self.assertEqual(parsed.param("url"), template)
                 self.assertFalse((Path(directory) / "unused").exists())
                 settings = self.iface.canvas.mapSettings()
