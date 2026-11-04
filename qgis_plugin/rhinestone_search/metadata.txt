@@ -1,7 +1,7 @@
 [general]
 name=Rhinestone Search
 description=国内公開データを検索し、選択だけで地図に追加
-about=Local keyword search using Rhinestone Core. Initial format: GeoJSON.
+about=Local keyword search using Rhinestone Core. OGR/GDAL vector, raster, table and ZIP deliveries.
 version=0.1.0
 qgisMinimumVersion=3.34
 qgisMaximumVersion=4.99

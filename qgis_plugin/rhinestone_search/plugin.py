@@ -1,13 +1,27 @@
 """Minimal Qt UI. All network I/O and Core work happen outside the GUI process."""
 
 import json
+import os
 import platform
+import re
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
-from qgis.core import QgsCoordinateTransform, QgsProject, QgsVectorLayer
+from qgis.core import (
+    Qgis,
+    QgsApplication,
+    QgsCoordinateTransform,
+    QgsDataSourceUri,
+    QgsProject,
+    QgsProviderRegistry,
+    QgsProviderSublayerDetails,
+    QgsProviderSublayerTask,
+    QgsRasterLayer,
+    QgsVectorTileLayer,
+)
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QProcess, QStandardPaths, Qt, QTimer
 from qgis.PyQt.QtGui import QAction
 from qgis.PyQt.QtWidgets import (
@@ -31,11 +45,42 @@ def python_executable():
     raise RuntimeError("QGISに対応するPython実行ファイルが見つかりません")
 
 
+def dataset_paths(path):
+    """Use installed OGR/GDAL file filters to scan extracted distributions."""
+    root = Path(path)
+    if not root.is_dir() or root.suffix.lower() == ".gdb":
+        return [str(root)]
+    registry = QgsProviderRegistry.instance()
+    filters = registry.fileVectorFilters() + ";;" + registry.fileRasterFilters()
+    suffixes = {
+        "." + ext.lower() for ext in re.findall(r"\*\.([a-zA-Z0-9_]+)", filters)
+    }
+    paths = []
+    for directory, folders, files in os.walk(root):
+        folders[:] = sorted(f for f in folders if f != "__MACOSX")
+        for folder in folders[:]:
+            if folder.lower().endswith(".gdb"):
+                paths.append(str(Path(directory) / folder))
+                folders.remove(folder)
+        shapes = {
+            Path(f).stem.casefold() for f in files if Path(f).suffix.lower() == ".shp"
+        }
+        for file in sorted(files):
+            member = Path(directory) / file
+            if member.suffix.lower() not in suffixes:
+                continue
+            if member.suffix.lower() == ".dbf" and member.stem.casefold() in shapes:
+                continue
+            paths.append(str(member))
+    return paths
+
+
 class RhinestonePlugin:
     def __init__(self, iface):
         self.iface = iface
         self.dock = None
         self.process = None
+        self.scan_task = None
         self.pending_directory = None
         self.closed = False
 
@@ -72,9 +117,12 @@ class RhinestonePlugin:
         self.dock.show()
         self.query.setFocus()
 
+    def busy(self):
+        return self.process is not None or self.scan_task is not None
+
     def search(self):
         text = self.query.text().strip()
-        if not text or self.process is not None:
+        if not text or self.busy():
             return
         self.results.clear()
         self.search_status = ""
@@ -146,8 +194,8 @@ class RhinestonePlugin:
 
     def reset(self, process):
         self.process = None
-        self.button.setEnabled(True)
-        self.results.setEnabled(True)
+        self.button.setEnabled(self.scan_task is None)
+        self.results.setEnabled(self.scan_task is None)
         process.deleteLater()
 
     def searched(self, result):
@@ -195,7 +243,7 @@ class RhinestonePlugin:
         self.results.clearSelection()
 
     def select(self, item):
-        if self.process is not None:
+        if self.busy():
             return
         row = item.data(Qt.ItemDataRole.UserRole)
         if not row or row["reason"]:
@@ -220,17 +268,49 @@ class RhinestonePlugin:
             {
                 "action": "download",
                 "resource": row["resource"],
-                "target": str(self.pending_directory / "data.geojson"),
+                "target": str(self.pending_directory / "data"),
             },
             self.downloaded,
         )
 
     def downloaded(self, result):
-        layer = QgsVectorLayer(result["path"], self.selected_title, "ogr")
+        if "tile" in result:
+            self.add_tile(result)
+            return
+        self.scan_paths = dataset_paths(result["path"])
+        self.sublayers = []
+        self.status.setText("OGR/GDALでデータを確認中…")
+        self.button.setEnabled(False)
+        self.results.setEnabled(False)
+        self.scan_next(result)
+
+    def add_tile(self, result):
+        tile = result["tile"]
+        uri = QgsDataSourceUri()
+        for key, value in {
+            "type": "xyz",
+            "url": tile["url"],
+            "zmin": tile.get("min_zoom"),
+            "zmax": tile.get("max_zoom"),
+        }.items():
+            if value is not None:
+                uri.setParam(key, str(value))
+        encoded = bytes(uri.encodedUri()).decode("utf-8")
+        if tile["format"] in {"pbf", "mvt"}:
+            layer = QgsVectorTileLayer(encoded, self.selected_title)
+        else:
+            layer = QgsRasterLayer(encoded, self.selected_title, "wms")
         if not layer.isValid():
-            self.status.setText("レイヤー追加失敗: QGIS/OGRで開けません")
+            sip.delete(layer)
+            self.status.setText("レイヤー追加失敗: XYZタイルを開けません")
             self.cleanup_pending()
             return
+        metadata = layer.metadata()
+        metadata.setRights([tile.get("attribution", "")])
+        metadata.setAbstract(
+            "\n".join(tile.get(k, "") for k in ("coverage", "usage_notes", "usage_url"))
+        )
+        layer.setMetadata(metadata)
         layer.setCustomProperty(
             "rhinestone/resource", json.dumps(result["resource"], ensure_ascii=False)
         )
@@ -238,13 +318,99 @@ class RhinestonePlugin:
             "rhinestone/plan", json.dumps(result["plan"], ensure_ascii=False)
         )
         QgsProject.instance().addMapLayer(layer)
-        # QGIS's layer-tree bridge may change the canvas CRS on its queued
-        # first-layer update. Zoom only after that update has run.
-        QTimer.singleShot(0, lambda: self.zoom_to_layer(layer.id()))
-        # Files must outlive plugin unload and project save/reopen. Cache is retained.
+        # QGIS requests only visible tiles; never download a global tile pyramid.
+        self.cleanup_pending()
+        self.status.setText(
+            f"追加しました: {self.selected_title}（XYZタイル） / {self.search_status}"
+        )
+
+    def scan_next(self, result):
+        if not self.scan_paths:
+            self.add_sublayers(result)
+            return
+        task = QgsProviderSublayerTask(self.scan_paths.pop(0))
+        self.scan_task = task
+        task.taskCompleted.connect(lambda: self.scanned(task, result, True))
+        task.taskTerminated.connect(lambda: self.scanned(task, result, False))
+        QgsApplication.taskManager().addTask(task)
+
+    def scanned(self, task, result, success):
+        self.scan_task = None
+        if self.closed:
+            self.cleanup_pending()
+            return
+        if not success:
+            self.status.setText("レイヤー追加失敗: データ確認を中止しました")
+            self.cleanup_pending()
+            self.button.setEnabled(True)
+            self.results.setEnabled(True)
+            return
+        self.sublayers.extend(
+            d for d in task.results() if d.providerKey() in {"ogr", "gdal"}
+        )
+        self.scan_next(result)
+
+    def add_sublayers(self, result):
+        selector = result["plan"].get("options", {}).get("layer")
+        details = self.sublayers
+        if selector is not None:
+            details = [
+                d
+                for d in details
+                if (d.layerNumber() if isinstance(selector, int) else d.name())
+                == selector
+            ]
+        options = QgsProviderSublayerDetails.LayerOptions(
+            QgsProject.instance().transformContext()
+        )
+        layers = []
+        for detail in details:
+            layer = detail.toLayer(options)
+            if layer is None or not layer.isValid():
+                # Release all providers before deleting their files on Windows.
+                if layer is not None:
+                    sip.delete(layer)
+                for prepared in layers:
+                    sip.delete(prepared)
+                self.status.setText("レイヤー追加失敗: QGIS/OGR/GDALで開けません")
+                self.button.setEnabled(True)
+                self.results.setEnabled(True)
+                self.cleanup_pending()
+                return
+            layer.setName(
+                self.selected_title
+                if len(details) == 1
+                else f"{self.selected_title} — {detail.name()}"
+            )
+            encoding = result["plan"].get("options", {}).get("encoding")
+            if encoding and layer.type() == Qgis.LayerType.Vector:
+                layer.setProviderEncoding(encoding)
+            layer.setCustomProperty(
+                "rhinestone/resource",
+                json.dumps(result["resource"], ensure_ascii=False),
+            )
+            layer.setCustomProperty(
+                "rhinestone/plan", json.dumps(result["plan"], ensure_ascii=False)
+            )
+            layers.append(layer)
+        self.button.setEnabled(True)
+        self.results.setEnabled(True)
+        if not layers:
+            self.status.setText(
+                "レイヤー追加失敗: 対応するOGR/GDALドライバー・レイヤーがありません"
+            )
+            self.cleanup_pending()
+            return
+        QgsProject.instance().addMapLayers(layers)
+        spatial = next(
+            (layer for layer in layers if layer.isSpatial() and layer.crs().isValid()),
+            None,
+        )
+        if spatial is not None:
+            QTimer.singleShot(0, lambda: self.zoom_to_layer(spatial.id()))
         self.pending_directory = None
         self.status.setText(
-            f"追加しました: {self.selected_title} / {self.search_status}"
+            f"追加しました: {self.selected_title}（{len(layers)}レイヤー） / {self.search_status}"
         )
 
     def zoom_to_layer(self, layer_id):
@@ -274,7 +440,10 @@ class RhinestonePlugin:
             self.process.kill()
             self.process.waitForFinished(1000)
             self.process = None
-        self.cleanup_pending()
+        if self.scan_task is not None:
+            self.scan_task.cancel()
+        else:
+            self.cleanup_pending()
         self.iface.removePluginMenu("Rhinestone", self.action)
         if self.dock is not None:
             self.iface.removeDockWidget(self.dock)

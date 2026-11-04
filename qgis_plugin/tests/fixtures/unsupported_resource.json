@@ -1,8 +1,8 @@
 {
   "schema": "rhinestone.resource",
   "version": 3,
-  "uri": "https://example.org/data.csv",
-  "format": "csv",
+  "uri": "https://example.org/data.wms",
+  "format": "wms",
   "media_type": null,
   "metadata": {
     "title": null,
@@ -17,23 +17,23 @@
     "dataset_identifier": null,
     "resource_identifier": null,
     "api_endpoint": null,
-    "original_url": "https://example.org/data.csv",
+    "original_url": "https://example.org/data.wms",
     "query_parameters": {},
     "retrieved_at": null,
     "checksum": null,
     "adapter": "direct",
     "adapter_version": null,
     "raw": {
-      "uri": "https://example.org/data.csv",
-      "format": "csv"
+      "uri": "https://example.org/data.wms",
+      "format": "wms"
     }
   },
   "access_plan": {
     "schema": "rhinestone.access-plan",
     "version": 1,
     "kind": "file",
-    "uri": "https://example.org/data.csv",
-    "format": "csv",
+    "uri": "https://example.org/data.wms",
+    "format": "wms",
     "media_type": null,
     "options": {},
     "provider": "direct",
@@ -45,8 +45,8 @@
     "dataset_identifier": null,
     "resource_identifier": null,
     "parameters": {
-      "uri": "https://example.org/data.csv",
-      "format": "csv"
+      "uri": "https://example.org/data.wms",
+      "format": "wms"
     }
   },
   "local_path": null,

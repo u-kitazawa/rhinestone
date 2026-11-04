@@ -2,47 +2,206 @@
 
 import json
 import os
+import re
+import shutil
 import sys
-from pathlib import Path
+import zipfile
+from collections.abc import Mapping
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 # -I -S excludes user/system site packages. Never alter QGIS's import paths.
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 
-from rhinestone import ProviderId, Resource, configure, search  # noqa: E402
+from rhinestone import AccessPlan, ProviderId, Resource, configure, search  # noqa: E402
 
-MAX_BYTES = 50 * 1024 * 1024
+MAX_BYTES = 512 * 1024 * 1024
+MAX_UNPACKED_BYTES = 1024 * 1024 * 1024
+MAX_MEMBERS = 4096
+SUFFIXES = {
+    "geojson": ".geojson",
+    "json": ".json",
+    "csv": ".csv",
+    "gpkg": ".gpkg",
+    "flatgeobuf": ".fgb",
+    "gml": ".gml",
+    "citygml": ".gml",
+    "kml": ".kml",
+    "geotiff": ".tif",
+    "cog": ".tif",
+    "netcdf": ".nc",
+    "shapefile": ".shp",
+    "zip": ".zip",
+}
 
 
 class DownloadError(ValueError):
     """A safe, user-readable download rejection."""
 
 
+def plan_for(resource, app):
+    """Keep explicit plans; recognize provider-independent XYZ URL templates."""
+    original = resource.access_plan
+    if original and (
+        original.options
+        or original.credential
+        or original.service
+        or original.kind == "service-query"
+    ):
+        return app.plan(resource)
+    template = resource.uri
+    for axis in ("x", "y", "z"):
+        template = template.replace("%7B" + axis + "%7D", "{" + axis + "}")
+        template = template.replace("%7b" + axis + "%7d", "{" + axis + "}")
+    if not all("{" + axis + "}" in template for axis in ("x", "y", "z")):
+        return app.plan(resource)
+    suffix = Path(urlsplit(template).path).suffix.lower().lstrip(".")
+    vector = resource.media_type in {
+        "application/vnd.mapbox-vector-tile",
+        "application/x-protobuf",
+    }
+    tile = {
+        "scheme": "xyz",
+        "url": template,
+        "crs": "EPSG:3857",
+        "tile_size": 256,
+        "format": "pbf"
+        if vector
+        else suffix
+        if suffix in {"png", "jpg", "jpeg", "webp", "pbf", "mvt"}
+        else "raster",
+        "attribution": resource.metadata.publisher or "",
+    }
+    return AccessPlan(
+        "remote-dataset",
+        resource.uri,
+        format=resource.format,
+        media_type=resource.media_type,
+        provider=resource.reference.provider_id,
+        options={"tile": tile},
+    )
+
+
+def tile_problem(tile):
+    if not isinstance(tile, Mapping) or tile.get("scheme") != "xyz":
+        return "XYZ以外のタイル方式は未対応"
+    url = tile.get("url")
+    if not isinstance(url, str):
+        return "タイルURLが不正"
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or any("{" + axis + "}" not in url for axis in ("x", "y", "z"))
+    ):
+        return "HTTP(S)のXYZタイルURLが必要"
+    if tile.get("crs") != "EPSG:3857" or tile.get("tile_size", 256) != 256:
+        return "タイルはEPSG:3857・256ピクセルに対応"
+    low, high = tile.get("min_zoom"), tile.get("max_zoom")
+    if (
+        any(
+            value is not None and (type(value) is not int or not 0 <= value <= 30)
+            for value in (low, high)
+        )
+        or low is not None
+        and high is not None
+        and low > high
+    ):
+        return "タイルのズーム範囲が不正"
+    if tile.get("format") not in {"png", "jpg", "jpeg", "webp", "pbf", "mvt", "raster"}:
+        return "タイルの画像・MVT形式が未対応"
+    return None
+
+
 def unsupported(plan):
-    """Only explicitly declared standalone HTTP(S) GeoJSON is supported."""
-    if plan.credential or plan.service or plan.kind == "service-query":
+    """Check delivery semantics; actual driver support is queried from QGIS."""
+    if (
+        plan.credential
+        or plan.service
+        or plan.kind == "service-query"
+        or plan.format in {"wms", "wfs", "wmts", "api", "ogc-api-features"}
+    ):
         return "認証・サービス形式は未対応"
-    if plan.options:
-        return "ZIP・追加オプション付きの配布は未対応"
-    if plan.format != "geojson":
-        return "初期版はGeoJSONのみ対応"
+    if "tile" in plan.options:
+        if set(plan.options) != {"tile"}:
+            return "タイルに未対応の追加オプションがあります"
+        return tile_problem(plan.options["tile"])
+    if set(plan.options) - {"archive", "entry_point", "encoding", "layer"}:
+        return "このアクセスオプションは未対応"
+    if plan.format in {None, "unknown"} or not re.fullmatch(
+        r"[a-z0-9][a-z0-9_-]{0,31}", plan.format
+    ):
+        return "配信形式が不明、またはファイル形式が未対応"
+    if plan.format == "shapefile" and plan.options.get("archive") != "zip":
+        return "Shapefileは関連ファイルを含むZIP配布に対応"
+    layer = plan.options.get("layer")
+    if layer is not None and (
+        isinstance(layer, bool) or not isinstance(layer, str | int)
+    ):
+        return "レイヤー指定が不正"
     if urlsplit(plan.uri).scheme not in {"http", "https"}:
         return "HTTP(S)配布のみ対応"
-    # QGIS OGR URI separators must never be interpreted as provider options.
     return None
+
+
+def unpack(path, plan):
+    """Preserve sidecars and directories; never pick the first archive member."""
+    directory = path.parent / "contents"
+    with zipfile.ZipFile(path) as archive:
+        members = archive.infolist()
+        if (
+            len(members) > MAX_MEMBERS
+            or sum(m.file_size for m in members) > MAX_UNPACKED_BYTES
+        ):
+            raise DownloadError("ZIPの展開上限（1 GiB・4096ファイル）を超えています")
+        destinations = set()
+        for member in members:
+            relative = PurePosixPath(member.filename)
+            if (
+                relative.is_absolute()
+                or ".." in relative.parts
+                or "\\" in member.filename
+                or ":" in member.filename
+                or (member.external_attr >> 16) & 0o170000 == 0o120000
+            ):
+                raise DownloadError("ZIPに安全に展開できないパスがあります")
+            key = str(relative).casefold()
+            if key in destinations:
+                raise DownloadError("ZIPに重複するパスがあります")
+            destinations.add(key)
+        directory.mkdir()
+        for member in members:
+            archive.extract(member, directory)
+    entry = plan.options.get("entry_point")
+    if entry is not None:
+        selected = directory / entry
+        if not selected.exists():
+            raise DownloadError("ZIP内に指定されたデータがありません")
+        return selected
+    return directory
 
 
 def execute(request):
     if request["action"] == "search":
         results = search(
-            providers=[ProviderId.SEARCH_CKAN_JP], text=request["text"], limit=20
+            providers=[
+                ProviderId.SEARCH_CKAN_JP,
+                ProviderId.GEOSPATIAL_JP,
+                ProviderId.GSI,
+            ],
+            text=request["text"],
+            limit=20,
         )
         rows = []
         app = configure()
         for resource in results:
+            plan = None
             try:
-                reason = unsupported(app.plan(resource))
+                plan = plan_for(resource, app)
+                reason = unsupported(plan)
             except Exception as error:
                 reason = f"AccessPlanを作成できません ({type(error).__name__})"
             rows.append(
@@ -50,7 +209,9 @@ def execute(request):
                     "resource": resource.to_dict(),
                     "title": resource.title,
                     "provider": resource.metadata.publisher or resource.discovered_by,
-                    "format": resource.format or "不明",
+                    "format": "XYZタイル"
+                    if plan and "tile" in plan.options
+                    else resource.format or "不明",
                     "reason": reason,
                 }
             )
@@ -68,11 +229,20 @@ def execute(request):
     if request["action"] != "download":
         raise ValueError("Unknown worker action")
     resource = Resource.from_dict(request["resource"])
-    plan = configure().plan(resource)
+    plan = plan_for(resource, configure())
     reason = unsupported(plan)
     if reason:
         raise DownloadError(reason)
-    target = Path(request["target"])
+    if "tile" in plan.options:
+        return {
+            "tile": plan.to_dict()["options"]["tile"],
+            "resource": resource.to_dict(),
+            "plan": plan.to_dict(),
+        }
+    archive = plan.options.get("archive") == "zip" or plan.format == "zip"
+    target = Path(request["target"]).with_suffix(
+        ".zip" if archive else SUFFIXES.get(plan.format, "." + plan.format)
+    )
     # The GUI supplies an exclusive temporary directory owned by this request.
     partial = target.with_suffix(".part")
     try:
@@ -83,27 +253,17 @@ def execute(request):
             while chunk := response.read(65536):
                 total += len(chunk)
                 if total > MAX_BYTES:
-                    raise DownloadError("50 MiBを超える配布は未対応")
+                    raise DownloadError("512 MiBを超える配布は未対応")
                 stream.write(chunk)
-        # Check JSON syntax before handing the local file to OGR; no conversion.
-        with partial.open(encoding="utf-8-sig") as stream:
-            document = json.load(stream)
-        if not isinstance(document, dict) or document.get("type") not in {
-            "FeatureCollection",
-            "Feature",
-            "Point",
-            "MultiPoint",
-            "LineString",
-            "MultiLineString",
-            "Polygon",
-            "MultiPolygon",
-            "GeometryCollection",
-        }:
-            raise DownloadError("GeoJSONではない応答")
         os.replace(partial, target)
+        source = unpack(target, plan) if archive else target
+    except Exception:
+        target.unlink(missing_ok=True)
+        shutil.rmtree(target.parent / "contents", ignore_errors=True)
+        raise
     finally:
         partial.unlink(missing_ok=True)
-    return {"path": str(target), "resource": resource.to_dict(), "plan": plan.to_dict()}
+    return {"path": str(source), "resource": resource.to_dict(), "plan": plan.to_dict()}
 
 
 def main():
