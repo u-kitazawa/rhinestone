@@ -19,6 +19,7 @@ from qgis.core import (
     QgsProviderSublayerDetails,
     QgsProviderSublayerTask,
     QgsRasterLayer,
+    QgsTiledSceneLayer,
     QgsVectorTileBasicRenderer,
     QgsVectorTileLayer,
 )
@@ -26,6 +27,8 @@ from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QProcess, QStandardPaths, Qt, QTimer
 from qgis.PyQt.QtGui import QAction, QColor
 from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QDockWidget,
     QFormLayout,
     QLabel,
@@ -55,9 +58,12 @@ def python_executable():
     raise RuntimeError("QGISに対応するPython実行ファイルが見つかりません")
 
 
-def dataset_paths(path):
+def dataset_paths(path, tile_roots=()):
     """Use installed OGR/GDAL file filters to scan extracted distributions."""
     root = Path(path)
+    excluded = {Path(p).resolve() for p in tile_roots}
+    if root.resolve() in excluded:
+        return []
     if not root.is_dir() or root.suffix.lower() == ".gdb":
         return [str(root)]
     registry = QgsProviderRegistry.instance()
@@ -68,6 +74,9 @@ def dataset_paths(path):
     paths = []
     for directory, folders, files in os.walk(root):
         folders[:] = sorted(f for f in folders if f != "__MACOSX")
+        folders[:] = [
+            f for f in folders if (Path(directory) / f).resolve() not in excluded
+        ]
         for folder in folders[:]:
             if folder.lower().endswith(".gdb"):
                 paths.append(str(Path(directory) / folder))
@@ -549,7 +558,7 @@ class RhinestonePlugin:
         reference = resource.get("reference", {})
         plan = resource.get("access_plan") or {}
         note = row.get("reason") or (
-            "配布物内の対応レイヤーをまとめて追加します"
+            "取得後に読込可能なレイヤーを確認し、複数あれば選択します"
             if plan.get("options", {}).get("archive")
             else "追加時にOGR/GDALまたはタイルレイヤーで読み込みます"
         )
@@ -606,7 +615,7 @@ class RhinestonePlugin:
         if "tile" in result:
             self.add_tile(result)
             return
-        self.scan_paths = dataset_paths(result["path"])
+        self.scan_paths = dataset_paths(result["path"], result.get("tile_roots", []))
         self.sublayers = []
         self.status.setText("OGR/GDALでデータを確認中…")
         self.update_controls()
@@ -702,26 +711,48 @@ class RhinestonePlugin:
                 if (d.layerNumber() if isinstance(selector, int) else d.name())
                 == selector
             ]
+        candidates = [
+            {"name": d.name(), "kind": "file", "detail": d} for d in details
+        ] + result.get("tile_layers", [])
+        if candidates and all(c.get("reason") for c in candidates):
+            self.status.setText(
+                "レイヤー追加不可: " + " / ".join(c["reason"] for c in candidates)
+            )
+            self.cleanup_pending()
+            self.update_controls()
+            return
+        candidates = self.choose_layers(candidates)
+        if candidates is None:
+            self.status.setText("レイヤー追加を中止しました")
+            self.cleanup_pending()
+            self.update_controls()
+            return
         options = QgsProviderSublayerDetails.LayerOptions(
             QgsProject.instance().transformContext()
         )
         layers = []
-        for detail in details:
-            layer = detail.toLayer(options)
+        for candidate in candidates:
+            layer = (
+                candidate["detail"].toLayer(options)
+                if candidate["kind"] == "file"
+                else self.archive_tile_layer(candidate)
+            )
             if layer is None or not layer.isValid():
                 # Release all providers before deleting their files on Windows.
                 if layer is not None:
                     sip.delete(layer)
                 for prepared in layers:
                     sip.delete(prepared)
-                self.status.setText("レイヤー追加失敗: QGIS/OGR/GDALで開けません")
+                self.status.setText(
+                    "レイヤー追加失敗: QGISで選択したデータを開けません"
+                )
                 self.update_controls()
                 self.cleanup_pending()
                 return
             layer.setName(
                 self.selected_title
-                if len(details) == 1
-                else f"{self.selected_title} — {detail.name()}"
+                if len(candidates) == 1 and not result.get("tile_layers")
+                else f"{self.selected_title} — {candidate['name']}"
             )
             encoding = result["plan"].get("options", {}).get("encoding")
             if encoding and layer.type() == Qgis.LayerType.Vector:
@@ -733,6 +764,10 @@ class RhinestonePlugin:
             layer.setCustomProperty(
                 "rhinestone/plan", json.dumps(result["plan"], ensure_ascii=False)
             )
+            if candidate.get("bounds"):
+                layer.setCustomProperty(
+                    "rhinestone/extent_wgs84", json.dumps(candidate["bounds"])
+                )
             layers.append(layer)
         self.update_controls()
         if not layers:
@@ -753,6 +788,96 @@ class RhinestonePlugin:
             f"追加しました: {self.selected_title}（{len(layers)}レイヤー） / {self.search_status}"
         )
 
+    def choose_layers(self, candidates):
+        available = [c for c in candidates if not c.get("reason")]
+        if len(candidates) <= 1:
+            return available
+        dialog = QDialog(self.dock)
+        dialog.setWindowTitle("追加するレイヤーを選択")
+        dialog.resize(720, 480)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("取得した配布物から、追加するデータを選んでください。"))
+        listing = QListWidget()
+        listing.setWordWrap(True)
+        for index, candidate in enumerate(candidates):
+            kind = {"scene": "3D Tiles", "vector-tile": "MVT", "file": "OGR/GDAL"}[
+                candidate["kind"]
+            ]
+            reason = candidate.get("reason")
+            item = QListWidgetItem(
+                f"{candidate['name']}（{kind}）" + (f" — {reason}" if reason else "")
+            )
+            item.setData(Qt.ItemDataRole.UserRole, index)
+            if reason:
+                item.setFlags(Qt.ItemFlag.NoItemFlags)
+            else:
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(Qt.CheckState.Unchecked)
+            listing.addItem(item)
+        layout.addWidget(listing)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        confirm = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        confirm.setText("選択したレイヤーを追加")
+        confirm.setEnabled(False)
+        listing.itemChanged.connect(
+            lambda *_: confirm.setEnabled(
+                any(
+                    listing.item(i).checkState() == Qt.CheckState.Checked
+                    for i in range(listing.count())
+                )
+            )
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        accepted = dialog.exec() == QDialog.DialogCode.Accepted
+        selected = (
+            [
+                candidates[i]
+                for i in range(listing.count())
+                if listing.item(i).checkState() == Qt.CheckState.Checked
+            ]
+            if accepted
+            else None
+        )
+        dialog.deleteLater()
+        return selected
+
+    @staticmethod
+    def archive_tile_layer(candidate):
+        if candidate["kind"] == "scene":
+            return QgsTiledSceneLayer(
+                candidate["path"], candidate["name"], "cesiumtiles"
+            )
+        uri = QgsDataSourceUri()
+        for key, value in {
+            "type": "xyz",
+            "url": candidate["url"],
+            "zmin": candidate["min_zoom"],
+            "zmax": candidate["max_zoom"],
+        }.items():
+            uri.setParam(key, str(value))
+        layer = QgsVectorTileLayer(
+            bytes(uri.encodedUri()).decode("utf-8"), candidate["name"]
+        )
+        renderer = QgsVectorTileBasicRenderer()
+        renderer.setStyles(
+            QgsVectorTileBasicRenderer.simpleStyle(
+                QColor("#c5dfeb"),
+                QColor("#38748f"),
+                0.2,
+                QColor("#38748f"),
+                0.4,
+                QColor("#12ab34"),
+                QColor("#126b34"),
+                4,
+            )
+        )
+        layer.setRenderer(renderer)
+        return layer
+
     def zoom_to_layer(self, layer_id):
         if self.closed:
             return
@@ -761,10 +886,17 @@ class RhinestonePlugin:
             return
         canvas = self.iface.mapCanvas()
         extent = layer.extent()
+        source_crs = layer.crs()
+        bounds = layer.customProperty("rhinestone/extent_wgs84", "")
+        if bounds:
+            from qgis.core import QgsCoordinateReferenceSystem, QgsRectangle
+
+            extent = QgsRectangle(*json.loads(bounds))
+            source_crs = QgsCoordinateReferenceSystem("EPSG:4326")
         if extent.isEmpty():
             extent.grow(0.001 if layer.crs().isGeographic() else 10)
         transform = QgsCoordinateTransform(
-            layer.crs(), canvas.mapSettings().destinationCrs(), QgsProject.instance()
+            source_crs, canvas.mapSettings().destinationCrs(), QgsProject.instance()
         )
         canvas.setExtent(transform.transformBoundingBox(extent))
         canvas.refresh()

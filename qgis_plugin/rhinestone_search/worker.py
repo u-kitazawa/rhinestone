@@ -15,6 +15,9 @@ from urllib.request import urlopen
 
 # -I -S excludes user/system site packages. Never alter QGIS's import paths.
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
+sys.path.insert(0, str(Path(__file__).parent))
+
+from archive_layers import discover_tiles
 
 from rhinestone import AccessPlan, Format, ProviderId, Resource, configure, search
 from rhinestone.adapters.provider import (
@@ -30,7 +33,6 @@ from rhinestone.catalogs import BUILTIN
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery  # noqa: E402
 
-MAX_MEMBERS = 4096
 SUFFIXES = {
     "geojson": ".geojson",
     "json": ".json",
@@ -169,8 +171,6 @@ def unpack(path, plan):
     directory = path.parent / "contents"
     with zipfile.ZipFile(path) as archive:
         members = archive.infolist()
-        if len(members) > MAX_MEMBERS:
-            raise DownloadError("ZIPのエントリー上限（4096件）を超えています")
         destinations = set()
         for member in members:
             relative = PurePosixPath(member.filename)
@@ -371,7 +371,12 @@ def execute(request):
         raise
     finally:
         partial.unlink(missing_ok=True)
-    return {"path": str(source), "resource": resource.to_dict(), "plan": plan.to_dict()}
+    return {
+        "path": str(source),
+        "resource": resource.to_dict(),
+        "plan": plan.to_dict(),
+        **(discover_tiles(source) if archive else {}),
+    }
 
 
 def main():

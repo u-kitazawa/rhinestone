@@ -194,6 +194,14 @@ class PluginTests(unittest.TestCase):
         self.iface = Interface()
         self.plugin = classFactory(self.iface)
         self.plugin.initGui()
+        self.selection_patch = patch.object(
+            self.plugin,
+            "choose_layers",
+            side_effect=lambda candidates: [
+                c for c in candidates if not c.get("reason")
+            ],
+        )
+        self.selection_patch.start()
         self.plugin.show()
         self.iface.window.show()
         APP.processEvents()
@@ -201,6 +209,7 @@ class PluginTests(unittest.TestCase):
         self.assertTrue(self.plugin.catalog_loaded, self.plugin.status.text())
 
     def tearDown(self):
+        self.selection_patch.stop()
         self.plugin.unload()
         self.iface.canvas.stopRendering()
         sip.delete(self.iface.bridge)
@@ -717,6 +726,103 @@ class PluginTests(unittest.TestCase):
             wait_until(lambda: not job.isActive())
             self.assertTrue(server.hits)
             self.release_layers()
+
+    def test_archive_selection_is_explicit_and_cancel_adds_nothing(self):
+        from qgis.PyQt.QtWidgets import (
+            QApplication,
+            QDialog,
+            QDialogButtonBox,
+            QListWidget,
+        )
+
+        candidates = [
+            {"name": "first", "kind": "file"},
+            {"name": "second", "kind": "scene"},
+        ]
+
+        def select_second():
+            dialog = QApplication.activeModalWidget()
+            self.assertIsInstance(dialog, QDialog)
+            listing = dialog.findChild(QListWidget)
+            buttons = dialog.findChild(QDialogButtonBox)
+            confirm = buttons.button(QDialogButtonBox.StandardButton.Ok)
+            self.assertFalse(confirm.isEnabled())
+            listing.item(1).setCheckState(Qt.CheckState.Checked)
+            self.assertTrue(confirm.isEnabled())
+            confirm.click()
+
+        QTimer.singleShot(0, select_second)
+        self.assertEqual(
+            module.RhinestonePlugin.choose_layers(self.plugin, candidates),
+            [candidates[1]],
+        )
+        QTimer.singleShot(0, lambda: QApplication.activeModalWidget().reject())
+        self.assertIsNone(
+            module.RhinestonePlugin.choose_layers(self.plugin, candidates)
+        )
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_reported_plateau_zip_adds_and_renders_scene_and_local_mvt(self):
+        from qgis.core import QgsMapRendererSequentialJob, QgsRectangle
+        from qgis.PyQt.QtCore import QSize
+
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        layers = self.add_distribution(fixture.read_bytes(), "zip")
+        self.assertEqual(len(layers), 2)
+        self.assertEqual(
+            {layer.type() for layer in layers},
+            {Qgis.LayerType.TiledScene, Qgis.LayerType.VectorTile},
+        )
+        for layer in layers:
+            bounds = json.loads(layer.customProperty("rhinestone/extent_wgs84"))
+            settings = self.iface.canvas.mapSettings()
+            settings.setLayers([layer])
+            settings.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+            extent = QgsRectangle(*bounds)
+            extent.scale(1.05)
+            settings.setExtent(extent)
+            settings.setOutputSize(QSize(512, 512))
+            settings.setBackgroundColor(QColor("white"))
+            job = QgsMapRendererSequentialJob(settings)
+            job.start()
+            wait_until(lambda: not job.isActive())
+            image = job.renderedImage()
+            pixels = sum(
+                image.pixelColor(x, y) != QColor("white")
+                for x in range(512)
+                for y in range(512)
+            )
+            self.assertGreater(
+                pixels, 0, f"blank render: {layer.name()} / {job.errors()}"
+            )
+            self.assertFalse(job.errors(), str(job.errors()))
+            if os.environ.get("RHINESTONE_PLATEAU_SCREENSHOTS"):
+                image.save(
+                    str(
+                        Path(os.environ["RHINESTONE_PLATEAU_SCREENSHOTS"])
+                        / f"plateau-{layer.type().name}.png"
+                    )
+                )
+            print(
+                json.dumps(
+                    {
+                        "plateau_layer": layer.name(),
+                        "type": layer.type().name,
+                        "painted_pixels": pixels,
+                    }
+                )
+            )
+        self.release_layers()
+
+    def test_reported_plateau_zip_can_add_only_selected_mvt(self):
+        self.plugin.choose_layers.side_effect = lambda candidates: [
+            c for c in candidates if c["kind"] == "vector-tile"
+        ]
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        layers = self.add_distribution(fixture.read_bytes(), "zip")
+        self.assertEqual(len(layers), 1)
+        self.assertEqual(layers[0].type(), Qgis.LayerType.VectorTile)
+        self.release_layers()
 
     @unittest.skipUnless(LIVE, "explicit --live required")
     def test_real_search_click_download_ogr(self):

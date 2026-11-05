@@ -263,11 +263,11 @@ def test_download_over_previous_limit_reads_bounded_chunks(monkeypatch, tmp_path
     assert not list(tmp_path.glob("*.part"))
 
 
-def test_zip_entry_limit_cleans_download(monkeypatch, tmp_path):
-    monkeypatch.setattr(worker, "MAX_MEMBERS", 1)
-    with pytest.raises(worker.DownloadError, match="エントリー上限"):
-        download_archive(monkeypatch, tmp_path, {"a": b"a", "b": b"b"})
-    assert list(tmp_path.iterdir()) == []
+def test_tiled_archive_over_previous_entry_limit_is_not_rejected(monkeypatch, tmp_path):
+    result = download_archive(
+        monkeypatch, tmp_path, {f"tiles/{i}.bin": b"a" for i in range(4097)}
+    )
+    assert len(list((Path(result["path"]) / "tiles").iterdir())) == 4097
 
 
 def test_disk_full_during_download_cleans_partial_file(monkeypatch, tmp_path):
