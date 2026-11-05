@@ -62,7 +62,7 @@ def dataset_paths(path, tile_roots=()):
     """Use installed OGR/GDAL file filters to scan extracted distributions."""
     root = Path(path)
     excluded = {Path(p).resolve() for p in tile_roots}
-    if root.resolve() in excluded:
+    if any(root.resolve().is_relative_to(p) for p in excluded):
         return []
     if not root.is_dir() or root.suffix.lower() == ".gdb":
         return [str(root)]
@@ -711,9 +711,21 @@ class RhinestonePlugin:
                 if (d.layerNumber() if isinstance(selector, int) else d.name())
                 == selector
             ]
+        tile_layers = result.get("tile_layers", [])
+        tile_layers = [
+            {
+                **candidate,
+                "reason": "3D TilesはQGIS 3.44以降に対応しています（旧版でのクラッシュを回避）",
+            }
+            if candidate["kind"] == "scene" and Qgis.QGIS_VERSION_INT < 34400
+            else candidate
+            for candidate in tile_layers
+        ]
+        if selector is not None:
+            tile_layers = [c for c in tile_layers if c["name"] == selector]
         candidates = [
             {"name": d.name(), "kind": "file", "detail": d} for d in details
-        ] + result.get("tile_layers", [])
+        ] + tile_layers
         if candidates and all(c.get("reason") for c in candidates):
             self.status.setText(
                 "レイヤー追加不可: " + " / ".join(c["reason"] for c in candidates)
@@ -848,6 +860,8 @@ class RhinestonePlugin:
     @staticmethod
     def archive_tile_layer(candidate):
         if candidate["kind"] == "scene":
+            if Qgis.QGIS_VERSION_INT < 34400:
+                return None
             return QgsTiledSceneLayer(
                 candidate["path"], candidate["name"], "cesiumtiles"
             )

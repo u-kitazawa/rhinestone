@@ -492,7 +492,7 @@ class PluginTests(unittest.TestCase):
         self.assertIn("追加失敗", self.plugin.status.text())
         self.assertNotIn("rhinestone", sys.modules)
 
-    def add_distribution(self, data, format, options=None):
+    def add_distribution(self, data, format, options=None, expected_error=None):
         with FixtureServer(data) as server:
             uri = server.url + "/selected"
             selected = portable(uri, format, options)
@@ -521,9 +521,11 @@ class PluginTests(unittest.TestCase):
             self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
             QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
             wait_until(lambda: not self.plugin.busy())
-            self.assertIn("追加しました", self.plugin.status.text())
+            self.assertIn(expected_error or "追加しました", self.plugin.status.text())
             self.assertEqual(server.hits, ["/selected"])
             layers = list(QgsProject.instance().mapLayers().values())
+            if expected_error:
+                self.assertEqual(layers, [])
             for layer in layers:
                 self.assertTrue(layer.isValid())
                 self.assertEqual(
@@ -768,10 +770,12 @@ class PluginTests(unittest.TestCase):
 
         fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
         layers = self.add_distribution(fixture.read_bytes(), "zip")
-        self.assertEqual(len(layers), 2)
+        self.assertEqual(len(layers), 2 if Qgis.QGIS_VERSION_INT >= 34400 else 1)
         self.assertEqual(
             {layer.type() for layer in layers},
-            {Qgis.LayerType.TiledScene, Qgis.LayerType.VectorTile},
+            {Qgis.LayerType.TiledScene, Qgis.LayerType.VectorTile}
+            if Qgis.QGIS_VERSION_INT >= 34400
+            else {Qgis.LayerType.VectorTile},
         )
         for layer in layers:
             bounds = json.loads(layer.customProperty("rhinestone/extent_wgs84"))
@@ -823,6 +827,44 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(len(layers), 1)
         self.assertEqual(layers[0].type(), Qgis.LayerType.VectorTile)
         self.release_layers()
+
+    def test_explicit_plateau_tileset_entry_point_opens_only_that_model(self):
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        layers = self.add_distribution(
+            fixture.read_bytes(),
+            "zip",
+            {
+                "archive": "zip",
+                "entry_point": "11100_saitama-shi_city_2023_citygml_1_op_tran_3dtiles_lod3/tileset.json",
+            },
+            expected_error="3.44" if Qgis.QGIS_VERSION_INT < 34400 else None,
+        )
+        if Qgis.QGIS_VERSION_INT < 34400:
+            return
+        self.assertEqual(len(layers), 1)
+        self.assertEqual(layers[0].type(), Qgis.LayerType.TiledScene)
+        self.release_layers()
+
+    def test_cancel_archive_selection_cleans_pending_download(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pending = Path(directory) / "download"
+            pending.mkdir()
+            (pending / "partial").touch()
+            self.plugin.pending_directory = pending
+            self.plugin.sublayers = []
+            self.plugin.choose_layers.side_effect = lambda candidates: None
+            self.plugin.add_sublayers(
+                {
+                    "plan": {},
+                    "tile_layers": [
+                        {"kind": "scene", "name": "first"},
+                        {"kind": "vector-tile", "name": "second"},
+                    ],
+                }
+            )
+            self.assertFalse(pending.exists())
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+            self.assertIn("中止", self.plugin.status.text())
 
     @unittest.skipUnless(LIVE, "explicit --live required")
     def test_real_search_click_download_ogr(self):

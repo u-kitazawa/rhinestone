@@ -55,10 +55,14 @@ def tile_bounds(value):
 
 def discover_tiles(path):
     root = Path(path).resolve()
-    if not root.is_dir():
+    if root.is_file() and root.suffix.lower() == ".json":
+        documents = [root]
+        root = root.parent
+    elif root.is_dir():
+        documents = sorted(root.rglob("*.json"))
+    else:
         return {"tile_layers": [], "tile_roots": []}
     scenes, vectors, roots, referenced = [], [], set(), set()
-    documents = sorted(root.rglob("*.json"))
     for source in documents:
         try:
             document = json.loads(source.read_text(encoding="utf-8-sig"))
@@ -68,7 +72,7 @@ def discover_tiles(path):
             continue
         name = str(source.parent.relative_to(root))
         if name == ".":
-            name = source.stem
+            name = source.parent.name
         if isinstance(document.get("asset"), dict) and "root" in document:
             candidate = {"kind": "scene", "path": str(source), "name": name}
             try:

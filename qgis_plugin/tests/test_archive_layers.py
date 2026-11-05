@@ -52,6 +52,15 @@ def test_nested_tileset_is_not_a_second_layer(tmp_path):
     assert len(archive.discover_tiles(tmp_path)["tile_layers"]) == 1
 
 
+def test_explicit_json_entry_point_does_not_select_sibling_models(tmp_path):
+    first = write(tmp_path, "first/tileset.json", scene("data.b3dm"))
+    write(tmp_path, "second/tileset.json", scene("data.b3dm"))
+    (first.parent / "data.b3dm").touch()
+    result = archive.discover_tiles(first)
+    assert len(result["tile_layers"]) == 1
+    assert result["tile_layers"][0]["path"] == str(first)
+
+
 @pytest.mark.parametrize(
     "uri",
     [
