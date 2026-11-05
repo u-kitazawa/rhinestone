@@ -262,6 +262,7 @@ def extract_selected(url, snapshot, groups, target):
     ):
         raise ValueError("取得するモデルを選択してください")
     directory = Path(target)
+    created = False
     try:
         with RangeFile(url, snapshot) as reader, zipfile.ZipFile(reader) as archive:
             if directory_token(archive) != snapshot.get("directory"):
@@ -272,11 +273,13 @@ def extract_selected(url, snapshot, groups, target):
             members = archive.infolist()
             limits = member_limits(archive)
             directory.mkdir()
+            created = True
             for info in members:
                 if any(member_name(info).startswith(g + "/") for g in groups):
                     reader.member_end = limits[info.header_offset]
                     archive.extract(info, directory)
             return reader.received
     except Exception:
-        shutil.rmtree(directory, ignore_errors=True)
+        if created:
+            shutil.rmtree(directory, ignore_errors=True)
         raise

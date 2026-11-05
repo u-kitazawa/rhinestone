@@ -202,6 +202,20 @@ def test_corrupted_selected_payload_is_rejected_and_removed(tmp_path):
         assert not (tmp_path / "selected").exists()
 
 
+def test_existing_target_is_never_deleted(tmp_path):
+    target = tmp_path / "selected"
+    target.mkdir()
+    existing = target / "existing.txt"
+    existing.write_text("keep")
+    with Server(fixture_bytes()) as server:
+        preview = remote_zip.inspect(server.url)
+        with pytest.raises(FileExistsError):
+            remote_zip.extract_selected(
+                server.url, preview["snapshot"], ["unused"], target
+            )
+    assert existing.read_text() == "keep"
+
+
 def test_wrong_content_range_is_rejected():
     with Server(fixture_bytes()) as server:
         server.bad_range = True
