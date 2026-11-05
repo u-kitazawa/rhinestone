@@ -43,6 +43,8 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from .settings import CredentialError, CredentialStore, SettingsDialog
+
 
 def python_executable():
     """Use QGIS's matching Python, never an arbitrary executable on PATH."""
@@ -94,6 +96,7 @@ class RhinestonePlugin:
         self.selected_row = None
         self.catalog_loaded = False
         self.diagnostic_text = ""
+        self.provider_credentials = {}
 
     def initGui(self):
         self.action = QAction("Rhinestone Search", self.iface.mainWindow())
@@ -133,6 +136,9 @@ class RhinestonePlugin:
             form.addRow("地域（area）", self.area)
             form.addRow("提供元", self.providers_button)
             form.addRow("形式（複数可）", self.formats_button)
+            self.settings_button = QPushButton("設定（認証情報・APIキー）")
+            self.settings_button.clicked.connect(self.show_settings)
+            form.addRow(self.settings_button)
             advanced_button = QToolButton()
             advanced_button.setText("期間・範囲・件数")
             advanced_button.setCheckable(True)
@@ -211,6 +217,9 @@ class RhinestonePlugin:
             self.start({"action": "catalog"}, self.catalog_ready)
 
     def catalog_ready(self, catalog):
+        self.provider_credentials = {
+            p["id"]: p.get("credential") for p in catalog["providers"]
+        }
         for button, storage, values in (
             (self.providers_button, self.provider_actions, catalog["providers"]),
             (self.formats_button, self.format_actions, catalog["formats"]),
@@ -231,6 +240,17 @@ class RhinestonePlugin:
         self.catalog_loaded = True
         self.update_filter_labels()
         self.status.setText("キーワードや地域を指定して検索")
+
+    def show_settings(self):
+        if self.busy():
+            return
+        try:
+            dialog = SettingsDialog(self.dock)
+        except CredentialError as error:
+            self.status.setText(str(error))
+            return
+        dialog.exec()
+        dialog.deleteLater()
 
     def update_filter_labels(self, *_args):
         providers = [a.text() for a in self.provider_actions if a.isChecked()]
@@ -326,13 +346,25 @@ class RhinestonePlugin:
         }
         if not any(conditions["time"]):
             conditions["time"] = None
+        credentials = {}
+        names = {self.provider_credentials.get(p) for p in providers} - {None}
+        if names:
+            try:
+                saved = CredentialStore().load()
+                credentials = {name: saved[name] for name in names if name in saved}
+            except CredentialError as error:
+                self.status.setText(str(error))
+                return
         self.results.clear()
         self.selected_row = None
         self.details.clear()
         self.result_filter.clear()
         self.search_status = ""
         self.status.setText("検索中…")
-        self.start({"action": "search", "conditions": conditions}, self.searched)
+        self.start(
+            {"action": "search", "conditions": conditions, "credentials": credentials},
+            self.searched,
+        )
 
     def start(self, request, completed):
         try:

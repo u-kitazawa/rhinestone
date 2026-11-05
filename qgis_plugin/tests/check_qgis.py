@@ -36,9 +36,17 @@ sys.path.insert(0, str(ROOT.parent))
 assert "rhinestone" not in sys.modules
 from rhinestone_search import classFactory  # noqa: E402
 from rhinestone_search import plugin as module  # noqa: E402
+from rhinestone_search.settings import (  # noqa: E402
+    KEY,
+    CredentialError,
+    CredentialStore,
+    SettingsDialog,
+)
 
 LIVE = "--live" in sys.argv
 sys.argv = [s for s in sys.argv if s != "--live"]
+AUTH_DIRECTORY = tempfile.TemporaryDirectory()
+os.environ["QGIS_AUTH_DB_DIR_PATH"] = AUTH_DIRECTORY.name
 APP = QgsApplication([], True)
 if os.environ.get("QGIS_PREFIX_PATH"):
     APP.setPrefixPath(os.environ["QGIS_PREFIX_PATH"], True)
@@ -209,6 +217,79 @@ class PluginTests(unittest.TestCase):
         metadata.read(ROOT / "metadata.txt", encoding="utf-8")
         self.assertEqual(metadata["general"]["qgisMinimumVersion"], "3.34")
         self.assertEqual(metadata["general"]["qgisMaximumVersion"], "4.99")
+
+    def test_credentials_encrypt_reload_update_and_delete(self):
+        manager = QgsApplication.authManager()
+        self.assertFalse(manager.isDisabled())
+        self.assertTrue(manager.setMasterPassword("fixture-master-password", True))
+        store = CredentialStore(manager)
+        try:
+            self.assertEqual(store.load(), {})
+            store.save({"mlit-dpf": "fixture-key"})
+            self.assertNotIn("fixture-key", str(manager.authSetting(KEY, "", False)))
+            self.assertEqual(
+                CredentialStore(manager).load(), {"mlit-dpf": "fixture-key"}
+            )
+            dialog = SettingsDialog(self.plugin.dock, store)
+            dialog.show()
+            APP.processEvents()
+            self.assertEqual(dialog.secret.text(), "")
+            self.assertEqual(dialog.secret.echoMode(), dialog.secret.EchoMode.Password)
+            dialog.secret.setText("updated-key")
+            QTest.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+            self.assertEqual(store.load(), {"mlit-dpf": "updated-key"})
+            self.assertEqual(dialog.secret.text(), "")
+            QTest.mouseClick(dialog.delete_button, Qt.MouseButton.LeftButton)
+            self.assertEqual(store.load(), {})
+            dialog.reject()
+            self.assertEqual(dialog.values, {})
+            dialog.deleteLater()
+        finally:
+            manager.removeAuthSetting(KEY)
+
+    def test_credential_unlock_and_save_failures_are_visible(self):
+        from unittest.mock import Mock
+
+        manager = Mock()
+        manager.isDisabled.return_value = False
+        manager.setMasterPassword.return_value = False
+        store = CredentialStore(manager)
+        with self.assertRaises(CredentialError):
+            store.load()
+        manager.authSetting.assert_not_called()
+        manager.setMasterPassword.return_value = True
+        manager.storeAuthSetting.return_value = False
+        with self.assertRaises(CredentialError):
+            store.save({"mlit-dpf": "not-in-error"})
+        manager.authSetting.return_value = "invalid-json"
+        with self.assertRaises(CredentialError):
+            store.load()
+
+    def test_search_sends_only_selected_credentials_and_stops_on_unlock_failure(self):
+        for action in self.plugin.provider_actions:
+            action.setChecked(action.data() == "mlit-dpf")
+        with patch.object(module, "CredentialStore") as factory:
+            factory.return_value.load.return_value = {
+                "mlit-dpf": "fixture-key",
+                "unrelated": "other-key",
+            }
+            with patch.object(self.plugin, "start") as start:
+                self.plugin.search()
+                self.assertEqual(
+                    start.call_args.args[0]["credentials"], {"mlit-dpf": "fixture-key"}
+                )
+            factory.return_value.load.side_effect = CredentialError("解除できません")
+            with patch.object(self.plugin, "start") as start:
+                self.plugin.search()
+                start.assert_not_called()
+                self.assertIn("解除できません", self.plugin.status.text())
+        for action in self.plugin.provider_actions:
+            action.setChecked(action.data() == "gsi")
+        with patch.object(module, "CredentialStore") as factory:
+            with patch.object(self.plugin, "start") as start:
+                self.plugin.search()
+                self.assertEqual(start.call_args.args[0]["credentials"], {})
+            factory.assert_not_called()
 
     def test_empty_failure_unknown_and_no_implicit_selection(self):
         self.plugin.searched({"rows": [], "diagnostics": []})

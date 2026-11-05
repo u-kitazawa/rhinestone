@@ -486,3 +486,71 @@ def test_bbox_and_open_ended_time_are_converted_without_guessing():
     assert query.time[0] is None
     assert query.time[1].utcoffset().total_seconds() == 0
     assert query.limit is None
+
+
+def test_search_injects_only_selected_provider_credentials(monkeypatch):
+    captured = []
+
+    def configured(**kwargs):
+        captured.append(kwargs["credentials"])
+        return SimpleNamespace(search=lambda query: SearchResults({}))
+
+    monkeypatch.setattr(worker, "configure", configured)
+    result = worker.execute(
+        {
+            "action": "search",
+            "conditions": conditions(providers=["mlit-dpf"]),
+            "credentials": {"mlit-dpf": "private-key", "unused": "other-secret"},
+        }
+    )
+    assert set(captured[0]) == {"mlit-dpf"}
+    assert captured[0]["mlit-dpf"]() == "private-key"
+    assert "private-key" not in json.dumps(result)
+    assert "other-secret" not in json.dumps(result)
+
+
+def test_unselected_credentials_are_not_configured(monkeypatch):
+    monkeypatch.setattr(worker, "search", lambda query: SearchResults({}))
+    monkeypatch.setattr(worker, "configure", lambda: SimpleNamespace())
+    assert worker.execute(
+        {
+            "action": "search",
+            "conditions": conditions(),
+            "credentials": {"mlit-dpf": "unused-secret"},
+        }
+    ) == {"rows": [], "diagnostics": []}
+
+
+def test_dpf_search_uses_key_in_header_without_serializing_it(monkeypatch):
+    import rhinestone._http as http
+
+    calls = []
+
+    def post(url, body, headers=None):
+        calls.append((url, headers))
+        return {"data": {"search": {"totalNumber": 0, "searchResults": []}}}
+
+    monkeypatch.setattr(http, "post_json", post)
+    result = worker.execute(
+        {
+            "action": "search",
+            "conditions": conditions(providers=["mlit-dpf"]),
+            "credentials": {"mlit-dpf": "fixture-api-key"},
+        }
+    )
+    assert calls
+    assert all(
+        url == "https://data-platform.mlit.go.jp/api/v1"
+        and headers == {"apikey": "fixture-api-key"}
+        for url, headers in calls
+    )
+    assert result == {"rows": [], "diagnostics": []}
+
+
+@pytest.mark.parametrize("values", [[], {"name": 1}, {"": "secret"}, {"key": ""}])
+def test_invalid_credentials_do_not_echo_values(values):
+    with pytest.raises(worker.DownloadError, match="認証情報") as error:
+        worker.execute(
+            {"action": "search", "conditions": conditions(), "credentials": values}
+        )
+    assert "secret" not in str(error.value)

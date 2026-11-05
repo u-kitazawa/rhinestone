@@ -256,6 +256,7 @@ def execute(request):
                 {
                     "id": p.id,
                     "label": PROVIDER_LABELS.get(p.id, p.id),
+                    "credential": p.settings.get("credential"),
                     "searchable": callable(
                         getattr(PROVIDER_ADAPTERS.get(p.adapter_type), "search", None)
                     ),
@@ -272,12 +273,28 @@ def execute(request):
         }
     if request["action"] == "search":
         query = search_conditions(request["conditions"])
+        values = request.get("credentials", {})
+        if not isinstance(values, dict) or any(
+            not isinstance(k, str) or not isinstance(v, str) or not k or not v
+            for k, v in values.items()
+        ):
+            raise DownloadError("認証情報の名前と値は空でない文字列にしてください")
+        names = {
+            p.settings.get("credential") for p in BUILTIN if p.id in query.providers
+        } - {None}
+        credentials = {
+            k: (lambda value=v: value) for k, v in values.items() if k in names
+        }
+        app = (
+            configure(catalog=BUILTIN, credentials=credentials)
+            if credentials
+            else configure()
+        )
         try:
-            results = search(query)
+            results = app.search(query) if credentials else search(query)
         except ConfigValidationError as error:
             raise DownloadError("検索条件が不正です: " + str(error)) from error
         rows = []
-        app = configure()
         for resource in results:
             plan = None
             try:
