@@ -12,7 +12,6 @@ jobs:
       UV_PYTHON: /usr/bin/python3
       QT_QPA_PLATFORM: offscreen
       QGIS_PREFIX_PATH: /usr
-      RHINESTONE_PLATEAU_SCREENSHOTS: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -28,6 +27,7 @@ jobs:
         run: |
           /usr/bin/python3 -m zipfile -e "$RUNNER_TEMP/rhinestone-qgis-linux-x86_64-py312.zip" "$RUNNER_TEMP/plugin"
           export RHINESTONE_PLUGIN_DIR="$RUNNER_TEMP/plugin/rhinestone_search"
+          export RHINESTONE_PLATEAU_SCREENSHOTS="$RUNNER_TEMP"
           /usr/bin/python3 qgis_plugin/tests/check_qgis.py
       - uses: actions/upload-artifact@v4
         with:
@@ -47,7 +47,6 @@ jobs:
     env:
       QT_QPA_PLATFORM: offscreen
       RHINESTONE_QGIS_MAJOR: "4"
-      RHINESTONE_PLATEAU_SCREENSHOTS: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -67,6 +66,7 @@ jobs:
           export PYTHONPATH="$CONDA_PREFIX/share/qgis/python"
           export QGIS_PREFIX_PATH="$CONDA_PREFIX"
           export RHINESTONE_PLUGIN_DIR="$RUNNER_TEMP/plugin/rhinestone_search"
+          export RHINESTONE_PLATEAU_SCREENSHOTS="$RUNNER_TEMP"
           python qgis_plugin/tests/check_qgis.py
       - uses: actions/upload-artifact@v4
         with:
@@ -99,7 +99,6 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       RHINESTONE_QGIS_MAJOR: ${{ matrix.major }}
       RHINESTONE_QGIS_VERSION: ${{ matrix.version }}
-      RHINESTONE_PLATEAU_SCREENSHOTS: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -126,6 +125,7 @@ jobs:
         run: |
           chcp 65001 >nul
           set "RHINESTONE_PLUGIN_DIR=%RUNNER_TEMP%\plugin 日本語\rhinestone_search"
+          set "RHINESTONE_PLATEAU_SCREENSHOTS=%RUNNER_TEMP%"
           call C:\OSGeo4W\bin\${{ matrix.launcher }} -m zipfile -e "%RUNNER_TEMP%\${{ matrix.artifact }}.zip" "%RUNNER_TEMP%\plugin 日本語"
           if errorlevel 1 exit /b 1
           call C:\OSGeo4W\bin\${{ matrix.launcher }} qgis_plugin\tests\check_qgis.py
