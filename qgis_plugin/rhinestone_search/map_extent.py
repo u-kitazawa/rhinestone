@@ -20,9 +20,3 @@ class BboxMapTool(QgsMapToolExtent):
             self.cancelled.emit()
         elif event.button() == Qt.MouseButton.LeftButton:
             super().canvasReleaseEvent(event)
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape:
-            self.cancelled.emit()
-        else:
-            super().keyPressEvent(event)

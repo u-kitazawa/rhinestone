@@ -480,6 +480,8 @@ class PluginTests(unittest.TestCase):
         self.plugin.area.setText("横浜市")
         for operation in ("escape", "right", "button", "switch"):
             with self.subTest(operation=operation):
+                self.plugin.bbox.setText("138,35,140,37")
+                self.plugin.area.setText("横浜市")
                 self.plugin.draw_bbox_button.click()
                 QTest.mousePress(
                     canvas.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(40, 40)
@@ -528,7 +530,12 @@ class PluginTests(unittest.TestCase):
         extent = canvas.extent()
         self.assertEqual(
             actual,
-            [extent.xMinimum(), extent.yMinimum(), extent.xMaximum(), extent.yMaximum()],
+            [
+                extent.xMinimum(),
+                extent.yMinimum(),
+                extent.xMaximum(),
+                extent.yMaximum(),
+            ],
         )
         self.plugin.area.setText("横浜市")
         original = self.plugin.bbox.text()
@@ -1152,4 +1159,3 @@ if __name__ == "__main__":
     APP.processEvents()
     APP.exitQgis()
     sys.exit(not program.result.wasSuccessful())
-

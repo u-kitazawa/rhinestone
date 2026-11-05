@@ -315,6 +315,9 @@ class RhinestonePlugin:
         tool.extentChanged.connect(self.bbox_selected)
         tool.cancelled.connect(self.stop_bbox_selection)
         tool.deactivated.connect(lambda: self.bbox_deactivated(tool))
+        # QGIS forwards key presses only through this signal while a mouse
+        # button is held, so a map tool's keyPressEvent alone cannot cancel a drag.
+        canvas.keyPressed.connect(self.bbox_key_pressed)
         canvas.setMapTool(tool)
         self.draw_bbox_button.setChecked(True)
         canvas.setFocus()
@@ -329,8 +332,13 @@ class RhinestonePlugin:
         self.stop_bbox_selection()
         self.apply_bbox(extent)
 
+    def bbox_key_pressed(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.stop_bbox_selection()
+
     def bbox_deactivated(self, tool):
         if self.bbox_tool is tool:
+            self.iface.mapCanvas().keyPressed.disconnect(self.bbox_key_pressed)
             self.bbox_tool = None
             self.bbox_previous_tool = None
             self.draw_bbox_button.setChecked(False)
@@ -1114,4 +1122,3 @@ class RhinestonePlugin:
             self.iface.removeDockWidget(self.dock)
             self.dock.deleteLater()
         self.action.deleteLater()
-
