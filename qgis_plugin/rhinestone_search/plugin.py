@@ -36,6 +36,7 @@ from qgis.PyQt.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMenu,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -106,6 +107,7 @@ class RhinestonePlugin:
         self.catalog_loaded = False
         self.diagnostic_text = ""
         self.provider_credentials = {}
+        self.archive_pending = False
 
     def initGui(self):
         self.action = QAction("Rhinestone Search", self.iface.mainWindow())
@@ -316,7 +318,11 @@ class RhinestonePlugin:
         )
 
     def busy(self):
-        return self.process is not None or self.scan_task is not None
+        return (
+            self.process is not None
+            or self.scan_task is not None
+            or self.archive_pending
+        )
 
     def search(self):
         if self.busy():
@@ -558,8 +564,8 @@ class RhinestonePlugin:
         reference = resource.get("reference", {})
         plan = resource.get("access_plan") or {}
         note = row.get("reason") or (
-            "取得後に読込可能なレイヤーを確認し、複数あれば選択します"
-            if plan.get("options", {}).get("archive")
+            "ZIPの一覧を先に確認し、対応モデルは全体取得前に選択できます。全体取得が必要な場合は確認します"
+            if plan.get("options", {}).get("archive") or resource.get("format") == "zip"
             else "追加時にOGR/GDALまたはタイルレイヤーで読み込みます"
         )
         text = f"{row['title']}\n\n{description}\n\n" + "\n".join(
@@ -601,10 +607,17 @@ class RhinestonePlugin:
             self.status.setText("追加失敗: キャッシュへ保存できません")
             return
         self.selected_title = row["title"]
-        self.status.setText("選択したデータを取得中…")
+        plan = row["resource"].get("access_plan") or {}
+        archive = (
+            row["resource"].get("format") == "zip"
+            or plan.get("options", {}).get("archive") == "zip"
+        )
+        self.status.setText(
+            "ZIPの候補一覧を確認中…" if archive else "選択したデータを取得中…"
+        )
         self.start(
             {
-                "action": "download",
+                "action": "inspect_archive" if archive else "download",
                 "resource": row["resource"],
                 "target": str(self.pending_directory / "data"),
             },
@@ -612,6 +625,9 @@ class RhinestonePlugin:
         )
 
     def downloaded(self, result):
+        if "archive_preview" in result:
+            self.archive_prepared(result)
+            return
         if "tile" in result:
             self.add_tile(result)
             return
@@ -620,6 +636,77 @@ class RhinestonePlugin:
         self.status.setText("OGR/GDALでデータを確認中…")
         self.update_controls()
         self.scan_next(result)
+
+    @staticmethod
+    def supported_tile_candidates(candidates):
+        return [
+            {
+                **candidate,
+                "reason": "3D TilesはQGIS 3.44以降に対応しています（旧版でのクラッシュを回避）",
+            }
+            if candidate["kind"] == "scene" and Qgis.QGIS_VERSION_INT < 34400
+            else candidate
+            for candidate in candidates
+        ]
+
+    def confirm_full_archive(self, preview):
+        size = preview.get("size")
+        amount = f"約{size / 1024**2:,.1f} MiB" if size is not None else "サイズ不明"
+        return (
+            QMessageBox.question(
+                self.dock,
+                "ZIP全体の取得が必要です",
+                f"{preview['reason']}。\nZIP全体（{amount}）を取得・展開してから内容を確認します。続行しますか？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        )
+
+    def archive_prepared(self, result):
+        preview = result["archive_preview"]
+        request = {
+            "resource": result["resource"],
+            "target": str(self.pending_directory / "data"),
+        }
+        if preview.get("whole_required"):
+            if not self.confirm_full_archive(preview):
+                self.status.setText("ZIP全体の取得を中止しました")
+                self.cleanup_pending()
+                return
+            request["action"] = "download"
+            self.status.setText("確認済みのZIP全体を取得中…")
+        else:
+            candidates = self.supported_tile_candidates(preview["models"])
+            if not any(not c.get("reason") for c in candidates):
+                self.status.setText(
+                    "モデル取得不可: "
+                    + " / ".join(sorted({c["reason"] for c in candidates}))
+                )
+                self.cleanup_pending()
+                return
+            chosen = self.choose_layers(candidates)
+            if not chosen:
+                self.status.setText("モデルの取得を中止しました")
+                self.cleanup_pending()
+                return
+            request.update(
+                action="download_selection",
+                snapshot=preview["snapshot"],
+                models=[c["id"] for c in chosen],
+            )
+            self.status.setText(f"選択した{len(chosen)}モデルを部分取得中…")
+        # Release the finished inspection process before starting a new worker,
+        # keeping controls disabled across the queued transition.
+        self.archive_pending = True
+
+        def continue_archive():
+            self.archive_pending = False
+            if not self.closed:
+                self.start(request, self.downloaded)
+                self.update_controls()
+
+        QTimer.singleShot(0, continue_archive)
 
     def add_tile(self, result):
         tile = result["tile"]
@@ -712,15 +799,7 @@ class RhinestonePlugin:
                 == selector
             ]
         tile_layers = result.get("tile_layers", [])
-        tile_layers = [
-            {
-                **candidate,
-                "reason": "3D TilesはQGIS 3.44以降に対応しています（旧版でのクラッシュを回避）",
-            }
-            if candidate["kind"] == "scene" and Qgis.QGIS_VERSION_INT < 34400
-            else candidate
-            for candidate in tile_layers
-        ]
+        tile_layers = self.supported_tile_candidates(tile_layers)
         if selector is not None:
             tile_layers = [c for c in tile_layers if c["name"] == selector]
         candidates = [
@@ -733,7 +812,11 @@ class RhinestonePlugin:
             self.cleanup_pending()
             self.update_controls()
             return
-        candidates = self.choose_layers(candidates)
+        candidates = (
+            candidates
+            if result.get("selection_complete")
+            else self.choose_layers(candidates)
+        )
         if candidates is None:
             self.status.setText("レイヤー追加を中止しました")
             self.cleanup_pending()
@@ -805,10 +888,19 @@ class RhinestonePlugin:
         if len(candidates) <= 1:
             return available
         dialog = QDialog(self.dock)
-        dialog.setWindowTitle("追加するレイヤーを選択")
+        before_download = any("compressed_size" in c for c in candidates)
+        dialog.setWindowTitle(
+            "取得するモデルを選択" if before_download else "追加するレイヤーを選択"
+        )
         dialog.resize(720, 480)
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("取得した配布物から、追加するデータを選んでください。"))
+        layout.addWidget(
+            QLabel(
+                "選択したモデルのファイルだけを取得します。サイズはZIP内の圧縮サイズの合計です。"
+                if before_download
+                else "取得した配布物から、追加するデータを選んでください。"
+            )
+        )
         listing = QListWidget()
         listing.setWordWrap(True)
         for index, candidate in enumerate(candidates):
@@ -817,7 +909,13 @@ class RhinestonePlugin:
             ]
             reason = candidate.get("reason")
             item = QListWidgetItem(
-                f"{candidate['name']}（{kind}）" + (f" — {reason}" if reason else "")
+                f"{candidate['name']}（{kind}）"
+                + (f" — {reason}" if reason else "")
+                + (
+                    f" / 取得 約{candidate['compressed_size'] / 1024**2:,.1f} MiB、展開 約{candidate['unpacked_size'] / 1024**2:,.1f} MiB"
+                    if "compressed_size" in candidate
+                    else ""
+                )
             )
             item.setData(Qt.ItemDataRole.UserRole, index)
             if reason:
@@ -831,7 +929,11 @@ class RhinestonePlugin:
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         confirm = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        confirm.setText("選択したレイヤーを追加")
+        confirm.setText(
+            "選択したモデルを取得・追加"
+            if before_download
+            else "選択したレイヤーを追加"
+        )
         confirm.setEnabled(False)
         listing.itemChanged.connect(
             lambda *_: confirm.setEnabled(

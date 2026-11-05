@@ -9,7 +9,7 @@ import sys
 import zipfile
 from collections.abc import Mapping
 from datetime import datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
@@ -17,7 +17,8 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from archive_layers import discover_tiles
+from archive_layers import discover_tiles, validate_members
+from remote_zip import ArchiveChanged, RangeUnsupported, extract_selected, inspect
 
 from rhinestone import AccessPlan, Format, ProviderId, Resource, configure, search
 from rhinestone.adapters.provider import (
@@ -171,21 +172,10 @@ def unpack(path, plan):
     directory = path.parent / "contents"
     with zipfile.ZipFile(path) as archive:
         members = archive.infolist()
-        destinations = set()
-        for member in members:
-            relative = PurePosixPath(member.filename)
-            if (
-                relative.is_absolute()
-                or ".." in relative.parts
-                or "\\" in member.filename
-                or ":" in member.filename
-                or (member.external_attr >> 16) & 0o170000 == 0o120000
-            ):
-                raise DownloadError("ZIPに安全に展開できないパスがあります")
-            key = str(relative).casefold()
-            if key in destinations:
-                raise DownloadError("ZIPに重複するパスがあります")
-            destinations.add(key)
+        try:
+            validate_members(members)
+        except ValueError as error:
+            raise DownloadError(str(error)) from error
         directory.mkdir()
         for member in members:
             archive.extract(member, directory)
@@ -336,7 +326,7 @@ def execute(request):
             for d in results.diagnostics
         ]
         return {"rows": rows, "diagnostics": diagnostics}
-    if request["action"] != "download":
+    if request["action"] not in {"download", "inspect_archive", "download_selection"}:
         raise ValueError("Unknown worker action")
     resource = Resource.from_dict(request["resource"])
     plan = plan_for(resource, configure())
@@ -350,6 +340,59 @@ def execute(request):
             "plan": plan.to_dict(),
         }
     archive = plan.options.get("archive") == "zip" or plan.format == "zip"
+    if request["action"] == "inspect_archive":
+        if not archive:
+            raise DownloadError("ZIP配布だけが事前選択に対応しています")
+        try:
+            preview = inspect(plan.uri)
+        except RangeUnsupported as error:
+            preview = {"models": [], "size": error.size, "reason": str(error)}
+        except (ValueError, zipfile.BadZipFile) as error:
+            raise DownloadError(
+                "ZIPの候補一覧を確認できません。配布物を再確認してください"
+            ) from error
+        entry = plan.options.get("entry_point")
+        if entry:
+            preview["models"] = [
+                m
+                for m in preview["models"]
+                if entry == m["id"] or entry.startswith(m["id"] + "/")
+            ]
+        if not any(not m.get("reason") for m in preview["models"]):
+            preview["whole_required"] = True
+            preview.setdefault("reason", "このZIPはモデル単位の部分取得に未対応です")
+        return {
+            "archive_preview": preview,
+            "resource": resource.to_dict(),
+            "plan": plan.to_dict(),
+        }
+    if request["action"] == "download_selection":
+        if not archive:
+            raise DownloadError("ZIP配布だけが部分取得に対応しています")
+        directory = Path(request["target"]).parent / "contents"
+        try:
+            received = extract_selected(
+                plan.uri, request["snapshot"], request["models"], directory
+            )
+        except (ArchiveChanged, RangeUnsupported) as error:
+            raise DownloadError(str(error)) from error
+        except OSError as error:
+            if error.errno == errno.ENOSPC:
+                raise DownloadError("保存先の空き容量が不足しています") from error
+            raise
+        source = (
+            directory / plan.options["entry_point"]
+            if plan.options.get("entry_point")
+            else directory
+        )
+        return {
+            "path": str(source),
+            "resource": resource.to_dict(),
+            "plan": plan.to_dict(),
+            "selection_complete": True,
+            "received": received,
+            **discover_tiles(source),
+        }
     target = Path(request["target"]).with_suffix(
         ".zip" if archive else SUFFIXES.get(plan.format, "." + plan.format)
     )

@@ -3,8 +3,26 @@
 import json
 import math
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
+
+
+def validate_members(members):
+    destinations = set()
+    for member in members:
+        relative = PurePosixPath(member.filename)
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or "\\" in member.filename
+            or ":" in member.filename
+            or (member.external_attr >> 16) & 0o170000 == 0o120000
+        ):
+            raise ValueError("ZIPに安全に展開できないパスがあります")
+        key = str(relative).casefold()
+        if key in destinations:
+            raise ValueError("ZIPに重複するパスがあります")
+        destinations.add(key)
 
 
 def local_reference(base, uri, root):

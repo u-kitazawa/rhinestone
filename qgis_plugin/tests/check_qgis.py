@@ -120,16 +120,36 @@ def portable(uri, format, options=None):
 
 
 class FixtureServer:
-    def __init__(self, data):
+    def __init__(self, data, supports_ranges=True):
         self.hits = []
+        self.ranges = []
         hits = self.hits
+        ranges = self.ranges
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 hits.append(self.path)
-                self.send_response(200)
+                header = self.headers.get("Range")
+                ranges.append(header)
+                body = data
+                if header and supports_ranges:
+                    low, high = header[6:].split("-")
+                    start = int(low) if low else max(0, len(data) - int(high))
+                    end = min(int(high), len(data) - 1) if low else len(data) - 1
+                    body = data[start : end + 1]
+                    self.send_response(206)
+                    self.send_header(
+                        "Content-Range", f"bytes {start}-{end}/{len(data)}"
+                    )
+                else:
+                    self.send_response(200)
+                self.send_header("ETag", '"fixture-v1"')
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(data)
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
 
             def log_message(self, *args):
                 pass
@@ -202,6 +222,10 @@ class PluginTests(unittest.TestCase):
             ],
         )
         self.selection_patch.start()
+        self.confirmation_patch = patch.object(
+            self.plugin, "confirm_full_archive", return_value=True
+        )
+        self.confirmation_patch.start()
         self.plugin.show()
         self.iface.window.show()
         APP.processEvents()
@@ -210,6 +234,7 @@ class PluginTests(unittest.TestCase):
 
     def tearDown(self):
         self.selection_patch.stop()
+        self.confirmation_patch.stop()
         self.plugin.unload()
         self.iface.canvas.stopRendering()
         sip.delete(self.iface.bridge)
@@ -494,6 +519,7 @@ class PluginTests(unittest.TestCase):
 
     def add_distribution(self, data, format, options=None, expected_error=None):
         with FixtureServer(data) as server:
+            self.last_fixture_server = server
             uri = server.url + "/selected"
             selected = portable(uri, format, options)
             self.plugin.results.clear()
@@ -522,7 +548,10 @@ class PluginTests(unittest.TestCase):
             QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
             wait_until(lambda: not self.plugin.busy())
             self.assertIn(expected_error or "追加しました", self.plugin.status.text())
-            self.assertEqual(server.hits, ["/selected"])
+            self.assertTrue(server.hits)
+            self.assertTrue(all(hit == "/selected" for hit in server.hits))
+            if format != "zip" and not (options or {}).get("archive"):
+                self.assertEqual(server.hits, ["/selected"])
             layers = list(QgsProject.instance().mapLayers().values())
             if expected_error:
                 self.assertEqual(layers, [])
@@ -819,14 +848,70 @@ class PluginTests(unittest.TestCase):
         self.release_layers()
 
     def test_reported_plateau_zip_can_add_only_selected_mvt(self):
-        self.plugin.choose_layers.side_effect = lambda candidates: [
-            c for c in candidates if c["kind"] == "vector-tile"
-        ]
+        def choose_before_download(candidates):
+            self.assertFalse((self.plugin.pending_directory / "contents").exists())
+            self.assertTrue(all(r is not None for r in self.last_fixture_server.ranges))
+            self.assertTrue(all("compressed_size" in c for c in candidates))
+            return [c for c in candidates if c["kind"] == "vector-tile"]
+
+        self.plugin.choose_layers.side_effect = choose_before_download
         fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
         layers = self.add_distribution(fixture.read_bytes(), "zip")
         self.assertEqual(len(layers), 1)
         self.assertEqual(layers[0].type(), Qgis.LayerType.VectorTile)
+        self.assertEqual(self.plugin.choose_layers.call_count, 1)
+        self.plugin.confirm_full_archive.assert_not_called()
         self.release_layers()
+
+    def test_non_range_zip_requires_confirmation_and_decline_does_not_download(self):
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        self.plugin.confirm_full_archive.return_value = False
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            FixtureServer(fixture.read_bytes(), supports_ranges=False) as server,
+        ):
+            pending = Path(directory) / "download"
+            pending.mkdir()
+            self.plugin.pending_directory = pending
+            self.plugin.selected_title = "ZIP"
+            self.plugin.start(
+                {
+                    "action": "inspect_archive",
+                    "resource": portable(server.url, "zip"),
+                    "target": str(pending / "data"),
+                },
+                self.plugin.downloaded,
+            )
+            wait_until(lambda: not self.plugin.busy())
+            self.plugin.confirm_full_archive.assert_called_once()
+            self.assertEqual(server.ranges, ["bytes=-22"])
+            self.assertFalse(pending.exists())
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_pre_download_selection_cancel_does_not_fetch_model_bodies(self):
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        self.plugin.choose_layers.side_effect = lambda candidates: None
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            FixtureServer(fixture.read_bytes()) as server,
+        ):
+            pending = Path(directory) / "download"
+            pending.mkdir()
+            self.plugin.pending_directory = pending
+            self.plugin.selected_title = "ZIP"
+            self.plugin.start(
+                {
+                    "action": "inspect_archive",
+                    "resource": portable(server.url, "zip"),
+                    "target": str(pending / "data"),
+                },
+                self.plugin.downloaded,
+            )
+            wait_until(lambda: not self.plugin.busy())
+            self.assertFalse(pending.exists())
+            self.assertTrue(all(r is not None for r in server.ranges))
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+            self.assertIn("中止", self.plugin.status.text())
 
     def test_explicit_plateau_tileset_entry_point_opens_only_that_model(self):
         fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"

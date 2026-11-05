@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-qgis qgis-providers
       - name: Check Core worker boundary
-        run: uv run pytest qgis_plugin/tests/test_worker.py qgis_plugin/tests/test_archive_layers.py --no-cov
+        run: uv run pytest qgis_plugin/tests/test_worker.py qgis_plugin/tests/test_archive_layers.py qgis_plugin/tests/test_remote_zip.py --no-cov
       - name: Build dependency-complete ZIP
         run: /usr/bin/python3 scripts/build_qgis_plugin.py --output "$RUNNER_TEMP/rhinestone-qgis-linux-x86_64-py312.zip"
       - name: Exercise installed ZIP with real QGIS and no system Core
