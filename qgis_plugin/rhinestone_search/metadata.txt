@@ -1,0 +1,13 @@
+[general]
+name=Rhinestone Search
+description=地域・提供元・形式で公開データを検索し、詳細を確認して地図に追加
+about=Filtered search and metadata inspection using Rhinestone Core. OGR/GDAL vector, raster, table and ZIP deliveries.
+version=0.1.0
+qgisMinimumVersion=3.34
+qgisMaximumVersion=4.99
+author=Rhinestone contributors
+email=88121050+U-KITAZAWA@users.noreply.github.com
+repository=https://github.com/u-kitazawa/rhinestone
+tracker=https://github.com/u-kitazawa/rhinestone/issues/297
+experimental=True
+category=Vector

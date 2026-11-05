@@ -1,0 +1,1161 @@
+"""Run with QGIS's Python after extracting the distribution ZIP.
+
+RHINESTONE_PLUGIN_DIR points to extracted rhinestone_search. Optional --live uses
+search.ckan.jp and the selected publisher's real HTTP endpoint.
+"""
+
+import configparser
+import json
+import os
+import sys
+import tempfile
+import threading
+import time
+import unittest
+import zipfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from unittest.mock import patch
+
+from qgis.core import (
+    Qgis,
+    QgsApplication,
+    QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
+    QgsDataSourceUri,
+    QgsProject,
+    QgsRectangle,
+)
+from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas, QgsMapToolPan
+from qgis.PyQt import sip
+from qgis.PyQt.QtCore import QT_VERSION_STR, QEvent, QPoint, Qt, QTimer
+from qgis.PyQt.QtGui import QColor, QImage
+from qgis.PyQt.QtTest import QTest
+from qgis.PyQt.QtWidgets import QMainWindow
+
+ROOT = Path(os.environ["RHINESTONE_PLUGIN_DIR"])
+sys.path.insert(0, str(ROOT.parent))
+assert "rhinestone" not in sys.modules
+from rhinestone_search import classFactory  # noqa: E402
+from rhinestone_search import plugin as module  # noqa: E402
+from rhinestone_search.settings import (  # noqa: E402
+    KEY,
+    CredentialError,
+    CredentialStore,
+    SettingsDialog,
+)
+
+LIVE = "--live" in sys.argv
+sys.argv = [s for s in sys.argv if s != "--live"]
+AUTH_DIRECTORY = tempfile.TemporaryDirectory()
+os.environ["QGIS_AUTH_DB_DIR_PATH"] = AUTH_DIRECTORY.name
+APP = QgsApplication([], True)
+if os.environ.get("QGIS_PREFIX_PATH"):
+    APP.setPrefixPath(os.environ["QGIS_PREFIX_PATH"], True)
+APP.initQgis()
+print(
+    json.dumps(
+        {
+            "qgis": Qgis.QGIS_VERSION,
+            "qt": QT_VERSION_STR,
+            "python": sys.version.split()[0],
+        }
+    ),
+    flush=True,
+)
+if os.environ.get("RHINESTONE_QGIS_MAJOR"):
+    assert Qgis.QGIS_VERSION_INT // 10000 == int(os.environ["RHINESTONE_QGIS_MAJOR"])
+if os.environ.get("RHINESTONE_QGIS_VERSION"):
+    expected = tuple(
+        int(part) for part in os.environ["RHINESTONE_QGIS_VERSION"].split(".")
+    )
+    actual = (Qgis.QGIS_VERSION_INT // 10000, Qgis.QGIS_VERSION_INT // 100 % 100)
+    assert actual[: len(expected)] == expected, (Qgis.QGIS_VERSION, expected)
+if Qgis.QGIS_VERSION_INT >= 40000:
+    assert QT_VERSION_STR.startswith("6.")
+if os.environ.get("RHINESTONE_FONT"):
+    from qgis.PyQt.QtGui import QFont, QFontDatabase
+
+    QFontDatabase.addApplicationFont(os.environ["RHINESTONE_FONT"])
+    APP.setFont(QFont("Noto Sans CJK JP", 10))
+
+
+class Interface:
+    def __init__(self):
+        self.window = QMainWindow()
+        self.canvas = QgsMapCanvas()
+        self.canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
+        self.bridge = QgsLayerTreeMapCanvasBridge(
+            QgsProject.instance().layerTreeRoot(), self.canvas
+        )
+        self.window.setCentralWidget(self.canvas)
+        self.window.resize(1000, 650)
+
+    def mainWindow(self):
+        return self.window
+
+    def mapCanvas(self):
+        return self.canvas
+
+    def addPluginToMenu(self, *_args):
+        pass
+
+    def removePluginMenu(self, *_args):
+        pass
+
+    def addDockWidget(self, area, dock):
+        self.window.addDockWidget(area, dock)
+
+    def removeDockWidget(self, dock):
+        self.window.removeDockWidget(dock)
+
+
+def portable(uri, format, options=None):
+    value = json.loads(
+        (Path(__file__).parent / "fixtures/unsupported_resource.json").read_text()
+    )
+    value["uri"] = uri
+    value["format"] = format
+    value["access_plan"].update(uri=uri, format=format, options=options or {})
+    value["reference"]["parameters"].update(uri=uri, format=format)
+    return value
+
+
+class FixtureServer:
+    def __init__(self, data, supports_ranges=True):
+        self.hits = []
+        self.ranges = []
+        hits = self.hits
+        ranges = self.ranges
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                hits.append(self.path)
+                header = self.headers.get("Range")
+                ranges.append(header)
+                body = data
+                if header and supports_ranges:
+                    low, high = header[6:].split("-")
+                    start = int(low) if low else max(0, len(data) - int(high))
+                    end = min(int(high), len(data) - 1) if low else len(data) - 1
+                    body = data[start : end + 1]
+                    self.send_response(206)
+                    self.send_header(
+                        "Content-Range", f"bytes {start}-{end}/{len(data)}"
+                    )
+                else:
+                    self.send_response(200)
+                self.send_header("ETag", '"fixture-v1"')
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *args):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *args):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self.server.server_port}"
+
+
+def vector_fixture(path, driver, names=("points",)):
+    from osgeo import ogr, osr
+
+    data = ogr.GetDriverByName(driver).CreateDataSource(str(path))
+    crs = osr.SpatialReference()
+    crs.ImportFromEPSG(4326)
+    crs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    for name in names:
+        layer = data.CreateLayer(name, crs, ogr.wkbPoint)
+        layer.CreateField(ogr.FieldDefn("name", ogr.OFTString))
+        feature = ogr.Feature(layer.GetLayerDefn())
+        feature.SetField("name", "selected")
+        feature.SetGeometry(ogr.CreateGeometryFromWkt("POINT (139 36)"))
+        assert layer.CreateFeature(feature) == 0
+        feature = None
+        layer = None
+    data = None
+
+
+def row(uri, title="同じ名前", reason=None):
+    return {
+        "resource": {"uri": uri},
+        "title": title,
+        "provider": "test",
+        "format": "geojson",
+        "reason": reason,
+    }
+
+
+def wait_until(predicate, seconds=120):
+    deadline = time.monotonic() + seconds
+    while not predicate():
+        APP.processEvents()
+        if time.monotonic() > deadline:
+            raise AssertionError("QGIS operation timed out")
+        QTest.qWait(10)
+
+
+class PluginTests(unittest.TestCase):
+    def setUp(self):
+        self.iface = Interface()
+        self.plugin = classFactory(self.iface)
+        self.plugin.initGui()
+        self.selection_patch = patch.object(
+            self.plugin,
+            "choose_layers",
+            side_effect=lambda candidates: [
+                c for c in candidates if not c.get("reason")
+            ],
+        )
+        self.selection_patch.start()
+        self.confirmation_patch = patch.object(
+            self.plugin, "confirm_full_archive", return_value=True
+        )
+        self.confirmation_patch.start()
+        self.plugin.show()
+        self.iface.window.show()
+        APP.processEvents()
+        wait_until(lambda: not self.plugin.busy())
+        self.assertTrue(self.plugin.catalog_loaded, self.plugin.status.text())
+
+    def tearDown(self):
+        self.selection_patch.stop()
+        self.confirmation_patch.stop()
+        self.plugin.unload()
+        self.iface.canvas.stopRendering()
+        sip.delete(self.iface.bridge)
+        self.iface.canvas.setLayers([])
+        QgsProject.instance().removeAllMapLayers()
+        self.iface.window.close()
+        self.iface.window.deleteLater()
+        APP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        APP.processEvents()
+        del self.plugin, self.iface
+
+    def test_metadata_allows_qgis3_and_qgis4(self):
+        metadata = configparser.ConfigParser()
+        metadata.read(ROOT / "metadata.txt", encoding="utf-8")
+        self.assertEqual(metadata["general"]["qgisMinimumVersion"], "3.34")
+        self.assertEqual(metadata["general"]["qgisMaximumVersion"], "4.99")
+
+    def test_credentials_encrypt_reload_update_and_delete(self):
+        manager = QgsApplication.authManager()
+        self.assertFalse(manager.isDisabled())
+        self.assertTrue(manager.setMasterPassword("fixture-master-password", True))
+        store = CredentialStore(manager)
+        try:
+            self.assertEqual(store.load(), {})
+            store.save({"mlit-dpf": "fixture-key"})
+            self.assertNotIn("fixture-key", str(manager.authSetting(KEY, "", False)))
+            self.assertEqual(
+                CredentialStore(manager).load(), {"mlit-dpf": "fixture-key"}
+            )
+            dialog = SettingsDialog(self.plugin.dock, store)
+            dialog.show()
+            APP.processEvents()
+            self.assertEqual(dialog.secret.text(), "")
+            self.assertEqual(dialog.secret.echoMode(), dialog.secret.EchoMode.Password)
+            dialog.secret.setText("updated-key")
+            QTest.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+            self.assertEqual(store.load(), {"mlit-dpf": "updated-key"})
+            self.assertEqual(dialog.secret.text(), "")
+            QTest.mouseClick(dialog.delete_button, Qt.MouseButton.LeftButton)
+            self.assertEqual(store.load(), {})
+            dialog.reject()
+            self.assertEqual(dialog.values, {})
+            dialog.deleteLater()
+        finally:
+            manager.removeAuthSetting(KEY)
+
+    def test_credential_unlock_and_save_failures_are_visible(self):
+        from unittest.mock import Mock
+
+        manager = Mock()
+        manager.isDisabled.return_value = False
+        manager.setMasterPassword.return_value = False
+        store = CredentialStore(manager)
+        with self.assertRaises(CredentialError):
+            store.load()
+        manager.authSetting.assert_not_called()
+        manager.setMasterPassword.return_value = True
+        manager.storeAuthSetting.return_value = False
+        with self.assertRaises(CredentialError):
+            store.save({"mlit-dpf": "not-in-error"})
+        manager.authSetting.return_value = "invalid-json"
+        with self.assertRaises(CredentialError):
+            store.load()
+
+    def test_search_sends_only_selected_credentials_and_stops_on_unlock_failure(self):
+        for action in self.plugin.provider_actions:
+            action.setChecked(action.data() == "mlit-dpf")
+        with patch.object(module, "CredentialStore") as factory:
+            factory.return_value.load.return_value = {
+                "mlit-dpf": "fixture-key",
+                "unrelated": "other-key",
+            }
+            with patch.object(self.plugin, "start") as start:
+                self.plugin.search()
+                self.assertEqual(
+                    start.call_args.args[0]["credentials"], {"mlit-dpf": "fixture-key"}
+                )
+            factory.return_value.load.side_effect = CredentialError("解除できません")
+            with patch.object(self.plugin, "start") as start:
+                self.plugin.search()
+                start.assert_not_called()
+                self.assertIn("解除できません", self.plugin.status.text())
+        for action in self.plugin.provider_actions:
+            action.setChecked(action.data() == "gsi")
+        with patch.object(module, "CredentialStore") as factory:
+            with patch.object(self.plugin, "start") as start:
+                self.plugin.search()
+                self.assertEqual(start.call_args.args[0]["credentials"], {})
+            factory.assert_not_called()
+
+    def test_empty_failure_unknown_and_no_implicit_selection(self):
+        self.plugin.searched({"rows": [], "diagnostics": []})
+        self.assertEqual(self.plugin.status.text(), "結果0件")
+        diagnostics = [
+            {
+                "provider": "test",
+                "reason": "provider_failure",
+                "failure_type": "response",
+            }
+        ]
+        self.plugin.searched({"rows": [], "diagnostics": diagnostics})
+        self.assertIn("失敗", self.plugin.status.text())
+        self.plugin.searched(
+            {"rows": [row("a", reason="未対応")], "diagnostics": diagnostics}
+        )
+        self.assertIn("一部", self.plugin.status.text())
+        self.assertTrue(
+            self.plugin.results.item(0).flags() & Qt.ItemFlag.ItemIsSelectable
+        )
+        self.assertIsNone(self.plugin.results.currentItem())
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+        self.assertEqual(self.plugin.add_button.text(), "選択したデータを追加")
+        self.assertFalse(self.plugin.add_button.isEnabled())
+
+    def test_click_shows_details_and_add_button_uses_exact_resource(self):
+        self.plugin.searched({"rows": [row("first"), row("second")], "diagnostics": []})
+        captured = []
+        with patch.object(
+            self.plugin,
+            "start",
+            side_effect=lambda request, callback: captured.append(request),
+        ):
+            item = self.plugin.results.item(1)
+            QTest.mouseClick(
+                self.plugin.results.viewport(),
+                Qt.MouseButton.LeftButton,
+                pos=self.plugin.results.visualItemRect(item).center(),
+            )
+            self.assertEqual(captured, [])
+            self.assertIn("second", self.plugin.details.toPlainText())
+            self.assertTrue(self.plugin.add_button.isEnabled())
+            QTest.keyClick(self.plugin.results, Qt.Key.Key_Return)
+            self.assertEqual(captured, [])
+            QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0]["resource"]["uri"], "second")
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_search_controls_forward_parameters_and_provider_selection(self):
+        captured = []
+        for action in self.plugin.provider_actions:
+            action.setChecked(action.data() == "geospatial-jp")
+        for action in self.plugin.format_actions:
+            action.setChecked(action.data() in {"geojson", "gpkg"})
+        self.plugin.area.setText("横浜市")
+        self.plugin.start_time.setText("2026-01-01T00:00:00+09:00")
+        self.plugin.limit.setValue(7)
+        with patch.object(
+            self.plugin,
+            "start",
+            side_effect=lambda request, callback: captured.append(request),
+        ):
+            QTest.mouseClick(self.plugin.button, Qt.MouseButton.LeftButton)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(
+            captured[0]["conditions"],
+            {
+                "text": None,
+                "area": "横浜市",
+                "bbox": None,
+                "time": ["2026-01-01T00:00:00+09:00", None],
+                "format": ["geojson", "gpkg"],
+                "limit": 7,
+                "providers": ["geospatial-jp"],
+            },
+        )
+
+    def test_empty_providers_and_conflicting_spatial_conditions_are_visible(self):
+        with patch.object(self.plugin, "start") as start:
+            for action in self.plugin.provider_actions:
+                action.setChecked(False)
+            self.plugin.search()
+            self.assertIn("提供元", self.plugin.status.text())
+            self.plugin.provider_actions[0].setChecked(True)
+            self.plugin.area.setText("横浜市")
+            self.plugin.bbox.setText("138,35,140,37")
+            self.plugin.search()
+            self.assertIn("どちらか", self.plugin.status.text())
+            start.assert_not_called()
+
+    def test_draw_bbox_transforms_reverse_drag_and_forwards_search(self):
+        canvas = self.iface.canvas
+        wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
+        projected = QgsCoordinateReferenceSystem("EPSG:3857")
+        canvas.setDestinationCrs(projected)
+        forward = QgsCoordinateTransform(wgs84, projected, QgsProject.instance())
+        canvas.setExtent(forward.transformBoundingBox(QgsRectangle(138, 35, 140, 37)))
+        canvas.refresh()
+        APP.processEvents()
+        previous = QgsMapToolPan(canvas)
+        canvas.setMapTool(previous)
+        self.plugin.area.setText("横浜市")
+        start = QPoint(canvas.width() * 3 // 4, canvas.height() * 3 // 4)
+        end = QPoint(canvas.width() // 4, canvas.height() // 4)
+        screen_to_map = canvas.getCoordinateTransform()
+        rectangle = QgsRectangle(
+            screen_to_map.toMapCoordinates(start.x(), start.y()),
+            screen_to_map.toMapCoordinates(end.x(), end.y()),
+        )
+        backward = QgsCoordinateTransform(projected, wgs84, QgsProject.instance())
+        expected = backward.transformBoundingBox(rectangle)
+        captured = []
+        with patch.object(
+            self.plugin,
+            "start",
+            side_effect=lambda request, _: captured.append(request),
+        ):
+            self.plugin.draw_bbox_button.click()
+            tool = self.plugin.bbox_tool
+            self.assertIs(canvas.mapTool(), tool)
+            self.assertTrue(self.plugin.draw_bbox_button.isChecked())
+            QTest.mousePress(canvas.viewport(), Qt.MouseButton.LeftButton, pos=start)
+            QTest.mouseMove(canvas.viewport(), end)
+            QTest.mouseRelease(canvas.viewport(), Qt.MouseButton.LeftButton, pos=end)
+            self.assertEqual(captured, [])  # Drawing never starts a search.
+            actual = [float(v) for v in self.plugin.bbox.text().split(",")]
+            for value, wanted in zip(
+                actual,
+                (
+                    expected.xMinimum(),
+                    expected.yMinimum(),
+                    expected.xMaximum(),
+                    expected.yMaximum(),
+                ),
+            ):
+                self.assertAlmostEqual(value, wanted, places=7)
+            self.assertEqual(self.plugin.area.text(), "")
+            self.assertIsNone(self.plugin.bbox_tool)
+            self.assertIs(canvas.mapTool(), previous)
+            self.assertFalse(self.plugin.draw_bbox_button.isChecked())
+            QTest.mouseClick(self.plugin.button, Qt.MouseButton.LeftButton)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0]["conditions"]["bbox"], actual)
+        self.assertIsNone(captured[0]["conditions"]["area"])
+
+    def test_bbox_cancel_and_tool_switch_preserve_spatial_inputs(self):
+        canvas = self.iface.canvas
+        previous = QgsMapToolPan(canvas)
+        canvas.setMapTool(previous)
+        self.plugin.bbox.setText("138,35,140,37")
+        self.plugin.area.setText("横浜市")
+        for operation in ("escape", "right", "button", "switch"):
+            with self.subTest(operation=operation):
+                self.plugin.bbox.setText("138,35,140,37")
+                self.plugin.area.setText("横浜市")
+                self.plugin.draw_bbox_button.click()
+                QTest.mousePress(
+                    canvas.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(40, 40)
+                )
+                QTest.mouseMove(canvas.viewport(), QPoint(100, 100))
+                other = None
+                if operation == "escape":
+                    QTest.keyClick(canvas, Qt.Key.Key_Escape)
+                elif operation == "right":
+                    QTest.mouseClick(canvas.viewport(), Qt.MouseButton.RightButton)
+                elif operation == "button":
+                    self.plugin.draw_bbox_button.click()
+                else:
+                    other = QgsMapToolPan(canvas)
+                    canvas.setMapTool(other)
+                QTest.mouseRelease(
+                    canvas.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(100, 100)
+                )
+                self.assertIsNone(self.plugin.bbox_tool)
+                self.assertIs(canvas.mapTool(), other or previous)
+                self.assertFalse(self.plugin.draw_bbox_button.isChecked())
+                self.assertEqual(self.plugin.bbox.text(), "138,35,140,37")
+                self.assertEqual(self.plugin.area.text(), "横浜市")
+                canvas.setMapTool(previous)
+
+    def test_empty_bbox_drag_does_not_replace_existing_range(self):
+        canvas = self.iface.canvas
+        self.plugin.bbox.setText("138,35,140,37")
+        self.plugin.draw_bbox_button.click()
+        QTest.mouseClick(
+            canvas.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(40, 40)
+        )
+        self.assertEqual(self.plugin.bbox.text(), "138,35,140,37")
+        self.assertIsNotNone(self.plugin.bbox_tool)
+        self.assertIn("幅と高さ", self.plugin.status.text())
+        self.plugin.stop_bbox_selection()
+
+    def test_current_extent_and_invalid_transform_preserve_inputs(self):
+        canvas = self.iface.canvas
+        canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        canvas.setExtent(QgsRectangle(138, 35, 140, 37))
+        self.plugin.draw_bbox_button.click()
+        self.plugin.extent_button.click()
+        self.assertIsNone(self.plugin.bbox_tool)
+        actual = [float(v) for v in self.plugin.bbox.text().split(",")]
+        extent = canvas.extent()
+        self.assertEqual(
+            actual,
+            [
+                extent.xMinimum(),
+                extent.yMinimum(),
+                extent.xMaximum(),
+                extent.yMaximum(),
+            ],
+        )
+        self.plugin.area.setText("横浜市")
+        original = self.plugin.bbox.text()
+        canvas.setDestinationCrs(QgsCoordinateReferenceSystem())
+        self.plugin.apply_bbox(QgsRectangle(138, 35, 140, 37))
+        self.assertIn("設定できません", self.plugin.status.text())
+        self.assertEqual(self.plugin.bbox.text(), original)
+        self.assertEqual(self.plugin.area.text(), "横浜市")
+        canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        self.plugin.apply_bbox(QgsRectangle(-200, -100, 200, 100))
+        self.assertIn("設定できません", self.plugin.status.text())
+        self.assertEqual(self.plugin.bbox.text(), original)
+
+    def test_unload_restores_map_tool_during_bbox_selection(self):
+        canvas = self.iface.canvas
+        previous = QgsMapToolPan(canvas)
+        canvas.setMapTool(previous)
+        self.plugin.draw_bbox_button.click()
+        self.assertIsNotNone(self.plugin.bbox_tool)
+        self.plugin.unload()
+        self.assertIs(canvas.mapTool(), previous)
+        self.assertIsNone(self.plugin.bbox_tool)
+        # tearDown owns the normal unload path; do not remove UI objects twice.
+        self.plugin.unload = lambda: None
+
+    def test_unsupported_details_are_readable_and_result_filter_does_not_add(self):
+        selected = row("https://example.org/park", title="公園")
+        selected["resource"]["metadata"] = {
+            "description": "公園の位置と設備",
+            "publisher": "横浜市",
+            "license": "CC BY 4.0",
+            "updated_at": "2026-01-01",
+        }
+        unsupported = row(
+            "https://example.org/unknown", title="未対応データ", reason="形式が不明です"
+        )
+        self.plugin.searched({"rows": [selected, unsupported], "diagnostics": []})
+        self.plugin.results.setCurrentRow(0)
+        text = self.plugin.details.toPlainText()
+        for expected in ("公園の位置と設備", "横浜市", "CC BY 4.0", "2026-01-01"):
+            self.assertIn(expected, text)
+        self.plugin.results.setCurrentRow(1)
+        self.assertIn("形式が不明", self.plugin.details.toPlainText())
+        self.assertFalse(self.plugin.add_button.isEnabled())
+        self.plugin.result_filter.setText("設備")
+        self.assertFalse(self.plugin.results.item(0).isHidden())
+        self.assertTrue(self.plugin.results.item(1).isHidden())
+        self.assertIsNone(self.plugin.selected_row)
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_invalid_layer_is_not_added(self):
+        self.plugin.search_status = "1件"
+        self.plugin.selected_title = "invalid"
+        self.plugin.downloaded({"path": "/not/a/file", "resource": {}, "plan": {}})
+        wait_until(lambda: not self.plugin.busy())
+        self.assertIn("追加失敗", self.plugin.status.text())
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_local_geojson_layer_crs_and_unload_lifetime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "data.geojson"
+            target.write_text(
+                json.dumps(
+                    {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "properties": {},
+                                "geometry": {"type": "Point", "coordinates": [139, 36]},
+                            },
+                            {
+                                "type": "Feature",
+                                "properties": {},
+                                "geometry": {"type": "Point", "coordinates": [140, 37]},
+                            },
+                        ],
+                    }
+                )
+            )
+            self.plugin.search_status = "2件"
+            self.plugin.selected_title = "parks"
+            self.plugin.downloaded(
+                {"path": str(target), "resource": {"uri": "selected"}, "plan": {}}
+            )
+            wait_until(lambda: not self.plugin.busy())
+            layers = list(QgsProject.instance().mapLayers().values())
+            self.assertEqual(len(layers), 1)
+            self.assertEqual(layers[0].featureCount(), 2)
+            self.assertEqual(
+                json.loads(layers[0].customProperty("rhinestone/resource"))["uri"],
+                "selected",
+            )
+            APP.processEvents()
+            self.assertEqual(len(self.iface.canvas.layers()), 1)
+            self.assertLess(self.iface.canvas.extent().width(), 2_000_000)
+            self.assertTrue(target.exists())
+            # Windows cannot delete an OGR source while its layer owns the file.
+            # Production caches outlive layers; release the test layer first.
+            self.iface.canvas.setLayers([])
+            QgsProject.instance().removeAllMapLayers()
+            APP.processEvents()
+
+    def test_missing_bundle_is_visible(self):
+        with patch.object(
+            module.Path, "read_text", side_effect=FileNotFoundError("bundle")
+        ):
+            self.plugin.query.setText("公園")
+            QTest.keyClick(self.plugin.query, Qt.Key.Key_Return)
+        self.assertIn("起動できません", self.plugin.status.text())
+        self.assertIsNone(self.plugin.process)
+
+    def test_bundled_core_runs_outside_qgis_without_site_packages(self):
+        fixture = Path(__file__).parent / "fixtures/unsupported_resource.json"
+        self.plugin.start(
+            {
+                "action": "download",
+                "resource": json.loads(fixture.read_text()),
+                "target": "/never-written.geojson",
+            },
+            self.fail,
+        )
+        wait_until(lambda: not self.plugin.busy())
+        self.assertIn("未対応", self.plugin.status.text())
+        self.assertIn("追加失敗", self.plugin.status.text())
+        self.assertNotIn("rhinestone", sys.modules)
+
+    def add_distribution(self, data, format, options=None, expected_error=None):
+        with FixtureServer(data) as server:
+            self.last_fixture_server = server
+            uri = server.url + "/selected"
+            selected = portable(uri, format, options)
+            self.plugin.results.clear()
+            self.plugin.searched(
+                {
+                    "rows": [
+                        {
+                            "resource": selected,
+                            "title": "選択した配布",
+                            "provider": "fixture",
+                            "format": format,
+                            "reason": None,
+                        }
+                    ],
+                    "diagnostics": [],
+                }
+            )
+            item = self.plugin.results.item(0)
+            QTest.mouseClick(
+                self.plugin.results.viewport(),
+                Qt.MouseButton.LeftButton,
+                pos=self.plugin.results.visualItemRect(item).center(),
+            )
+            self.assertFalse(self.plugin.busy())
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+            QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
+            wait_until(lambda: not self.plugin.busy())
+            self.assertIn(expected_error or "追加しました", self.plugin.status.text())
+            self.assertTrue(server.hits)
+            self.assertTrue(all(hit == "/selected" for hit in server.hits))
+            if format != "zip" and not (options or {}).get("archive"):
+                self.assertEqual(server.hits, ["/selected"])
+            layers = list(QgsProject.instance().mapLayers().values())
+            if expected_error:
+                self.assertEqual(layers, [])
+            for layer in layers:
+                self.assertTrue(layer.isValid())
+                self.assertEqual(
+                    json.loads(layer.customProperty("rhinestone/resource")), selected
+                )
+            return layers
+
+    def release_layers(self):
+        self.iface.canvas.setLayers([])
+        QgsProject.instance().removeAllMapLayers()
+        APP.processEvents()
+
+    def test_vector_drivers_through_selected_resource_and_worker(self):
+        cases = [
+            ("GPKG", "gpkg", ".gpkg"),
+            ("FlatGeobuf", "flatgeobuf", ".fgb"),
+            ("GML", "gml", ".gml"),
+            ("KML", "kml", ".kml"),
+            ("GPX", "gpx", ".gpx"),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            for driver, format, suffix in cases:
+                with self.subTest(driver=driver):
+                    path = Path(directory) / ("data" + suffix)
+                    vector_fixture(path, driver)
+                    layers = self.add_distribution(path.read_bytes(), format)
+                    self.assertGreaterEqual(len(layers), 1)
+                    self.assertEqual(sum(layer.featureCount() for layer in layers), 1)
+                    self.release_layers()
+
+    def test_multiple_gpkg_layers_and_explicit_layer_selector(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "multi.gpkg"
+            vector_fixture(path, "GPKG", ("first", "second"))
+            layers = self.add_distribution(path.read_bytes(), "gpkg")
+            self.assertEqual(len(layers), 2)
+            self.assertEqual(
+                {layer.name() for layer in layers},
+                {"選択した配布 — first", "選択した配布 — second"},
+            )
+            self.release_layers()
+            layers = self.add_distribution(
+                path.read_bytes(), "gpkg", {"layer": "second"}
+            )
+            self.assertEqual(len(layers), 1)
+            self.assertIn("second", layers[0].source())
+            self.release_layers()
+
+    def test_zip_shapefile_nested_sidecars_and_multiple_datasets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shape = root / "日本語"
+            shape.mkdir()
+            vector_fixture(shape / "points.shp", "ESRI Shapefile")
+            vector_fixture(root / "second.geojson", "GeoJSON")
+            archive_path = root / "data.zip"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                for path in [*shape.iterdir(), root / "second.geojson"]:
+                    archive.write(path, path.relative_to(root))
+            layers = self.add_distribution(archive_path.read_bytes(), "zip")
+            self.assertEqual(len(layers), 2)  # .dbf is a sidecar, not a third table.
+            self.assertTrue(all(layer.featureCount() == 1 for layer in layers))
+            self.release_layers()
+            layers = self.add_distribution(
+                archive_path.read_bytes(),
+                "shapefile",
+                {"archive": "zip", "entry_point": "日本語/points.shp"},
+            )
+            self.assertEqual(len(layers), 1)
+            self.release_layers()
+
+    def test_csv_is_a_table_without_inventing_geometry(self):
+        layers = self.add_distribution(b"name,x,y\npark,139,36\n", "csv")
+        self.assertEqual(len(layers), 1)
+        self.assertEqual(layers[0].featureCount(), 1)
+        self.assertFalse(layers[0].isSpatial())
+        self.release_layers()
+
+    def test_raster_and_netcdf_drivers(self):
+        from osgeo import gdal, osr
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "raster.tif"
+            dataset = gdal.GetDriverByName("GTiff").Create(
+                str(path), 2, 2, 1, gdal.GDT_Byte
+            )
+            dataset.SetGeoTransform((139, 0.01, 0, 36, 0, -0.01))
+            crs = osr.SpatialReference()
+            crs.ImportFromEPSG(4326)
+            dataset.SetProjection(crs.ExportToWkt())
+            dataset.GetRasterBand(1).Fill(42)
+            dataset = None
+            cog = Path(directory) / "cloud.tif"
+            dataset = gdal.Translate(str(cog), str(path), format="COG")
+            dataset = None
+            for format, fixture in (("geotiff", path), ("cog", cog)):
+                layers = self.add_distribution(fixture.read_bytes(), format)
+                self.assertEqual(len(layers), 1)
+                self.assertEqual(layers[0].type(), Qgis.LayerType.Raster)
+                self.assertEqual(layers[0].width(), 2)
+                self.release_layers()
+            nc = Path(directory) / "data.nc"
+            if gdal.GetDriverByName("netCDF") is not None:
+                dataset = gdal.Translate(str(nc), str(path), format="netCDF")
+                dataset = None
+                layers = self.add_distribution(nc.read_bytes(), "netcdf")
+                self.assertTrue(layers)
+                self.assertTrue(
+                    all(layer.type() == Qgis.LayerType.Raster for layer in layers)
+                )
+                self.release_layers()
+
+    def test_generic_xyz_template_preserves_query_and_renders_visible_tiles(self):
+        from qgis.core import QgsMapRendererSequentialJob, QgsRectangle
+        from qgis.PyQt.QtCore import QSize
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tile.png"
+            image = QImage(256, 256, QImage.Format.Format_RGB32)
+            image.fill(QColor("#12ab34"))
+            image.save(str(path))
+            with FixtureServer(path.read_bytes()) as server:
+                template = server.url + "/{z}/{x}/{y}.png?key=a&other=b"
+                selected = portable(template, "unknown")
+                self.plugin.selected_title = "Other publisher XYZ"
+                self.plugin.search_status = "1件"
+                self.plugin.start(
+                    {
+                        "action": "download",
+                        "resource": selected,
+                        "target": str(Path(directory) / "unused"),
+                    },
+                    self.plugin.downloaded,
+                )
+                wait_until(lambda: not self.plugin.busy())
+                layers = list(QgsProject.instance().mapLayers().values())
+                self.assertEqual(len(layers), 1, self.plugin.status.text())
+                layer = layers[0]
+                parsed = QgsDataSourceUri()
+                parsed.setEncodedUri(layer.source())
+                self.assertEqual(parsed.param("url"), template)
+                self.assertFalse((Path(directory) / "unused").exists())
+                settings = self.iface.canvas.mapSettings()
+                settings.setLayers([layer])
+                settings.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
+                settings.setExtent(QgsRectangle(-100000, -100000, 100000, 100000))
+                settings.setOutputSize(QSize(256, 256))
+                job = QgsMapRendererSequentialJob(settings)
+                job.start()
+                wait_until(lambda: not job.isActive())
+                self.assertTrue(server.hits)
+                self.assertEqual(
+                    job.renderedImage().pixelColor(128, 128).name(), "#12ab34"
+                )
+                self.assertLess(len(server.hits), 30)
+                self.release_layers()
+
+    def test_mvt_xyz_layer_and_zoom_limits(self):
+        from qgis.core import QgsMapRendererSequentialJob, QgsRectangle
+        from qgis.PyQt.QtCore import QSize
+
+        # Minimal valid MVT: one point in the center of a 4096-unit tile.
+        feature = b"\x08\x01\x18\x01\x22\x05\x09\x80\x20\x80\x20"
+        layer_data = (
+            b"\x0a\x06points\x12"
+            + bytes([len(feature)])
+            + feature
+            + b"\x28\x80\x20\x78\x02"
+        )
+        mvt = b"\x1a" + bytes([len(layer_data)]) + layer_data
+        with FixtureServer(mvt) as server:
+            self.plugin.selected_title = "Vector XYZ"
+            self.plugin.search_status = "1件"
+            tile = {
+                "scheme": "xyz",
+                "url": server.url + "/{z}/{x}/{y}.pbf",
+                "format": "pbf",
+                "min_zoom": 2,
+                "max_zoom": 14,
+                "attribution": "Publisher",
+            }
+            self.plugin.downloaded(
+                {"tile": tile, "resource": {}, "plan": {"options": {"tile": tile}}}
+            )
+            layers = list(QgsProject.instance().mapLayers().values())
+            self.assertEqual(len(layers), 1, self.plugin.status.text())
+            self.assertEqual(layers[0].type(), Qgis.LayerType.VectorTile)
+            self.assertEqual(layers[0].sourceMinZoom(), 2)
+            self.assertEqual(layers[0].sourceMaxZoom(), 14)
+            self.assertEqual(layers[0].metadata().rights(), ["Publisher"])
+            self.assertTrue(layers[0].renderer().styles())
+            # This fixture's point is centered in every requested tile.
+            settings = self.iface.canvas.mapSettings()
+            settings.setLayers(layers)
+            settings.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:3857"))
+            settings.setExtent(QgsRectangle(4_000_000, 4_000_000, 6_000_000, 6_000_000))
+            settings.setOutputSize(QSize(256, 256))
+            job = QgsMapRendererSequentialJob(settings)
+            job.start()
+            wait_until(lambda: not job.isActive())
+            self.assertTrue(server.hits)
+            self.release_layers()
+
+    def test_archive_selection_is_explicit_and_cancel_adds_nothing(self):
+        from qgis.PyQt.QtWidgets import (
+            QApplication,
+            QDialog,
+            QDialogButtonBox,
+            QListWidget,
+        )
+
+        candidates = [
+            {"name": "first", "kind": "file"},
+            {"name": "second", "kind": "scene"},
+        ]
+
+        def select_second():
+            dialog = QApplication.activeModalWidget()
+            self.assertIsInstance(dialog, QDialog)
+            listing = dialog.findChild(QListWidget)
+            buttons = dialog.findChild(QDialogButtonBox)
+            confirm = buttons.button(QDialogButtonBox.StandardButton.Ok)
+            self.assertFalse(confirm.isEnabled())
+            listing.item(1).setCheckState(Qt.CheckState.Checked)
+            self.assertTrue(confirm.isEnabled())
+            confirm.click()
+
+        QTimer.singleShot(0, select_second)
+        self.assertEqual(
+            module.RhinestonePlugin.choose_layers(self.plugin, candidates),
+            [candidates[1]],
+        )
+        QTimer.singleShot(0, lambda: QApplication.activeModalWidget().reject())
+        self.assertIsNone(
+            module.RhinestonePlugin.choose_layers(self.plugin, candidates)
+        )
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_reported_plateau_zip_adds_and_renders_scene_and_local_mvt(self):
+        from qgis.core import QgsMapRendererSequentialJob, QgsRectangle
+        from qgis.PyQt.QtCore import QSize
+
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        layers = self.add_distribution(fixture.read_bytes(), "zip")
+        self.assertEqual(len(layers), 2 if Qgis.QGIS_VERSION_INT >= 34400 else 1)
+        self.assertEqual(
+            {layer.type() for layer in layers},
+            {Qgis.LayerType.TiledScene, Qgis.LayerType.VectorTile}
+            if Qgis.QGIS_VERSION_INT >= 34400
+            else {Qgis.LayerType.VectorTile},
+        )
+        for layer in layers:
+            bounds = json.loads(layer.customProperty("rhinestone/extent_wgs84"))
+            settings = self.iface.canvas.mapSettings()
+            settings.setLayers([layer])
+            settings.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+            extent = QgsRectangle(*bounds)
+            extent.scale(1.05)
+            settings.setExtent(extent)
+            settings.setOutputSize(QSize(512, 512))
+            settings.setBackgroundColor(QColor("white"))
+            job = QgsMapRendererSequentialJob(settings)
+            job.start()
+            wait_until(lambda: not job.isActive())
+            image = job.renderedImage()
+            pixels = sum(
+                image.pixelColor(x, y) != QColor("white")
+                for x in range(512)
+                for y in range(512)
+            )
+            self.assertGreater(
+                pixels, 0, f"blank render: {layer.name()} / {job.errors()}"
+            )
+            self.assertFalse(job.errors(), str(job.errors()))
+            if os.environ.get("RHINESTONE_PLATEAU_SCREENSHOTS"):
+                image.save(
+                    str(
+                        Path(os.environ["RHINESTONE_PLATEAU_SCREENSHOTS"])
+                        / f"plateau-{layer.type().name}.png"
+                    )
+                )
+            print(
+                json.dumps(
+                    {
+                        "plateau_layer": layer.name(),
+                        "type": layer.type().name,
+                        "painted_pixels": pixels,
+                    }
+                )
+            )
+        self.release_layers()
+
+    def test_reported_plateau_zip_can_add_only_selected_mvt(self):
+        def choose_before_download(candidates):
+            self.assertFalse((self.plugin.pending_directory / "contents").exists())
+            self.assertTrue(all(r is not None for r in self.last_fixture_server.ranges))
+            self.assertTrue(all("compressed_size" in c for c in candidates))
+            return [c for c in candidates if c["kind"] == "vector-tile"]
+
+        self.plugin.choose_layers.side_effect = choose_before_download
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        layers = self.add_distribution(fixture.read_bytes(), "zip")
+        self.assertEqual(len(layers), 1)
+        self.assertEqual(layers[0].type(), Qgis.LayerType.VectorTile)
+        self.assertEqual(self.plugin.choose_layers.call_count, 1)
+        self.plugin.confirm_full_archive.assert_not_called()
+        self.release_layers()
+
+    def test_non_range_zip_requires_confirmation_and_decline_does_not_download(self):
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        self.plugin.confirm_full_archive.return_value = False
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            FixtureServer(fixture.read_bytes(), supports_ranges=False) as server,
+        ):
+            pending = Path(directory) / "download"
+            pending.mkdir()
+            self.plugin.pending_directory = pending
+            self.plugin.selected_title = "ZIP"
+            self.plugin.start(
+                {
+                    "action": "inspect_archive",
+                    "resource": portable(server.url, "zip"),
+                    "target": str(pending / "data"),
+                },
+                self.plugin.downloaded,
+            )
+            wait_until(lambda: not self.plugin.busy())
+            self.plugin.confirm_full_archive.assert_called_once()
+            self.assertEqual(server.ranges, ["bytes=-22"])
+            self.assertFalse(pending.exists())
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+
+    def test_pre_download_selection_cancel_does_not_fetch_model_bodies(self):
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        self.plugin.choose_layers.side_effect = lambda candidates: None
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            FixtureServer(fixture.read_bytes()) as server,
+        ):
+            pending = Path(directory) / "download"
+            pending.mkdir()
+            self.plugin.pending_directory = pending
+            self.plugin.selected_title = "ZIP"
+            self.plugin.start(
+                {
+                    "action": "inspect_archive",
+                    "resource": portable(server.url, "zip"),
+                    "target": str(pending / "data"),
+                },
+                self.plugin.downloaded,
+            )
+            wait_until(lambda: not self.plugin.busy())
+            self.assertFalse(pending.exists())
+            self.assertTrue(all(r is not None for r in server.ranges))
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+            self.assertIn("中止", self.plugin.status.text())
+
+    def test_explicit_plateau_tileset_entry_point_opens_only_that_model(self):
+        fixture = Path(__file__).parent / "fixtures/plateau-saitama-2023-sample.zip"
+        layers = self.add_distribution(
+            fixture.read_bytes(),
+            "zip",
+            {
+                "archive": "zip",
+                "entry_point": "11100_saitama-shi_city_2023_citygml_1_op_tran_3dtiles_lod3/tileset.json",
+            },
+            expected_error="3.44" if Qgis.QGIS_VERSION_INT < 34400 else None,
+        )
+        if Qgis.QGIS_VERSION_INT < 34400:
+            return
+        self.assertEqual(len(layers), 1)
+        self.assertEqual(layers[0].type(), Qgis.LayerType.TiledScene)
+        self.release_layers()
+
+    def test_cancel_archive_selection_cleans_pending_download(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pending = Path(directory) / "download"
+            pending.mkdir()
+            (pending / "partial").touch()
+            self.plugin.pending_directory = pending
+            self.plugin.sublayers = []
+            self.plugin.choose_layers.side_effect = lambda candidates: None
+            self.plugin.add_sublayers(
+                {
+                    "plan": {},
+                    "tile_layers": [
+                        {"kind": "scene", "name": "first"},
+                        {"kind": "vector-tile", "name": "second"},
+                    ],
+                }
+            )
+            self.assertFalse(pending.exists())
+            self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+            self.assertIn("中止", self.plugin.status.text())
+
+    @unittest.skipUnless(LIVE, "explicit --live required")
+    def test_real_search_click_download_ogr(self):
+        beats = []
+        timer = QTimer()
+        timer.timeout.connect(lambda: beats.append(time.monotonic()))
+        timer.start(20)
+        self.plugin.query.setText("那須塩原市 公園")
+        QTest.keyClick(self.plugin.query, Qt.Key.Key_Return)
+        self.assertIn("検索中", self.plugin.status.text())
+        wait_until(lambda: not self.plugin.busy())
+        self.assertGreater(len(beats), 2)
+        candidates = [
+            self.plugin.results.item(i)
+            for i in range(self.plugin.results.count())
+            if self.plugin.results.item(i).flags() & Qt.ItemFlag.ItemIsSelectable
+        ]
+        self.assertGreaterEqual(len(candidates), 2, self.plugin.status.text())
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+        selected = candidates[1]
+        expected = selected.data(Qt.ItemDataRole.UserRole)["resource"]["uri"]
+        QTest.mouseClick(
+            self.plugin.results.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=self.plugin.results.visualItemRect(selected).center(),
+        )
+        self.assertEqual(len(QgsProject.instance().mapLayers()), 0)
+        QTest.mouseClick(self.plugin.add_button, Qt.MouseButton.LeftButton)
+        wait_until(lambda: not self.plugin.busy())
+        layers = list(QgsProject.instance().mapLayers().values())
+        self.assertEqual(len(layers), 1, self.plugin.status.text())
+        layer = layers[0]
+        self.assertTrue(layer.isValid())
+        self.assertGreater(layer.featureCount(), 0)
+        self.assertEqual(
+            json.loads(layer.customProperty("rhinestone/resource"))["uri"], expected
+        )
+        print(
+            json.dumps(
+                {
+                    "source": expected,
+                    "features": layer.featureCount(),
+                    "crs": layer.crs().authid(),
+                    "heartbeat": len(beats),
+                },
+                ensure_ascii=False,
+            )
+        )
+        QTest.qWait(500)
+        APP.processEvents()
+        self.assertEqual(len(self.iface.canvas.layers()), 1)
+        self.assertLess(self.iface.canvas.extent().width(), 2_000_000)
+        if os.environ.get("RHINESTONE_SCREENSHOT"):
+            self.iface.window.grab().save(os.environ["RHINESTONE_SCREENSHOT"])
+        timer.stop()
+
+
+if __name__ == "__main__":
+    program = unittest.main(verbosity=2, exit=False)
+    APP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    APP.processEvents()
+    APP.exitQgis()
+    sys.exit(not program.result.wasSuccessful())

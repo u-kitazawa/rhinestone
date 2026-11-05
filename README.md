@@ -150,3 +150,5 @@ bash scripts/check.sh
 ```
 
 MIT Licenseです。
+
+QGISから検索して地図へ追加する実験版は[QGIS Searchプラグイン](qgis_plugin/README.md)を参照してください。
