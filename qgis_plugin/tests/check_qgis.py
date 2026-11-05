@@ -21,12 +21,14 @@ from qgis.core import (
     Qgis,
     QgsApplication,
     QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
     QgsDataSourceUri,
     QgsProject,
+    QgsRectangle,
 )
-from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas
+from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas, QgsMapToolPan
 from qgis.PyQt import sip
-from qgis.PyQt.QtCore import QT_VERSION_STR, QEvent, Qt, QTimer
+from qgis.PyQt.QtCore import QT_VERSION_STR, QEvent, QPoint, Qt, QTimer
 from qgis.PyQt.QtGui import QColor, QImage
 from qgis.PyQt.QtTest import QTest
 from qgis.PyQt.QtWidgets import QMainWindow
@@ -414,6 +416,143 @@ class PluginTests(unittest.TestCase):
             self.plugin.search()
             self.assertIn("どちらか", self.plugin.status.text())
             start.assert_not_called()
+
+    def test_draw_bbox_transforms_reverse_drag_and_forwards_search(self):
+        canvas = self.iface.canvas
+        wgs84 = QgsCoordinateReferenceSystem("EPSG:4326")
+        projected = QgsCoordinateReferenceSystem("EPSG:3857")
+        canvas.setDestinationCrs(projected)
+        forward = QgsCoordinateTransform(wgs84, projected, QgsProject.instance())
+        canvas.setExtent(forward.transformBoundingBox(QgsRectangle(138, 35, 140, 37)))
+        canvas.refresh()
+        APP.processEvents()
+        previous = QgsMapToolPan(canvas)
+        canvas.setMapTool(previous)
+        self.plugin.area.setText("横浜市")
+        start = QPoint(canvas.width() * 3 // 4, canvas.height() * 3 // 4)
+        end = QPoint(canvas.width() // 4, canvas.height() // 4)
+        screen_to_map = canvas.getCoordinateTransform()
+        rectangle = QgsRectangle(
+            screen_to_map.toMapCoordinates(start.x(), start.y()),
+            screen_to_map.toMapCoordinates(end.x(), end.y()),
+        )
+        backward = QgsCoordinateTransform(projected, wgs84, QgsProject.instance())
+        expected = backward.transformBoundingBox(rectangle)
+        captured = []
+        with patch.object(
+            self.plugin,
+            "start",
+            side_effect=lambda request, _: captured.append(request),
+        ):
+            self.plugin.draw_bbox_button.click()
+            tool = self.plugin.bbox_tool
+            self.assertIs(canvas.mapTool(), tool)
+            self.assertTrue(self.plugin.draw_bbox_button.isChecked())
+            QTest.mousePress(canvas.viewport(), Qt.MouseButton.LeftButton, pos=start)
+            QTest.mouseMove(canvas.viewport(), end)
+            QTest.mouseRelease(canvas.viewport(), Qt.MouseButton.LeftButton, pos=end)
+            self.assertEqual(captured, [])  # Drawing never starts a search.
+            actual = [float(v) for v in self.plugin.bbox.text().split(",")]
+            for value, wanted in zip(
+                actual,
+                (
+                    expected.xMinimum(),
+                    expected.yMinimum(),
+                    expected.xMaximum(),
+                    expected.yMaximum(),
+                ),
+            ):
+                self.assertAlmostEqual(value, wanted, places=7)
+            self.assertEqual(self.plugin.area.text(), "")
+            self.assertIsNone(self.plugin.bbox_tool)
+            self.assertIs(canvas.mapTool(), previous)
+            self.assertFalse(self.plugin.draw_bbox_button.isChecked())
+            QTest.mouseClick(self.plugin.button, Qt.MouseButton.LeftButton)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0]["conditions"]["bbox"], actual)
+        self.assertIsNone(captured[0]["conditions"]["area"])
+
+    def test_bbox_cancel_and_tool_switch_preserve_spatial_inputs(self):
+        canvas = self.iface.canvas
+        previous = QgsMapToolPan(canvas)
+        canvas.setMapTool(previous)
+        self.plugin.bbox.setText("138,35,140,37")
+        self.plugin.area.setText("横浜市")
+        for operation in ("escape", "right", "button", "switch"):
+            with self.subTest(operation=operation):
+                self.plugin.draw_bbox_button.click()
+                QTest.mousePress(
+                    canvas.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(40, 40)
+                )
+                QTest.mouseMove(canvas.viewport(), QPoint(100, 100))
+                other = None
+                if operation == "escape":
+                    QTest.keyClick(canvas, Qt.Key.Key_Escape)
+                elif operation == "right":
+                    QTest.mouseClick(canvas.viewport(), Qt.MouseButton.RightButton)
+                elif operation == "button":
+                    self.plugin.draw_bbox_button.click()
+                else:
+                    other = QgsMapToolPan(canvas)
+                    canvas.setMapTool(other)
+                QTest.mouseRelease(
+                    canvas.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(100, 100)
+                )
+                self.assertIsNone(self.plugin.bbox_tool)
+                self.assertIs(canvas.mapTool(), other or previous)
+                self.assertFalse(self.plugin.draw_bbox_button.isChecked())
+                self.assertEqual(self.plugin.bbox.text(), "138,35,140,37")
+                self.assertEqual(self.plugin.area.text(), "横浜市")
+                canvas.setMapTool(previous)
+
+    def test_empty_bbox_drag_does_not_replace_existing_range(self):
+        canvas = self.iface.canvas
+        self.plugin.bbox.setText("138,35,140,37")
+        self.plugin.draw_bbox_button.click()
+        QTest.mouseClick(
+            canvas.viewport(), Qt.MouseButton.LeftButton, pos=QPoint(40, 40)
+        )
+        self.assertEqual(self.plugin.bbox.text(), "138,35,140,37")
+        self.assertIsNotNone(self.plugin.bbox_tool)
+        self.assertIn("幅と高さ", self.plugin.status.text())
+        self.plugin.stop_bbox_selection()
+
+    def test_current_extent_and_invalid_transform_preserve_inputs(self):
+        canvas = self.iface.canvas
+        canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        canvas.setExtent(QgsRectangle(138, 35, 140, 37))
+        self.plugin.draw_bbox_button.click()
+        self.plugin.extent_button.click()
+        self.assertIsNone(self.plugin.bbox_tool)
+        actual = [float(v) for v in self.plugin.bbox.text().split(",")]
+        extent = canvas.extent()
+        self.assertEqual(
+            actual,
+            [extent.xMinimum(), extent.yMinimum(), extent.xMaximum(), extent.yMaximum()],
+        )
+        self.plugin.area.setText("横浜市")
+        original = self.plugin.bbox.text()
+        canvas.setDestinationCrs(QgsCoordinateReferenceSystem())
+        self.plugin.apply_bbox(QgsRectangle(138, 35, 140, 37))
+        self.assertIn("設定できません", self.plugin.status.text())
+        self.assertEqual(self.plugin.bbox.text(), original)
+        self.assertEqual(self.plugin.area.text(), "横浜市")
+        canvas.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        self.plugin.apply_bbox(QgsRectangle(-200, -100, 200, 100))
+        self.assertIn("設定できません", self.plugin.status.text())
+        self.assertEqual(self.plugin.bbox.text(), original)
+
+    def test_unload_restores_map_tool_during_bbox_selection(self):
+        canvas = self.iface.canvas
+        previous = QgsMapToolPan(canvas)
+        canvas.setMapTool(previous)
+        self.plugin.draw_bbox_button.click()
+        self.assertIsNotNone(self.plugin.bbox_tool)
+        self.plugin.unload()
+        self.assertIs(canvas.mapTool(), previous)
+        self.assertIsNone(self.plugin.bbox_tool)
+        # tearDown owns the normal unload path; do not remove UI objects twice.
+        self.plugin.unload = lambda: None
 
     def test_unsupported_details_are_readable_and_result_filter_does_not_add(self):
         selected = row("https://example.org/park", title="公園")
@@ -1013,3 +1152,4 @@ if __name__ == "__main__":
     APP.processEvents()
     APP.exitQgis()
     sys.exit(not program.result.wasSuccessful())
+

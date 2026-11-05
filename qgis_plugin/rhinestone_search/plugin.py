@@ -1,6 +1,7 @@
 """Minimal Qt UI. All network I/O and Core work happen outside the GUI process."""
 
 import json
+import math
 import os
 import platform
 import re
@@ -12,7 +13,9 @@ from pathlib import Path
 from qgis.core import (
     Qgis,
     QgsApplication,
+    QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
+    QgsCsException,
     QgsDataSourceUri,
     QgsProject,
     QgsProviderRegistry,
@@ -47,6 +50,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from .map_extent import BboxMapTool
 from .settings import CredentialError, CredentialStore, SettingsDialog
 
 
@@ -108,6 +112,8 @@ class RhinestonePlugin:
         self.diagnostic_text = ""
         self.provider_credentials = {}
         self.archive_pending = False
+        self.bbox_tool = None
+        self.bbox_previous_tool = None
 
     def initGui(self):
         self.action = QAction("Rhinestone Search", self.iface.mainWindow())
@@ -162,9 +168,16 @@ class RhinestonePlugin:
             for control in (self.start_time, self.end_time):
                 control.setPlaceholderText("2026-01-01T00:00:00+09:00（省略可）")
             self.bbox = QLineEdit()
+            self.bbox.setAccessibleName("検索範囲（西・南・東・北）")
             self.bbox.setPlaceholderText("西,南,東,北（経度・緯度）。areaと併用不可")
             self.extent_button = QPushButton("現在の表示範囲を使う")
             self.extent_button.clicked.connect(self.use_extent)
+            self.draw_bbox_button = QPushButton("地図上で範囲を指定")
+            self.draw_bbox_button.setCheckable(True)
+            self.draw_bbox_button.setToolTip(
+                "地図をドラッグして矩形を指定。Esc・右クリック・再クリックで中止"
+            )
+            self.draw_bbox_button.clicked.connect(self.select_bbox)
             self.limit = QSpinBox()
             self.limit.setRange(0, 1000)
             self.limit.setSpecialValueText("提供元の既定")
@@ -173,6 +186,7 @@ class RhinestonePlugin:
             extra.addRow("終了日時", self.end_time)
             extra.addRow("範囲（bbox）", self.bbox)
             extra.addRow(self.extent_button)
+            extra.addRow(self.draw_bbox_button)
             extra.addRow("件数（提供元ごと）", self.limit)
             form.addRow(self.advanced)
             self.advanced.hide()
@@ -284,30 +298,91 @@ class RhinestonePlugin:
         self.formats_button.setToolTip("\n".join(formats))
 
     def use_extent(self):
+        self.stop_bbox_selection()
         canvas = self.iface.mapCanvas()
-        from qgis.core import QgsCoordinateReferenceSystem
+        self.apply_bbox(canvas.extent())
 
-        transform = QgsCoordinateTransform(
-            canvas.mapSettings().destinationCrs(),
-            QgsCoordinateReferenceSystem("EPSG:4326"),
-            QgsProject.instance(),
+    def select_bbox(self):
+        if self.busy():
+            return
+        if self.bbox_tool is not None:
+            self.stop_bbox_selection()
+            return
+        canvas = self.iface.mapCanvas()
+        self.bbox_previous_tool = canvas.mapTool()
+        tool = BboxMapTool(canvas)
+        self.bbox_tool = tool
+        tool.extentChanged.connect(self.bbox_selected)
+        tool.cancelled.connect(self.stop_bbox_selection)
+        tool.deactivated.connect(lambda: self.bbox_deactivated(tool))
+        canvas.setMapTool(tool)
+        self.draw_bbox_button.setChecked(True)
+        canvas.setFocus()
+        self.status.setText(
+            "地図をドラッグして検索範囲を囲んでください（Esc・右クリックで中止）"
         )
-        extent = transform.transformBoundingBox(canvas.extent())
-        self.bbox.setText(
-            ", ".join(
-                str(v)
-                for v in (
-                    extent.xMinimum(),
-                    extent.yMinimum(),
-                    extent.xMaximum(),
-                    extent.yMaximum(),
-                )
+
+    def bbox_selected(self, extent):
+        if extent.isEmpty():
+            self.status.setText("幅と高さのある範囲をドラッグしてください")
+            return
+        self.stop_bbox_selection()
+        self.apply_bbox(extent)
+
+    def bbox_deactivated(self, tool):
+        if self.bbox_tool is tool:
+            self.bbox_tool = None
+            self.bbox_previous_tool = None
+            self.draw_bbox_button.setChecked(False)
+            if not self.closed and not self.busy():
+                self.status.setText("地図上での範囲指定を中止しました")
+        tool.deleteLater()
+
+    def stop_bbox_selection(self):
+        tool = self.bbox_tool
+        if tool is None:
+            return
+        canvas = self.iface.mapCanvas()
+        previous = self.bbox_previous_tool
+        if canvas.mapTool() is tool:
+            canvas.unsetMapTool(tool)
+            if previous is not None and not sip.isdeleted(previous):
+                canvas.setMapTool(previous)
+
+    def apply_bbox(self, rectangle):
+        source_crs = self.iface.mapCanvas().mapSettings().destinationCrs()
+        try:
+            if not source_crs.isValid():
+                raise ValueError("地図の座標系が未設定です")
+            transform = QgsCoordinateTransform(
+                source_crs,
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                QgsProject.instance(),
             )
-        )
+            extent = transform.transformBoundingBox(rectangle)
+            values = (
+                extent.xMinimum(),
+                extent.yMinimum(),
+                extent.xMaximum(),
+                extent.yMaximum(),
+            )
+            if (
+                not all(math.isfinite(v) for v in values)
+                or not -180 <= values[0] < values[2] <= 180
+                or not -90 <= values[1] < values[3] <= 90
+            ):
+                raise ValueError("有効な経度・緯度の範囲を指定してください")
+        except (QgsCsException, ValueError) as error:
+            self.status.setText(f"範囲を設定できません: {error}")
+            return
+        self.bbox.setText(", ".join(str(v) for v in values))
         self.area.clear()
+        self.status.setText("検索範囲を設定しました。検索ボタンで検索してください")
 
     def update_controls(self):
         available = not self.busy()
+        if not available:
+            self.stop_bbox_selection()
         self.search_controls.setEnabled(available)
         self.results.setEnabled(available)
         self.result_filter.setEnabled(available)
@@ -327,6 +402,7 @@ class RhinestonePlugin:
     def search(self):
         if self.busy():
             return
+        self.stop_bbox_selection()
         providers = [a.data() for a in self.provider_actions if a.isChecked()]
         if not providers:
             self.status.setText("提供元を1件以上選択してください")
@@ -1024,6 +1100,7 @@ class RhinestonePlugin:
 
     def unload(self):
         self.closed = True
+        self.stop_bbox_selection()
         if self.process is not None:
             self.process.kill()
             self.process.waitForFinished(1000)
@@ -1037,3 +1114,4 @@ class RhinestonePlugin:
             self.iface.removeDockWidget(self.dock)
             self.dock.deleteLater()
         self.action.deleteLater()
+
