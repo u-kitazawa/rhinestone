@@ -1,5 +1,6 @@
 """One request per isolated Python process; no QGIS or private Core APIs."""
 
+import errno
 import json
 import os
 import re
@@ -29,8 +30,6 @@ from rhinestone.catalogs import BUILTIN
 from rhinestone.errors import ConfigValidationError
 from rhinestone.models import SearchQuery  # noqa: E402
 
-MAX_BYTES = 512 * 1024 * 1024
-MAX_UNPACKED_BYTES = 1024 * 1024 * 1024
 MAX_MEMBERS = 4096
 SUFFIXES = {
     "geojson": ".geojson",
@@ -170,11 +169,8 @@ def unpack(path, plan):
     directory = path.parent / "contents"
     with zipfile.ZipFile(path) as archive:
         members = archive.infolist()
-        if (
-            len(members) > MAX_MEMBERS
-            or sum(m.file_size for m in members) > MAX_UNPACKED_BYTES
-        ):
-            raise DownloadError("ZIPの展開上限（1 GiB・4096ファイル）を超えています")
+        if len(members) > MAX_MEMBERS:
+            raise DownloadError("ZIPのエントリー上限（4096件）を超えています")
         destinations = set()
         for member in members:
             relative = PurePosixPath(member.filename)
@@ -346,17 +342,15 @@ def execute(request):
         with urlopen(plan.uri, timeout=30) as response, partial.open("xb") as stream:
             if urlsplit(response.url).scheme not in {"http", "https"}:
                 raise ValueError("Unsupported redirect")
-            total = 0
             while chunk := response.read(65536):
-                total += len(chunk)
-                if total > MAX_BYTES:
-                    raise DownloadError("512 MiBを超える配布は未対応")
                 stream.write(chunk)
         os.replace(partial, target)
         source = unpack(target, plan) if archive else target
-    except Exception:
+    except Exception as error:
         target.unlink(missing_ok=True)
         shutil.rmtree(target.parent / "contents", ignore_errors=True)
+        if isinstance(error, OSError) and error.errno == errno.ENOSPC:
+            raise DownloadError("保存先の空き容量が不足しています") from error
         raise
     finally:
         partial.unlink(missing_ok=True)

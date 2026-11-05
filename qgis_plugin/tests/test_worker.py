@@ -218,17 +218,74 @@ def test_bad_archive_is_cleaned(monkeypatch, tmp_path, entries, options):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_unpacked_size_limit(monkeypatch, tmp_path):
-    monkeypatch.setattr(worker, "MAX_UNPACKED_BYTES", 3)
-    with pytest.raises(worker.DownloadError, match="展開上限"):
-        download_archive(monkeypatch, tmp_path, {"a": b"1234"})
+def test_large_zip_manifest_is_not_rejected_by_size(monkeypatch, tmp_path):
+    original = zipfile.ZipFile.infolist
+
+    def large_manifest(archive):
+        from copy import copy
+
+        members = [copy(member) for member in original(archive)]
+        for member in members:
+            member.file_size = 1024 * 1024 * 1024 + 1
+        return members
+
+    # Keep extraction real while simulating a large central-directory size.
+    extract = zipfile.ZipFile.extract
+    monkeypatch.setattr(zipfile.ZipFile, "infolist", large_manifest)
+    monkeypatch.setattr(
+        zipfile.ZipFile,
+        "extract",
+        lambda archive, member, path: extract(archive, member.filename, path),
+    )
+    result = download_archive(monkeypatch, tmp_path, {"a.csv": b"a,b\n1,2"})
+    assert (Path(result["path"]) / "a.csv").read_bytes() == b"a,b\n1,2"
+
+
+def test_download_over_previous_limit_reads_bounded_chunks(monkeypatch, tmp_path):
+    class LargeResponse(Response):
+        remaining = 513 * 1024 * 1024
+
+        def read(self, size=-1):
+            assert 0 < size <= 65536
+            count = min(size, self.remaining)
+            self.remaining -= count
+            return b"x" * count
+
+    monkeypatch.setattr(worker, "urlopen", lambda *a, **kw: LargeResponse())
+    result = worker.execute(
+        {
+            "action": "download",
+            "resource": resource().to_dict(),
+            "target": str(tmp_path / "data.geojson"),
+        }
+    )
+    assert Path(result["path"]).stat().st_size == 513 * 1024 * 1024
+    assert not list(tmp_path.glob("*.part"))
+
+
+def test_zip_entry_limit_cleans_download(monkeypatch, tmp_path):
+    monkeypatch.setattr(worker, "MAX_MEMBERS", 1)
+    with pytest.raises(worker.DownloadError, match="エントリー上限"):
+        download_archive(monkeypatch, tmp_path, {"a": b"a", "b": b"b"})
     assert list(tmp_path.iterdir()) == []
 
 
-def test_size_limit_cleans_partial_file(monkeypatch, tmp_path):
-    monkeypatch.setattr(worker, "MAX_BYTES", 3)
+def test_disk_full_during_download_cleans_partial_file(monkeypatch, tmp_path):
+    original = Path.open
+
+    class FullDisk(io.BytesIO):
+        def write(self, data):
+            raise OSError(28, "No space left on device")
+
+    def open_file(path, mode="r", *args, **kwargs):
+        if mode == "xb":
+            path.touch()
+            return FullDisk()
+        return original(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", open_file)
     monkeypatch.setattr(worker, "urlopen", lambda *a, **kw: Response(b"1234"))
-    with pytest.raises(ValueError, match="512 MiB"):
+    with pytest.raises(worker.DownloadError, match="空き容量"):
         worker.execute(
             {
                 "action": "download",
@@ -236,6 +293,17 @@ def test_size_limit_cleans_partial_file(monkeypatch, tmp_path):
                 "target": str(tmp_path / "data.geojson"),
             }
         )
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_disk_full_during_extraction_cleans_all_files(monkeypatch, tmp_path):
+    def extract(archive, member, directory):
+        (directory / member.filename).write_bytes(b"partial")
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(zipfile.ZipFile, "extract", extract)
+    with pytest.raises(worker.DownloadError, match="空き容量"):
+        download_archive(monkeypatch, tmp_path, {"a.csv": b"a,b"})
     assert list(tmp_path.iterdir()) == []
 
 
