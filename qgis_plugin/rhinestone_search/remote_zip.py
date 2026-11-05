@@ -177,7 +177,7 @@ def inventory(archive, reader, only=None):
         try:
             with archive.open(info) as stream:
                 document = json.load(stream)
-        except (UnicodeError, ValueError):
+        except (UnicodeError, json.JSONDecodeError):
             continue
         finally:
             reader.member_end = None

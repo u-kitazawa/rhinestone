@@ -144,6 +144,20 @@ def test_changed_archive_is_rejected_before_extracting(tmp_path):
         assert not (tmp_path / "selected").exists()
 
 
+def test_change_during_declaration_read_aborts_preview(monkeypatch):
+    original = remote_zip.RangeFile.fetch
+    with Server(fixture_bytes()) as server:
+
+        def changed_fetch(reader, byte_range):
+            if reader.member_end is not None:
+                server.etag = '"version-two"'
+            return original(reader, byte_range)
+
+        monkeypatch.setattr(remote_zip.RangeFile, "fetch", changed_fetch)
+        with pytest.raises(remote_zip.ArchiveChanged):
+            remote_zip.inspect(server.url)
+
+
 def test_changed_directory_is_rejected_even_if_validator_is_reused(tmp_path):
     with Server(fixture_bytes()) as server:
         preview = remote_zip.inspect(server.url)
