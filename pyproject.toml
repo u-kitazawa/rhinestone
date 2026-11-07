@@ -35,7 +35,7 @@ Documentation = "https://github.com/u-kitazawa/rhinestone/tree/main/docs"
 
 [dependency-groups]
 dev = [
-    "rdflib>=6,<7",
+    "rdflib>=6,<8",
     "pyright>=1.1.339,<1.1.390",
     "pytest>=9.0.3,<10",
     "pytest-cov>=4.1,<8",
